@@ -36,7 +36,8 @@ adle_core/
   infrastructure/ database, ORM models, migrate (with backup), asset store, ids
   migrations/     Alembic revisions (shipped inside the package)
   ingestion/      type detection, parsers, chunking, the parser worker process
-  generation/     provider credentials, scene policy (model client, quota: M5)
+  generation/     provider credentials and client, quota rules (pure), scene policy,
+                  drafts (what a model writes -> Lesson IR), prompts, data/ (generated files)
   orchestration/ audio/   (M5–M6)
   tools/          developer entry points (contract export)
 tests/unit/        fast, isolated
@@ -92,13 +93,25 @@ everything and decides nothing.
 - **Sample content** is addressed by key in templates (`@concept:weighted_sum`) and installed
   through the ordinary services. Scene files there are excluded from ruff and mypy: they are
   Wanim scenes, not service code.
+- **A model request goes through `ModelGateway.complete`**, from inside a job. Nothing else
+  may call `ChatClient`. Do not add sampling parameters, retries, or a second request "to fix
+  it": the number of requests per job is fixed in `application/generation.py` (ADR-012).
+- **A model writes a draft; the core writes the lesson.** Identifiers, objective links,
+  citations, and durations are assigned in `generation/drafts.py`. A citation is a number the
+  prompt offered, or it is dropped.
+- **Text from the learner or their documents goes in a `_block(...)`** in `prompts.py`. Never
+  concatenate it into an instruction.
+- `adle_core/generation/data/` is generated (`npm run wanim-names`, `npm run scene-guide`) and
+  excluded from ruff. Do not edit it by hand.
 - **No score leaves the core.** `api/schemas.py` must not expose the tracing estimate or anything
   that reads like a percentage. The interface gets a state, a label, and what is missing.
 - **Text shown to the learner about their knowledge** is written in `learner_model/tracing.py`
   and `mastery.py`. Keep it free of blame and of numbers that imply precision.
 - Tests that need "a later version of the schema" use `use_migrations_with_extra_revision` in
   `test_database.py`, which chains a test-only revision after the real newest one.
-- No provider call in any test. Use the fake server fixture (added with the client in M5).
+- No provider call in any test. The `provider` fixture (`tests/support/model.py`) answers in
+  process; queue answers, failures, or nonsense with `provider.queue(...)`. The test container
+  lifts the per-minute limit so a test with five requests does not wait a minute.
 
 ## Style
 

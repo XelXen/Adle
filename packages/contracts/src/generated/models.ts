@@ -225,6 +225,13 @@ export interface Job {
   progress_total: number;
   result: unknown;
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+  subject_id: string | null;
+}
+export interface JobList {
+  jobs: Job[];
+}
+export interface LatestJob {
+  job: Job | null;
 }
 export interface LearnerPreferences {
   captions: boolean;
@@ -478,6 +485,17 @@ export interface PrerequisitesUpdate {
    */
   prerequisites: PrerequisiteInput[];
 }
+/**
+ * Which concepts of a proposal to add, by their position in it.
+ *
+ */
+export interface ProposalAcceptance {
+  /**
+   * @minItems 1
+   * @maxItems 40
+   */
+  selected: number[];
+}
 export interface ProviderCredential {
   api_key: string;
 }
@@ -487,6 +505,19 @@ export interface ProviderStatus {
   key_configured: boolean;
   model: string;
   provider_id: string;
+}
+/**
+ * Adle's own count of today's requests. An estimate: the provider keeps the real one.
+ *
+ */
+export interface ProviderUsage {
+  requests_last_minute: number;
+  requests_per_day: number;
+  requests_per_minute: number;
+  requests_today: number;
+  resets_at: string;
+  tokens_per_day: number;
+  tokens_today: number;
 }
 export interface SearchHit {
   chunk_id: number;

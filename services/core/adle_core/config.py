@@ -7,8 +7,10 @@ need them. Nothing in the domain layer reads environment variables directly.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from adle_core.generation.provider import ProviderConfig, ProviderConfigError
 
 DATA_DIR_ENV = "ADLE_DATA_DIR"
 
@@ -26,6 +28,8 @@ class Settings:
     """
 
     data_dir: Path
+    #: Where model requests go. The documented provider unless a developer set another.
+    provider: ProviderConfig = field(default_factory=ProviderConfig)
 
     @property
     def db_path(self) -> Path:
@@ -57,4 +61,8 @@ class Settings:
             raise SettingsError(
                 f"No data directory configured. Pass --data-dir or set {DATA_DIR_ENV}."
             )
-        return cls(data_dir=Path(raw).expanduser().resolve())
+        try:
+            provider = ProviderConfig.from_environment(os.environ)
+        except ProviderConfigError as error:
+            raise SettingsError(str(error)) from error
+        return cls(data_dir=Path(raw).expanduser().resolve(), provider=provider)

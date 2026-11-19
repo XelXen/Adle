@@ -75,25 +75,27 @@ Built and tested but not yet reachable from the interface: `restore_database`
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the M4 commit.
+`node scripts/check.mjs --e2e` on the tree that became the brand and M5 core commits. After
+that run the core gained two routes and a few tests (ruff, mypy, pytest re-run: PASS).
 
 | Gate | Status | Detail |
 |---|---|---|
 | Contracts up to date (API and Lesson IR schema) | PASS | `npm run contracts:check` |
 | Scene name allowlist up to date | PASS | `npm run wanim-names:check` |
+| Packaged scene guide up to date | PASS | `npm run scene-guide:check` |
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 304 tests, 15 files |
+| Vitest | PASS | 319 tests, 15 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 70 source files |
-| pytest | PASS | 665 tests |
+| mypy (strict) | PASS | 78 source files |
+| pytest | PASS | 821 tests |
 | Playwright + Electron (E2E) | PASS | 45 tests, none flaky |
 | `npm audit` (all dependencies) | NOT RUN | Last run before KaTeX was added; run again before release |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
 | Packaged build | BLOCKED | No packager chosen yet (M8) |
 | macOS / Linux | NOT RUN | Developed on Windows only |
-| Real AI provider | NOT RUN | No request has been sent yet; tests never will |
+| Real AI provider | BLOCKED | The provider fails every request upstream (HTTP 500 `do_request_failed`); see "Where M5 stands" |
 
 ## Launch reliability (ADR-008)
 
@@ -149,26 +151,51 @@ investigated, not ignored.
   cue to leave a live page). Finer synchronisation needs Wanim's slides mode
   (`self.next_slide()`), which is documented upstream and not yet tested here.
 
+## Where M5 stands
+
+**Committed: the core half** (ADR-012). `generation/provider.py` (one streamed chat completion;
+no redirects, no environment proxies, no sampling parameters), `generation/quota.py` (pure
+rules), `application/model_gateway.py` (quota, one request in flight, usage rows written
+before sending, one retry after a 429), `generation/drafts.py` (the draft a model writes,
+compiled deterministically into the Lesson IR), `generation/prompts.py`, the packaged scene
+guide, `application/generation.py` (curriculum proposal and lesson as jobs), migration `0004`,
+routes `generation.*`, `jobs.list_active`, `provider.usage`.
+
+**Real provider: BLOCKED at the provider.** On 2026-11-19 the owner's key was valid
+(`GET /v1/models` lists exactly `coding-kimi-k3-free`) but all nine completion requests failed
+with HTTP 500 `do_request_failed` (`Post "https://***/coding/v1/messages": Bad Request`): on both
+the OpenAI-compatible and Anthropic-compatible endpoints, with the smallest possible body. That
+is AIHubMix's call to its upstream failing, not the request. The prompts are therefore
+unchecked against the real model. To retry, from the repository root:
+
+```bash
+uv run --directory services/core python <scratch>/tools/real_smoke.py <key file> <output dir> probe
+```
+
+(The script lives outside the repository on purpose; it is described in ADR-012. Nine of the
+day's 80 budgeted requests were used.)
+
+Also committed: `e2e/support/fake-provider.ts`, the local server end-to-end tests will point the
+app at. No spec uses it yet.
+
+**In the working tree, not committed:** the start of the interface for generation
+(`renderer/src/lib/generation.ts`, `use-course-jobs.ts`, `GenerationStatus`,
+`ProposalDialog`, usage in Settings). None of it is wired into a screen yet.
+
 ## Next actions (M5), in order
 
-1. **Provider client and quota** (started, not yet wired in): `generation/quota.py` (pure rules,
-   tested) and `generation/provider.py` (one streamed chat completion, tested against a mock
-   transport). Still to do: a `model_usage` table and migration, a gateway that applies the
-   quota, waits or refuses, records usage, and retries once after a 429; `provider.usage`.
-2. **Generation as jobs:** a forgiving draft format the model writes, compiled deterministically
-   into the Lesson IR (ids, objective links, citations only from passages that were supplied);
-   one request for the lesson, one per scene (at most one retry when the static policy rejects
-   a file, and a segment that loses its scene becomes an explanation); a curriculum proposal the
-   learner reviews before anything is added.
-3. **Fake provider** for unit tests (mock transport) and for E2E (a local HTTP server, reached
-   through `ADLE_PROVIDER_BASE_URL`). No test calls the real provider.
-4. **Interface:** propose a curriculum; create a lesson with progress and cancel; usage estimate
-   in Settings; clear states for no key, rate limited, quota used up, and failure.
-5. **Narration aloud** through the operating system's voices (Web Speech API, local voices only)
+1. **Interface for generation:** "Suggest concepts with AI" on the curriculum (progress, cancel,
+   review dialog, a proposal that finished unseen can still be reviewed or set aside);
+   "Create a lesson" on a concept (progress, cancel, what is sent, the notes a job returns);
+   clear states for no key, rate limited, used up for today, provider failure.
+2. **End-to-end tests against the fake provider** (`ADLE_PROVIDER_BASE_URL` pointing at
+   `e2e/support/fake-provider.ts`): propose and accept; create and play a generated lesson;
+   failure and retry; cancel; no key.
+3. **Narration aloud** through the operating system's voices (Web Speech API, local voices only)
    behind the existing `Narrator` interface, with word highlighting only where the engine
-   reports word boundaries, a voice and volume setting, and the silent captions as fallback.
-6. **A few real requests** (owner's key, read from outside the repository, never typed into the
-   app by an agent) to check the prompts against the real model. Record usage here.
+   reports word boundaries, a voice and volume setting, and silent captions as the fallback.
+4. **Retry the real provider** when it answers again, and adjust the prompts to what the model
+   actually writes.
 
 Then M6 (misconceptions, next-step policy with reasons, review queue, progress screen,
 rubric-bounded grading), M7 (the rest of the sample course, export / restore / delete, polish),

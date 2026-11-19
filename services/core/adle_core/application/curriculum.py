@@ -128,6 +128,18 @@ class CurriculumRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class ProposedConceptInput:
+    """One concept of a proposal the learner accepted."""
+
+    title: str
+    summary: str
+    objectives: Sequence[str]
+    #: (position in the same list, reason). Only earlier positions are honoured.
+    needs: Sequence[tuple[int, str]]
+    section_ids: Sequence[str]
+
+
+@dataclass(frozen=True, slots=True)
 class OutlineCandidateRecord:
     section_id: str
     title: str
@@ -483,6 +495,80 @@ class CurriculumService:
                     existing[kept_id].position = index
                     existing[kept_id].statement = statement
             return self._load(session, get_course_or_404(session, concept.course_id))
+
+    def add_proposed(
+        self, course_id: str, proposed: Sequence[ProposedConceptInput]
+    ) -> CurriculumRecord:
+        """Add concepts a model proposed and the learner chose, with their links.
+
+        All of them are added, or none. A concept may only need one that comes
+        earlier in ``proposed``, so adding them cannot create a loop. A title the
+        course already has is skipped (and so is any need that pointed at it); a
+        section that is no longer in the course is simply not linked.
+        """
+        with self._database.session() as session:
+            course = get_course_or_404(session, course_id)
+            count = self._count(session, course_id)
+            taken = {
+                _tidy(title).casefold()
+                for title in session.scalars(
+                    select(Concept.title).where(Concept.course_id == course_id)
+                )
+            }
+            sections = set(
+                session.scalars(
+                    select(SourceSection.id)
+                    .join(Source, Source.id == SourceSection.source_id)
+                    .where(Source.course_id == course_id)
+                )
+            )
+            created: dict[int, Concept] = {}
+            for index, item in enumerate(proposed):
+                title = _tidy(item.title)[:200]
+                if not title or title.casefold() in taken:
+                    continue
+                if count >= MAX_CONCEPTS:
+                    raise ValidationFailedError(
+                        f"A course can have at most {MAX_CONCEPTS} concepts."
+                    )
+                taken.add(title.casefold())
+                statements = [_tidy(text) for text in item.objectives if _tidy(text)]
+                concept = self._add_concept(
+                    session,
+                    course_id,
+                    count,
+                    title=title,
+                    summary=item.summary.strip(),
+                    objectives=statements[:MAX_OBJECTIVES],
+                    origin="model",
+                )
+                count += 1
+                session.flush()
+                linked: set[str] = set()
+                for needed, reason in item.needs:
+                    earlier = created.get(needed)
+                    if earlier is None or needed >= index or earlier.id in linked:
+                        continue
+                    if len(linked) >= MAX_PREREQUISITES:
+                        break
+                    linked.add(earlier.id)
+                    session.add(
+                        ConceptEdge(
+                            concept_id=concept.id,
+                            prerequisite_id=earlier.id,
+                            reason=_tidy(reason),
+                            origin="model",
+                        )
+                    )
+                for section_id in dict.fromkeys(item.section_ids):
+                    if section_id in sections:
+                        self._link(session, concept, course_id, section_id)
+                created[index] = concept
+            if not created:
+                raise ValidationFailedError(
+                    "The course already has every concept in that selection."
+                )
+            return self._load(session, course)
 
     # -- prerequisites -----------------------------------------------------
 

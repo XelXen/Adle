@@ -32,7 +32,12 @@ line-length = 100
 target-version = "py312"
 src = ["."]
 # Scene files are data: Python-like source for the Wanim runtime, never imported here.
-extend-exclude = ["migrations/versions", "adle_core/sample_course/scenes"]
+extend-exclude = [
+  "migrations/versions",
+  "adle_core/sample_course/scenes",
+  # Generated from the scene-authoring skill; reformatting its code blocks would make it drift.
+  "adle_core/generation/data",
+]
 
 [tool.ruff.lint]
 select = [

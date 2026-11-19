@@ -8,20 +8,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import httpx2 as httpx
 from fastapi import Request
 
 from adle_core.api.auth import LaunchToken
 from adle_core.application.assessment import AssessmentService
 from adle_core.application.courses import CourseService
 from adle_core.application.curriculum import CurriculumService
+from adle_core.application.generation import GenerationService
 from adle_core.application.jobs import JobRunner
 from adle_core.application.learner import LearnerService
 from adle_core.application.lessons import LessonService
+from adle_core.application.model_gateway import ModelGateway
 from adle_core.application.retrieval import FtsRetriever, Retriever
 from adle_core.application.sample_course import SampleCourseService
 from adle_core.application.sources import SourceService
 from adle_core.config import Settings
 from adle_core.generation.credentials import CredentialVault
+from adle_core.generation.provider import ChatClient
+from adle_core.generation.quota import DEFAULT_LIMITS, QuotaLimits
 from adle_core.infrastructure.asset_store import AssetStore
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.migrate import MigrationOutcome, migrate
@@ -44,10 +49,14 @@ class Services:
     lessons: LessonService
     assessment: AssessmentService
     sample_course: SampleCourseService
+    provider_client: ChatClient
+    gateway: ModelGateway
+    generation: GenerationService
 
     def close(self) -> None:
         """Stop background work and release the database. Safe to call more than once."""
         self.jobs.stop()
+        self.provider_client.close()
         self.database.dispose()
 
 
@@ -56,6 +65,8 @@ def build_services(
     launch_token: LaunchToken,
     *,
     extract: Extractor = extract_isolated,
+    provider_transport: httpx.BaseTransport | None = None,
+    quota_limits: QuotaLimits = DEFAULT_LIMITS,
 ) -> Services:
     """Open (and if needed migrate) the database, then assemble the services.
 
@@ -78,10 +89,13 @@ def build_services(
     curriculum = CurriculumService(database, retriever)
     lessons = LessonService(database)
     learner = LearnerService(database)
+    credentials = CredentialVault()
+    provider_client = ChatClient(settings.provider, credentials, transport=provider_transport)
+    gateway = ModelGateway(database, provider_client, limits=quota_limits)
     return Services(
         settings=settings,
         launch_token=launch_token,
-        credentials=CredentialVault(),
+        credentials=credentials,
         database=database,
         migration=migration,
         jobs=jobs,
@@ -93,6 +107,11 @@ def build_services(
         lessons=lessons,
         assessment=AssessmentService(database, lessons, learner),
         sample_course=SampleCourseService(database, courses, curriculum, lessons),
+        provider_client=provider_client,
+        gateway=gateway,
+        generation=GenerationService(
+            database, jobs, gateway, curriculum, lessons, learner, retriever
+        ),
     )
 
 

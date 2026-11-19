@@ -39,6 +39,15 @@ CONCEPT_TAGS = ("conceptual", "calculation", "visual", "procedural")
 OBSERVATION_KINDS = ("answer", "self_report")
 MASTERY_STATES = ("not_assessed", "building", "needs_evidence", "demonstrated")
 LESSON_ORIGINS = ("sample", "generated")
+MODEL_USAGE_OUTCOMES = (
+    "pending",
+    "ok",
+    "rate_limited",
+    "refused",
+    "unavailable",
+    "unreadable",
+    "cancelled",
+)
 
 
 def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
@@ -453,6 +462,29 @@ class Attempt(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
 
 
+class ModelUsage(Base):
+    """One request sent to the model provider.
+
+    The local estimate of how much of the provider's allowance has been used is
+    computed from these rows (``generation.quota``). A row is written before the
+    request is sent, so a request that never returns still counts.
+    """
+
+    __tablename__ = "model_usage"
+    __table_args__ = (_one_of("outcome", MODEL_USAGE_OUTCOMES),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, index=True)
+    #: What the request was for (``curriculum``, ``lesson``, ``scene``). Never its content.
+    purpose: Mapped[str] = mapped_column(String(40), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: True while the token counts are Adle's own estimate rather than the provider's report.
+    estimated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+
+
 class Job(Base):
     """A long-running piece of work the interface can watch and cancel."""
 
@@ -464,6 +496,9 @@ class Job(Base):
     course_id: Mapped[str | None] = mapped_column(
         ForeignKey("courses.id", ondelete="CASCADE"), index=True
     )
+    #: What the job is about, when it is about one thing (a concept for a lesson job).
+    #: Lets a repeated request find the job that is already doing the work.
+    subject_id: Mapped[str | None] = mapped_column(String(32), index=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued")
     #: ``{"done": int, "total": int, "message": str}``
     progress: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)

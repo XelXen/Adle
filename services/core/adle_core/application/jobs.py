@@ -20,6 +20,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from sqlalchemy import select
+
 from adle_core.errors import AdleError, NotFoundError
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.ids import new_id
@@ -35,6 +37,7 @@ class JobSnapshot:
     id: str
     kind: str
     course_id: str | None
+    subject_id: str | None
     status: str
     progress_done: int
     progress_total: int
@@ -55,6 +58,7 @@ def _snapshot(job: Job) -> JobSnapshot:
         id=job.id,
         kind=job.kind,
         course_id=job.course_id,
+        subject_id=job.subject_id,
         status=job.status,
         progress_done=int(progress.get("done", 0)),
         progress_total=int(progress.get("total", 0)),
@@ -133,10 +137,24 @@ class JobRunner:
         if self._thread is not None:
             self._thread.join(timeout)
 
-    def submit(self, kind: str, work: Work, *, course_id: str | None = None) -> JobSnapshot:
+    def submit(
+        self,
+        kind: str,
+        work: Work,
+        *,
+        course_id: str | None = None,
+        subject_id: str | None = None,
+    ) -> JobSnapshot:
         job_id = new_id("job")
         with self._database.session() as session:
-            job = Job(id=job_id, kind=kind, course_id=course_id, status="queued", progress={})
+            job = Job(
+                id=job_id,
+                kind=kind,
+                course_id=course_id,
+                subject_id=subject_id,
+                status="queued",
+                progress={},
+            )
             session.add(job)
             session.flush()
             snapshot = _snapshot(job)
@@ -144,6 +162,44 @@ class JobRunner:
             self._cancel_events[job_id] = threading.Event()
         self._queue.put((job_id, work))
         return snapshot
+
+    def find_active(self, kind: str, subject_id: str) -> JobSnapshot | None:
+        """The job of this kind already working on this subject, if there is one."""
+        with self._database.session() as session:
+            job = session.scalars(
+                select(Job)
+                .where(
+                    Job.kind == kind,
+                    Job.subject_id == subject_id,
+                    Job.status.in_(ACTIVE_STATUSES),
+                )
+                .order_by(Job.created_at.desc())
+            ).first()
+            return _snapshot(job) if job is not None else None
+
+    def latest(self, kind: str, subject_id: str) -> JobSnapshot | None:
+        """The most recent job of this kind about this subject, whatever became of it."""
+        with self._database.session() as session:
+            job = session.scalars(
+                select(Job)
+                .where(Job.kind == kind, Job.subject_id == subject_id)
+                .order_by(Job.created_at.desc(), Job.id.desc())
+            ).first()
+            return _snapshot(job) if job is not None else None
+
+    def list_active(self, course_id: str) -> list[JobSnapshot]:
+        """Jobs of a course that are waiting or running, oldest first."""
+        with self._database.session() as session:
+            jobs = session.scalars(
+                select(Job)
+                .where(Job.course_id == course_id, Job.status.in_(ACTIVE_STATUSES))
+                .order_by(Job.created_at, Job.id)
+            )
+            return [_snapshot(job) for job in jobs]
+
+    def set_result(self, job_id: str, result: Any) -> None:
+        """Replace a finished job's result (for example to note that it has been used)."""
+        self._update(job_id, result=result)
 
     def get(self, job_id: str) -> JobSnapshot:
         with self._database.session() as session:

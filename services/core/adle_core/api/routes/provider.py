@@ -7,6 +7,8 @@ the renderer's operation allowlist (``x-adle-internal``).
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,12 +33,25 @@ class ProviderStatus(BaseModel):
     key_configured: bool
 
 
+class ProviderUsage(BaseModel):
+    """Adle's own count of today's requests. An estimate: the provider keeps the real one."""
+
+    requests_today: int
+    requests_per_day: int
+    tokens_today: int
+    tokens_per_day: int
+    requests_last_minute: int
+    requests_per_minute: int
+    resets_at: datetime
+
+
 def _status(services: Services) -> ProviderStatus:
+    config = services.gateway.config
     return ProviderStatus(
-        provider_id="aihubmix",
-        display_name="AIHubMix",
-        base_url="https://aihubmix.com/v1",
-        model="coding-kimi-k3-free",
+        provider_id=config.provider_id,
+        display_name=config.display_name,
+        base_url=config.base_url,
+        model=config.model,
         key_configured=services.credentials.has_api_key,
     )
 
@@ -44,6 +59,20 @@ def _status(services: Services) -> ProviderStatus:
 @router.get("", operation_id="provider.status", response_model=ProviderStatus)
 def provider_status(services: Services = Depends(get_services)) -> ProviderStatus:
     return _status(services)
+
+
+@router.get("/usage", operation_id="provider.usage", response_model=ProviderUsage)
+def provider_usage(services: Services = Depends(get_services)) -> ProviderUsage:
+    usage = services.gateway.usage()
+    return ProviderUsage(
+        requests_today=usage.requests_today,
+        requests_per_day=usage.limits.requests_per_day,
+        tokens_today=usage.tokens_today,
+        tokens_per_day=usage.limits.tokens_per_day,
+        requests_last_minute=usage.requests_last_minute,
+        requests_per_minute=usage.limits.requests_per_minute,
+        resets_at=usage.resets_at,
+    )
 
 
 @router.put(

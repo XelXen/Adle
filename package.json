@@ -35,6 +35,8 @@
     "setup": "npm ci && npx install-electron --no && npm run core:sync",
     "wanim-names": "node scripts/export-wanim-names.mjs",
     "wanim-names:check": "node scripts/export-wanim-names.mjs --check",
+    "scene-guide": "node scripts/sync-scene-guide.mjs",
+    "scene-guide:check": "node scripts/sync-scene-guide.mjs --check",
     "icons": "electron scripts/build-icons.cjs",
     "icons:verify": "electron scripts/build-icons.cjs --verify"
   },

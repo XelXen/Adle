@@ -51,6 +51,7 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Core: auto-format | `npm run core:format` |
 | Regenerate API contract | `npm run contracts` (after any route or model change) |
 | Regenerate scene name allowlist | `npm run wanim-names` (after a Wanim upgrade) |
+| Repackage the scene guide for prompts | `npm run scene-guide` (after editing the scene skill or its examples) |
 | Re-render the app icons | `npm run icons` (after the mark changes; `npm run icons:verify` compares it with the artwork) |
 | Rebuild document fixtures | see `fixtures/sample-documents/README.md` |
 | Add a sample lesson | files in `services/core/adle_core/sample_course/`, then `core:test` and `e2e -- lesson.spec.ts` |

@@ -1,0 +1,169 @@
+/**
+ * A stand-in for the AI provider, for end-to-end tests.
+ *
+ * It is a small HTTP server on this computer that speaks the same streamed
+ * chat-completion protocol as the real provider. The app under test is pointed
+ * at it with `ADLE_PROVIDER_BASE_URL`, so every part of the real path is
+ * exercised (the core's client, quota, jobs, the interface) and nothing leaves
+ * the machine. No end-to-end test ever reaches the real provider.
+ *
+ * By default it answers each kind of request with a good canned answer (the
+ * same ones the Python tests use, from `fixtures/model-answers`). A test can
+ * queue other answers ahead of the defaults: a refusal, nonsense, or a hang.
+ */
+import { readFileSync } from 'node:fs';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import path from 'node:path';
+
+import { repoRoot } from './app';
+import { exampleScene } from './player';
+
+const answers = path.join(repoRoot, 'fixtures', 'model-answers');
+const read = (name: string): string => readFileSync(path.join(answers, name), 'utf8');
+
+export type RequestKind = 'curriculum' | 'lesson' | 'scene';
+
+export interface RecordedRequest {
+  kind: RequestKind;
+  /** The `Authorization` header as it arrived. */
+  authorization: string | undefined;
+  /** Everything the model was shown: the system and user text. */
+  prompt: string;
+  body: Record<string, unknown>;
+}
+
+/**
+ * What to answer with:
+ *  - a string: the text of the model's answer;
+ *  - `{ status }`: an HTTP error with that status;
+ *  - `HANG`: accept the request and say nothing until the test releases it or the app gives up.
+ */
+export type Answer = string | { status: number; retryAfter?: number } | { hang: true };
+
+/** An answer that never comes by itself. */
+export const HANG: Answer = { hang: true };
+
+export interface FakeProvider {
+  /** The value for `ADLE_PROVIDER_BASE_URL`. */
+  baseUrl: string;
+  requests: RecordedRequest[];
+  /** Answer the next requests with these before falling back to the defaults. */
+  queue: (...next: Answer[]) => void;
+  /** Let every hanging request finish with an ordinary answer. */
+  release: () => void;
+  close: () => Promise<void>;
+}
+
+function kindOf(system: string): RequestKind {
+  if (system.includes('design the curriculum')) return 'curriculum';
+  if (system.includes('Wanim scene file')) return 'scene';
+  return 'lesson';
+}
+
+function defaultAnswer(kind: RequestKind, user: string): string {
+  if (kind === 'curriculum') return read('curriculum.json');
+  if (kind === 'lesson') return read('lesson.json');
+  return exampleScene(user.includes('Kind: interactive') ? 'neuron_weight.py' : 'weighted_sum.py');
+}
+
+function readBody(request: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    request.on('data', (chunk: Buffer) => chunks.push(chunk));
+    request.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    request.on('error', reject);
+  });
+}
+
+/** Send `text` the way the provider streams it: a few chunks, usage, then the end marker. */
+function stream(response: ServerResponse, text: string): void {
+  response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  const step = Math.max(1, Math.ceil(text.length / 4));
+  for (let index = 0; index < text.length; index += step) {
+    const chunk = { choices: [{ delta: { content: text.slice(index, index + step) } }] };
+    response.write(`data: ${JSON.stringify(chunk)}\n\n`);
+  }
+  response.write(
+    `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`,
+  );
+  response.write(
+    `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 1200, completion_tokens: 600 } })}\n\n`,
+  );
+  response.end('data: [DONE]\n\n');
+}
+
+export async function startFakeProvider(options: { delayMs?: number } = {}): Promise<FakeProvider> {
+  const delayMs = options.delayMs ?? 250;
+  const requests: RecordedRequest[] = [];
+  const queued: Answer[] = [];
+  const hanging = new Set<() => void>();
+
+  const server = createServer((request, response) => {
+    void (async () => {
+      if (request.method !== 'POST' || request.url !== '/v1/chat/completions') {
+        response.writeHead(404).end();
+        return;
+      }
+      const body = JSON.parse(await readBody(request)) as Record<string, unknown> & {
+        messages: { role: string; content: string }[];
+      };
+      const system = body.messages[0]?.content ?? '';
+      const user = body.messages[1]?.content ?? '';
+      const kind = kindOf(system);
+      requests.push({
+        kind,
+        authorization: request.headers.authorization,
+        prompt: `${system}\n${user}`,
+        body,
+      });
+
+      const answer = queued.shift() ?? defaultAnswer(kind, user);
+      if (typeof answer === 'object' && 'hang' in answer) {
+        await new Promise<void>((resolve) => {
+          hanging.add(resolve);
+          // The app closing the connection (a cancel) ends the wait too.
+          request.socket.on('close', resolve);
+        });
+        if (response.destroyed || request.socket.destroyed) return;
+        stream(response, defaultAnswer(kind, user));
+        return;
+      }
+      // Long enough for the interface to show that something is happening.
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      if (typeof answer === 'string') {
+        stream(response, answer);
+        return;
+      }
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (answer.retryAfter !== undefined) headers['retry-after'] = String(answer.retryAfter);
+      response.writeHead(answer.status, headers);
+      response.end(JSON.stringify({ error: { message: 'refused by the fake provider' } }));
+    })().catch(() => {
+      if (!response.headersSent) response.writeHead(500);
+      response.end();
+    });
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+
+  return {
+    baseUrl: `http://127.0.0.1:${port}/v1`,
+    requests,
+    queue: (...next) => {
+      queued.push(...next);
+    },
+    release: () => {
+      for (const resolve of hanging) resolve();
+      hanging.clear();
+    },
+    close: () =>
+      new Promise<void>((resolve) => {
+        for (const finish of hanging) finish();
+        hanging.clear();
+        server.closeAllConnections();
+        server.close(() => resolve());
+      }),
+  };
+}

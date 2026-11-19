@@ -462,12 +462,17 @@
             "enum": ["queued", "running", "succeeded", "failed", "cancelled"],
             "title": "Status",
             "type": "string"
+          },
+          "subject_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Subject Id"
           }
         },
         "required": [
           "id",
           "kind",
           "course_id",
+          "subject_id",
           "status",
           "progress_done",
           "progress_total",
@@ -477,6 +482,18 @@
           "error_message"
         ],
         "title": "Job",
+        "type": "object"
+      },
+      "JobList": {
+        "properties": {
+          "jobs": {
+            "items": { "$ref": "#/components/schemas/Job" },
+            "title": "Jobs",
+            "type": "array"
+          }
+        },
+        "required": ["jobs"],
+        "title": "JobList",
         "type": "object"
       },
       "Knowledge": {
@@ -504,6 +521,14 @@
         },
         "required": ["state", "label", "missing", "answered", "self_report", "review_due_at"],
         "title": "Knowledge",
+        "type": "object"
+      },
+      "LatestJob": {
+        "properties": {
+          "job": { "anyOf": [{ "$ref": "#/components/schemas/Job" }, { "type": "null" }] }
+        },
+        "required": ["job"],
+        "title": "LatestJob",
         "type": "object"
       },
       "LearnerPreferences": {
@@ -1005,6 +1030,22 @@
         "title": "PrerequisitesUpdate",
         "type": "object"
       },
+      "ProposalAcceptance": {
+        "additionalProperties": false,
+        "description": "Which concepts of a proposal to add, by their position in it.",
+        "properties": {
+          "selected": {
+            "items": { "maximum": 100, "minimum": 0, "type": "integer" },
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Selected",
+            "type": "array"
+          }
+        },
+        "required": ["selected"],
+        "title": "ProposalAcceptance",
+        "type": "object"
+      },
       "ProviderCredential": {
         "additionalProperties": false,
         "properties": {
@@ -1030,6 +1071,29 @@
         },
         "required": ["provider_id", "display_name", "base_url", "model", "key_configured"],
         "title": "ProviderStatus",
+        "type": "object"
+      },
+      "ProviderUsage": {
+        "description": "Adle's own count of today's requests. An estimate: the provider keeps the real one.",
+        "properties": {
+          "requests_last_minute": { "title": "Requests Last Minute", "type": "integer" },
+          "requests_per_day": { "title": "Requests Per Day", "type": "integer" },
+          "requests_per_minute": { "title": "Requests Per Minute", "type": "integer" },
+          "requests_today": { "title": "Requests Today", "type": "integer" },
+          "resets_at": { "format": "date-time", "title": "Resets At", "type": "string" },
+          "tokens_per_day": { "title": "Tokens Per Day", "type": "integer" },
+          "tokens_today": { "title": "Tokens Today", "type": "integer" }
+        },
+        "required": [
+          "requests_today",
+          "requests_per_day",
+          "tokens_today",
+          "tokens_per_day",
+          "requests_last_minute",
+          "requests_per_minute",
+          "resets_at"
+        ],
+        "title": "ProviderUsage",
         "type": "object"
       },
       "ReflectionSegment": {
@@ -1519,6 +1583,39 @@
         },
         "summary": "Concept Evidence",
         "tags": ["curriculum"]
+      }
+    },
+    "/v1/concepts/{concept_id}/lessons": {
+      "post": {
+        "operationId": "generation.generate_lesson",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Generate Lesson",
+        "tags": ["generation"]
       }
     },
     "/v1/concepts/{concept_id}/objectives": {
@@ -2090,6 +2187,109 @@
         "tags": ["curriculum"]
       }
     },
+    "/v1/courses/{course_id}/curriculum/proposal": {
+      "get": {
+        "description": "The newest proposal for a course, so one that finished unseen can still be reviewed.",
+        "operationId": "generation.latest_proposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LatestJob" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Latest Proposal",
+        "tags": ["generation"]
+      },
+      "post": {
+        "operationId": "generation.propose_curriculum",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Propose Curriculum",
+        "tags": ["generation"]
+      }
+    },
+    "/v1/courses/{course_id}/jobs": {
+      "get": {
+        "description": "Work still in progress for a course, so a screen can pick it up again after navigating.",
+        "operationId": "jobs.list_active",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/JobList" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List Active Jobs",
+        "tags": ["generation"]
+      }
+    },
     "/v1/courses/{course_id}/lessons": {
       "get": {
         "operationId": "lessons.list",
@@ -2388,6 +2588,47 @@
         "tags": ["courses"]
       }
     },
+    "/v1/jobs/{job_id}/accept": {
+      "post": {
+        "operationId": "generation.accept_proposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": { "title": "Job Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ProposalAcceptance" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Accept Proposal",
+        "tags": ["generation"]
+      }
+    },
     "/v1/jobs/{job_id}/cancel": {
       "post": {
         "operationId": "jobs.cancel",
@@ -2419,6 +2660,39 @@
         },
         "summary": "Cancel Job",
         "tags": ["courses"]
+      }
+    },
+    "/v1/jobs/{job_id}/dismiss": {
+      "post": {
+        "operationId": "generation.dismiss_proposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": { "title": "Job Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Dismiss Proposal",
+        "tags": ["generation"]
       }
     },
     "/v1/learner/preferences": {
@@ -2714,6 +2988,33 @@
         "summary": "Set Credential",
         "tags": ["provider"],
         "x-adle-internal": true
+      }
+    },
+    "/v1/provider/usage": {
+      "get": {
+        "operationId": "provider.usage",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ProviderUsage" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Provider Usage",
+        "tags": ["provider"]
       }
     },
     "/v1/sources/{source_id}": {

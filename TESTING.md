@@ -82,6 +82,11 @@ Strict mode: warnings are errors.
 | `tests/unit/test_lessons_api.py` | The sample course installs complete, once, or not at all; a lesson served for the player; progress and sticky completion; every reference must belong to the course, including citations; an outdated lesson is reported, listed, and removable; **stored scenes are described again from their source and withheld if they may not run**; cascading deletes |
 | `tests/unit/test_scoring.py` | Each question form, tolerance and floating-point noise, sign slips, normalised short answers, partial credit for ordering, self-assessed explanations, malformed responses |
 | `tests/unit/test_answers_api.py` | Outcome, feedback, explanation, and what changed for right, wrong, hinted, unsure, repeated, and skipped answers; the attempt and the evidence are stored together; no blame and no score in any text |
+| `tests/unit/test_quota.py` | Allowed, wait, or used up; the minute window across midnight; the token allowance counts the request about to be sent; waiting as long as asked always opens the window (property) |
+| `tests/unit/test_provider_client.py` | One request to the configured address with the key in one header and nowhere else; no sampling parameters; streamed and unstreamed answers; every refusal as a readable error that quotes nothing; redirects not followed; size and time bounds; cancel between chunks; endpoint configuration |
+| `tests/unit/test_model_gateway.py` | Usage written before sending; a full minute waited out; a used-up day refused before sending; one retry after a 429 and never two; nothing else retried; cancel while waiting; one request in flight |
+| `tests/unit/test_drafts.py` | A model's answer found however it was wrapped; ids and links assigned here, never read from the model; citations only of passages that were supplied; at most two scenes; scene loss; a proposal cannot contain a loop |
+| `tests/unit/test_generation_api.py` | Proposal and lesson jobs end to end against the scripted provider: request counts for every path, prompts carry what they should and nothing secret, a hostile document cannot close its quotation, cancel, quota, provider failures, a proposal found again or set aside |
 | `tests/integration/test_process_lifecycle.py` | Real child process: handshake, loopback, shutdown on stdin EOF, bad handshakes, token not in argv or stderr |
 | `tests/integration/test_isolated_extraction.py` | Parsing in a real child process; a parse past its time limit is killed; **regression: an import inside the real service process** (ADR-007) |
 
@@ -126,7 +131,9 @@ the window themselves.
 | `apps/desktop/electron/main/core/__fixtures__/fake-core.mjs` | Stand-in for the core's launch protocol |
 | `fixtures/sample-documents/` | Real PDF (printed by Chromium), Word, Markdown, and text files, plus encrypted, scanned, damaged, mislabelled, and empty ones. Its README says how each is built. |
 
-No test calls the real AI provider. The fake provider server arrives with the client (M5).
+No test calls the real AI provider. Python tests replace the transport in process
+(`tests/support/model.py`); end-to-end tests point the app at a local server
+(`e2e/support/fake-provider.ts`). Both answer from `fixtures/model-answers/`.
 
 `e2e/lesson.spec.ts` edits the profile's database between two launches (with Node's built-in
 `node:sqlite`) to put a broken scene into a stored lesson. That is the honest way to reach the

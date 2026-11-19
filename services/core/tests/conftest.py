@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from pathlib import Path
 
+import httpx2 as httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -12,7 +13,9 @@ from adle_core.api.app import create_app
 from adle_core.api.auth import LaunchToken
 from adle_core.application.services import Services, build_services
 from adle_core.config import Settings
+from adle_core.generation.quota import QuotaLimits
 from adle_core.ingestion.extract import extract_in_process
+from tests.support.model import FakeProvider
 
 TEST_TOKEN = "test-launch-token-0123456789abcdef0123456789"
 
@@ -25,10 +28,24 @@ def settings(tmp_path: Path) -> Settings:
 
 
 @pytest.fixture
-def services(settings: Settings) -> Iterator[Services]:
+def provider() -> FakeProvider:
+    """The model provider, replaced by a scripted stand-in. No test reaches the real one."""
+    return FakeProvider()
+
+
+@pytest.fixture
+def services(settings: Settings, provider: FakeProvider) -> Iterator[Services]:
     """Real services on a fresh database. Documents are parsed in-process for speed;
     the child-process path has its own integration tests."""
-    services = build_services(settings, LaunchToken(TEST_TOKEN), extract=extract_in_process)
+    services = build_services(
+        settings,
+        LaunchToken(TEST_TOKEN),
+        extract=extract_in_process,
+        provider_transport=httpx.MockTransport(provider),
+        # The daily allowance is the real one. The per-minute limit is lifted so that a
+        # test which makes five requests does not sit waiting for a minute to pass.
+        quota_limits=QuotaLimits(requests_per_minute=600),
+    )
     yield services
     services.close()
 

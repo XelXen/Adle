@@ -1,0 +1,409 @@
+"""Turning what a model writes into something Adle can validate and store."""
+
+from __future__ import annotations
+
+import copy
+from typing import Any
+
+import pytest
+
+from adle_core.generation.drafts import (
+    MAX_PROPOSED_CONCEPTS,
+    DraftError,
+    LessonContext,
+    ObjectiveRef,
+    PassageRef,
+    as_visualization,
+    compile_curriculum,
+    compile_lesson,
+    extract_json_object,
+    extract_python_file,
+    parse_lesson_draft,
+    tidy,
+    without_scene,
+)
+from adle_core.lessons.ir import Lesson
+from tests.support.model import CURRICULUM, LESSON
+
+CONCEPT = "con_0123456789abcdef0123"
+CONTEXT = LessonContext(
+    lesson_id="les_0123456789abcdef0123",
+    course_id="crs_0123456789abcdef0123",
+    concept_id=CONCEPT,
+    objectives=[
+        ObjectiveRef("obj_00000000000000000001", "Compute a weighted sum by hand."),
+        ObjectiveRef("obj_00000000000000000002", "Say what a weight means for an input."),
+        ObjectiveRef("obj_00000000000000000003", "Explain what the bias changes."),
+    ],
+    passages=[
+        PassageRef("src_00000000000000000001", "sec_00000000000000000001", "notes.pdf", "page 3"),
+        PassageRef("src_00000000000000000001", "sec_00000000000000000002", "notes.pdf", "page 4"),
+    ],
+)
+
+
+def compiled(**changes: Any) -> Any:
+    return compile_lesson(parse_lesson_draft({**copy.deepcopy(LESSON), **changes}), CONTEXT)
+
+
+# -- reading an answer ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"a": 1}',
+        '  \n{"a": 1}\n',
+        '```json\n{"a": 1}\n```',
+        '```\n{"a": 1}\n```',
+        'Here is the lesson:\n\n```json\n{"a": 1}\n```\nHope this helps.',
+        'Sure. {"a": 1} is the answer.',
+    ],
+)
+def test_the_json_object_is_found_however_the_model_wrapped_it(text: str) -> None:
+    assert extract_json_object(text) == {"a": 1}
+
+
+@pytest.mark.parametrize("text", ["", "no json here", "[1, 2]", '{"a": ', "```json\n[1]\n```"])
+def test_an_answer_without_one_json_object_is_refused_with_a_reason(text: str) -> None:
+    with pytest.raises(DraftError) as raised:
+        extract_json_object(text)
+    assert raised.value.problems
+
+
+def test_a_python_file_is_taken_from_its_fence_or_as_it_stands() -> None:
+    assert extract_python_file("from manim import *\n\nclass A(Scene):\n    pass") == (
+        "from manim import *\n\nclass A(Scene):\n    pass\n"
+    )
+    fenced = "Here you go:\n```python\nfrom manim import *\n```\nEnjoy!"
+    assert extract_python_file(fenced) == "from manim import *\n"
+
+
+@pytest.mark.parametrize(
+    ("written", "expected"),
+    [
+        ("  two   spaces\nand a line ", "two spaces and a line"),
+        ("A **bold** and __strong__ point", "A bold and strong point"),
+        ("Use `relu` here", "Use relu here"),
+        (r"The sum \( w x + b \) is called z", "The sum $w x + b$ is called z"),
+        (r"\[ z = 2 \]", "$z = 2$"),
+        ("- a list item", "a list item"),
+        ("1. first step", "first step"),
+        ("$w * x$ stays", "$w * x$ stays"),
+        ("3 * 4 * 5 stays", "3 * 4 * 5 stays"),
+    ],
+)
+def test_formatting_habits_are_normalised_without_changing_what_is_said(
+    written: str, expected: str
+) -> None:
+    assert tidy(written) == expected
+
+
+# -- a lesson ---------------------------------------------------------------------
+
+
+def test_a_good_draft_compiles_into_a_valid_lesson() -> None:
+    result = compiled()
+    lesson = Lesson.model_validate(result.lesson)
+
+    assert lesson.lesson_id == CONTEXT.lesson_id
+    assert lesson.concept_ids == [CONCEPT]
+    assert [segment.id for segment in lesson.segments] == [f"seg_{n}" for n in range(1, 9)]
+    assert [segment.type for segment in lesson.segments] == [
+        "explanation",
+        "visualization",
+        "checkpoint",
+        "interaction",
+        "worked_example",
+        "checkpoint",
+        "checkpoint",
+        "summary",
+    ]
+    # Objectives come from the curriculum, not from the model.
+    assert [objective.objective_id for objective in lesson.objectives] == [
+        objective.id for objective in CONTEXT.objectives
+    ]
+    assert lesson.grounding == "general_knowledge"
+    assert lesson.source_refs == []
+    assert lesson.strategy == "visual"
+
+
+def test_identifiers_and_links_are_assigned_here_never_read_from_the_model() -> None:
+    draft = copy.deepcopy(LESSON)
+    draft["lesson_id"] = "les_ffffffffffffffffffff"
+    draft["segments"][2]["id"] = "seg_evil"
+    draft["segments"][2]["question"]["id"] = "q_evil"
+    draft["segments"][2]["question"]["concept_id"] = "con_ffffffffffffffffffff"
+    lesson = Lesson.model_validate(compile_lesson(parse_lesson_draft(draft), CONTEXT).lesson)
+
+    questions = lesson.questions()
+    assert [question.id for question in questions] == ["q_1", "q_2", "q_3"]
+    assert {question.concept_id for question in questions} == {CONCEPT}
+    assert [question.objective_id for question in questions] == [
+        "obj_00000000000000000002",
+        "obj_00000000000000000001",
+        "obj_00000000000000000003",
+    ]
+    choice = questions[0]
+    assert choice.form == "multiple_choice"
+    assert [option.id for option in choice.options] == ["a", "b", "c"]
+    assert choice.correct_option == "a"
+    # A known kind of mistake is kept as a hypothesis; an unknown label is dropped.
+    assert [option.misconception for option in choice.options] == [
+        None,
+        "definition_confusion",
+        None,
+    ]
+    assert questions[1].form == "numeric"
+    assert questions[1].expected == 3
+    assert questions[2].form == "true_false"
+    assert questions[2].is_transfer is True
+
+
+def test_durations_are_computed_from_the_words_not_taken_from_the_model() -> None:
+    draft = copy.deepcopy(LESSON)
+    draft["estimated_minutes"] = 600
+    draft["segments"][0]["estimated_seconds"] = 1
+    lesson = compile_lesson(parse_lesson_draft(draft), CONTEXT).lesson
+    assert all(10 <= segment["estimated_seconds"] <= 900 for segment in lesson["segments"])
+    assert 1 <= lesson["estimated_minutes"] <= 10
+    checkpoint = lesson["segments"][2]
+    assert checkpoint["estimated_seconds"] >= 45
+
+
+def test_scenes_become_briefs_for_the_scene_writer() -> None:
+    result = compiled()
+    assert [(brief.scene_id, brief.segment_id, brief.kind) for brief in result.scenes] == [
+        ("scn_1", "seg_2", "animation"),
+        ("scn_2", "seg_4", "interactive"),
+    ]
+    first = result.scenes[0]
+    assert first.title == "The weighted sum"
+    assert "Two small circles" in first.brief
+    assert len(first.narration) == 2
+    reference = result.lesson["segments"][1]["scene"]
+    assert reference == {"scene_id": "scn_1", "fallback_text": first.description}
+
+
+def test_a_lesson_asks_for_at_most_two_scenes_and_keeps_the_rest_as_words() -> None:
+    draft = copy.deepcopy(LESSON)
+    extra = copy.deepcopy(draft["segments"][1])
+    extra["title"] = "A third picture"
+    extra["beats"] = [{"say": "One more look at the same sum."}]
+    draft["segments"].insert(5, extra)
+    result = compile_lesson(parse_lesson_draft(draft), CONTEXT)
+
+    assert len(result.scenes) == 2
+    third = result.lesson["segments"][5]
+    assert third["type"] == "explanation"
+    assert "scene" not in third
+    # What the picture would have shown is put on the board instead.
+    assert third["narration"][0]["show"].startswith("Two inputs on the left")
+    Lesson.model_validate(result.lesson)
+
+
+def test_only_passages_that_were_supplied_can_be_cited() -> None:
+    result = compiled(sources=[2, 9, 0, -1, 2])
+    lesson = Lesson.model_validate(result.lesson)
+    assert lesson.grounding == "materials"
+    assert [(ref.section_id, ref.locator) for ref in lesson.source_refs] == [
+        ("sec_00000000000000000002", "page 4")
+    ]
+
+
+def test_an_unknown_strategy_falls_back_rather_than_failing() -> None:
+    assert compiled(strategy="Interpretive Dance").lesson["strategy"] == "visual"
+    assert compiled(strategy="Worked Example").lesson["strategy"] == "worked_example"
+
+
+@pytest.mark.parametrize(
+    ("change", "expected"),
+    [
+        (lambda d: d["segments"][0].update(type="hologram"), "segments.0"),
+        (lambda d: d["segments"][2].pop("question"), "segments.2: a checkpoint needs a question"),
+        (lambda d: d["segments"][2]["question"].update(form="essay"), "not a question form"),
+        (
+            lambda d: [
+                option.update(correct=False) for option in d["segments"][2]["question"]["options"]
+            ],
+            "exactly one option",
+        ),
+        (
+            lambda d: [
+                option.update(correct=True) for option in d["segments"][2]["question"]["options"]
+            ],
+            "exactly one option",
+        ),
+        (lambda d: d["segments"][5]["question"].pop("answer"), "needs a number"),
+        (lambda d: d["segments"][6]["question"].pop("correct"), "true or false"),
+    ],
+)
+def test_what_only_a_rewrite_can_fix_is_reported_precisely(change: Any, expected: str) -> None:
+    draft = copy.deepcopy(LESSON)
+    change(draft)
+    with pytest.raises(DraftError) as raised:
+        compile_lesson(parse_lesson_draft(draft), CONTEXT)
+    assert any(expected in problem for problem in raised.value.problems)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [{}, {"title": "x"}, {"title": "", "segments": []}, {"title": "x", "segments": "none"}],
+)
+def test_a_draft_that_is_not_lesson_shaped_is_refused(data: dict[str, Any]) -> None:
+    with pytest.raises(DraftError):
+        parse_lesson_draft(data)
+
+
+def test_the_other_question_forms_compile() -> None:
+    draft = copy.deepcopy(LESSON)
+    draft["segments"][2]["question"] = {
+        "form": "Short Answer",
+        "stem": "What is added after the products?",
+        "accepted": ["the bias", " bias "],
+        "explanation": "The bias is added at the end.",
+    }
+    draft["segments"][5]["question"] = {
+        "form": "ordering",
+        "stem": "Put the steps in order.",
+        "items": ["Multiply each input by its weight", "Add the products", "Add the bias"],
+        "explanation": "Multiply, add, then add the bias.",
+    }
+    draft["segments"][6]["question"] = {
+        "form": "explanation",
+        "stem": "Why does a neuron need a bias?",
+        "rubric": [
+            "Without it the output is zero when all inputs are zero",
+            "It shifts the output",
+        ],
+        "sample_answer": "With every input at zero the products vanish, so only a bias can move the output.",
+        "explanation": "The bias is the part of the output that does not depend on the inputs.",
+    }
+    lesson = Lesson.model_validate(compile_lesson(parse_lesson_draft(draft), CONTEXT).lesson)
+    short, ordering, explanation = lesson.questions()
+    assert (short.form, short.accepted) == ("short_answer", ["the bias", "bias"])
+    assert ordering.form == "ordering"
+    assert [item.id for item in ordering.items] == ["a", "b", "c"]
+    assert explanation.form == "explanation"
+    assert [point.id for point in explanation.rubric] == ["p1", "p2"]
+    assert explanation.required_points == 1
+
+
+def test_a_scene_that_could_not_be_made_is_taken_out_and_its_part_kept_as_words() -> None:
+    result = compiled()
+    lesson = without_scene(result.lesson, "scn_1")
+    segment = lesson["segments"][1]
+    assert segment["type"] == "explanation"
+    assert "scene" not in segment
+    assert segment["title"] == "The weighted sum"
+    # The board already had a line, so the description is not forced onto it.
+    assert segment["narration"][1]["show"] == "$z = w_1 x_1 + w_2 x_2 + b$"
+    # The other scene is untouched.
+    assert lesson["segments"][3]["scene"]["scene_id"] == "scn_2"
+
+    without_either = without_scene(lesson, "scn_2")
+    interaction = without_either["segments"][3]
+    assert interaction["type"] == "explanation"
+    assert "prompt" not in interaction
+    assert interaction["narration"][0]["show"].startswith("A bar shows the output")
+    Lesson.model_validate(without_either)
+
+
+def test_an_interaction_with_nothing_to_operate_becomes_a_visualization() -> None:
+    lesson = as_visualization(compiled().lesson, "scn_2")
+    segment = lesson["segments"][3]
+    assert segment["type"] == "visualization"
+    assert "prompt" not in segment
+    assert segment["scene"]["scene_id"] == "scn_2"
+    Lesson.model_validate(lesson)
+
+
+# -- a curriculum -----------------------------------------------------------------
+
+
+def test_a_proposal_keeps_only_links_to_earlier_concepts() -> None:
+    proposed = compile_curriculum(copy.deepcopy(CURRICULUM), existing_titles=[], section_ids=[])
+    assert [concept.title for concept in proposed] == [
+        "Limits",
+        "The derivative as a limit",
+        "Differentiation rules",
+    ]
+    assert proposed[0].needs == []
+    assert [(need.index, need.reason) for need in proposed[1].needs] == [
+        (0, "The derivative is defined as a limit.")
+    ]
+    # "7" does not exist; the other two are kept with the reasons that were given for them.
+    assert [(need.index, need.reason) for need in proposed[2].needs] == [
+        (1, "The rules are shortcuts for the limit definition."),
+        (0, "Limits again."),
+    ]
+
+
+def test_a_proposal_cannot_contain_a_loop() -> None:
+    data = {
+        "concepts": [
+            {"title": "A", "objectives": ["Do a."], "needs": [2], "reasons": ["later"]},
+            {
+                "title": "B",
+                "objectives": ["Do b."],
+                "needs": [1, 2],
+                "reasons": ["earlier", "itself"],
+            },
+        ]
+    }
+    first, second = compile_curriculum(data, existing_titles=[], section_ids=[])
+    assert first.needs == []
+    assert [need.index for need in second.needs] == [0]
+
+
+def test_concepts_the_course_already_has_are_left_out_with_links_to_them() -> None:
+    proposed = compile_curriculum(
+        copy.deepcopy(CURRICULUM), existing_titles=["  limits "], section_ids=[]
+    )
+    assert [concept.title for concept in proposed] == [
+        "The derivative as a limit",
+        "Differentiation rules",
+    ]
+    assert proposed[0].needs == []
+    assert [need.index for need in proposed[1].needs] == [0]
+
+
+def test_headings_are_linked_by_number_and_unknown_numbers_are_dropped() -> None:
+    data = copy.deepcopy(CURRICULUM)
+    data["concepts"][0]["sources"] = [2, 2, 5, 0]
+    proposed = compile_curriculum(data, existing_titles=[], section_ids=["sec_a", "sec_b", "sec_c"])
+    assert proposed[0].section_ids == ["sec_b"]
+
+
+def test_a_proposal_is_bounded_and_tidied() -> None:
+    data = {
+        "concepts": [
+            {
+                "title": f"**Concept** {number}",
+                "summary": "word " * 400,
+                "objectives": [f"Do thing {step}." for step in range(9)],
+            }
+            for number in range(40)
+        ]
+    }
+    proposed = compile_curriculum(data, existing_titles=[], section_ids=[])
+    assert len(proposed) == MAX_PROPOSED_CONCEPTS
+    assert proposed[0].title == "Concept 0"
+    assert len(proposed[0].summary) <= 600
+    assert len(proposed[0].objectives) == 4
+
+
+@pytest.mark.parametrize(
+    "data",
+    [{}, {"concepts": []}, {"concepts": [{"summary": "no title"}]}, {"concepts": "none"}],
+)
+def test_a_proposal_that_is_not_one_is_refused(data: dict[str, Any]) -> None:
+    with pytest.raises(DraftError):
+        compile_curriculum(data, existing_titles=[], section_ids=[])
+
+
+def test_a_proposal_of_only_known_concepts_is_refused() -> None:
+    with pytest.raises(DraftError, match="does not already have"):
+        compile_curriculum(
+            {"concepts": [{"title": "Limits"}]}, existing_titles=["Limits"], section_ids=[]
+        )

@@ -415,6 +415,8 @@ class Job(_Output):
     id: str
     kind: str
     course_id: str | None
+    #: What the job is about: a concept for a lesson, the course for a proposal.
+    subject_id: str | None
     status: JobStatus
     progress_done: int
     progress_total: int
@@ -423,3 +425,21 @@ class Job(_Output):
     result: Any | None
     error_code: str | None
     error_message: str | None
+
+
+class JobList(_Output):
+    jobs: list[Job]
+
+
+class LatestJob(_Output):
+    #: Absent when there has never been one.
+    job: Job | None
+
+
+# -- generation --------------------------------------------------------------
+
+
+class ProposalAcceptance(_Input):
+    """Which concepts of a proposal to add, by their position in it."""
+
+    selected: list[Annotated[int, Field(ge=0, le=100)]] = Field(min_length=1, max_length=40)

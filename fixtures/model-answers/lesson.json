@@ -1,0 +1,142 @@
+{
+  "title": "How a neuron weighs its inputs",
+  "strategy": "visual",
+  "sources": [],
+  "segments": [
+    {
+      "type": "explanation",
+      "title": "Why inputs are weighted",
+      "beats": [
+        {
+          "say": "A neuron receives several numbers and has to turn them into one."
+        },
+        {
+          "say": "It does not treat them equally. Each input is multiplied by a weight that says how much it counts.",
+          "show": "A weight says how much an input counts."
+        }
+      ]
+    },
+    {
+      "type": "visualization",
+      "title": "The weighted sum",
+      "beats": [
+        {
+          "say": "Here are two inputs, each joined to the neuron by a connection with its own weight."
+        },
+        {
+          "say": "The neuron multiplies each input by its weight, adds the results, and then adds a bias.",
+          "show": "$z = w_1 x_1 + w_2 x_2 + b$"
+        }
+      ],
+      "scene": {
+        "brief": "Two small circles on the left labelled as inputs, one larger circle on the right for the neuron, a line from each input to the neuron. Then write the formula z = w1 x1 + w2 x2 + b underneath.",
+        "description": "Two inputs on the left are each joined by a line to one neuron on the right. Below is the formula $z = w_1 x_1 + w_2 x_2 + b$."
+      }
+    },
+    {
+      "type": "checkpoint",
+      "title": "Which input counts more?",
+      "question": {
+        "form": "multiple_choice",
+        "objective": 2,
+        "stem": "Two inputs are both $1$. Their weights are $3$ and $0.2$. Which input changes the output more?",
+        "options": [
+          {
+            "text": "The first input",
+            "correct": true,
+            "feedback": "Yes: its weight is larger."
+          },
+          {
+            "text": "The second input",
+            "correct": false,
+            "feedback": "Its weight is the smaller one.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "text": "Both the same",
+            "correct": false,
+            "feedback": "The inputs are equal but the weights are not.",
+            "misconception": "not a real kind"
+          }
+        ],
+        "explanation": "Each input is multiplied by its weight, so the larger weight has more effect.",
+        "hint": "Look at what each input is multiplied by.",
+        "difficulty": 1
+      }
+    },
+    {
+      "type": "interaction",
+      "title": "Change a weight",
+      "prompt": "Move the weight below zero and back. What happens to the output?",
+      "beats": [
+        {
+          "say": "Now try it yourself. The input is fixed at one, so the output is the weight plus the bias."
+        }
+      ],
+      "scene": {
+        "brief": "A bar whose height is the output z = w x + b with x fixed at 1. A slider named weight from -2 to 2 sets w. A switch named bias_on adds 0.5.",
+        "description": "A bar shows the output. A slider sets the weight between $-2$ and $2$, and a switch adds a bias of $0.5$."
+      }
+    },
+    {
+      "type": "worked_example",
+      "title": "A weighted sum by hand",
+      "problem": "Inputs $2$ and $3$, weights $0.5$ and $-1$, bias $4$. Find $z$.",
+      "beats": [
+        {
+          "say": "Two times one half is one.",
+          "show": "$0.5 \\times 2 = 1$"
+        },
+        {
+          "say": "Three times minus one is minus three.",
+          "show": "$-1 \\times 3 = -3$"
+        },
+        {
+          "say": "One minus three is minus two, and adding four gives two.",
+          "show": "$z = 2$"
+        }
+      ]
+    },
+    {
+      "type": "checkpoint",
+      "title": "Your turn",
+      "question": {
+        "form": "numeric",
+        "objective": 1,
+        "stem": "Inputs $4$ and $1$, weights $0.5$ and $2$, bias $-1$. What is $z$?",
+        "answer": 3,
+        "tolerance": 0.001,
+        "explanation": "$0.5 \\times 4 = 2$, $2 \\times 1 = 2$, and $2 + 2 - 1 = 3$.",
+        "hint": "Multiply first, then add, then add the bias.",
+        "difficulty": 2
+      }
+    },
+    {
+      "type": "checkpoint",
+      "title": "Nothing coming in",
+      "question": {
+        "form": "true_false",
+        "objective": 3,
+        "stem": "If every input is $0$, the output equals the bias.",
+        "correct": true,
+        "explanation": "Every product is zero, so only the bias is left.",
+        "difficulty": 2,
+        "transfer": true
+      }
+    },
+    {
+      "type": "summary",
+      "title": "In short",
+      "beats": [
+        {
+          "say": "A neuron multiplies each input by a weight and adds the results.",
+          "show": "Multiply, then add."
+        },
+        {
+          "say": "The bias is added at the end.",
+          "show": "The bias sets the baseline."
+        }
+      ]
+    }
+  ]
+}

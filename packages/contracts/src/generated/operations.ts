@@ -16,6 +16,8 @@ import type {
   Health,
   ImportRequest,
   Job,
+  JobList,
+  LatestJob,
   LearnerPreferences,
   LearnerPreferencesUpdate,
   LessonForPlayer,
@@ -27,8 +29,10 @@ import type {
   OutlineSelection,
   Passages,
   PrerequisitesUpdate,
+  ProposalAcceptance,
   ProviderCredential,
   ProviderStatus,
+  ProviderUsage,
   SearchResults,
   SelfRating,
   SourceDetail,
@@ -103,8 +107,34 @@ export const OPERATIONS = {
     path: '/v1/concepts/{concept_id}',
     internal: false,
   },
+  'generation.accept_proposal': {
+    method: 'POST',
+    path: '/v1/jobs/{job_id}/accept',
+    internal: false,
+  },
+  'generation.dismiss_proposal': {
+    method: 'POST',
+    path: '/v1/jobs/{job_id}/dismiss',
+    internal: false,
+  },
+  'generation.generate_lesson': {
+    method: 'POST',
+    path: '/v1/concepts/{concept_id}/lessons',
+    internal: false,
+  },
+  'generation.latest_proposal': {
+    method: 'GET',
+    path: '/v1/courses/{course_id}/curriculum/proposal',
+    internal: false,
+  },
+  'generation.propose_curriculum': {
+    method: 'POST',
+    path: '/v1/courses/{course_id}/curriculum/proposal',
+    internal: false,
+  },
   'jobs.cancel': { method: 'POST', path: '/v1/jobs/{job_id}/cancel', internal: false },
   'jobs.get': { method: 'GET', path: '/v1/jobs/{job_id}', internal: false },
+  'jobs.list_active': { method: 'GET', path: '/v1/courses/{course_id}/jobs', internal: false },
   'learner.concept_evidence': {
     method: 'GET',
     path: '/v1/concepts/{concept_id}/evidence',
@@ -141,6 +171,7 @@ export const OPERATIONS = {
   },
   'provider.set_credential': { method: 'PUT', path: '/v1/provider/credential', internal: true },
   'provider.status': { method: 'GET', path: '/v1/provider', internal: false },
+  'provider.usage': { method: 'GET', path: '/v1/provider/usage', internal: false },
   'sources.delete': { method: 'DELETE', path: '/v1/sources/{source_id}', internal: false },
   'sources.get': { method: 'GET', path: '/v1/sources/{source_id}', internal: false },
   'sources.import_paths': {
@@ -265,6 +296,36 @@ export interface OperationTypes {
     body: ConceptUpdate;
     result: Curriculum;
   };
+  'generation.accept_proposal': {
+    path: { job_id: string };
+    query: undefined;
+    body: ProposalAcceptance;
+    result: Curriculum;
+  };
+  'generation.dismiss_proposal': {
+    path: { job_id: string };
+    query: undefined;
+    body: undefined;
+    result: Job;
+  };
+  'generation.generate_lesson': {
+    path: { concept_id: string };
+    query: undefined;
+    body: undefined;
+    result: Job;
+  };
+  'generation.latest_proposal': {
+    path: { course_id: string };
+    query: undefined;
+    body: undefined;
+    result: LatestJob;
+  };
+  'generation.propose_curriculum': {
+    path: { course_id: string };
+    query: undefined;
+    body: undefined;
+    result: Job;
+  };
   'jobs.cancel': {
     path: { job_id: string };
     query: undefined;
@@ -276,6 +337,12 @@ export interface OperationTypes {
     query: undefined;
     body: undefined;
     result: Job;
+  };
+  'jobs.list_active': {
+    path: { course_id: string };
+    query: undefined;
+    body: undefined;
+    result: JobList;
   };
   'learner.concept_evidence': {
     path: { concept_id: string };
@@ -348,6 +415,12 @@ export interface OperationTypes {
     query: undefined;
     body: undefined;
     result: ProviderStatus;
+  };
+  'provider.usage': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: ProviderUsage;
   };
   'sources.delete': {
     path: { source_id: string };

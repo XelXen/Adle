@@ -1,0 +1,596 @@
+"""What a model is asked to write, and how it becomes something Adle can store.
+
+A model is not asked for the Lesson IR. It is asked for a **draft**: a smaller,
+forgiving shape with no identifiers, no bookkeeping, and no references it could
+get wrong. This module compiles a draft into the IR deterministically:
+
+* identifiers are assigned here, never read from the model;
+* objectives and citations are looked up by the numbers the model was given,
+  and a number that was not offered is dropped, so a citation cannot be invented;
+* durations are computed from the words, not guessed by the model;
+* harmless formatting habits (Markdown emphasis, ``\\( \\)`` mathematics) are
+  normalised, and everything else is left for the IR's own validation to judge.
+
+The result is still untrusted: it goes through ``lessons.bundle.parse_bundle``
+like any other lesson.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+import re
+from dataclasses import dataclass, field
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from adle_core.lessons.ir import (
+    MAX_BEATS,
+    MAX_SEGMENTS,
+    MISCONCEPTION_KINDS,
+    SCHEMA_VERSION,
+    STRATEGIES,
+)
+
+#: A lesson asks for at most this many scenes: each one is a separate model request.
+MAX_SCENES_PER_LESSON = 2
+MAX_PROPOSED_CONCEPTS = 16
+MAX_PROPOSED_OBJECTIVES = 4
+READING_WORDS_PER_MINUTE = 150
+
+
+class DraftError(ValueError):
+    """The model's answer is not a usable draft. ``problems`` says what to fix."""
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("; ".join(problems))
+        self.problems = problems
+
+
+# -- reading the answer ---------------------------------------------------------
+
+_FENCE = re.compile(r"```[a-zA-Z0-9_+-]*[ \t]*\r?\n(.*?)```", re.DOTALL)
+
+
+def extract_json_object(text: str) -> dict[str, Any]:
+    """The one JSON object in a model's answer, with or without a code fence around it."""
+    candidate = text.strip()
+    fenced = _FENCE.search(candidate)
+    if fenced:
+        candidate = fenced.group(1).strip()
+    if not candidate.startswith("{"):
+        start, end = candidate.find("{"), candidate.rfind("}")
+        if start < 0 or end <= start:
+            raise DraftError(["The answer must be one JSON object and nothing else."])
+        candidate = candidate[start : end + 1]
+    try:
+        value = json.loads(candidate)
+    except ValueError as error:
+        raise DraftError(["The answer is not valid JSON."]) from error
+    if not isinstance(value, dict):
+        raise DraftError(["The answer must be one JSON object."])
+    return value
+
+
+def extract_python_file(text: str) -> str:
+    """The Python file in a model's answer: the first fenced block, or the whole answer."""
+    fenced = _FENCE.search(text)
+    source = fenced.group(1) if fenced else text
+    return source.strip() + "\n"
+
+
+# -- tidying text ----------------------------------------------------------------
+
+_PAREN_MATH = re.compile(r"\\\((.+?)\\\)|\\\[(.+?)\\\]", re.DOTALL)
+_BOLD = re.compile(r"\*\*(.+?)\*\*|__(.+?)__")
+_CODE = re.compile(r"`([^`]+)`")
+_LIST_MARK = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+
+
+def tidy(text: str) -> str:
+    """Normalise the formatting habits of a model without changing what is said."""
+    text = _PAREN_MATH.sub(lambda match: f"${(match.group(1) or match.group(2)).strip()}$", text)
+    text = _BOLD.sub(lambda match: match.group(1) or match.group(2), text)
+    text = _CODE.sub(lambda match: match.group(1), text)
+    text = _LIST_MARK.sub("", text)
+    return " ".join(text.split())
+
+
+def _text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = tidy(value)
+    return cleaned or None
+
+
+def _words(text: str) -> int:
+    return len(text.split())
+
+
+# -- the lesson draft ---------------------------------------------------------------
+
+
+class _Draft(BaseModel):
+    # Extra keys are ignored: a model that adds a comment field has not written a bad lesson.
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+
+class BeatDraft(_Draft):
+    say: str = Field(min_length=1)
+    show: str | None = None
+
+
+class SceneDraft(_Draft):
+    #: For whoever writes the scene: what to draw and how it changes.
+    brief: str = Field(min_length=1, max_length=1500)
+    #: The same thing in words, for a learner who cannot see the picture.
+    description: str = Field(min_length=1)
+
+
+class OptionDraft(_Draft):
+    text: str = Field(min_length=1)
+    correct: bool = False
+    feedback: str | None = None
+    misconception: str | None = None
+
+
+class QuestionDraft(_Draft):
+    form: str
+    stem: str = Field(min_length=1)
+    explanation: str = Field(min_length=1)
+    hint: str | None = None
+    #: Which of the concept's objectives this checks, counted from 1 as they were listed.
+    objective: int | None = None
+    difficulty: int = 2
+    transfer: bool = False
+    options: list[OptionDraft] = Field(default_factory=list)
+    correct: bool | None = None
+    answer: float | None = None
+    tolerance: float | None = None
+    unit: str | None = None
+    accepted: list[str] = Field(default_factory=list)
+    items: list[str] = Field(default_factory=list)
+    rubric: list[str] = Field(default_factory=list)
+    sample_answer: str | None = None
+
+
+class SegmentDraft(_Draft):
+    type: str
+    title: str = Field(min_length=1)
+    beats: list[BeatDraft] = Field(default_factory=list)
+    prompt: str | None = None
+    problem: str | None = None
+    scene: SceneDraft | None = None
+    question: QuestionDraft | None = None
+
+
+class LessonDraft(_Draft):
+    title: str = Field(min_length=1)
+    strategy: str = "visual"
+    segments: list[SegmentDraft] = Field(min_length=1)
+    #: The numbers of the supplied passages the lesson draws on.
+    sources: list[int] = Field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectiveRef:
+    id: str
+    statement: str
+
+
+@dataclass(frozen=True, slots=True)
+class PassageRef:
+    """A passage that was shown to the model, as the lesson may cite it."""
+
+    source_id: str
+    section_id: str
+    source_name: str
+    locator: str
+
+
+@dataclass(frozen=True, slots=True)
+class LessonContext:
+    lesson_id: str
+    course_id: str
+    concept_id: str
+    objectives: list[ObjectiveRef]
+    #: In the order they were numbered in the prompt, starting at 1.
+    passages: list[PassageRef] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class SceneBrief:
+    """One scene to be written: everything the scene writer is told."""
+
+    scene_id: str
+    segment_id: str
+    kind: Literal["animation", "interactive"]
+    title: str
+    brief: str
+    description: str
+    narration: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class CompiledLesson:
+    #: The lesson in IR form, not yet validated.
+    lesson: dict[str, Any]
+    scenes: list[SceneBrief]
+
+
+def _problems(error: ValidationError, prefix: str = "") -> list[str]:
+    found = []
+    for item in error.errors(include_input=False, include_url=False):
+        where = ".".join(str(part) for part in item["loc"])
+        message = str(item["msg"]).removeprefix("Value error, ")
+        found.append(f"{prefix}{where}: {message}" if where else f"{prefix}{message}")
+    return found[:12]
+
+
+def parse_lesson_draft(data: dict[str, Any]) -> LessonDraft:
+    try:
+        return LessonDraft.model_validate(data)
+    except ValidationError as error:
+        raise DraftError(_problems(error)) from error
+
+
+_SECONDS_FOR = {"checkpoint": 45, "interaction": 60, "reflection": 25}
+
+
+def _narration(beats: list[BeatDraft]) -> list[dict[str, Any]]:
+    narration = []
+    for beat in beats[:MAX_BEATS]:
+        entry: dict[str, Any] = {"text": tidy(beat.say)}
+        shown = _text(beat.show)
+        if shown:
+            entry["show"] = shown
+        narration.append(entry)
+    return narration
+
+
+def _seconds(kind: str, narration: list[dict[str, Any]]) -> int:
+    spoken = sum(_words(beat["text"]) for beat in narration)
+    reading = math.ceil(spoken / READING_WORDS_PER_MINUTE * 60)
+    return max(10, min(900, reading + _SECONDS_FOR.get(kind, 0)))
+
+
+def _letter(index: int) -> str:
+    return "abcdefghijklmnopqrstuvwxyz"[index]
+
+
+def _question(
+    draft: QuestionDraft, question_id: str, context: LessonContext, problems: list[str], where: str
+) -> dict[str, Any] | None:
+    form = draft.form.strip().lower().replace("-", "_").replace(" ", "_")
+    item: dict[str, Any] = {
+        "id": question_id,
+        "form": form,
+        "concept_id": context.concept_id,
+        "stem": tidy(draft.stem),
+        "explanation": tidy(draft.explanation),
+        "difficulty": min(3, max(1, draft.difficulty)),
+        "is_transfer": draft.transfer,
+    }
+    hint = _text(draft.hint)
+    if hint:
+        item["hint"] = hint
+    if draft.objective is not None and 1 <= draft.objective <= len(context.objectives):
+        item["objective_id"] = context.objectives[draft.objective - 1].id
+
+    if form in ("multiple_choice", "prediction"):
+        options = draft.options[:5]
+        correct = [index for index, option in enumerate(options) if option.correct]
+        if len(correct) != 1:
+            problems.append(f'{where}: exactly one option must have "correct": true')
+            return None
+        item["options"] = []
+        for index, option in enumerate(options):
+            entry: dict[str, Any] = {"id": _letter(index), "text": tidy(option.text)}
+            feedback = _text(option.feedback)
+            if feedback:
+                entry["feedback"] = feedback
+            kind = (option.misconception or "").strip().lower()
+            # An unknown label is dropped rather than refused: it is only a hypothesis.
+            if kind in MISCONCEPTION_KINDS and not option.correct:
+                entry["misconception"] = kind
+            item["options"].append(entry)
+        item["correct_option"] = _letter(correct[0])
+    elif form == "true_false":
+        if draft.correct is None:
+            problems.append(f'{where}: a true_false question needs "correct": true or false')
+            return None
+        item["correct"] = draft.correct
+    elif form == "numeric":
+        if draft.answer is None:
+            problems.append(f'{where}: a numeric question needs a number in "answer"')
+            return None
+        item["expected"] = draft.answer
+        item["tolerance"] = abs(draft.tolerance) if draft.tolerance is not None else 0.0
+        unit = _text(draft.unit)
+        if unit:
+            item["unit"] = unit
+    elif form == "short_answer":
+        accepted = [tidy(answer) for answer in draft.accepted if tidy(answer)][:8]
+        if not accepted:
+            problems.append(f'{where}: a short_answer question needs "accepted" answers')
+            return None
+        item["accepted"] = accepted
+    elif form == "ordering":
+        items = [tidy(entry) for entry in draft.items if tidy(entry)][:6]
+        item["items"] = [{"id": _letter(index), "text": text} for index, text in enumerate(items)]
+    elif form == "explanation":
+        rubric = [tidy(point) for point in draft.rubric if tidy(point)][:5]
+        item["rubric"] = [
+            {"id": f"p{index + 1}", "text": text} for index, text in enumerate(rubric)
+        ]
+        item["required_points"] = max(1, math.ceil(len(rubric) / 2))
+        item["sample_answer"] = tidy(draft.sample_answer or "")
+    else:
+        problems.append(f'{where}: "{draft.form}" is not a question form Adle has')
+        return None
+    return item
+
+
+def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson:
+    """Turn a draft into an (unvalidated) lesson in IR form, plus the scenes still to be written.
+
+    Raises ``DraftError`` for problems only a rewrite can fix. Everything else is
+    left to ``parse_bundle``, which reports precisely.
+    """
+    problems: list[str] = []
+    segments: list[dict[str, Any]] = []
+    scenes: list[SceneBrief] = []
+    questions = 0
+
+    for index, segment in enumerate(draft.segments[:MAX_SEGMENTS]):
+        where = f"segments.{index}"
+        kind = segment.type.strip().lower().replace("-", "_").replace(" ", "_")
+        segment_id = f"seg_{index + 1}"
+        narration = _narration(segment.beats)
+        entry: dict[str, Any] = {
+            "id": segment_id,
+            "type": kind,
+            "title": tidy(segment.title),
+            "narration": narration,
+        }
+
+        if kind == "checkpoint":
+            if segment.question is None:
+                problems.append(f"{where}: a checkpoint needs a question")
+                continue
+            questions += 1
+            question = _question(
+                segment.question, f"q_{questions}", context, problems, f"{where}.question"
+            )
+            if question is None:
+                continue
+            entry["question"] = question
+        elif kind in ("interaction", "reflection"):
+            entry["prompt"] = tidy(segment.prompt or "")
+        elif kind == "worked_example":
+            entry["problem"] = tidy(segment.problem or "")
+        elif kind not in ("explanation", "visualization", "summary"):
+            problems.append(f'{where}: "{segment.type}" is not a kind of segment Adle has')
+            continue
+
+        wants_scene = kind in ("visualization", "interaction") or (
+            kind in ("explanation", "worked_example") and segment.scene is not None
+        )
+        if wants_scene and segment.scene is not None and len(scenes) < MAX_SCENES_PER_LESSON:
+            scene_id = f"scn_{len(scenes) + 1}"
+            description = tidy(segment.scene.description)
+            entry["scene"] = {"scene_id": scene_id, "fallback_text": description}
+            scenes.append(
+                SceneBrief(
+                    scene_id=scene_id,
+                    segment_id=segment_id,
+                    kind="interactive" if kind == "interaction" else "animation",
+                    title=entry["title"],
+                    brief=tidy(segment.scene.brief),
+                    description=description,
+                    narration=[beat["text"] for beat in narration],
+                )
+            )
+        elif kind in ("visualization", "interaction"):
+            # No scene was described, or the lesson already has as many as it may ask for:
+            # the part is still worth having as words.
+            described = tidy(segment.scene.description) if segment.scene else None
+            entry = _as_explanation(entry, described)
+
+        entry["estimated_seconds"] = _seconds(entry["type"], entry["narration"])
+        segments.append(entry)
+
+    if problems:
+        raise DraftError(problems[:12])
+
+    strategy = draft.strategy.strip().lower().replace("-", "_").replace(" ", "_")
+    cited: dict[str, PassageRef] = {}
+    for number in draft.sources:
+        # Only passages that were actually supplied can be cited.
+        if 1 <= number <= len(context.passages):
+            passage = context.passages[number - 1]
+            cited.setdefault(passage.section_id, passage)
+
+    total_seconds = sum(segment["estimated_seconds"] for segment in segments)
+    lesson: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "lesson_id": context.lesson_id,
+        "course_id": context.course_id,
+        "title": tidy(draft.title),
+        "concept_ids": [context.concept_id],
+        "objectives": [
+            {"objective_id": objective.id, "statement": objective.statement}
+            for objective in context.objectives[:6]
+        ],
+        "source_refs": [
+            {
+                "source_id": passage.source_id,
+                "section_id": passage.section_id,
+                "source_name": passage.source_name,
+                "locator": passage.locator,
+            }
+            for passage in list(cited.values())[:12]
+        ],
+        "grounding": "materials" if cited else "general_knowledge",
+        "strategy": strategy if strategy in STRATEGIES else "visual",
+        "estimated_minutes": max(1, min(60, math.ceil(total_seconds / 60))),
+        "segments": segments,
+    }
+    return CompiledLesson(lesson=lesson, scenes=scenes)
+
+
+def _as_explanation(segment: dict[str, Any], described: str | None) -> dict[str, Any]:
+    """The same part without its scene: narration, with the picture's description on the board."""
+    narration = [dict(beat) for beat in segment.get("narration", [])]
+    nothing_shown = not any(beat.get("show") for beat in narration)
+    if narration and described and len(described) <= 600 and nothing_shown:
+        narration[0]["show"] = described
+    return {
+        "id": segment["id"],
+        "type": "explanation",
+        "title": segment["title"],
+        "narration": narration,
+        "estimated_seconds": _seconds("explanation", narration),
+    }
+
+
+def without_scene(lesson: dict[str, Any], scene_id: str) -> dict[str, Any]:
+    """The lesson with one scene taken out, for when that scene could not be made.
+
+    A visualization or an interaction becomes an explanation that carries the
+    scene's description; any other part simply loses its picture.
+    """
+    segments = []
+    for segment in lesson["segments"]:
+        scene = segment.get("scene")
+        if not scene or scene.get("scene_id") != scene_id:
+            segments.append(segment)
+        elif segment["type"] in ("visualization", "interaction"):
+            segments.append(_as_explanation(segment, scene.get("fallback_text")))
+        else:
+            segments.append({key: value for key, value in segment.items() if key != "scene"})
+    return {**lesson, "segments": segments}
+
+
+def as_visualization(lesson: dict[str, Any], scene_id: str) -> dict[str, Any]:
+    """An interaction whose scene turned out to have nothing to operate becomes a visualization."""
+    segments = []
+    for segment in lesson["segments"]:
+        scene = segment.get("scene")
+        if scene and scene.get("scene_id") == scene_id and segment["type"] == "interaction":
+            changed = {key: value for key, value in segment.items() if key != "prompt"}
+            changed["type"] = "visualization"
+            changed["estimated_seconds"] = _seconds("visualization", changed["narration"])
+            segments.append(changed)
+        else:
+            segments.append(segment)
+    return {**lesson, "segments": segments}
+
+
+# -- the curriculum draft -------------------------------------------------------
+
+
+class ConceptDraft(_Draft):
+    title: str = Field(min_length=1)
+    summary: str = ""
+    objectives: list[str] = Field(default_factory=list)
+    #: Numbers of earlier concepts in this list (counted from 1) that must come first.
+    needs: list[int] = Field(default_factory=list)
+    #: One reason per entry of ``needs``, in the same order.
+    reasons: list[str] = Field(default_factory=list)
+    #: Numbers of the supplied headings this concept is drawn from.
+    sources: list[int] = Field(default_factory=list)
+
+
+class CurriculumDraft(_Draft):
+    concepts: list[ConceptDraft] = Field(min_length=1)
+
+
+@dataclass(frozen=True, slots=True)
+class ProposedNeed:
+    #: Index into the proposal's own list of concepts.
+    index: int
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProposedConcept:
+    title: str
+    summary: str
+    objectives: list[str]
+    needs: list[ProposedNeed]
+    section_ids: list[str]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "title": self.title,
+            "summary": self.summary,
+            "objectives": self.objectives,
+            "needs": [{"index": need.index, "reason": need.reason} for need in self.needs],
+            "section_ids": self.section_ids,
+        }
+
+
+def _clip(text: str, limit: int) -> str:
+    """Shorten at a word boundary. Used for titles and summaries, never for lesson content."""
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:") or text[:limit]
+
+
+def compile_curriculum(
+    data: dict[str, Any], *, existing_titles: list[str], section_ids: list[str]
+) -> list[ProposedConcept]:
+    """Turn a model's proposal into concepts that can be offered to the learner.
+
+    A concept may only need concepts listed before it, so the proposal cannot
+    contain a loop. Concepts the course already has are left out, and so are
+    references to them.
+    """
+    try:
+        draft = CurriculumDraft.model_validate(data)
+    except ValidationError as error:
+        raise DraftError(_problems(error)) from error
+
+    taken = {" ".join(title.split()).casefold() for title in existing_titles}
+    #: Position in the draft -> position in what is kept.
+    kept: dict[int, int] = {}
+    proposed: list[ProposedConcept] = []
+    for position, concept in enumerate(draft.concepts):
+        if len(proposed) >= MAX_PROPOSED_CONCEPTS:
+            break
+        title = _clip(tidy(concept.title), 120)
+        if not title or title.casefold() in taken:
+            continue
+        taken.add(title.casefold())
+        needs: dict[int, ProposedNeed] = {}
+        for order, number in enumerate(concept.needs):
+            earlier = number - 1
+            if earlier in kept and earlier < position:
+                reason = tidy(concept.reasons[order]) if order < len(concept.reasons) else ""
+                needs.setdefault(
+                    kept[earlier], ProposedNeed(index=kept[earlier], reason=_clip(reason, 300))
+                )
+        sections: dict[str, None] = {}
+        for number in concept.sources:
+            if 1 <= number <= len(section_ids):
+                sections.setdefault(section_ids[number - 1])
+        objectives = [
+            _clip(tidy(statement), 300) for statement in concept.objectives if tidy(statement)
+        ][:MAX_PROPOSED_OBJECTIVES]
+        kept[position] = len(proposed)
+        proposed.append(
+            ProposedConcept(
+                title=title,
+                summary=_clip(tidy(concept.summary), 600),
+                objectives=objectives,
+                needs=list(needs.values())[:6],
+                section_ids=list(sections)[:6],
+            )
+        )
+    if not proposed:
+        raise DraftError(
+            ["The proposal contains no concept that the course does not already have."]
+        )
+    return proposed

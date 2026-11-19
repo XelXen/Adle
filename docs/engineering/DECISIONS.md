@@ -17,6 +17,7 @@ supersedes the old one and update this index.
 | [009](../decisions/ADR-009-curriculum-and-learner-model.md) | The concept graph is validated on every write; knowledge is an append-only record folded through BKT into four qualitative states; no score ever leaves the core. |
 | [010](../decisions/ADR-010-lesson-ir-and-playback.md) | The Lesson IR is defined once in the core and published as JSON Schema; lessons enter through one validating gateway and their scenes are re-checked on every read; answer keys never leave the core; the lesson player takes its clock from the narrator. |
 | [011](../decisions/ADR-011-brand-mark-and-colour.md) | The mark is the owner's "ad" monogram, drawn as vectors and verified against the artwork; the brand colour is its teal; success keeps a green of its own; app icons are rendered from the vectors by Electron. |
+| [012](../decisions/ADR-012-provider-quota-and-generation.md) | One module sends, one decides the quota, one records; no sampling parameters; a model writes a forgiving draft that is compiled into the Lesson IR, so ids and citations cannot be invented; a fixed, small number of requests per job; a proposal adds nothing until the learner picks. |
 
 ## Smaller standing choices (no ADR)
 

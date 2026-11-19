@@ -1,0 +1,47 @@
+{
+  "concepts": [
+    {
+      "title": "Limits",
+      "summary": "What a function approaches as its input approaches a value.",
+      "objectives": [
+        "Estimate a limit from a table of values.",
+        "Explain why a limit can exist where the function is not defined."
+      ],
+      "needs": [],
+      "reasons": [],
+      "sources": []
+    },
+    {
+      "title": "The derivative as a limit",
+      "summary": "The slope of a curve at a point, defined as the limit of the slopes of chords.",
+      "objectives": [
+        "Compute a derivative from the limit definition for a simple polynomial.",
+        "Interpret a derivative as a rate of change."
+      ],
+      "needs": [
+        1
+      ],
+      "reasons": [
+        "The derivative is defined as a limit."
+      ],
+      "sources": []
+    },
+    {
+      "title": "Differentiation rules",
+      "summary": "The power, sum, and product rules that make differentiation quick.",
+      "objectives": [
+        "Apply the power rule and the sum rule to a polynomial."
+      ],
+      "needs": [
+        2,
+        1,
+        7
+      ],
+      "reasons": [
+        "The rules are shortcuts for the limit definition.",
+        "Limits again."
+      ],
+      "sources": []
+    }
+  ]
+}
