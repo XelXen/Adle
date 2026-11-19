@@ -979,6 +979,8 @@ _Last updated: 2026-11-19._
 
 - **Colour tokens** adjusted where the starting values missed WCAG AA: `muted`, a separate filled
   `action` colour, `border-strong`, and `*-text` companions for accents (ADR-006).
+- **The brand is the owner's "ad" mark and its teal**, not the green of section 4.2. Success keeps
+  the green (ADR-011).
 - **There is no `packages/lesson-ir`.** The Lesson IR is defined once, in the core, and its JSON
   Schema is generated into `packages/contracts/schemas/` with the API contract (ADR-010).
 - **Questions are scored and recorded from M4**, not M6: a lesson without working questions is

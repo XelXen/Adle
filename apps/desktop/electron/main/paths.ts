@@ -15,6 +15,14 @@ export const paths = {
   rendererDir: path.join(DIST_DIR, 'renderer'),
   playerDir: path.join(DIST_DIR, 'player'),
   preloadScript: path.join(DIST_DIR, 'electron', 'preload.cjs'),
+  /** The app icon for the window and taskbar. Rendered by `npm run icons`, committed. */
+  windowIcon: path.join(
+    DIST_DIR,
+    '..',
+    'assets',
+    'icons',
+    process.platform === 'win32' ? 'icon.ico' : 'icon.png',
+  ),
 
   /** Repository root; only meaningful in development (unpackaged) runs. */
   repoRoot: path.resolve(DIST_DIR, '..', '..', '..'),

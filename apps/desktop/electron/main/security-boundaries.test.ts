@@ -2,6 +2,7 @@
  * Unit tests for the main-process security boundaries: what may be loaded,
  * who may call the bridge, and which core operations the renderer can reach.
  */
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
@@ -72,6 +73,18 @@ describe('main window', () => {
     // Not hidden until `ready-to-show`: see the note in window.ts.
     expect(options.show).toBe(true);
     expect(options.backgroundColor).toBe('#F6F8F4');
+  });
+
+  it('carries the app icon, which exists in the repository', () => {
+    createMainWindow({ showDevTools: false });
+    const options = createdWindows.at(-1) as { icon: string };
+    expect(options.icon).toMatch(/assets[\\/]icons[\\/]icon\.(ico|png)$/);
+    expect(existsSync(options.icon)).toBe(true);
+    // Both forms are committed, whichever platform the test runs on.
+    const icons = path.dirname(options.icon);
+    for (const file of ['icon.ico', 'icon.png', 'icon-1024.png']) {
+      expect(existsSync(path.join(icons, file)), file).toBe(true);
+    }
   });
 });
 

@@ -12,6 +12,7 @@ import {
   ErrorState,
   IconButton,
   LoadingState,
+  Logo,
   ProgressBar,
   RadioGroup,
   SegmentedControl,
@@ -415,6 +416,23 @@ describe('Toast', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Key saved');
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss notification' }));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('Logo', () => {
+  it('is one image named for the product, with the wordmark as decoration', () => {
+    const { container } = render(<Logo />);
+    // The name is announced once: by the mark, not again by the word beside it.
+    expect(screen.getByRole('img', { name: 'Adle' })).toBeInTheDocument();
+    expect(screen.getByText('Adle')).toHaveAttribute('aria-hidden', 'true');
+    // Two letters: the "a" as one shape, the "d" as a ring and a stem.
+    expect(container.querySelectorAll('svg path, svg circle')).toHaveLength(3);
+  });
+
+  it('can be shown as the mark alone', () => {
+    render(<Logo wordmark={false} size="large" />);
+    expect(screen.getByRole('img', { name: 'Adle' })).toBeInTheDocument();
+    expect(screen.queryByText('Adle')).not.toBeInTheDocument();
   });
 });
 

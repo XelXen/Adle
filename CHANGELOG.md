@@ -51,6 +51,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
   instead and the rest of the lesson is unaffected.
 - Full keyboard operation, visible focus, reduced-motion support, and text that scales to 200%.
 
+### Changed
+
+- Adle has its logo: the letters "a" and "d" as two linked rings. It appears in the app, in the
+  window and taskbar icon, and the app's accent colour is now the logo's teal. Green is kept for
+  one meaning only: something went well.
+
 ### Notes
 
 - Only the first concept of the sample course has a lesson so far, and lessons cannot yet be

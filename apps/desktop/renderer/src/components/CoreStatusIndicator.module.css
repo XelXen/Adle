@@ -27,7 +27,7 @@
 }
 
 .ready .dot {
-  background: var(--ad-color-primary);
+  background: var(--ad-color-success);
 }
 
 .starting .dot {

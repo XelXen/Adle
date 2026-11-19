@@ -5,31 +5,27 @@
   color: var(--ad-color-ink);
 }
 
+/* The mark is a little wider than it is tall (72 by 63), so only its height is set. */
 .mark {
   flex: none;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: auto;
+  height: 1.625rem;
+  aspect-ratio: 72 / 63;
 }
 
 .large .mark {
-  width: 3rem;
   height: 3rem;
 }
 
-.tile {
-  fill: var(--ad-color-action);
+.a {
+  fill: var(--ad-color-brand-ink);
 }
 
-.stem {
-  stroke: var(--ad-color-on-action);
-}
-
-.leaf {
-  fill: var(--ad-color-on-action);
-}
-
-.leafSmall {
-  fill: var(--ad-color-sun);
+.d {
+  fill: none;
+  stroke: var(--ad-color-primary);
+  stroke-width: 9;
+  stroke-linecap: round;
 }
 
 .wordmark {

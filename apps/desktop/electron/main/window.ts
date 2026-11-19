@@ -19,6 +19,8 @@ export function createMainWindow(options: { showDevTools: boolean }): BrowserWin
     // below matches the app canvas, so showing early does not flash white.
     show: true,
     title: 'Adle',
+    // Windows and Linux take the window and taskbar icon from here; macOS uses the bundle's.
+    icon: paths.windowIcon,
     backgroundColor: nativeTheme.shouldUseDarkColors ? CANVAS_DARK : CANVAS_LIGHT,
     autoHideMenuBar: true,
     webPreferences: {

@@ -21,7 +21,8 @@ Code: `packages/design-system`. Import components from `@adle/design-system`; im
 
 All values live in `src/styles/tokens.css` as `--ad-*` custom properties. Nothing else may define
 a colour (a test enforces this). Changes from the starting palette are explained in
-`docs/decisions/ADR-006-design-tokens-and-theme.md`.
+`docs/decisions/ADR-006-design-tokens-and-theme.md`, and the brand colour in
+`docs/decisions/ADR-011-brand-mark-and-colour.md`.
 
 ### Colour
 
@@ -34,11 +35,13 @@ a colour (a test enforces this). Changes from the starting palette are explained
 | `muted` | `#5F6E65` | `#9DB0A5` | Secondary text |
 | `border` | `#DCE5DC` | `#2C3A32` | Hairlines, card outlines |
 | `border-strong` | `#7F9084` | `#6C8176` | Boundaries of inputs and switches (3:1) |
-| `primary` | `#269B62` | `#3DBE7F` | Brand marks, progress, selection |
-| `primary-soft` | `#E2F4E9` | `#1C3327` | Selected and success backgrounds |
-| `primary-text` | `#1B7549` | `#6AD3A0` | Green used as text or icon |
-| `action` / `-hover` / `-pressed` | `#1F8352` / `#186B43` / `#135636` | `#4CC78C` / `#63D39D` / `#7BDCAE` | Filled primary buttons |
-| `on-action` | `#FFFFFF` | `#0C1410` | Text on `action` |
+| `primary` | `#167D8D` | `#3FB4C5` | The brand teal: the mark, progress, selection |
+| `primary-soft` | `#DFF1F3` | `#16323A` | Selected and highlighted backgrounds |
+| `primary-text` | `#0F6672` | `#6FD1DD` | Teal used as text or icon |
+| `action` / `-hover` / `-pressed` | `#167D8D` / `#116876` / `#0D545F` | `#4CC0D0` / `#66CDDB` / `#80D9E5` | Filled primary buttons |
+| `on-action` | `#FFFFFF` | `#06161A` | Text on `action` |
+| `brand-ink` | `#071B2B` | `#E7EFE9` | The dark letter of the mark. Nothing else |
+| `success` / `-soft` / `-text` | `#269B62` / `#E2F4E9` / `#1B7549` | `#3DBE7F` / `#1C3327` / `#6AD3A0` | Something went well: success badges, callouts, toasts |
 | `sun`, `coral`, `blue`, `violet` | `#F2C14E` `#EF806C` `#5B8DE6` `#9178D7` | `#E9BE5A` `#F08F7D` `#7BA4EE` `#A694E3` | Accents and visualization. **Not for text.** |
 | `*-soft` / `*-text` | — | — | Tinted background and its readable text, per accent |
 | `danger` / `-soft` / `-text` | `#C84E4E` … | `#E57373` … | Errors and destructive actions |
@@ -48,7 +51,10 @@ Contrast is checked by `tokens.test.ts` for both themes: text pairs ≥ 4.5:1 (i
 boundaries and marks ≥ 3:1.
 
 **Do** pair an accent's `-soft` background with its `-text` colour.
-**Don't** put `sun`, `coral`, `blue`, or `violet` text on a surface, or white text on `primary`.
+**Do** use `success` for an outcome and `primary` for the product: they are different colours on
+purpose.
+**Don't** put `sun`, `coral`, `blue`, or `violet` text on a surface. For a filled control use
+`action` with `on-action`, never a colour pair of your own.
 
 ### Typography
 
@@ -192,11 +198,30 @@ Start before anything has played, Continue once the part has come to rest.
 - `prefers-reduced-motion` and `prefers-color-scheme` are honoured.
 - axe (WCAG 2.2 AA) runs on every screen in both themes in the end-to-end suite.
 
+## The mark
+
+The Adle mark is the letters "a" and "d" as two interlocking rings, the "d" in front.
+
+| What | Where |
+|---|---|
+| The owner's artwork | `apps/desktop/assets/brand/adle-logo.png` |
+| The same shapes as vectors | `apps/desktop/assets/brand/mark.svg` |
+| In the interface | `Logo` (`@adle/design-system`), with or without the word "Adle" |
+| App icons | `apps/desktop/assets/icons/` (`npm run icons`; do not edit by hand) |
+
+- In the interface the "d" is `primary` and the "a" is `brand-ink`, so the mark follows the
+  theme. Do not recolour it, outline it, tilt it, or put it on a busy background.
+- Keep clear space of at least the width of one ring's stroke on every side.
+- Smallest size: 20 px high. Below that the gap between the rings closes.
+- The app icon is the mark on a rounded tile of the artwork's own backdrop (`#EEEEEE`).
+- `npm run icons:verify` checks that the vectors still match the artwork.
+
 ## Scenes
 
-Wanim scenes use the same palette through `src/scene-palette.ts` and the conventions in
-`skills/wanim-scene-authoring/SKILL.md`. The stage background is the `surface` token, supplied by
-the player.
+Wanim scenes have a small palette of their own (`src/scene-palette.ts`, mirrored from the tokens
+and listed in `skills/wanim-scene-authoring/SKILL.md`). Its `green` is the `success` green, not
+the brand teal: inside a picture colours tell things apart, they do not carry the brand. The
+stage background is the `surface` token, supplied by the player.
 
 ## Seeing it
 

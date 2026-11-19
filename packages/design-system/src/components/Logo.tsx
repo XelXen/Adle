@@ -9,26 +9,27 @@ export interface LogoProps {
 }
 
 /**
- * The Adle mark: a sprout made of two leaves on a stem. Original geometry,
- * deliberately simple so it reads at 20 px and never becomes a mascot.
+ * The Adle mark: the letters "a" and "d" as two interlocking rings, the "d" passing in
+ * front of the "a".
+ *
+ * Geometry is taken from the original artwork (`apps/desktop/assets/brand`) at one tenth
+ * of its scale: rings of outer radius 24 and stroke 9 whose centres are one radius apart,
+ * and a stem that rises from the right edge of the "d" to a round cap. The "a" is its ring
+ * minus the whole disc of the "d", which is what makes the two read as linked.
+ *
+ * The "d" takes the brand colour. The "a" takes `brand-ink`, which is the artwork's navy
+ * on light surfaces and a near-white on dark ones, so the mark never disappears.
  */
 export function Logo({ wordmark = true, size = 'medium', className }: LogoProps) {
   return (
     <span className={cx(styles.logo, styles[size], className)}>
-      <svg className={styles.mark} viewBox="0 0 32 32" role="img" aria-label="Adle">
-        <rect className={styles.tile} width="32" height="32" rx="9" />
+      <svg className={styles.mark} viewBox="0 0 72 63" role="img" aria-label="Adle">
         <path
-          className={styles.stem}
-          d="M16 25V14"
-          fill="none"
-          strokeWidth="2.4"
-          strokeLinecap="round"
+          className={styles.a}
+          d="M36 18.215A24 24 0 1 0 36 59.785A24 24 0 0 1 28.688 53.249A15 15 0 1 1 28.688 24.751A24 24 0 0 1 36 18.215Z"
         />
-        <path className={styles.leaf} d="M16 15c0-4.4 3.1-7.5 7.5-7.5 0 4.4-3.1 7.5-7.5 7.5Z" />
-        <path
-          className={styles.leafSmall}
-          d="M16 19c0-3.3-2.4-5.6-5.7-5.6 0 3.3 2.4 5.6 5.7 5.6Z"
-        />
+        <circle className={styles.d} cx="48" cy="39" r="19.5" />
+        <path className={styles.d} d="M67.5 4.5V39" />
       </svg>
       {wordmark ? (
         <span className={styles.wordmark} aria-hidden="true">

@@ -23,8 +23,8 @@
 }
 
 .success {
-  background: var(--ad-color-primary-soft);
-  color: var(--ad-color-primary-text);
+  background: var(--ad-color-success-soft);
+  color: var(--ad-color-success-text);
 }
 
 .info {

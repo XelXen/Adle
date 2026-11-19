@@ -4,8 +4,10 @@
  * Rules:
  *   - Components and screens use these variables. No raw hex values, radii, or
  *     spacing numbers anywhere else (enforced by tokens.test.ts).
- *   - The dark theme is designed, not inverted: deep forest surfaces, softened
- *     accents, and its own action colours.
+ *   - The brand colour is the teal of the Adle mark. Success has a green of its own,
+ *     so "this is the product" and "this went well" never look the same.
+ *   - The dark theme is designed, not inverted: deep surfaces, softened accents, and
+ *     its own action colours.
  *   - The theme follows `prefers-color-scheme`. The desktop shell maps the
  *     learner's choice (system / light / dark) onto it, so there is exactly one
  *     theming mechanism.
@@ -27,15 +29,22 @@
   --ad-color-border-strong: #7f9084;
 
   /* ---- Colour: brand and actions ---------------------------------------- */
-  --ad-color-primary: #269b62;
-  --ad-color-primary-soft: #e2f4e9;
-  /* Filled actions use a deeper green so white labels reach 4.5:1. */
-  --ad-color-action: #1f8352;
-  --ad-color-action-hover: #186b43;
-  --ad-color-action-pressed: #135636;
+  /* The teal of the mark. White labels on it reach 4.5:1, so it is also the filled action. */
+  --ad-color-primary: #167d8d;
+  --ad-color-primary-soft: #dff1f3;
+  --ad-color-action: #167d8d;
+  --ad-color-action-hover: #116876;
+  --ad-color-action-pressed: #0d545f;
   --ad-color-on-action: #ffffff;
-  /* Green used as text or icon on light surfaces. */
-  --ad-color-primary-text: #1b7549;
+  /* Teal used as text or icon on light surfaces, including on primary-soft. */
+  --ad-color-primary-text: #0f6672;
+  /* The dark letter of the mark. Only the logo uses it. */
+  --ad-color-brand-ink: #071b2b;
+
+  /* ---- Colour: success ---------------------------------------------------- */
+  --ad-color-success: #269b62;
+  --ad-color-success-soft: #e2f4e9;
+  --ad-color-success-text: #1b7549;
 
   /* ---- Colour: accents --------------------------------------------------- */
   --ad-color-sun: #f2c14e;
@@ -123,14 +132,19 @@
     --ad-color-border: #2c3a32;
     --ad-color-border-strong: #6c8176;
 
-    --ad-color-primary: #3dbe7f;
-    --ad-color-primary-soft: #1c3327;
+    --ad-color-primary: #3fb4c5;
+    --ad-color-primary-soft: #16323a;
     /* On dark surfaces the action is a bright fill with dark text. */
-    --ad-color-action: #4cc78c;
-    --ad-color-action-hover: #63d39d;
-    --ad-color-action-pressed: #7bdcae;
-    --ad-color-on-action: #0c1410;
-    --ad-color-primary-text: #6ad3a0;
+    --ad-color-action: #4cc0d0;
+    --ad-color-action-hover: #66cddb;
+    --ad-color-action-pressed: #80d9e5;
+    --ad-color-on-action: #06161a;
+    --ad-color-primary-text: #6fd1dd;
+    --ad-color-brand-ink: #e7efe9;
+
+    --ad-color-success: #3dbe7f;
+    --ad-color-success-soft: #1c3327;
+    --ad-color-success-text: #6ad3a0;
 
     --ad-color-sun: #e9be5a;
     --ad-color-sun-soft: #33290f;

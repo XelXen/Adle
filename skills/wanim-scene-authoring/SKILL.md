@@ -78,8 +78,8 @@ class NeuronWeight(InteractiveScene):
 ### Colour
 
 Scenes cannot read CSS, so they pick colours from `self.theme` in `setup()`. Use only this palette.
-It mirrors the Sprout design tokens; `packages/design-system/src/tokens.test.ts` fails if the two
-drift apart.
+It mirrors the Sprout design tokens (`green` is the success green, not the app's teal accent);
+`packages/design-system/src/tokens.test.ts` fails if the two drift apart.
 
 | Name | Light | Dark | Use |
 |---|---|---|---|

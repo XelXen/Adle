@@ -62,6 +62,9 @@ path, a URL, or a directory from the renderer.
   builds the renderer and player with Vite. Output goes to `dist/` (not committed).
 - There is no dev server (ADR-003). `npm run dev` rebuilds and restarts Electron.
 - `ADLE_USER_DATA_DIR=<dir>` runs against an isolated profile. Tests always set it.
+- `assets/brand/` holds the logo artwork and its vector form; `assets/icons/` is rendered from
+  it by `npm run icons` and committed. The window reads its icon from `assets/icons/` at run
+  time (`paths.windowIcon`), so packaging must ship that folder (M8).
 
 ## Tests
 

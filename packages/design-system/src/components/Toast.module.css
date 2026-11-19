@@ -38,7 +38,7 @@
 }
 
 .success .icon {
-  color: var(--ad-color-primary-text);
+  color: var(--ad-color-success-text);
 }
 
 .info .icon {

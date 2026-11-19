@@ -16,6 +16,7 @@ supersedes the old one and update this index.
 | [008](../decisions/ADR-008-window-shown-immediately.md) | The main window is created visible, on the canvas colour; nothing waits for `ready-to-show`, which occasionally never came. |
 | [009](../decisions/ADR-009-curriculum-and-learner-model.md) | The concept graph is validated on every write; knowledge is an append-only record folded through BKT into four qualitative states; no score ever leaves the core. |
 | [010](../decisions/ADR-010-lesson-ir-and-playback.md) | The Lesson IR is defined once in the core and published as JSON Schema; lessons enter through one validating gateway and their scenes are re-checked on every read; answer keys never leave the core; the lesson player takes its clock from the narrator. |
+| [011](../decisions/ADR-011-brand-mark-and-colour.md) | The mark is the owner's "ad" monogram, drawn as vectors and verified against the artwork; the brand colour is its teal; success keeps a green of its own; app icons are rendered from the vectors by Electron. |
 
 ## Smaller standing choices (no ADR)
 

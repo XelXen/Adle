@@ -1,3 +1,5 @@
+<img src="apps/desktop/assets/icons/icon.png" alt="" width="88" align="right">
+
 # Adle
 
 **Learn at your own pace. Understand for real.**

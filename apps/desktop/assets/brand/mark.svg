@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280">
+  <!--
+    The Adle mark, redrawn as vectors from adle-logo.png on the same 1280 grid.
+
+    Two rings of outer radius 240 and stroke 90 whose centres are one radius apart: the
+    "a" at (520, 680) and the "d" at (760, 680). The "d" passes in front, so the "a" is
+    its ring minus the whole disc of the "d". The stem of the "d" rises from the ring's
+    right edge to a round cap centred at (955, 335).
+  -->
+  <path
+    fill="#071b2b"
+    d="M640 472.154A240 240 0 1 0 640 887.846A240 240 0 0 1 566.875 822.488A150 150 0 1 1 566.875 537.512A240 240 0 0 1 640 472.154Z"
+  />
+  <g fill="none" stroke="#167d8d" stroke-width="90" stroke-linecap="round">
+    <circle cx="760" cy="680" r="195" />
+    <path d="M955 335V680" />
+  </g>
+</svg>

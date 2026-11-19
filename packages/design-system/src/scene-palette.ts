@@ -24,7 +24,8 @@ export const SCENE_PALETTE_TOKENS: Record<keyof ScenePalette, string> = {
   background: '--ad-color-surface',
   ink: '--ad-color-ink',
   muted: '--ad-color-muted',
-  green: '--ad-color-primary',
+  // Scenes keep their green. It is the success green, not the brand's teal.
+  green: '--ad-color-success',
   sun: '--ad-color-sun',
   coral: '--ad-color-coral',
   blue: '--ad-color-blue',

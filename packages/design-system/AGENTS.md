@@ -9,6 +9,9 @@ Read the root `AGENTS.md` and `DESIGN_SYSTEM.md` first.
   else. `tokens.test.ts` fails on a raw colour in any stylesheet here or in the renderer.
 - **A new or changed colour must pass contrast in both themes.** Add its pairings to `PAIRS` in
   `tokens.test.ts`. The dark theme must define every colour token.
+- **Brand and success are different colours.** `primary` / `action` are the teal of the mark;
+  `success` is green and means only "this went well". `brand-ink` is for the logo alone
+  (ADR-011).
 - If you change a token that scenes use, update `src/scene-palette.ts` and the palette table in
   `skills/wanim-scene-authoring/SKILL.md` (a test checks the first; you check the second).
 - **One component, one file pair:** `Name.tsx` + `Name.module.css`, exported from `src/index.ts`.
