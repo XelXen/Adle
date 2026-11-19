@@ -1,0 +1,49 @@
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ad-space-3);
+  max-width: var(--ad-layout-reading-max);
+  margin: 0 auto;
+  padding: var(--ad-space-8) var(--ad-space-5);
+  text-align: center;
+}
+
+.visual {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-bottom: var(--ad-space-2);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-primary-soft);
+  color: var(--ad-color-primary-text);
+}
+
+.visual svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.errorVisual {
+  background: var(--ad-color-danger-soft);
+  color: var(--ad-color-danger-text);
+}
+
+.title {
+  font: var(--ad-text-heading);
+}
+
+.description {
+  font: var(--ad-text-body);
+  color: var(--ad-color-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--ad-space-3);
+  margin-top: var(--ad-space-3);
+}

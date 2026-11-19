@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Adle scene player</title>
+    <link rel="stylesheet" href="./src/player.css" />
+  </head>
+  <body>
+    <!--
+      This document runs generated scene code. It is served from adle://player
+      with a sandboxing Content-Security-Policy and is embedded in a sandboxed
+      iframe: opaque origin, no storage, no network, no preload bridge.
+      See SECURITY.md ("Generated scene execution").
+    -->
+    <div id="stage">
+      <canvas id="scene-canvas" width="1280" height="720"></canvas>
+    </div>
+    <!-- Wanim's patched Python-to-JavaScript compiler is a classic script (global `RapydScript`). -->
+    <script src="./vendor/rapydscript.js"></script>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

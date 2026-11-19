@@ -1,0 +1,100 @@
+/* Global element defaults. Component styling lives in each component's CSS module. */
+@import '@fontsource-variable/inter/wght.css';
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--ad-color-canvas);
+  color: var(--ad-color-ink);
+  font: var(--ad-text-body);
+  font-feature-settings: 'cv11', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ul,
+ol,
+figure {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--ad-color-primary-text);
+  text-underline-offset: 0.2em;
+}
+
+/* One focus treatment for every interactive element, visible on any surface. */
+:focus-visible {
+  outline: var(--ad-focus-ring);
+  outline-offset: var(--ad-focus-offset);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Quiet scrollbars that match the surface they sit on. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ad-color-border-strong) transparent;
+}
+
+::selection {
+  background: var(--ad-color-primary-soft);
+  color: var(--ad-color-ink);
+}
+
+/* Quantities that change (timers, counts, progress) should not jitter. */
+.ad-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visually hidden but available to assistive technology. */
+.ad-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,44 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ad-space-2);
+  color: var(--ad-color-ink);
+}
+
+.mark {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.large .mark {
+  width: 3rem;
+  height: 3rem;
+}
+
+.tile {
+  fill: var(--ad-color-action);
+}
+
+.stem {
+  stroke: var(--ad-color-on-action);
+}
+
+.leaf {
+  fill: var(--ad-color-on-action);
+}
+
+.leafSmall {
+  fill: var(--ad-color-sun);
+}
+
+.wordmark {
+  font: var(--ad-text-heading);
+  font-weight: 700;
+  letter-spacing: var(--ad-tracking-tight);
+}
+
+.large .wordmark {
+  font: var(--ad-text-display);
+  letter-spacing: var(--ad-tracking-tight);
+}

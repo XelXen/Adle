@@ -1,0 +1,87 @@
+[project]
+name = "adle-core"
+version = "0.1.0"
+description = "Adle local core service: ingestion, curriculum, learner model, and AI orchestration."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "LicenseRef-Proprietary"
+dependencies = [
+    "alembic>=1.20.1",
+    "fastapi>=0.165.0",
+    "httpx2>=2.16.2",
+    "markdown-it-py>=4.3.0",
+    "pydantic>=2.14.3",
+    "pypdf>=7.1.1",
+    "python-docx>=1.2.0",
+    "sqlalchemy>=2.1.9",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+adle-core = "adle_core.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["adle_core"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["."]
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",   # pycodestyle / pyflakes
+  "I",             # import order
+  "B",             # bugbear
+  "UP",            # pyupgrade
+  "S",             # bandit-style security checks
+  "C4",            # comprehensions
+  "SIM",           # simplifications
+  "RUF",
+  "PT",            # pytest style
+  "T20",           # no stray prints
+  "ASYNC",
+]
+# Typographic characters used deliberately in prose and in section-path titles.
+allowed-confusables = ["–", "›"]
+ignore = [
+  "S101",   # asserts are fine in tests and for internal invariants
+  "B008",   # FastAPI's Depends() in defaults is idiomatic
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests carry long literal fixtures and fake credentials.
+"tests/**" = ["S105", "S106", "S311", "T20", "E501"]
+"adle_core/__main__.py" = ["T20"]
+"adle_core/tools/**" = ["T20"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["adle_core"]
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers --strict-config"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error"]
+markers = [
+  "slow: tests that take more than a second",
+]
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.170.15",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "ruff>=0.17.5",
+]

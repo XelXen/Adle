@@ -1,0 +1,208 @@
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import {
+  _electron as electron,
+  type ElectronApplication,
+  expect,
+  type Page,
+  test as base,
+} from '@playwright/test';
+
+export const desktopDir = path.resolve(import.meta.dirname, '..', '..');
+export const repoRoot = path.resolve(desktopDir, '..', '..');
+
+export interface LaunchedApp {
+  app: ElectronApplication;
+  page: Page;
+  /** Console errors and uncaught exceptions seen in the renderer. */
+  problems: string[];
+  close: () => Promise<void>;
+}
+
+export interface LaunchOptions {
+  /**
+   * Start with this theme, by writing the app's own saved preference before
+   * launch. This exercises the real mechanism (main process -> nativeTheme ->
+   * prefers-color-scheme) instead of emulating the media query.
+   */
+  theme?: 'light' | 'dark';
+  viewport?: { width: number; height: number };
+  /** Skip the first-run welcome so a test can start in the main shell. */
+  onboarded?: boolean;
+}
+
+/**
+ * Keep the window painting even when it opens behind other windows. Without
+ * these, Chromium treats a covered test window as occluded and stops producing
+ * frames, and every "wait until stable" check in Playwright then hangs. They
+ * change scheduling only, not behaviour under test.
+ */
+const ALWAYS_PAINT_SWITCHES = [
+  '--disable-features=CalculateNativeWinOcclusion',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding',
+];
+
+/** Apps still running, per profile, so a failed test can never leave one behind. */
+const openApps = new Map<string, Set<ElectronApplication>>();
+
+/**
+ * Wait until the app's window is visible before touching it.
+ *
+ * While the window was created hidden and shown on `ready-to-show`, roughly
+ * 1 to 3 in 100 driven launches on Windows never produced a first frame: no
+ * animation frame fired, the window never appeared, and every "wait until
+ * stable" check in Playwright hung until its timeout. Nothing done from the
+ * test side removed it. The window is now created visible
+ * (`electron/main/window.ts`, ADR-008), so this returns almost at once; it
+ * stays as the guard that would catch the problem coming back.
+ */
+async function whenShown(app: ElectronApplication): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible() ?? false),
+      { message: 'The app did not show its window.', timeout: 15_000, intervals: [25, 50, 100] },
+    )
+    .toBe(true);
+}
+
+/**
+ * Give the window keyboard focus and confirm it is painting.
+ *
+ * Focus is requested explicitly because a window opened by a test runner does
+ * not always receive it from the operating system, and keyboard tests need it.
+ */
+async function focusAndConfirmPainting(app: ElectronApplication, page: Page): Promise<void> {
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    window?.focus();
+    window?.webContents.focus();
+  });
+  // Fail here, with a clear reason, rather than thirty seconds into the first click.
+  const painting = await page.evaluate(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => resolve(false), 5_000);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            clearTimeout(timer);
+            resolve(true);
+          }),
+        );
+      }),
+  );
+  if (!painting) throw new Error('The app window is visible but is not painting frames.');
+}
+
+/** Start the built app against an isolated profile directory. */
+export async function launchApp(
+  profileDir: string,
+  options: LaunchOptions = {},
+): Promise<LaunchedApp> {
+  if (options.theme) {
+    writeFileSync(
+      path.join(profileDir, 'ui-state.json'),
+      JSON.stringify({ theme: options.theme, onboardingCompleted: false }),
+    );
+  }
+  const app = await electron.launch({
+    args: [desktopDir, ...ALWAYS_PAINT_SWITCHES],
+    env: { ...process.env, ADLE_USER_DATA_DIR: profileDir },
+    // Playwright forces a light colour scheme by default, which would mask the
+    // app's own theme handling. `null` leaves the media query to the app.
+    colorScheme: null,
+  });
+  const running = openApps.get(profileDir) ?? new Set<ElectronApplication>();
+  openApps.set(profileDir, running);
+  running.add(app);
+  app.on('close', () => running.delete(app));
+  const page = await app.firstWindow();
+  const problems: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') problems.push(`console: ${message.text()}`);
+  });
+  page.on('pageerror', (error) => problems.push(`exception: ${error.message}`));
+
+  await whenShown(app);
+  await page.setViewportSize(options.viewport ?? { width: 1280, height: 832 });
+  await page.waitForLoadState('domcontentloaded');
+  await page.getByRole('heading', { level: 1 }).first().waitFor();
+  await focusAndConfirmPainting(app, page);
+
+  if (options.onboarded) {
+    const start = page.getByRole('button', { name: 'Get started' });
+    if (await start.isVisible()) {
+      await start.click();
+      await page.getByRole('heading', { name: 'Library', level: 1 }).waitFor();
+    }
+  }
+
+  return { app, page, problems, close: () => app.close() };
+}
+
+/** Wait until the managed Python core reports ready. */
+export async function waitForCore(page: Page): Promise<void> {
+  await expect
+    .poll(async () => (await page.evaluate(() => window.adle!.core.status())).state, {
+      timeout: 30_000,
+    })
+    .toBe('ready');
+}
+
+/** Every regular file under `directory`, recursively. */
+export function listFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(directory, entry.name);
+    return entry.isDirectory() ? listFiles(full) : [full];
+  });
+}
+
+/** Files under `directory` whose bytes contain `needle` (as UTF-8 or UTF-16LE). */
+export function filesContaining(directory: string, needle: string): string[] {
+  const patterns = [Buffer.from(needle, 'utf8'), Buffer.from(needle, 'utf16le')];
+  return listFiles(directory).filter((file) => {
+    if (statSync(file).size > 64 * 1024 * 1024) return false;
+    let content: Buffer;
+    try {
+      content = readFileSync(file);
+    } catch {
+      return false; // locked by the running app (e.g. Chromium's own lock files)
+    }
+    return patterns.some((pattern) => content.includes(pattern));
+  });
+}
+
+interface Fixtures {
+  /** A fresh, empty profile directory, removed after the test. */
+  profileDir: string;
+  /** The app, launched past the welcome screen, closed after the test. */
+  adle: LaunchedApp;
+}
+
+export const test = base.extend<Fixtures>({
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructured first argument
+  profileDir: async ({}, use) => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'adle-e2e-'));
+    await use(directory);
+    // Close anything a failed test left running before touching its files.
+    for (const app of openApps.get(directory) ?? []) await app.close().catch(() => undefined);
+    openApps.delete(directory);
+    try {
+      rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    } catch {
+      // Windows can hold a handle for a moment after exit. A leftover temp profile
+      // contains only test data and must not fail an otherwise passing test.
+    }
+  },
+  adle: async ({ profileDir }, use) => {
+    // A fixed theme keeps screenshots and colour assertions the same on every machine.
+    const launched = await launchApp(profileDir, { onboarded: true, theme: 'light' });
+    await use(launched);
+    await launched.close();
+  },
+});
+
+export { expect };

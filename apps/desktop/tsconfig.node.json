@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"]
+  },
+  "include": [
+    "electron",
+    "e2e",
+    "playwright.config.ts",
+    "renderer/vite.config.ts",
+    "player/frame/vite.config.ts"
+  ]
+}

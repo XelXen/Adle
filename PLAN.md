@@ -957,19 +957,38 @@ Adle is not ready to call production-quality until all applicable items below ar
 
 ## 18. Current implementation status
 
-This plan is a starting specification, not a claim that implementation exists.
+Status is updated as work proceeds. The detailed, current picture (test results, findings, next
+actions) is in `docs/engineering/PROJECT_STATE.md`. A milestone is "Done" only when its acceptance
+criteria were demonstrated by tests that were actually run.
 
-| Milestone | Status | Notes |
+_Last updated: 2026-11-19._
+
+| Milestone | Status | Notes and acceptance evidence |
 |---|---|---|
-| M0 — Foundation | Not started | Inspect repository first |
-| M1 — Desktop/design system | Not started | Establish Sprout tokens/components |
-| M2 — Persistence/ingestion | Not started | Local document processing |
-| M3 — Curriculum/learner model | Not started | Structured learner state |
-| M4 — Wanim/IR | Not started | Run integration/security spike early |
-| M5 — Generation/audio | Not started | Observe AIHubMix quotas |
-| M6 — Assessment/adaptation | Not started | Evidence-based mastery |
-| M7 — Complete UX/sample course | Not started | Full vertical slice |
-| M8 — Release hardening | Not started | Packaging and quality gates |
+| M0 — Foundation | **Done** | npm workspaces + uv; pinned stack (ADR-001); `npm run check` runs format, lint, types, and unit tests for TypeScript and Python; docs, ADRs, nested `AGENTS.md`. CI workflow written but **not run** (no remote). |
+| M1 — Desktop/design system | **Done** | Electron main/preload/renderer separation; supervised Python core with stdin token handshake (ADR-002); `adle://` protocol (ADR-003); Sprout tokens and 20 components with contrast tests (ADR-006); welcome, library, settings. Acceptance shown by `e2e/first-run`, `provider-key`, `security`, `appearance-a11y` specs. |
+| M2 — Persistence/ingestion | **Done** | SQLite with transactional Alembic migrations, automatic backup before any upgrade, tested restore, refusal of newer or foreign databases; local PDF/DOCX/Markdown/text parsers in a killable worker process with type, size, and time limits; structural chunking with page/section provenance; duplicates by SHA-256; FTS5 search; course and materials screens with import by dialog or drop (ADR-007). Acceptance shown by `test_database`, `test_ingestion`, `test_courses_and_sources`, `test_isolated_extraction`, and `e2e/course-materials` (import, provenance, restart, removal, duplicates) with the session's network block proving it works offline. **Not built:** vector search (optional in this plan; deferred to packaging). |
+| M3 — Curriculum/learner model | Not started | Next. |
+| M4 — Wanim/IR | **Partly done** | Spike complete and converted into product code: isolated player frame, `WanimPlayerAdapter`, validated host protocol, static scene policy, authoring skill with three tested examples, threat model (ADR-004). `e2e/scene-player` and `security` specs cover: plain and interactive scenes, host- and pointer-driven input, events, pause/resume, theme, unmount, broken and hostile scenes, a stuck scene. **Remaining:** Lesson IR and validation; fallback rendering inside a lesson; packaged-build check (blocked until M8 packaging). |
+| M5 — Generation/audio | Not started | Provider limits re-verified on 2026-11-19: 5 requests/min, 100/day, 1M tokens/day per account. |
+| M6 — Assessment/adaptation | Not started | |
+| M7 — Complete UX/sample course | Not started | |
+| M8 — Release hardening | Not started | Includes choosing the packager and re-verifying player isolation in a packaged build. |
+
+### Deviations from this plan (each has an ADR)
+
+- **Colour tokens** adjusted where the starting values missed WCAG AA: `muted`, a separate filled
+  `action` colour, `border-strong`, and `*-text` companions for accents (ADR-006).
+- **`packages/lesson-ir`** is created with the Lesson IR in M4 rather than as an empty package now.
+- **No Vite dev server:** development uses the same built files and protocol as production (ADR-003).
+- **Player sandbox** uses a dedicated per-frame origin with `allow-same-origin`, not an opaque
+  origin, because the pinned Wanim runtime cannot run in one (ADR-004).
+- **TypeScript 6 / ESLint 9** instead of the newest majors, for lint-plugin compatibility; **httpx2**
+  instead of httpx (ADR-001).
+- **Migrations** live inside the Python package (`adle_core/migrations/`), not beside it, so they
+  ship with a packaged build without extra data-file handling (ADR-007).
+- **Failed imports are not stored as rows.** A rejected file leaves nothing behind; the reason is
+  reported in the import summary (ADR-007).
 
 ---
 

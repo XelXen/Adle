@@ -1,0 +1,98 @@
+.card {
+  border-radius: var(--ad-radius-card);
+  min-width: 0;
+}
+
+.surface {
+  background: var(--ad-color-surface);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  box-shadow: var(--ad-shadow-1);
+}
+
+.subtle {
+  background: var(--ad-color-surface-subtle);
+}
+
+.none {
+  padding: 0;
+}
+
+.compact {
+  padding: var(--ad-space-4);
+}
+
+.comfortable {
+  padding: var(--ad-space-5);
+}
+
+/* ---- Action card ------------------------------------------------------- */
+.action {
+  display: flex;
+  align-items: center;
+  gap: var(--ad-space-4);
+  width: 100%;
+  padding: var(--ad-space-4) var(--ad-space-5);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--ad-duration-fast) var(--ad-ease-out),
+    box-shadow var(--ad-duration-base) var(--ad-ease-out),
+    transform var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.action:hover:not(:disabled) {
+  border-color: var(--ad-color-primary);
+  box-shadow: var(--ad-shadow-2);
+}
+
+.action:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.media {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-primary-soft);
+  color: var(--ad-color-primary-text);
+}
+
+.media svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.actionText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.actionTitle {
+  font: var(--ad-text-body-strong);
+  color: var(--ad-color-ink);
+}
+
+.actionDescription {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ad-space-3);
+  flex: none;
+  color: var(--ad-color-muted);
+}

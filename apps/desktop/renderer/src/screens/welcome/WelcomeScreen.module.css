@@ -1,0 +1,91 @@
+.screen {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--ad-space-8) var(--ad-space-5);
+  overflow-y: auto;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-6);
+  width: 100%;
+  max-width: var(--ad-layout-reading-max);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+}
+
+.headline {
+  font: var(--ad-text-display);
+  letter-spacing: var(--ad-tracking-tight);
+}
+
+.lede {
+  font-size: 1.0625rem;
+  line-height: 1.625rem;
+  color: var(--ad-color-muted);
+}
+
+.highlights {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.highlight {
+  display: flex;
+  gap: var(--ad-space-4);
+}
+
+.highlightIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-primary-soft);
+  color: var(--ad-color-primary-text);
+}
+
+.highlightIcon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.highlightTitle {
+  font: var(--ad-text-body-strong);
+}
+
+.highlightBody {
+  margin-top: var(--ad-space-1);
+  font: var(--ad-text-body);
+  color: var(--ad-color-muted);
+}
+
+.inlineIcon {
+  width: 1rem;
+  height: 1rem;
+  margin-right: var(--ad-space-1);
+  vertical-align: -0.1875rem;
+}
+
+.calloutSecond {
+  margin-top: var(--ad-space-2);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-3);
+}

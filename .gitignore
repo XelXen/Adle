@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+release/
+*.tsbuildinfo
+.vite/
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+.playwright/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+*.egg-info/
+/services/core/build/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Databases and learner data (never commit user content)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+/var/
+.adle-data/
+
+# Voice models and caches
+*.onnx
+*.onnx.json
+.cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log

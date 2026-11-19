@@ -1,0 +1,62 @@
+{
+  "name": "adle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Adle — Adaptive Learning Environment. A local-first desktop app that learns what you understand and teaches what you need next.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @adle/desktop",
+    "build": "npm run build --workspace @adle/desktop",
+    "start": "npm run start --workspace @adle/desktop",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "node scripts/typecheck.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "npm run e2e --workspace @adle/desktop",
+    "core:sync": "uv sync --project services/core",
+    "core:lint": "uv run --directory services/core ruff check . && uv run --directory services/core ruff format --check .",
+    "core:typecheck": "uv run --directory services/core mypy",
+    "core:test": "uv run --directory services/core pytest",
+    "contracts": "node scripts/generate-contracts.mjs",
+    "contracts:check": "node scripts/generate-contracts.mjs --check",
+    "check": "node scripts/check.mjs",
+    "core:format": "uv run --directory services/core ruff format . && uv run --directory services/core ruff check --fix .",
+    "setup": "npm ci && npx install-electron --no && npm run core:sync",
+    "wanim-names": "node scripts/export-wanim-names.mjs",
+    "wanim-names:check": "node scripts/export-wanim-names.mjs --check"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "8.0.0",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.13",
+    "@types/node": "24.19.2",
+    "@vitejs/plugin-react": "6.3.0",
+    "eslint": "9.39.5",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.14.0",
+    "jsdom": "31.0.1",
+    "json-schema-to-typescript": "16.0.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0",
+    "vite": "8.3.8",
+    "vitest": "5.1.1"
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}

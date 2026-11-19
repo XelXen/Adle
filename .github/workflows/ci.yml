@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Static checks and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Install Python dependencies
+        run: npm run core:sync
+      - name: Contracts, format, lint, types, unit tests
+        run: node scripts/check.mjs
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+  e2e:
+    name: End-to-end (${{ matrix.os }})
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Download the pinned Electron binary
+        run: npx install-electron --no
+      - name: Install Python dependencies
+        run: npm run core:sync
+      - name: Run end-to-end tests (Windows)
+        if: runner.os == 'Windows'
+        run: npm run e2e
+      - name: Run end-to-end tests (Linux, virtual display)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run e2e
+      - name: Upload report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.os }}
+          path: |
+            apps/desktop/playwright-report
+            apps/desktop/test-results
+          retention-days: 7

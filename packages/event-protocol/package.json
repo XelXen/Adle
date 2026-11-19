@@ -1,0 +1,12 @@
+{
+  "name": "@adle/event-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Versioned, validated message protocol between the Adle host and the isolated scene player.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

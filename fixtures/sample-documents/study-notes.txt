@@ -1,0 +1,17 @@
+Study notes: gradient descent
+(Sample notes written for Adle's tests.)
+
+Gradient descent is a way of reducing a loss a little at a time. Start with any weights. Work out
+which direction makes the loss go up fastest: that direction is the gradient. Then move the
+weights a small step the opposite way.
+
+The learning rate controls the size of the step. With a learning rate that is too high the loss
+bounces around or even grows. With one that is too low the loss falls, but very slowly.
+
+A useful picture is a ball rolling downhill. The slope under the ball is the gradient. The ball
+always rolls towards lower ground, and it stops when the ground is flat.
+
+Things to remember for the quiz:
+1. The update rule is: new weight = old weight - learning rate x gradient.
+2. A flat region has a gradient of zero, so the weights stop changing there.
+3. Reaching a low point does not guarantee it is the lowest point overall.

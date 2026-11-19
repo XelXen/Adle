@@ -1,0 +1,71 @@
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ad-space-3);
+}
+
+.label {
+  font: var(--ad-text-supporting);
+  font-weight: 500;
+}
+
+.value {
+  font: var(--ad-text-caption);
+  color: var(--ad-color-muted);
+}
+
+.track {
+  --ad-progress-color: var(--ad-color-primary);
+
+  position: relative;
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-surface-subtle);
+}
+
+.info {
+  --ad-progress-color: var(--ad-color-blue);
+}
+
+.fill {
+  --ad-progress: 0%;
+
+  width: var(--ad-progress);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ad-progress-color);
+  transition: width var(--ad-duration-base) var(--ad-ease-out);
+}
+
+.indeterminate {
+  width: 40%;
+  animation: slide 1400ms var(--ad-ease-out) infinite;
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/* Without motion, an indeterminate bar becomes a steady, clearly "in progress" stripe. */
+@media (prefers-reduced-motion: reduce) {
+  .indeterminate {
+    width: 100%;
+    opacity: 0.5;
+    animation: none;
+  }
+}

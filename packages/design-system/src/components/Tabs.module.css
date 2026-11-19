@@ -1,0 +1,64 @@
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-5);
+  min-width: 0;
+}
+
+.list {
+  display: flex;
+  gap: var(--ad-space-1);
+  /* An inset shadow draws the rule so the selected tab's underline can sit on it. */
+  box-shadow: inset 0 -1px 0 var(--ad-color-border);
+  overflow: auto hidden;
+  scrollbar-width: none;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ad-space-2);
+  flex: none;
+  height: var(--ad-control-height);
+  padding: 0 var(--ad-space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: var(--ad-text-body);
+  font-weight: 500;
+  color: var(--ad-color-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--ad-duration-fast) var(--ad-ease-out),
+    border-color var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.tab:hover {
+  color: var(--ad-color-ink);
+}
+
+.tab:focus-visible {
+  outline-offset: -2px;
+  border-radius: var(--ad-radius-small);
+}
+
+.selected {
+  border-bottom-color: var(--ad-color-primary);
+  color: var(--ad-color-ink);
+  font-weight: 600;
+}
+
+.icon {
+  display: inline-flex;
+}
+
+.icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.panel {
+  min-width: 0;
+  border-radius: var(--ad-radius-small);
+}

@@ -1,0 +1,164 @@
+# Wanim reference for Adle
+
+Companion to [SKILL.md](SKILL.md). Facts about `@wanimjs/wanim` **0.1.3** as used by Adle.
+
+- **Verified** = exercised in this repository against the pinned runtime (see the test named).
+- **Documented upstream** = stated by Wanim's docs, not tested here.
+- **Observed** = behaviour found while integrating that the upstream docs do not state, or state
+  differently.
+
+Upstream docs read on 2026-11-19: <https://wanim.org/llms.txt>, <https://wanim.org/docs/intro/>,
+<https://wanim.org/docs/interactive/>, <https://wanim.org/docs/usage/>.
+
+## 1. How a scene runs
+
+1. Wanim preprocesses the Python source and strips the supported imports.
+2. A patched RapydScript-ng compiler (`browser/rapydscript.js`, a classic script exposing a global)
+   turns it into JavaScript.
+3. The JavaScript is evaluated against Wanim's TypeScript port of manim and drawn on a 2D canvas,
+   one frame at a time.
+
+Nothing leaves the page, and there is no Python process, LaTeX toolchain, or video file.
+
+**Observed.** The compiled code is run with `eval` inside a hidden, same-origin `about:blank`
+iframe that the bridge creates and removes per run. Consequences for the host:
+
+- The page needs `'unsafe-eval'` in its Content Security Policy.
+- The page cannot have an opaque origin: under `sandbox="allow-scripts"` alone the bridge fails
+  with *"Blocked a frame with origin "null" from accessing a cross-origin frame"*. Adle therefore
+  gives each player frame its own real origin (see ADR-004).
+- Scene code has the full power of JavaScript in that page. RapydScript's `v'...'` literal emits
+  raw JavaScript, and undeclared Python names resolve to browser globals.
+  (Test: `security.spec.ts` › "raw JavaScript in a scene still runs only inside the sandbox".)
+
+## 2. Entry points Adle uses
+
+| Import | Used for | Status |
+|---|---|---|
+| `@wanimjs/wanim/bridge` → `runPythonOnCanvas(source, canvas, options)` | Compile and play | Verified |
+| `bridge.wanim.configure_fonts(urls)` | Point `Text` at local fonts | Verified |
+| `bridge.wanim.preload_submodules('fonts')` | Parse fonts before the first scene | Verified |
+| `@wanimjs/wanim/browser/rapydscript` | The compiler script, loaded once with a `<script>` tag | Verified |
+| `<wanim-scene>` element, iframe embed player, share/notes HTTP API | Not used by Adle | Documented upstream |
+
+**Observed.** `preload_fonts` appears in the 0.1.3 type definitions but is **not exported** by the
+browser bundle. `preload_submodules('fonts')` is the working call.
+
+### `runPythonOnCanvas` options
+
+| Option | Adle passes | Notes |
+|---|---|---|
+| `quality` | `-ql` / `-qm` / `-qh` | 854×480, 1280×720, 1920×1080. Default `-qm`. Verified. |
+| `mode` | `'normal'` | Only interactive pages pause. `slides`, `two-view`, `animation` are documented upstream and unused. |
+| `theme` | `'light'` / `'dark'` | Read by the scene as `self.theme` in `setup()`. Wanim never repaints for a theme change; Adle reloads the scene. Verified. |
+| `background` | The Sprout surface colour | CSS hex override of the stage background. Verified. |
+| `instanceId` | The run id | Attached to forwarded messages. |
+| `realtime`, `fps` | `true`, `30` | `fps` is a target, not a guarantee. |
+| `sceneName` | Optional | Run one class when a file defines several. |
+| `signal` | An `AbortSignal` | Stops the run at the next frame boundary. Verified (dispose). |
+| `onScene(name)` | — | The class name. Fires **after** `onSceneReady`. Observed. |
+| `onSceneReady(scene)` | — | The scene instance, **before** `blueprint()` has run. Observed. |
+| `onController(controller)` | — | `next()`, `previous()`, `replay()`, `restart()`, `abort()`, and a `state` getter. |
+| `onMessage(message)` | — | `{ id, key, value, scene, sceneIndex, pageIndex, phaseKind }` for each `post_message`. Verified. |
+| `preload` | default `'auto'` | Scans the source for MathJax and font use. |
+
+**Observed.** `onStateChange` exists on the lower-level `render_presentation_to_canvas` but is not
+forwarded by `runPythonOnCanvas`. Adle polls `controller.state` once per animation frame instead.
+
+### Presentation state (`controller.state`)
+
+`sceneName`, `sceneIndex`, `sceneCount`, `phaseIndex`, `phaseCount`, `phaseKind`
+(`'blueprint' | 'construct'`), `slidesMode`, `done`, `canNext`, `canPrevious`, `canReplay`.
+
+**Observed.** On a scene whose last page is a `blueprint()`, `canNext` is `false` and the run never
+finishes: the scene stays live. Adle therefore reports two separate facts to the lesson:
+`interactive` (a live page is showing) and `canNext` (another page follows).
+
+## 3. What Wanim does not provide, and how Adle supplies it
+
+| Need | Wanim | Adle |
+|---|---|---|
+| Pause / resume mid-animation | No API. Frames are paced on `requestAnimationFrame`. | The player gates `requestAnimationFrame`: held while paused, released on resume. Animations advance a fixed step per logical frame, so there is no jump. Verified: `scene-player.spec.ts` (identical screenshots 1.2 s apart while paused). |
+| Hold on the first frame | — | Start with the gate closed (`autoplay: false`). Verified. |
+| Restart | `controller.restart()` | Adle reloads the source instead: one code path, always a clean state. |
+| Host sets a control value | `control.set_value(v)` is silent | Adle calls `set_value(v)` then `notify_input(previous, next)` so the scene's `on_input` listeners run as for a gesture. Verified. |
+| Enumerate a scene's controls | — | Convention: `self.adle_controls = {...}`, read by the player after `blueprint()` runs. Verified. |
+| Liveness | — | Host `ping` / player `pong`; five seconds of silence means the scene is stuck. Verified. |
+| Navigation buttons | Draws `<`, `↻`, `>` over the canvas | Hidden with CSS (`[data-wanim-action]`); Adle's lesson shell owns navigation. |
+
+## 4. Fonts and maths
+
+- **Fonts.** `Text` is rendered from font outlines parsed by opentype.js, which reads TTF, OTF, and
+  WOFF1 (**not WOFF2**). Wanim's default font chain is fetched from a public CDN (jsDelivr). Adle
+  replaces it with local files copied from `@fontsource/inter` at build time
+  (`inter-latin-400`, `inter-latin-ext-400`, `inter-greek-400`, all WOFF1, OFL-1.1). The first font
+  in the chain that has a glyph wins. Verified offline: the session refuses every non-`adle:` request.
+- **Glyph coverage.** Latin, Latin Extended, Greek. No arrows, no mathematical operators, no CJK.
+  Use `MathTex` for symbols.
+- **Maths.** MathJax, bundled as a lazily loaded chunk (about 2 MB). Standard TeX maths only.
+  `DecimalNumber` digits are also typeset by MathJax.
+
+## 5. Scene API notes
+
+Write ordinary manim Community v0.21 Python. Only the Wanim-specific parts are listed here.
+
+### Verified in the examples
+
+`Scene`, `InteractiveScene`, `setup`, `blueprint`, `construct`, `self.theme`, `self.add`,
+`self.play`, `self.wait`, `self.post_message`; `Text`, `MathTex`, `DecimalNumber`; `Circle`,
+`Rectangle`, `Line`, `Dot`, `VGroup`; `Axes`, `Axes.plot`, `Axes.c2p`; `ValueTracker`,
+`always_redraw`, `.animate`; `Write`, `Create`, `FadeIn`, `GrowFromCenter`; `Slider`, `Switch`;
+`add_reaction`, `on_input`; positioning with `to_edge`, `next_to`, `move_to`, `shift`, `arrange`;
+`set_value`, `set_color`, `set_width`, `stretch_to_fit_height`; `np.exp`.
+
+### Documented upstream, not yet exercised here
+
+`PathSlider`, `DraggablePoint`, `Chip`, `InputDecimalNumber`, `InputInteger`,
+`InputDecimalMatrix`, `InputDecimalTable`; `self.add_reaction` (scene-level); `SEPARATE = True`;
+`self.clear_stage()`; `set_storyboard` / `set_script`; `self.next_slide()` (slides mode only);
+`InteractiveThreeDScene`; `InteractiveLinearTransformationScene`.
+
+Rules that come with the interactive API (documented upstream):
+
+- `blueprint()` runs once; reactions then run every frame while the page is live.
+- Reactions stop when `construct()` starts.
+- `on_input(listener)` receives `(control, previous, next_value)` and fires only for reader
+  gestures (and Adle's host-set values). `set_value` from scene code is silent.
+- Do not put a control inside a group that is later moved or scaled.
+
+### Known gaps and failure modes (verified)
+
+| Source does this | Result | Stage |
+|---|---|---|
+| Invalid indentation or syntax | Message with file position | `compile` |
+| `import os` (or any other module) | "cannot use Python module 'os'" with guidance | `compile` |
+| No `Scene` subclass | "No Scene subclass found in the code." | `compile` |
+| Exception during `construct()` | The JavaScript error message | `runtime` |
+| `ImageMobject("x.png")` | "could not find x.png" | `runtime` |
+| `while True:` without `self.wait` | The frame stops answering; watchdog fires | `unresponsive` |
+
+Scenes and mobjects are JavaScript `Proxy` objects that throw an `AttributeError` for unknown
+**string** attributes, so reading a missing attribute from the host is an exception, not `undefined`.
+
+## 6. Timing baseline
+
+Measured on the development machine (Windows 11, Electron 45.4.1), `-qm`, development build:
+
+| Measure | Value |
+|---|---|
+| Player frame boot (document + runtime + fonts) | about 160–240 ms |
+| Compile and construct a simple scene | about 290 ms |
+| First frame after `load` | about 340 ms |
+
+These are one machine's observations, not a guarantee. Re-measure for the release performance
+report (M8).
+
+## 7. Licences
+
+| Component | Licence |
+|---|---|
+| `@wanimjs/wanim` | MIT |
+| `numpy-ts` | MIT |
+| `mathjax-full` | Apache-2.0 |
+| `opentype.js` | MIT |
+| Inter (via `@fontsource/inter`) | OFL-1.1 |

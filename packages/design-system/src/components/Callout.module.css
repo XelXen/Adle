@@ -1,0 +1,68 @@
+.callout {
+  display: flex;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-4);
+  border-radius: var(--ad-radius-control);
+  color: var(--ad-color-ink);
+}
+
+.icon {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-1);
+  min-width: 0;
+}
+
+.title {
+  font: var(--ad-text-body-strong);
+}
+
+.message {
+  font: var(--ad-text-supporting);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  margin-top: var(--ad-space-2);
+}
+
+.info {
+  background: var(--ad-color-blue-soft);
+}
+
+.info .icon {
+  color: var(--ad-color-blue-text);
+}
+
+.success {
+  background: var(--ad-color-primary-soft);
+}
+
+.success .icon {
+  color: var(--ad-color-primary-text);
+}
+
+.warning {
+  background: var(--ad-color-sun-soft);
+}
+
+.warning .icon {
+  color: var(--ad-color-sun-text);
+}
+
+.danger {
+  background: var(--ad-color-danger-soft);
+}
+
+.danger .icon {
+  color: var(--ad-color-danger-text);
+}

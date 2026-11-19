@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Lecture notes: loss and gradient descent</title>
+    <style>
+      body {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 12pt;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 20pt;
+      }
+      h2 {
+        font-size: 15pt;
+        margin-top: 1.4em;
+      }
+      .page {
+        break-after: page;
+      }
+      .note {
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="page">
+      <h1>Lecture notes: loss and gradient descent</h1>
+      <p class="note">Sample lecture notes written for Adle's tests. Page one of three.</p>
+      <h2>Measuring error with a loss function</h2>
+      <p>
+        A neural network makes a prediction, and we need a single number that says how wrong the
+        prediction was. That number is the loss. For a regression problem the usual choice is the
+        mean squared error: subtract the target from the prediction, square the difference, and
+        average over all of the training examples.
+      </p>
+      <p>
+        Squaring does two jobs. It makes every error positive, so that errors in opposite directions
+        cannot cancel out, and it punishes large mistakes much more than small ones.
+      </p>
+    </section>
+    <section class="page">
+      <h2>The gradient points uphill</h2>
+      <p class="note">Page two of three.</p>
+      <p>
+        Imagine the loss as the height of a landscape whose coordinates are the weights of the
+        network. The gradient at a point is the direction in which the ground rises most steeply. To
+        reduce the loss we therefore step in the opposite direction.
+      </p>
+      <p>
+        The chain rule lets us compute this direction for every weight, even in a deep network, by
+        multiplying together the local rates of change along the path from the weight to the loss.
+        Backpropagation is the bookkeeping that makes this efficient.
+      </p>
+    </section>
+    <section>
+      <h2>Choosing the learning rate</h2>
+      <p class="note">Page three of three.</p>
+      <p>
+        The learning rate decides how far each step goes. A very small learning rate is safe but
+        slow. A very large learning rate overshoots the valley and can make the loss increase
+        instead of decrease. In practice the learning rate is tuned by trying several values and
+        watching how the loss behaves over time.
+      </p>
+      <p>
+        Worked example: with a weight of 2.0, a gradient of 0.5, and a learning rate of 0.1, the
+        updated weight is 2.0 minus 0.1 times 0.5, which equals 1.95.
+      </p>
+    </section>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+node_modules
+dist
+out
+release
+coverage
+playwright-report
+test-results
+package-lock.json
+uv.lock
+.venv
+*.md
+services/core
+apps/desktop/player/frame/public/vendor
+fixtures/**/*.json

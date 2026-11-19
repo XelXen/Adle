@@ -1,0 +1,64 @@
+.indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--ad-space-2);
+  width: 100%;
+  padding: var(--ad-space-2);
+  border: 0;
+  border-radius: var(--ad-radius-small);
+  background: transparent;
+  font: var(--ad-text-caption);
+  color: var(--ad-color-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.indicator:hover {
+  background: var(--ad-color-surface-subtle);
+  color: var(--ad-color-ink);
+}
+
+.dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-border-strong);
+}
+
+.ready .dot {
+  background: var(--ad-color-primary);
+}
+
+.starting .dot {
+  background: var(--ad-color-sun);
+}
+
+.failed .dot,
+.stopped .dot {
+  background: var(--ad-color-danger);
+}
+
+.failed,
+.stopped {
+  color: var(--ad-color-danger-text);
+}
+
+.text {
+  min-width: 0;
+}
+
+@media (width <= 60rem) {
+  .indicator {
+    justify-content: center;
+  }
+
+  .text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

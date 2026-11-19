@@ -1,0 +1,37 @@
+.courses {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(24rem, 1fr));
+  gap: var(--ad-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- New course dialog -------------------------------------------------- */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-5);
+}
+
+.groupLabel {
+  font: var(--ad-text-body-strong);
+}
+
+.hint {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.formError {
+  font: var(--ad-text-supporting);
+  font-weight: 500;
+  color: var(--ad-color-danger-text);
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ad-space-3);
+}
