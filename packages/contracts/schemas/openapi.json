@@ -541,9 +541,19 @@
           },
           "goal": { "title": "Goal", "type": "string" },
           "narration": { "title": "Narration", "type": "boolean" },
-          "pace": { "enum": ["relaxed", "standard", "brisk"], "title": "Pace", "type": "string" }
+          "pace": { "enum": ["relaxed", "standard", "brisk"], "title": "Pace", "type": "string" },
+          "voice": { "title": "Voice", "type": "string" },
+          "volume": { "title": "Volume", "type": "integer" }
         },
-        "required": ["pace", "explanation_density", "narration", "captions", "goal"],
+        "required": [
+          "pace",
+          "explanation_density",
+          "narration",
+          "captions",
+          "goal",
+          "voice",
+          "volume"
+        ],
         "title": "LearnerPreferences",
         "type": "object"
       },
@@ -572,6 +582,14 @@
               { "type": "null" }
             ],
             "title": "Pace"
+          },
+          "voice": {
+            "anyOf": [{ "maxLength": 120, "type": "string" }, { "type": "null" }],
+            "title": "Voice"
+          },
+          "volume": {
+            "anyOf": [{ "maximum": 100, "minimum": 0, "type": "integer" }, { "type": "null" }],
+            "title": "Volume"
           }
         },
         "title": "LearnerPreferencesUpdate",

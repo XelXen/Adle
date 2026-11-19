@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass, fields
 from enum import StrEnum
 
 MAX_GOAL_LENGTH = 300
+MAX_VOICE_LENGTH = 120
 
 
 class Pace(StrEnum):
@@ -37,12 +38,20 @@ class LearnerPreferences:
     narration: bool = True
     #: Show the words of the narration as it plays.
     captions: bool = True
+    #: The name of the voice to read with, as this computer lists it. Empty: choose one.
+    voice: str = ""
+    #: How loud narration is, from 0 (silent) to 100.
+    volume: int = 100
     #: What the learner wants to get out of their study, in their own words.
     goal: str = ""
 
     def __post_init__(self) -> None:
         if len(self.goal) > MAX_GOAL_LENGTH:
             raise ValueError(f"A goal can be at most {MAX_GOAL_LENGTH} characters.")
+        if len(self.voice) > MAX_VOICE_LENGTH:
+            raise ValueError("That is not the name of a voice.")
+        if not 0 <= self.volume <= 100:
+            raise ValueError("Volume is a number from 0 to 100.")
 
     def to_stored(self) -> dict[str, object]:
         """One JSON-serialisable value per preference key."""
@@ -76,4 +85,10 @@ def from_stored(stored: Mapping[str, object]) -> LearnerPreferences:
     goal = stored.get("goal")
     if isinstance(goal, str):
         values["goal"] = " ".join(goal.split())[:MAX_GOAL_LENGTH]
+    voice = stored.get("voice")
+    if isinstance(voice, str) and len(voice) <= MAX_VOICE_LENGTH:
+        values["voice"] = voice
+    volume = stored.get("volume")
+    if isinstance(volume, int) and not isinstance(volume, bool) and 0 <= volume <= 100:
+        values["volume"] = volume
     return LearnerPreferences(**values)  # type: ignore[arg-type]

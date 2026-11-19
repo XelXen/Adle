@@ -1,0 +1,10 @@
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.note {
+  margin-top: var(--ad-space-2);
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}

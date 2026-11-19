@@ -161,14 +161,35 @@ Details and reasoning: `docs/decisions/ADR-010-lesson-ir-and-playback.md`.
 
 A learner's answers and written explanations stay in the local database. They are not logged.
 
-## Model output
+## The model provider and its output
 
-(Applies from M5; recorded here so the rule exists before the code.)
+Details and reasoning: `docs/decisions/ADR-012-provider-quota-and-generation.md`.
 
-- Document text and model output are data. Prompts delimit source excerpts and state that they
-  contain no instructions. The model has no tools: it cannot run commands, read files, or call
-  the network.
-- Model output is validated against strict schemas; unknown fields are rejected.
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| A request goes only where the learner was told | The address is fixed at start-up; `https` only, or `http` on this computer; anything but the default is shown as "Custom endpoint (host)" | `test_provider_client.py`; `e2e/generation.spec.ts` |
+| The key is in one header and nowhere else | Read from the vault per request; redirects not followed; environment proxy and `.netrc` not used | `test_provider_client.py` |
+| Nothing sent or received is logged | Log lines carry a purpose and a status code only | `test_provider_client.py` (bodies and prompts absent from the log) |
+| Nothing is sent that the learner did not start | Requests are made only inside a job the learner started; the suggestion dialog says what will be sent first; the lesson button says it beside itself | `test_generation_api.py`; `e2e/generation.spec.ts` |
+| A learner's document cannot instruct the model through Adle | Learner text is quoted inside marked blocks whose closing tag cannot be forged; the standing rule is in the system prompt; the model has no tools | `test_generation_api.py` (hostile document) |
+| Model output cannot enter the database unchecked | Draft parsed leniently, compiled deterministically, then `parse_bundle` (ADR-010); scenes through the static policy | `test_drafts.py`, `test_generation_api.py` |
+| A model cannot invent an identifier or a citation | Identifiers are assigned by the core; a citation is a number the prompt offered, or it is dropped | `test_drafts.py` |
+| A model cannot make Adle loop | A fixed number of requests per job; one request in flight; local limits under the provider's | `test_model_gateway.py`, `test_generation_api.py` |
+
+**Residual risks, accepted**
+
+- What is sent (a concept, its objectives, a few passages) leaves the computer for the provider
+  once the learner asks. The provider's handling of it is outside Adle's control; the first-run
+  screen and the settings say so.
+- A model can write a lesson that is valid and wrong. Validation checks form, not truth. The
+  lesson says where it came from ("From general knowledge", or the passages it cites).
+
+## Reading aloud
+
+Narration is spoken by the browser's speech synthesis using **only voices that run on this
+computer** (`localService`). A voice that would send text to a service is never listed or used
+(`lesson/speech.ts`, `speech.test.ts`). The session's network filter would refuse such a
+request in any case. See ADR-013.
 
 ## Privacy
 

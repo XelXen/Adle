@@ -239,6 +239,8 @@ export interface LearnerPreferences {
   goal: string;
   narration: boolean;
   pace: 'relaxed' | 'standard' | 'brisk';
+  voice: string;
+  volume: number;
 }
 export interface LearnerPreferencesUpdate {
   captions?: boolean | null;
@@ -246,6 +248,8 @@ export interface LearnerPreferencesUpdate {
   goal?: string | null;
   narration?: boolean | null;
   pace?: ('relaxed' | 'standard' | 'brisk') | null;
+  voice?: string | null;
+  volume?: number | null;
 }
 /**
  * Everything the player needs: the validated lesson and the scenes it plays.

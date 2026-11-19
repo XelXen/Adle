@@ -199,6 +199,8 @@ def update_preferences(
         narration=body.narration,
         captions=body.captions,
         goal=body.goal,
+        voice=body.voice,
+        volume=body.volume,
     )
     return schemas.LearnerPreferences.model_validate(updated)
 

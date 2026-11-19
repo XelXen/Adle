@@ -23,6 +23,8 @@ def test_defaults_suit_someone_who_has_not_chosen_anything() -> None:
             narration=True,
             captions=True,
             goal="",
+            voice="",
+            volume=100,
         )
         == DEFAULT_PREFERENCES
     )
@@ -73,3 +75,27 @@ def test_a_goal_is_tidied_and_bounded() -> None:
     assert len(loaded.goal) == MAX_GOAL_LENGTH
     with pytest.raises(ValueError, match="at most"):
         LearnerPreferences(goal="y" * (MAX_GOAL_LENGTH + 1))
+
+
+def test_a_voice_and_a_volume_are_kept_and_nonsense_is_ignored() -> None:
+    chosen = LearnerPreferences(voice="Microsoft Zira - English (United States)", volume=40)
+    assert from_stored(chosen.to_stored()) == chosen
+    # A stored value of the wrong kind falls back to the default, like any other preference.
+    for stored in (
+        {"voice": 7},
+        {"voice": "v" * 500},
+        {"volume": "loud"},
+        {"volume": 400},
+        {"volume": True},
+        {"volume": -5},
+    ):
+        assert from_stored(stored) == DEFAULT_PREFERENCES, stored
+
+
+def test_a_volume_outside_the_scale_is_refused() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="0 to 100"):
+        LearnerPreferences(volume=101)
+    with pytest.raises(ValueError, match="voice"):
+        LearnerPreferences(voice="v" * 121)

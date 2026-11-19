@@ -101,6 +101,23 @@ path, a URL, or a directory from the renderer.
   outlives a render and is not React state belongs in a small class created once in
   `useState(() => …)` (see `openSession` in `LessonScreen.tsx`).
 
+## Generation and narration
+
+- Work the AI provider does is a **job**. Start it, then follow it with `useCourseJobs`
+  (`lib/use-course-jobs.ts`), which also picks up work that was already under way. Show it with
+  `GenerationStatus`, which has every state: waiting, running with a way to cancel, refused
+  before it started, failed with what to do next, cancelled.
+- Read a job's `result` only through `lib/generation.ts`. It is free-form in the contract and is
+  checked there.
+- Say what will be sent before it is sent, beside the control that sends it, and name the
+  provider by the name the core gives (`provider.status`), never a hard-coded one.
+- Speech uses **local voices only** (`loadLocalVoices`). Do not list or use a voice whose
+  `localService` is false.
+- End-to-end journeys that are not about speech call `showNarrationAsText(page)` first.
+- No end-to-end test reaches the real provider: start `startFakeProvider()` and pass its
+  address in `ADLE_PROVIDER_BASE_URL`. The app keeps its real limit of four requests a minute,
+  so a journey that needs a fifth will see the app wait: test that, or stay under it.
+
 ## Renderer conventions
 
 - Logic that can be pure lives beside its screen in a `*-model.ts` file with unit tests

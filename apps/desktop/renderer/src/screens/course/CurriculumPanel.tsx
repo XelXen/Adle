@@ -1,7 +1,16 @@
-import { ArrowDown, ArrowUp, BookOpen, List, ListTree, Network, Plus } from 'lucide-react';
-import { useId, useState } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  BookOpen,
+  List,
+  ListTree,
+  Network,
+  Plus,
+  Sparkles,
+} from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
 
-import type { Concept, Course, Curriculum } from '@adle/contracts';
+import type { Concept, Course, Curriculum, Job } from '@adle/contracts';
 import {
   Badge,
   Button,
@@ -18,8 +27,19 @@ import {
 } from '@adle/design-system';
 
 import { useRouter } from '../../app/router';
+import { GenerationStatus } from '../../components/GenerationStatus';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
+import {
+  type JobFailure,
+  KIND_LESSON,
+  KIND_PROPOSAL,
+  readLessonOutcome,
+  readProposal,
+  refusalOf,
+} from '../../lib/generation';
+import { useCourseJobs } from '../../lib/use-course-jobs';
+import { isJobActive } from '../../lib/use-job';
 import { useResource } from '../../lib/use-resource';
 import { ConceptDetail, type ConceptLessons, KNOWLEDGE_TONE } from './ConceptDetail';
 import {
@@ -29,6 +49,7 @@ import {
   PrerequisitesDialog,
 } from './ConceptDialogs';
 import { ConceptMap } from './ConceptMap';
+import { ProposalDialog } from './ProposalDialog';
 import styles from './Curriculum.module.css';
 import {
   checkMove,
@@ -52,6 +73,8 @@ type OpenDialog =
   | { kind: 'prerequisites'; concept: Concept }
   | { kind: 'remove'; concept: Concept }
   | { kind: 'outline' }
+  | { kind: 'suggest' }
+  | { kind: 'proposal'; job: Job }
   | null;
 
 /** Inspect and edit what a course teaches, and in what order. */
@@ -69,10 +92,106 @@ export function CurriculumPanel({ course }: { course: Course }) {
   const lessons = useResource(`lessons:${courseId}`, () =>
     callCore('lessons.list', { path: { course_id: courseId } }),
   );
+  const provider = useResource('provider-status', () => callCore('provider.status'));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<View>('list');
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [removing, setRemoving] = useState(false);
+  /** What is being started right now, by what it is about: the course, or a concept. */
+  const [starting, setStarting] = useState<ReadonlySet<string>>(new Set());
+  const [refusals, setRefusals] = useState<ReadonlyMap<string, JobFailure>>(new Map());
+
+  const jobs = useCourseJobs(courseId, (job) => {
+    if (job.kind === KIND_LESSON) {
+      lessons.reload();
+      const outcome = readLessonOutcome(job);
+      if (outcome) {
+        toast.show({
+          tone: 'success',
+          title: 'Lesson ready',
+          description: [outcome.title, ...outcome.notes].join(' '),
+        });
+      }
+    } else if (job.kind === KIND_PROPOSAL && readProposal(job)) {
+      setDialog((open) => open ?? { kind: 'proposal', job });
+    }
+  });
+
+  // Suggestions that arrived while this screen was closed are still waiting to be looked at.
+  const { track } = jobs;
+  useEffect(() => {
+    let cancelled = false;
+    callCore('generation.latest_proposal', { path: { course_id: courseId } }).then(
+      ({ job }) => {
+        if (cancelled || !job) return;
+        const proposal = readProposal(job);
+        if (isJobActive(job) || (proposal && !proposal.closed)) track(job);
+      },
+      () => {
+        // Nothing to pick up; asking for suggestions still works.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId, track]);
+
+  const providerName =
+    provider.resource.status === 'ready' ? provider.resource.data.display_name : 'the AI provider';
+
+  /** Start a job about `subject`, and remember why if it could not be started. */
+  const begin = async (subject: string, start: () => Promise<Job>): Promise<void> => {
+    setRefusals((current) => {
+      const next = new Map(current);
+      next.delete(subject);
+      return next;
+    });
+    setStarting((current) => new Set(current).add(subject));
+    try {
+      track(await start());
+    } catch (error) {
+      setRefusals((current) => new Map(current).set(subject, refusalOf(error)));
+    } finally {
+      setStarting((current) => {
+        const next = new Set(current);
+        next.delete(subject);
+        return next;
+      });
+    }
+  };
+
+  const putAway = (subject: string, job: Job | null): void => {
+    if (job) jobs.forget(job.id);
+    setRefusals((current) => {
+      const next = new Map(current);
+      next.delete(subject);
+      return next;
+    });
+  };
+
+  const cancelJob = (job: Job | null): void => {
+    if (!job) return;
+    callCore('jobs.cancel', { path: { job_id: job.id } }).catch((error: unknown) => {
+      toast.show({
+        tone: 'danger',
+        title: 'It could not be cancelled',
+        description: describeError(error),
+      });
+    });
+  };
+
+  const suggest = (): Promise<void> =>
+    begin(courseId, () =>
+      callCore('generation.propose_curriculum', { path: { course_id: courseId } }),
+    );
+  const createLesson = (conceptId: string): Promise<void> =>
+    begin(conceptId, () =>
+      callCore('generation.generate_lesson', { path: { concept_id: conceptId } }),
+    );
+
+  const proposalJob = jobs.find(KIND_PROPOSAL, courseId);
+  const proposal = readProposal(proposalJob);
+  const suggesting = starting.has(courseId) || isJobActive(proposalJob);
 
   const candidates = outline.resource.status === 'ready' ? outline.resource.data.candidates : [];
 
@@ -224,6 +343,13 @@ export function CurriculumPanel({ course }: { course: Course }) {
         </Button>
       ) : null}
       <Button
+        icon={<Sparkles />}
+        disabled={suggesting}
+        onClick={() => setDialog({ kind: 'suggest' })}
+      >
+        Suggest concepts with AI
+      </Button>
+      <Button
         variant={path.length === 0 && candidates.length > 0 ? 'secondary' : 'primary'}
         icon={<Plus />}
         onClick={() => setDialog({ kind: 'create' })}
@@ -231,6 +357,38 @@ export function CurriculumPanel({ course }: { course: Course }) {
         Add a concept
       </Button>
     </Stack>
+  );
+
+  const suggestions = (
+    <div className={styles.generation}>
+      <GenerationStatus
+        job={proposalJob?.status === 'succeeded' ? null : proposalJob}
+        starting={starting.has(courseId)}
+        refusal={refusals.get(courseId) ?? null}
+        subject="the suggestions"
+        waitingText="Waiting to ask for suggestions"
+        onCancel={() => cancelJob(proposalJob)}
+        onRetry={() => void suggest()}
+        onDismiss={() => putAway(courseId, proposalJob)}
+      />
+      {proposalJob && proposal && !proposal.closed && dialog?.kind !== 'proposal' ? (
+        <Callout
+          title="Suggestions are ready"
+          actions={
+            <Button
+              size="small"
+              variant="primary"
+              onClick={() => setDialog({ kind: 'proposal', job: proposalJob })}
+            >
+              Review suggestions
+            </Button>
+          }
+        >
+          {providerName} suggested {pluralise(proposal.concepts.length, 'concept')} for this course.
+          Nothing is added until you choose.
+        </Callout>
+      ) : null}
+    </div>
   );
 
   const errors = data.issues.filter((issue) => issue.severity === 'error');
@@ -260,6 +418,8 @@ export function CurriculumPanel({ course }: { course: Course }) {
             </div>
           ) : null}
         </div>
+
+        {suggestions}
 
         {path.length === 0 ? (
           <EmptyState
@@ -365,6 +525,15 @@ export function CurriculumPanel({ course }: { course: Course }) {
                   path={path}
                   hasMaterials={hasMaterials}
                   lessons={lessonsFor(selected)}
+                  generation={{
+                    job: jobs.find(KIND_LESSON, selected.id),
+                    starting: starting.has(selected.id),
+                    refusal: refusals.get(selected.id) ?? null,
+                    providerName,
+                    onCreate: () => void createLesson(selected.id),
+                    onCancel: () => cancelJob(jobs.find(KIND_LESSON, selected.id)),
+                    onDismiss: () => putAway(selected.id, jobs.find(KIND_LESSON, selected.id)),
+                  }}
                   onOpenLesson={(lessonId) => navigate({ name: 'lesson', courseId, lessonId })}
                   onEdit={() => setDialog({ kind: 'edit', concept: selected })}
                   onRemove={() => setDialog({ kind: 'remove', concept: selected })}
@@ -410,6 +579,56 @@ export function CurriculumPanel({ course }: { course: Course }) {
           onAdd={addFromOutline}
         />
       ) : null}
+      {dialog?.kind === 'proposal' && readProposal(dialog.job) ? (
+        <ProposalDialog
+          proposal={readProposal(dialog.job)!}
+          providerName={providerName}
+          onClose={() => setDialog(null)}
+          onAdd={async (selected) => {
+            const before = data.concepts.length;
+            const next = await callCore('generation.accept_proposal', {
+              path: { job_id: dialog.job.id },
+              body: { selected },
+            });
+            accept(next);
+            jobs.forget(dialog.job.id);
+            setDialog(null);
+            toast.show({
+              tone: 'success',
+              title: `${pluralise(next.concepts.length - before, 'concept')} added`,
+              description: 'Check that they fit your course. You can edit anything.',
+            });
+          }}
+          onDiscard={async () => {
+            await callCore('generation.dismiss_proposal', { path: { job_id: dialog.job.id } });
+            jobs.forget(dialog.job.id);
+            setDialog(null);
+          }}
+        />
+      ) : null}
+      <Dialog
+        open={dialog?.kind === 'suggest'}
+        onClose={() => setDialog(null)}
+        title="Ask the AI for concepts?"
+        description={`Adle will send this course's name, topic, and description, your goal, the names of the concepts it already has${
+          hasMaterials ? ', and the headings of your materials with a few short excerpts' : ''
+        } to ${providerName}. It uses one of today's requests, sometimes two. Nothing is added to the course until you have looked at the suggestions.`}
+        actions={
+          <>
+            <Button onClick={() => setDialog(null)}>Not now</Button>
+            <Button
+              variant="primary"
+              icon={<Sparkles />}
+              onClick={() => {
+                setDialog(null);
+                void suggest();
+              }}
+            >
+              Send and suggest
+            </Button>
+          </>
+        }
+      />
       <Dialog
         open={dialog?.kind === 'remove'}
         onClose={() => setDialog(null)}

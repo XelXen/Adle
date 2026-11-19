@@ -233,6 +233,46 @@ describe('narration', () => {
     expect(controller.getState()).toEqual(before);
   });
 
+  it('hands the reading to another narrator, starting the current beat again', () => {
+    const { controller, narrator } = setup();
+    const other = new FakeNarrator();
+    controller.setNarrator(other); // nothing is being read yet: nothing to restart
+    expect(other.spoken).toEqual([]);
+
+    controller.setNarrator(narrator);
+    controller.play();
+    narrator.finish();
+    expect(narrator.spoken).toEqual(['First.', 'Second.']);
+
+    controller.setNarrator(other);
+    // The old narrator was stopped; the new one reads the same beat from its start.
+    expect(narrator.log).toEqual(['cancel']);
+    expect(other.spoken).toEqual(['Second.']);
+    expect(controller.getState()).toMatchObject({ status: 'playing', beatIndex: 1 });
+    controller.setNarrator(other); // the same one again changes nothing
+    expect(other.spoken).toEqual(['Second.']);
+
+    // A late callback from the old narrator does not move the lesson on.
+    narrator.finish();
+    expect(controller.getState()).toMatchObject({ status: 'playing', beatIndex: 1 });
+    other.finish();
+    expect(controller.getState().status).toBe('done');
+  });
+
+  it('stays paused when the narrator is changed while paused', () => {
+    const { controller, narrator } = setup();
+    const other = new FakeNarrator();
+    controller.play();
+    controller.pause();
+    controller.setNarrator(other);
+    expect(controller.getState()).toMatchObject({ status: 'paused', beatIndex: 0 });
+    expect(other.spoken).toEqual(['First.']);
+    expect(other.log).toEqual(['pause']);
+    controller.play();
+    expect(other.log).toEqual(['pause', 'resume']);
+    expect(narrator.spoken).toEqual(['First.']);
+  });
+
   it('copes with a narrator that finishes at once', () => {
     const narrator: Narrator = {
       kind: 'silent',

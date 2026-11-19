@@ -296,6 +296,9 @@ class LearnerPreferences(_Output):
     narration: bool
     captions: bool
     goal: str
+    #: Empty when the learner has not chosen one.
+    voice: str
+    volume: int
 
 
 class LearnerPreferencesUpdate(_Input):
@@ -304,6 +307,8 @@ class LearnerPreferencesUpdate(_Input):
     narration: bool | None = None
     captions: bool | None = None
     goal: Annotated[str, StringConstraints(max_length=600)] | None = None
+    voice: Annotated[str, StringConstraints(max_length=120)] | None = None
+    volume: Annotated[int, Field(ge=0, le=100)] | None = None
 
 
 class SelfRating(_Input):

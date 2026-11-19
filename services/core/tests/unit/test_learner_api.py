@@ -62,6 +62,8 @@ def test_preferences_start_with_sensible_defaults(client: TestClient) -> None:
         "narration": True,
         "captions": True,
         "goal": "",
+        "voice": "",
+        "volume": 100,
     }
 
 
@@ -79,8 +81,21 @@ def test_preferences_can_be_changed_one_at_a_time_and_are_kept(
         "narration": True,
         "captions": True,
         "goal": "Understand backpropagation.",
+        "voice": "",
+        "volume": 100,
     }
     client.patch("/v1/learner/preferences", json={"narration": False})
+    voiced = client.patch(
+        "/v1/learner/preferences",
+        json={"voice": " Microsoft Zira - English (United States) ", "volume": 35},
+    ).json()
+    assert (voiced["voice"], voiced["volume"]) == (
+        "Microsoft Zira - English (United States)",
+        35,
+    )
+    # Silence is a volume like any other, and choosing no voice is allowed again.
+    quiet = client.patch("/v1/learner/preferences", json={"voice": "", "volume": 0}).json()
+    assert (quiet["voice"], quiet["volume"]) == ("", 0)
     assert client.get("/v1/learner/preferences").json()["pace"] == "relaxed"
 
     # A new start of the service reads the same choices from disk.
@@ -104,6 +119,10 @@ def test_preferences_can_be_changed_one_at_a_time_and_are_kept(
         {"narration": "sometimes"},
         {"explanation_density": 3},
         {"goal": "x" * 601},
+        {"voice": "v" * 121},
+        {"volume": 101},
+        {"volume": -1},
+        {"volume": "loud"},
         {"goal": "word " * 80},
         {"favourite_colour": "green"},
     ],

@@ -33,7 +33,13 @@ understanding with short questions, and adapts the next step to what you have ac
   pictures you can pause, replay, try out, or read as a description, and questions that are
   explained whichever way you answer. A lesson remembers where you stopped, and tells you in
   words what your answers showed.
-- **Settings → Learning:** pace, explanation depth, narration, captions, and your goal.
+- **With an AI key:** ask for a list of concepts for a course and choose which to keep; have a
+  lesson written for any concept. You are told what is sent, you can cancel, and nothing is
+  added without you.
+- **Read aloud:** lessons are read by a voice installed on your computer, with nothing sent
+  anywhere. Without a voice, narration is shown as text.
+- **Settings → Learning:** pace, explanation depth, narration, voice and volume, captions, and
+  your goal.
 - **Settings → AI provider:** save or remove an AIHubMix key. It is encrypted by your operating
   system and never shown again.
 - **Settings → About & diagnostics:** restart the local service and run a live check of the
@@ -81,7 +87,8 @@ Installers are not available yet; packaging is part of the release milestone.
 |---|---|
 | AI provider key | Settings → AI provider |
 | Theme | Settings → Appearance |
-| Provider address and model | Shown in Settings → AI provider (`https://aihubmix.com/v1`, `coding-kimi-k3-free`). Editing arrives with lesson generation. |
+| Provider address and model | Shown in Settings → AI provider (`https://aihubmix.com/v1`, `coding-kimi-k3-free`). For development, start with `ADLE_PROVIDER_BASE_URL` and `ADLE_PROVIDER_MODEL` set: `https` only, or `http` on this computer. Another address is always shown as "Custom endpoint". |
+| Narration voice and volume | Settings → Learning |
 | Use a separate data folder | Start with the environment variable `ADLE_USER_DATA_DIR` set to an empty folder |
 
 The free AIHubMix model allows 5 requests per minute, 100 per day, and one million tokens per day

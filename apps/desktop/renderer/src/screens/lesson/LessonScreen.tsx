@@ -1,7 +1,17 @@
-import { ArrowLeft, ArrowRight, Check, Pause, Play, RotateCcw } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Captions,
+  Check,
+  Pause,
+  Play,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
-import type { LessonForPlayer, SceneArtifact } from '@adle/contracts';
+import type { LearnerPreferences, LessonForPlayer, SceneArtifact } from '@adle/contracts';
 import {
   Badge,
   Button,
@@ -23,8 +33,16 @@ import {
   type LessonSegment,
   type PlaybackState,
 } from '../../lesson/controller';
-import { type Pace, TimedNarrator } from '../../lesson/narration';
+import { type Narrator, TimedNarrator } from '../../lesson/narration';
 import { SceneCues } from '../../lesson/scene-cues';
+import {
+  browserLine,
+  browserSpeech,
+  loadLocalVoices,
+  pickVoice,
+  SpeechNarrator,
+  type Voice,
+} from '../../lesson/speech';
 import { callCore, CoreRequestError, describeError } from '../../lib/core-client';
 import { useResource } from '../../lib/use-resource';
 import { KNOWLEDGE_TONE } from '../course/ConceptDetail';
@@ -37,20 +55,47 @@ const GROUNDING_NOTE: Record<LessonForPlayer['lesson']['grounding'], string> = {
   general_knowledge: 'From general knowledge, not from your materials.',
 };
 
+/** What a lesson is read with when the learner has not said otherwise. */
+const DEFAULT_READING: LearnerPreferences = {
+  pace: 'standard',
+  explanation_density: 'balanced',
+  narration: true,
+  captions: true,
+  goal: '',
+  voice: '',
+  volume: 100,
+};
+
 /** Everything that lives exactly as long as one opened lesson. */
 interface Session {
   controller: LessonController;
   cues: SceneCues;
   save: (position: number, completed: boolean) => void;
+  /** Shows the narration as text, at reading pace. Always available. */
+  silent: Narrator;
+  /** Reads the narration aloud. Absent when this computer has no voice to read with. */
+  spoken: Narrator | null;
 }
 
 function openSession(
   data: LessonForPlayer,
-  pace: Pace,
+  preferences: LearnerPreferences,
+  voices: readonly Voice[],
   onSaveFailed: (error: unknown) => void,
 ): Session {
   const { lesson, progress } = data;
   const cues = new SceneCues();
+  const silent = new TimedNarrator(preferences.pace);
+  const engine = browserSpeech();
+  const voice = pickVoice(voices, preferences.voice);
+  const spoken =
+    engine && voice
+      ? new SpeechNarrator(engine, browserLine, {
+          voice,
+          pace: preferences.pace,
+          volume: preferences.volume / 100,
+        })
+      : null;
   let warned = false;
   const save = (position: number, completed: boolean): void => {
     callCore('lessons.save_progress', {
@@ -66,7 +111,7 @@ function openSession(
   const controller: LessonController = new LessonController(
     lesson,
     {
-      narrator: new TimedNarrator(pace),
+      narrator: preferences.narration && spoken ? spoken : silent,
       advanceScene: () => cues.advance(controller.segment.id),
       saveProgress: save,
     },
@@ -75,7 +120,7 @@ function openSession(
       ? { position: 0, furthest: lesson.segments.length - 1 }
       : { position: progress.position },
   );
-  return { controller, cues, save };
+  return { controller, cues, save, silent, spoken };
 }
 
 /** One lesson, played from start to finish with the learner in control of the pace. */
@@ -85,6 +130,8 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
     callCore('lessons.get', { path: { lesson_id: lessonId } }),
   );
   const preferences = useResource('learner-preferences', () => callCore('learner.get_preferences'));
+  // Asked once per lesson: the list of voices is short and does not change while one plays.
+  const voices = useResource('speech-voices', () => loadLocalVoices(browserSpeech()));
   const leave = (): void => navigate({ name: 'course', courseId, tab: 'curriculum' });
   const back = (
     <Button variant="tertiary" size="small" icon={<ArrowLeft />} onClick={leave}>
@@ -92,7 +139,11 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
     </Button>
   );
 
-  if (lesson.resource.status === 'loading' || preferences.resource.status === 'loading') {
+  if (
+    lesson.resource.status === 'loading' ||
+    preferences.resource.status === 'loading' ||
+    voices.resource.status === 'loading'
+  ) {
     return (
       <Page title="Lesson" eyebrow={back}>
         <LoadingState title="Opening the lesson…" />
@@ -127,14 +178,16 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
     );
   }
 
-  // Preferences are a nicety here: a lesson still plays at the standard pace without them.
-  const pace =
-    preferences.resource.status === 'ready' ? preferences.resource.data.pace : 'standard';
+  // Preferences and voices are niceties here: without them a lesson still plays, at the
+  // standard pace, with its narration shown as text.
   return (
     <LessonPlayer
       key={lessonId}
       data={lesson.resource.data}
-      pace={pace}
+      preferences={
+        preferences.resource.status === 'ready' ? preferences.resource.data : DEFAULT_READING
+      }
+      voices={voices.resource.status === 'ready' ? voices.resource.data : []}
       eyebrow={back}
       onLeave={leave}
     />
@@ -143,19 +196,21 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
 
 function LessonPlayer({
   data,
-  pace,
+  preferences,
+  voices,
   eyebrow,
   onLeave,
 }: {
   data: LessonForPlayer;
-  pace: Pace;
+  preferences: LearnerPreferences;
+  voices: readonly Voice[];
   eyebrow: ReactNode;
   onLeave: () => void;
 }) {
   const toast = useToast();
   const { lesson, scenes } = data;
-  const [{ controller, cues, save }] = useState(() =>
-    openSession(data, pace, (error) =>
+  const [{ controller, cues, save, silent, spoken }] = useState(() =>
+    openSession(data, preferences, voices, (error) =>
       toast.show({
         tone: 'danger',
         title: 'Your place in this lesson could not be saved',
@@ -164,6 +219,20 @@ function LessonPlayer({
     ),
   );
   const state = useSyncExternalStore(controller.subscribe, controller.getState);
+  const [aloud, setAloud] = useState(preferences.narration && spoken !== null);
+  const [wordsShown, setWordsShown] = useState(preferences.captions);
+
+  /** Read aloud, or show the words at reading pace. The choice is kept for next time. */
+  const readAloud = (next: boolean): void => {
+    if (!spoken) return;
+    setAloud(next);
+    controller.setNarrator(next ? spoken : silent);
+    callCore('learner.update_preferences', { body: { narration: next } }).catch(() => {
+      // The lesson reads as asked either way; only remembering the choice failed.
+    });
+  };
+  // With nothing spoken, the words are the narration: they are always shown.
+  const transcriptShown = wordsShown || !aloud;
 
   useEffect(() => {
     // Opening a lesson is itself progress worth remembering.
@@ -233,7 +302,7 @@ function LessonPlayer({
             </span>
           </div>
 
-          <div className={cx(styles.body, beats.length > 0 && styles.withSide)}>
+          <div className={cx(styles.body, beats.length > 0 && transcriptShown && styles.withSide)}>
             <SegmentStage
               key={segment.id}
               lessonId={lesson.lesson_id}
@@ -243,7 +312,7 @@ function LessonPlayer({
               controller={controller}
               cues={cues}
             />
-            {beats.length > 0 ? (
+            {beats.length > 0 && transcriptShown ? (
               <aside className={styles.side} aria-label="Transcript">
                 <h3 className={styles.sideTitle}>Transcript</h3>
                 <ol className={styles.transcript}>
@@ -296,6 +365,29 @@ function LessonPlayer({
                   {playing ? 'Pause' : state.status === 'paused' ? 'Resume' : 'Start'}
                 </Button>
               )}
+              {spoken ? (
+                <Button
+                  aria-pressed={aloud}
+                  icon={aloud ? <Volume2 /> : <VolumeX />}
+                  onClick={() => readAloud(!aloud)}
+                >
+                  Read aloud
+                </Button>
+              ) : null}
+              {aloud ? (
+                <Button
+                  aria-pressed={wordsShown}
+                  icon={<Captions />}
+                  onClick={() => setWordsShown((shown) => !shown)}
+                >
+                  Transcript
+                </Button>
+              ) : null}
+              {!spoken && preferences.narration ? (
+                <span className={styles.note}>
+                  No voice is installed on this computer, so the narration is shown as text.
+                </span>
+              ) : null}
             </div>
             <div className={styles.controlGroup}>
               {!allowed ? (

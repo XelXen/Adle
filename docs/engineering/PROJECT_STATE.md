@@ -6,7 +6,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Last updated:** 2026-11-19
 - **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
 - **Last commit:** see `git log -1`
-- **Active milestone:** M5 — provider client, generation, narration
+- **Active milestone:** M6 — assessment, misconceptions, the next step
 - **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
   `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
 
@@ -19,7 +19,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 | M2 — Persistence and ingestion | **Done** | Database with safe migrations, backup and restore; import of PDF, DOCX, Markdown, text with provenance; duplicate detection; FTS5 search; course and materials screens. Vector search deliberately not built (ADR-007). |
 | M3 — Curriculum and learner model | **Done** | Concept graph validated on every write (loops, references, order, layers); curriculum screen (list and map; add, edit, reorder, remove; objectives; prerequisites with reasons; links to materials; outline from headings); learner preferences; knowledge as an append-only record folded through BKT into four states with reasons; review scheduling; retrieval with provenance (ADR-009). **Deferred to the lesson work:** working memory and the interaction event log. Answer evidence is exercised through the service in tests; in the app only self-rating can create evidence until questions exist. |
 | M4 — Wanim and Lesson IR | **Done** | Player frame, adapter, static scene policy, skill, threat model (ADR-004). Lesson IR 1.0 with a generated JSON Schema; one validating gateway; scenes re-checked on every read; answer keys kept in the core with deterministic scoring; the lesson player; the first lesson of the sample course (ADR-010). The packaged-build check is BLOCKED on M8 packaging. |
-| M5 — Generation, audio, timeline | Not started | — |
+| M5 — Generation, audio, timeline | **Done** (real provider BLOCKED) | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Every path is tested against a fake provider. **The real model has not produced a lesson yet:** the provider failed every request upstream on 2026-11-19, so the prompts are unchecked. |
 | M6 — Assessment and adaptation | Not started | — |
 | M7 — Complete UX and sample course | Not started | — |
 | M8 — Release hardening | Not started | — |
@@ -56,18 +56,31 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   from the start with every part open and no question blocking.
 - **When a scene cannot run:** if it fails in the player, or the core withholds it, the part
   shows its description in words and the lesson goes on.
-- Settings → AI provider: save / replace / remove the key (OS-encrypted); provider facts from the core.
-- Settings → Learning: pace, explanation depth, narration, captions, goal (stored by the core).
+- **Suggested concepts:** "Suggest concepts with AI" on the curriculum says what will be sent,
+  runs as a job with progress and Cancel, and ends in a review dialog where the learner picks
+  what to add. Suggestions that finish while the learner is elsewhere wait to be reviewed or
+  discarded. Nothing is added without the learner choosing it.
+- **Generated lessons:** "Create a lesson with AI" on a concept says what is sent and what it
+  costs of the day's requests, shows progress and Cancel, and adds a lesson that plays like any
+  other. No key, a rate-limit wait, a used-up day, a provider failure, and a cancelled job each
+  have their own words and their own way forward.
+- **Narration aloud:** the lesson is read by a voice installed on the computer (never an online
+  one), with "Read aloud" and "Transcript" switches in the lesson. Without a voice, or if the
+  voice fails, the narration is shown as text at the learner's reading pace.
+- Settings → AI provider: save / replace / remove the key (OS-encrypted); provider facts from the
+  core; how much of today's request and token allowance is used and when it resets.
+- Settings → Learning: pace, explanation depth, narration, voice, volume (with a sample),
+  captions, goal (stored by the core).
 - Settings → Privacy & data: what is stored, what is sent.
 - Settings → About & diagnostics: core status and restart; live scene runtime check with a mirrored,
   keyboard-operable slider.
 - Python core starts as a supervised child, authenticates with a per-launch token, migrates its
   database (with a backup first), and exits with the app.
 
-Not present yet (do not assume): spoken narration (captions only), provider calls (so no
-generated lessons and no AI-proposed curriculum), lessons for the other seven sample concepts,
-misconception handling, a chosen next step, review sessions, a progress screen, export and
-restore in the interface, packaging.
+Not present yet (do not assume): a lesson written by the real model (see "The real provider"),
+lessons for the other seven sample concepts, misconception handling, a chosen next step,
+practice and review sessions, a progress screen, export and restore in the interface,
+packaging.
 
 Built and tested but not yet reachable from the interface: `restore_database`
 (`infrastructure/migrate.py`). The restore screen arrives with export in M7.
@@ -75,8 +88,7 @@ Built and tested but not yet reachable from the interface: `restore_database`
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the brand and M5 core commits. After
-that run the core gained two routes and a few tests (ruff, mypy, pytest re-run: PASS).
+`node scripts/check.mjs --e2e` on the tree that became the M5 interface and narration commit.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -86,16 +98,16 @@ that run the core gained two routes and a few tests (ruff, mypy, pytest re-run: 
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 319 tests, 15 files |
+| Vitest | PASS | 358 tests, 17 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 78 source files |
-| pytest | PASS | 821 tests |
-| Playwright + Electron (E2E) | PASS | 45 tests, none flaky |
+| pytest | PASS | 830 tests |
+| Playwright + Electron (E2E) | PASS | 50 tests, none flaky |
 | `npm audit` (all dependencies) | NOT RUN | Last run before KaTeX was added; run again before release |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
 | Packaged build | BLOCKED | No packager chosen yet (M8) |
 | macOS / Linux | NOT RUN | Developed on Windows only |
-| Real AI provider | BLOCKED | The provider fails every request upstream (HTTP 500 `do_request_failed`); see "Where M5 stands" |
+| Real AI provider | BLOCKED | The provider fails every request upstream (HTTP 500 `do_request_failed`); see "The real provider" |
 
 ## Launch reliability (ADR-008)
 
@@ -151,55 +163,44 @@ investigated, not ignored.
   cue to leave a live page). Finer synchronisation needs Wanim's slides mode
   (`self.next_slide()`), which is documented upstream and not yet tested here.
 
-## Where M5 stands
+## The real provider
 
-**Committed: the core half** (ADR-012). `generation/provider.py` (one streamed chat completion;
-no redirects, no environment proxies, no sampling parameters), `generation/quota.py` (pure
-rules), `application/model_gateway.py` (quota, one request in flight, usage rows written
-before sending, one retry after a 429), `generation/drafts.py` (the draft a model writes,
-compiled deterministically into the Lesson IR), `generation/prompts.py`, the packaged scene
-guide, `application/generation.py` (curriculum proposal and lesson as jobs), migration `0004`,
-routes `generation.*`, `jobs.list_active`, `provider.usage`.
-
-**Real provider: BLOCKED at the provider.** On 2026-11-19 the owner's key was valid
-(`GET /v1/models` lists exactly `coding-kimi-k3-free`) but all nine completion requests failed
-with HTTP 500 `do_request_failed` (`Post "https://***/coding/v1/messages": Bad Request`): on both
-the OpenAI-compatible and Anthropic-compatible endpoints, with the smallest possible body. That
-is AIHubMix's call to its upstream failing, not the request. The prompts are therefore
-unchecked against the real model. To retry, from the repository root:
+**BLOCKED at the provider.** On 2026-11-19 the owner's key was valid (`GET /v1/models` lists
+exactly `coding-kimi-k3-free`) but all nine completion requests failed with HTTP 500
+`do_request_failed` (`Post "https://***/coding/v1/messages": Bad Request`): on both the
+OpenAI-compatible and Anthropic-compatible endpoints, with the smallest possible body. That is
+AIHubMix's call to its upstream failing, not the request. The prompts
+(`generation/prompts.py`) are therefore unchecked against the real model. To retry, from the
+repository root:
 
 ```bash
 uv run --directory services/core python <scratch>/tools/real_smoke.py <key file> <output dir> probe
 ```
 
 (The script lives outside the repository on purpose; it is described in ADR-012. Nine of the
-day's 80 budgeted requests were used.)
+day's 80 budgeted requests were used on 2026-11-19.) When it answers: run it with `curriculum`
+and `lesson`, read what the model actually writes, and adjust the prompts and the leniency of
+`generation/drafts.py` to it. Do not loosen the Lesson IR or the scene policy to fit the model.
 
-Also committed: `e2e/support/fake-provider.ts`, the local server end-to-end tests will point the
-app at. No spec uses it yet.
+## Next actions (M6), in order
 
-**In the working tree, not committed:** the start of the interface for generation
-(`renderer/src/lib/generation.ts`, `use-course-jobs.ts`, `GenerationStatus`,
-`ProposalDialog`, usage in Settings). None of it is wired into a screen yet.
+1. **Hypotheses about mistakes** (`learner_model/misconceptions.py`): fold a concept's attempts
+   and the learner's dismissals into tentative / supported / rejected / resolved hypotheses;
+   only a supported one about the idea itself stands in the way of "Demonstrated for now";
+   slips never do. Store what each question can reveal with the attempt.
+2. **Practice and review** (`learner_model/practice.py`): choose questions by what the evidence
+   still lacks; keep back a question answered in the last twelve hours; a repeat inside that
+   window counts as aided.
+3. **The next step** (`learner_model/next_step.py`): one recommendation with its reason in
+   words, and alternatives; never a repeat of the same lesson after a run of misses.
+4. **In the app:** a "Learn" tab on the course (next step, why, alternatives, progress in
+   words), a practice and review screen, hypotheses shown with a way to say "that was a slip",
+   and "what next" when a lesson ends.
+5. **Tests:** unit and property tests for the three modules, API tests, and an end-to-end
+   journey including a review that becomes due.
 
-## Next actions (M5), in order
-
-1. **Interface for generation:** "Suggest concepts with AI" on the curriculum (progress, cancel,
-   review dialog, a proposal that finished unseen can still be reviewed or set aside);
-   "Create a lesson" on a concept (progress, cancel, what is sent, the notes a job returns);
-   clear states for no key, rate limited, used up for today, provider failure.
-2. **End-to-end tests against the fake provider** (`ADLE_PROVIDER_BASE_URL` pointing at
-   `e2e/support/fake-provider.ts`): propose and accept; create and play a generated lesson;
-   failure and retry; cancel; no key.
-3. **Narration aloud** through the operating system's voices (Web Speech API, local voices only)
-   behind the existing `Narrator` interface, with word highlighting only where the engine
-   reports word boundaries, a voice and volume setting, and silent captions as the fallback.
-4. **Retry the real provider** when it answers again, and adjust the prompts to what the model
-   actually writes.
-
-Then M6 (misconceptions, next-step policy with reasons, review queue, progress screen,
-rubric-bounded grading), M7 (the rest of the sample course, export / restore / delete, polish),
-M8 (packaging, hardening).
+Then M7 (the rest of the sample course, export / restore / delete, polish) and M8 (packaging,
+hardening).
 
 ## Known gaps (tracked, not forgotten)
 

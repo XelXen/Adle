@@ -92,3 +92,18 @@ export async function screenshot(page: Page, name: string): Promise<void> {
     fullPage: false,
   });
 }
+
+/**
+ * Have lessons show their narration as text instead of reading it aloud.
+ *
+ * Narration is on by default and the test machine may well have a voice, so a
+ * journey that is not about speech turns it off first: the lesson then keeps
+ * time by reading pace, the same on every machine, and nothing is played
+ * through the speakers. `narration.spec.ts` covers reading aloud.
+ */
+export async function showNarrationAsText(page: Page): Promise<void> {
+  const saved = await page.evaluate(() =>
+    window.adle!.core.invoke('learner.update_preferences', { body: { narration: false } }),
+  );
+  expect(saved).toMatchObject({ ok: true, data: { narration: false } });
+}

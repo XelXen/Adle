@@ -9,7 +9,11 @@ import { DatabaseSync } from 'node:sqlite';
 import type { Locator, Page } from '@playwright/test';
 
 import { expect, launchApp, test, waitForCore } from './support/app';
-import { expectNoAccessibilityViolations, screenshot } from './support/courses';
+import {
+  expectNoAccessibilityViolations,
+  screenshot,
+  showNarrationAsText,
+} from './support/courses';
 import { fixtureScene } from './support/player';
 
 const COURSE = 'Introduction to neural networks';
@@ -24,6 +28,7 @@ const continueButton = (page: Page) => page.getByRole('button', { name: 'Continu
 
 async function addSampleCourse(page: Page): Promise<void> {
   await waitForCore(page);
+  await showNarrationAsText(page);
   await page.getByRole('button', { name: 'Try the sample course' }).click();
   await expect(page.getByRole('heading', { name: COURSE, level: 1 })).toBeVisible();
 }

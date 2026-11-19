@@ -150,6 +150,8 @@ class LearnerService:
         narration: bool | None = None,
         captions: bool | None = None,
         goal: str | None = None,
+        voice: str | None = None,
+        volume: int | None = None,
     ) -> LearnerPreferences:
         """Change the preferences that are given and return them all."""
         with self._database.session() as session:
@@ -169,6 +171,11 @@ class LearnerService:
                         f"A goal can be at most {MAX_GOAL_LENGTH} characters."
                     )
                 updated = replace(updated, goal=tidy)
+            if voice is not None:
+                # A voice is named by the computer it is on; the name is kept as given.
+                updated = replace(updated, voice=voice.strip())
+            if volume is not None:
+                updated = replace(updated, volume=volume)
             current = {row.key: row for row in session.scalars(select(LearnerPreference))}
             for key, value in updated.to_stored().items():
                 if key in current:

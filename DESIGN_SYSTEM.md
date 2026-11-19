@@ -157,6 +157,14 @@ Say what happened in words, not in colour. The chosen option reads "Your answer"
 never `danger`) inside a live region, with the explanation and what the answer changed. A wrong
 answer is "Not quite", never "Wrong".
 
+### Work the AI is doing
+
+Anything the provider is asked to do takes a while and may fail, so it is always shown the same
+way (`GenerationStatus`, in the app): a progress bar with what is happening now and a Cancel
+button; then either the result where it belongs, or a `Callout` that says what happened and
+offers the one useful next step ("Try again", "Open AI settings"), or nothing but "Dismiss"
+when waiting is the only remedy. Before the request: say what will be sent and to whom.
+
 ### A lesson's controls stay within reach
 
 The lesson's bar (Previous, Start / Pause / Play again, Continue) sticks to the bottom edge of the

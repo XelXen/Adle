@@ -10,6 +10,7 @@ import {
   ErrorState,
   IconButton,
   LoadingState,
+  ProgressBar,
   Section,
   Stack,
   TextField,
@@ -19,6 +20,7 @@ import {
 import { useApp } from '../../app/AppContext';
 import { getBridge } from '../../lib/bridge';
 import { callCore, describeError, unwrap } from '../../lib/core-client';
+import { formatClockTime } from '../../lib/format';
 import { useResource } from '../../lib/use-resource';
 import styles from './Settings.module.css';
 
@@ -30,6 +32,7 @@ export function ProviderSettings() {
   const provider = useResource(`provider-status:${coreStatus.state}`, () =>
     callCore('provider.status'),
   );
+  const usage = useResource(`provider-usage:${coreStatus.state}`, () => callCore('provider.usage'));
 
   const [draft, setDraft] = useState('');
   const [revealed, setRevealed] = useState(false);
@@ -189,6 +192,44 @@ export function ProviderSettings() {
                 <dd className={styles.mono}>{provider.resource.data.model}</dd>
               </div>
             </dl>
+          </Card>
+        )}
+      </Section>
+
+      <Section
+        title="Use today"
+        description="Adle's own count of what it has sent today. Your provider keeps the real total, and anything else that uses the same key counts against it too."
+      >
+        {usage.resource.status === 'loading' ? (
+          <LoadingState title="Counting today's requests…" />
+        ) : usage.resource.status === 'error' ? (
+          <ErrorState
+            title="Today's use could not be read"
+            description={describeError(usage.resource.error)}
+            actions={<Button onClick={usage.reload}>Try again</Button>}
+          />
+        ) : (
+          <Card>
+            <Stack gap={4}>
+              <ProgressBar
+                label="Requests"
+                showLabel
+                value={usage.resource.data.requests_today / usage.resource.data.requests_per_day}
+                valueText={`${usage.resource.data.requests_today.toLocaleString()} of ${usage.resource.data.requests_per_day.toLocaleString()}`}
+              />
+              <ProgressBar
+                label="Tokens (words and parts of words)"
+                showLabel
+                value={usage.resource.data.tokens_today / usage.resource.data.tokens_per_day}
+                valueText={`about ${usage.resource.data.tokens_today.toLocaleString()} of ${usage.resource.data.tokens_per_day.toLocaleString()}`}
+              />
+              <p className={styles.usageNote}>
+                Adle stops a little short of the provider's daily limit, sends one request at a
+                time, and never more than {usage.resource.data.requests_per_minute} a minute: it
+                waits instead. The count starts again at{' '}
+                {formatClockTime(usage.resource.data.resets_at)}.
+              </p>
+            </Stack>
           </Card>
         )}
       </Section>

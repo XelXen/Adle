@@ -17,6 +17,7 @@ import {
 import { callCore, describeError } from '../../lib/core-client';
 import { useResource } from '../../lib/use-resource';
 import styles from './Settings.module.css';
+import { VoiceSettings } from './VoiceSettings';
 
 type Pace = LearnerPreferences['pace'];
 type Density = LearnerPreferences['explanation_density'];
@@ -150,7 +151,7 @@ export function LearningSettings() {
           <Stack gap={4}>
             <Switch
               label="Narration"
-              description="Read lessons aloud. You can still pause, replay, or mute at any moment."
+              description="Read lessons aloud with a voice from this computer. You can still pause, replay, or switch it off inside a lesson."
               checked={current.narration}
               onCheckedChange={(narration) => void change({ narration })}
             />
@@ -160,6 +161,9 @@ export function LearningSettings() {
               checked={current.captions}
               onCheckedChange={(captions) => void change({ captions })}
             />
+            {current.narration ? (
+              <VoiceSettings preferences={current} onChange={(patch) => void change(patch)} />
+            ) : null}
           </Stack>
         </Card>
       </Section>

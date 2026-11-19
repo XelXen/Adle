@@ -80,3 +80,12 @@
   gap: var(--ad-space-1);
   min-width: 0;
 }
+
+.usageNote {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.voiceField {
+  max-width: 28rem;
+}

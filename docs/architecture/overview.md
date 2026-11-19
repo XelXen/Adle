@@ -167,6 +167,37 @@ sequenceDiagram
 - If a scene fails in the player, or the core withholds it, the part shows its description in
   words and the lesson continues.
 - Answers are judged in the core. See ADR-010.
+- Narration is read by a voice installed on the computer (`lesson/speech.ts`), or shown as text
+  at reading pace. Either way the narrator is the lesson's clock. See ADR-013.
+
+## Asking the model
+
+```mermaid
+sequenceDiagram
+  participant UI as Renderer
+  participant G as GenerationService (job)
+  participant Q as ModelGateway
+  participant P as Provider
+  UI->>G: generation.generate_lesson (concept)
+  G-->>UI: job (queued)
+  loop the lesson, then each scene (fixed, small number)
+    G->>Q: complete(request)
+    Note over Q: allowed? wait? used up for today?<br/>write the request down, then send
+    Q->>P: POST /chat/completions (key in one header)
+    P-->>Q: streamed answer
+    Q-->>G: text + usage
+    Note over G: draft -> Lesson IR (ids, citations,<br/>durations assigned here) -> validate
+  end
+  G->>G: parse_bundle, store
+  UI->>G: jobs.get (polling): progress, then result
+```
+
+- The model writes a forgiving draft. The core compiles it into the Lesson IR, so no identifier
+  or citation comes from the model.
+- The gateway keeps a local count under the provider's limits. The interface shows it as an
+  estimate.
+- A curriculum proposal works the same way, in one request, and adds nothing until the learner
+  has chosen from it. See ADR-012.
 
 ## Data on disk
 

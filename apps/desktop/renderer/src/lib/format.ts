@@ -33,3 +33,10 @@ export function formatRelativeDay(iso: string, now: Date = new Date()): string {
   if (days < 7) return `${days} days ago`;
   return then.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
+
+/** The time of day of a moment, in the learner's own time zone and format: "01:00", "1:00 AM". */
+export function formatClockTime(iso: string): string {
+  const moment = new Date(iso);
+  if (Number.isNaN(moment.getTime())) return '';
+  return moment.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}

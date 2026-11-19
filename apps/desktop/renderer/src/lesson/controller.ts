@@ -69,12 +69,15 @@ export class LessonController {
   /** Once the learner has pressed play, later segments start by themselves. */
   private started = false;
   private readonly listeners = new Set<() => void>();
+  /** Who is reading. Starts as the host's narrator and can be changed while a lesson plays. */
+  private narrator: Narrator;
 
   constructor(
     private readonly lesson: PlayerLesson,
     private readonly host: PlaybackHost,
     start: { position: number; furthest?: number } = { position: 0 },
   ) {
+    this.narrator = host.narrator;
     const last = lesson.segments.length - 1;
     const clamp = (index: number): number => Math.min(Math.max(0, index), last);
     const position = clamp(start.position);
@@ -165,6 +168,21 @@ export class LessonController {
     if (!this.state.explored) this.update({ explored: true });
   }
 
+  /**
+   * Read with another narrator from here on (aloud instead of silently, or the
+   * other way round). What was being read starts again with the new one, since
+   * the two keep time differently and the old one cannot hand over mid-sentence.
+   */
+  setNarrator(narrator: Narrator): void {
+    if (narrator === this.narrator) return;
+    this.narrator = narrator;
+    const { status, beatIndex } = this.state;
+    if (status !== 'playing' && status !== 'paused') return;
+    this.cancelNarration();
+    this.startBeat(Math.max(0, beatIndex));
+    if (status === 'paused') this.pause();
+  }
+
   /** Stop everything. The controller must not be used afterwards. */
   dispose(): void {
     this.cancelNarration();
@@ -218,7 +236,7 @@ export class LessonController {
     this.update({ status: 'playing', beatIndex: index, beatsStarted: index + 1, word: null });
     if (beat.advance_scene) this.host.advanceScene();
     let ended = false;
-    const utterance = this.host.narrator.speak(beat.text, {
+    const utterance = this.narrator.speak(beat.text, {
       onEnd: () => {
         ended = true;
         if (generation !== this.generation) return;

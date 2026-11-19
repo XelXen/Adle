@@ -46,6 +46,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A lesson remembers where you stopped. A finished lesson can be gone through again, with every
   part open and no question blocking the way.
 - Mathematics in lessons and questions is properly typeset.
+- With an AI provider key, ask for a list of concepts for a course. You are told what will be
+  sent before anything is sent, and nothing is added until you have looked at the suggestions
+  and chosen. Suggestions that arrive while you are elsewhere wait for you.
+- With a key, have a lesson written for any concept that has a learning objective. You see how
+  far along it is and can cancel. If a picture cannot be made, the lesson is kept and that part
+  is explained in words.
+- Settings → AI provider shows how many requests Adle has sent today. Adle sends one request at
+  a time, waits rather than exceed four a minute, and stops short of the provider's daily limit.
+- Lessons are read aloud with a voice installed on your computer. Nothing is sent anywhere to
+  do it. Choose the voice and volume in Settings → Learning, and switch reading aloud on or off
+  inside a lesson. Without a voice, narration is shown as text.
 - Your data is kept safe between versions: a copy is made before its format is ever changed.
 - Interactive visuals run in an isolated frame; if one cannot run, a text explanation is shown
   instead and the rest of the lesson is unaffected.
@@ -59,9 +70,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Notes
 
-- Only the first concept of the sample course has a lesson so far, and lessons cannot yet be
-  generated for your own courses.
-- Narration is shown as captions; it is not yet spoken aloud.
+- Only the first concept of the sample course has a ready-made lesson so far.
+- Generated lessons depend on the AI provider. On the day this was written the provider was
+  failing every request on its side; Adle reports that and saves nothing.
+- A picture moves in step with its narration part by part, not sentence by sentence.
 - Adle does not yet choose what you should do next or schedule reviews.
 - Scanned PDFs are not supported: Adle does not run text recognition (OCR).
 - There is no installer yet; the app runs from source.

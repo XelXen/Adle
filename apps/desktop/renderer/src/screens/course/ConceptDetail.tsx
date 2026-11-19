@@ -1,7 +1,23 @@
-import { Link as LinkIcon, Pencil, Play, RotateCcw, Search, Trash2, Unlink } from 'lucide-react';
+import {
+  Link as LinkIcon,
+  Pencil,
+  Play,
+  RotateCcw,
+  Search,
+  Sparkles,
+  Trash2,
+  Unlink,
+} from 'lucide-react';
 import { useId, useState } from 'react';
 
-import type { Concept, ConceptEvidence, Curriculum, LessonSummary, Passage } from '@adle/contracts';
+import type {
+  Concept,
+  ConceptEvidence,
+  Curriculum,
+  Job,
+  LessonSummary,
+  Passage,
+} from '@adle/contracts';
 import {
   Badge,
   Button,
@@ -13,8 +29,11 @@ import {
   useToast,
 } from '@adle/design-system';
 
+import { GenerationStatus } from '../../components/GenerationStatus';
 import { callCore, describeError } from '../../lib/core-client';
 import { formatRelativeDay } from '../../lib/format';
+import type { JobFailure } from '../../lib/generation';
+import { isJobActive } from '../../lib/use-job';
 import styles from './Curriculum.module.css';
 import {
   describeLesson,
@@ -63,12 +82,28 @@ export type ConceptLessons =
   | { status: 'error'; message: string; retry: () => void }
   | { status: 'ready'; lessons: readonly LessonSummary[] };
 
+/** Where the making of a lesson for one concept stands. */
+export interface LessonGeneration {
+  /** The job writing a lesson for this concept, if this screen knows of one. */
+  job: Job | null;
+  /** The request to start one is on its way. */
+  starting: boolean;
+  /** Starting was refused before a job existed. */
+  refusal: JobFailure | null;
+  /** The provider the request goes to, as the learner knows it. */
+  providerName: string;
+  onCreate: () => void;
+  onCancel: () => void;
+  onDismiss: () => void;
+}
+
 /** Everything about one concept: what it is, what it needs, where it comes from, what you have shown. */
 export function ConceptDetail({
   concept,
   path,
   hasMaterials,
   lessons,
+  generation,
   onOpenLesson,
   onEdit,
   onRemove,
@@ -81,6 +116,7 @@ export function ConceptDetail({
   path: readonly Concept[];
   hasMaterials: boolean;
   lessons: ConceptLessons;
+  generation: LessonGeneration;
   onOpenLesson: (lessonId: string) => void;
   onEdit: () => void;
   onRemove: () => void;
@@ -247,6 +283,47 @@ export function ConceptDetail({
               );
             })}
           </ul>
+        )}
+        <GenerationStatus
+          job={generation.job?.status === 'succeeded' ? null : generation.job}
+          starting={generation.starting}
+          refusal={generation.refusal}
+          subject="the lesson"
+          waitingText="Waiting for its turn"
+          onCancel={generation.onCancel}
+          onRetry={generation.onCreate}
+          onDismiss={generation.onDismiss}
+        />
+        {/* While work is under way, or its failure is on screen with its own way forward,
+            a second button to start the same thing would only be noise. */}
+        {generation.starting ||
+        isJobActive(generation.job) ||
+        generation.refusal !== null ||
+        generation.job?.status === 'failed' ||
+        generation.job?.status === 'cancelled' ? null : (
+          <div className={styles.generation}>
+            <div>
+              <Button
+                size="small"
+                icon={<Sparkles />}
+                disabled={concept.objectives.length === 0}
+                onClick={generation.onCreate}
+              >
+                {lessons.status === 'ready' && lessons.lessons.length > 0
+                  ? 'Create another lesson with AI'
+                  : 'Create a lesson with AI'}
+              </Button>
+            </div>
+            <p className={styles.aiNote}>
+              {concept.objectives.length === 0
+                ? 'Add a learning objective first, so the lesson has something to aim at.'
+                : `Sends ${
+                    hasMaterials
+                      ? 'this concept, its objectives, and a few related passages from your materials'
+                      : 'this concept and its objectives'
+                  } to ${generation.providerName}. It usually takes three of today's requests.`}
+            </p>
+          </div>
         )}
       </div>
 

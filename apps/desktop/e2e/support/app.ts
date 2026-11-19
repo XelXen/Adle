@@ -31,6 +31,8 @@ export interface LaunchOptions {
   viewport?: { width: number; height: number };
   /** Skip the first-run welcome so a test can start in the main shell. */
   onboarded?: boolean;
+  /** Extra environment for the app, for example the address of the fake AI provider. */
+  env?: Record<string, string>;
 }
 
 /**
@@ -110,7 +112,7 @@ export async function launchApp(
   }
   const app = await electron.launch({
     args: [desktopDir, ...ALWAYS_PAINT_SWITCHES],
-    env: { ...process.env, ADLE_USER_DATA_DIR: profileDir },
+    env: { ...process.env, ...options.env, ADLE_USER_DATA_DIR: profileDir },
     // Playwright forces a light colour scheme by default, which would mask the
     // app's own theme handling. `null` leaves the media query to the app.
     colorScheme: null,
