@@ -6,7 +6,9 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Last updated:** 2026-11-19
 - **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
 - **Last commit:** see `git log -1`
-- **Active milestone:** M3 — curriculum graph and learner model foundation
+- **Active milestone:** M4 remainder — Lesson IR and the lesson player
+- **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
+  `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
 
 ## Milestone status
 
@@ -15,7 +17,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 | M0 — Foundation | **Done** | Workspace, pinned toolchain, lint/type/test gates, docs, ADR process, CI workflow written. CI itself is NOT RUN (no remote yet). |
 | M1 — Desktop shell and Sprout | **Done** | App launches without a key; welcome, library, settings; key add/remove without exposure; themes; a11y gates. |
 | M2 — Persistence and ingestion | **Done** | Database with safe migrations, backup and restore; import of PDF, DOCX, Markdown, text with provenance; duplicate detection; FTS5 search; course and materials screens. Vector search deliberately not built (ADR-007). |
-| M3 — Curriculum and learner model | Not started | Next. |
+| M3 — Curriculum and learner model | **Done** | Concept graph validated on every write (loops, references, order, layers); curriculum screen (list and map; add, edit, reorder, remove; objectives; prerequisites with reasons; links to materials; outline from headings); learner preferences; knowledge as an append-only record folded through BKT into four states with reasons; review scheduling; retrieval with provenance (ADR-009). **Deferred to the lesson work:** working memory and the interaction event log. Answer evidence is exercised through the service in tests; in the app only self-rating can create evidence until questions exist. |
 | M4 — Wanim and Lesson IR | **Partly done** | Done: spike, player frame, adapter, static scene policy, skill, threat model (ADR-004). Missing: Lesson IR and its validation; adapter exercised through a lesson; packaged-build check (BLOCKED on M8 packaging). |
 | M5 — Generation, audio, timeline | Not started | — |
 | M6 — Assessment and adaptation | Not started | — |
@@ -32,15 +34,22 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   dropping them; progress while importing; per-file outcome (imported, already imported,
   rejected with a reason); extraction warnings; remove a source; search with file and page or
   section for every hit.
+- **Course → Curriculum** (the tab a course opens on once it has materials or a topic): the
+  concepts as a list in teaching order or as a map; add, edit, reorder, and remove concepts;
+  learning objectives; what each concept needs first and why, with loops refused and explained;
+  "Start from your materials" offers the headings of imported files as concepts; link a concept
+  to passages in the materials; say how well you already know a concept and read back the record
+  of everything noted about it.
 - Settings → AI provider: save / replace / remove the key (OS-encrypted); provider facts from the core.
+- Settings → Learning: pace, explanation depth, narration, captions, goal (stored by the core).
 - Settings → Privacy & data: what is stored, what is sent.
 - Settings → About & diagnostics: core status and restart; live scene runtime check with a mirrored,
   keyboard-operable slider.
 - Python core starts as a supervised child, authenticates with a per-launch token, migrates its
   database (with a backup first), and exits with the app.
 
-Not present yet (do not assume): curriculum, lessons, questions, audio, learner model, adaptation,
-provider calls, export and restore in the interface, packaging.
+Not present yet (do not assume): lessons, questions, audio, adaptation, provider calls (so no
+AI-proposed curriculum yet), a progress screen, export and restore in the interface, packaging.
 
 Built and tested but not yet reachable from the interface: `restore_database`
 (`infrastructure/migrate.py`). The restore screen arrives with export in M7.
@@ -48,8 +57,7 @@ Built and tested but not yet reachable from the interface: `restore_database`
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the M0–M2 commit, plus a second run of the
-E2E suite alone.
+`node scripts/check.mjs --e2e` on the tree that became the M3 commit.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -58,11 +66,11 @@ E2E suite alone.
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 213 tests, 10 files |
+| Vitest | PASS | 231 tests, 11 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 47 source files |
-| pytest | PASS | 252 tests |
-| Playwright + Electron (E2E) | PASS | 40 tests, none flaky, in both runs |
+| mypy (strict) | PASS | 59 source files |
+| pytest | PASS | 422 tests |
+| Playwright + Electron (E2E) | PASS | 43 tests, none flaky |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities (earlier in the session) |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
 | Packaged build | BLOCKED | No packager chosen yet (M8) |
@@ -112,25 +120,27 @@ investigated, not ignored.
   to a region.
 - A `BrowserWindow` created with `show: false` can fail to paint its first frame (ADR-008).
 
-## Next actions (M3, in order)
+## Next actions (M4 remainder, then M5), in order
 
-1. **Pure rules** with property tests: concept graph validation, loops, learning order, layers
-   (`adle_core/curriculum/graph.py`); outline candidates from imported headings
-   (`curriculum/outline.py`); Bayesian knowledge tracing, mastery states and criteria, review
-   scheduling, the observation fold with explanations, preferences (`adle_core/learner_model/`).
-2. **Schema** (Alembic revision 0002): `concepts`, `learning_objectives`, `concept_edges`,
-   `concept_source_refs`, `learner_preferences`, `learner_concept_states`,
-   `learner_observations`.
-3. **Services and API:** curriculum CRUD validated on every write, outline candidates (no AI),
-   retrieval with provenance behind an adapter, learner preferences, self-rating as recorded
-   evidence, per-concept explanation of every state change. `npm run contracts`.
-4. **UI:** Course → Curriculum (list and map; add, rename, remove, reorder; objectives;
-   prerequisites with reasons; source references; validation messages), Settings → Learning,
-   a qualitative state per concept ("Not assessed" until there is evidence).
-5. **Tests:** API tests and an E2E journey that drafts, edits, and reloads a curriculum.
+1. **Lesson IR** (`adle_core/lessons/ir.py`, Pydantic, `schema_version` "1.0"): a lesson with
+   typed segments (explanation, visualization, interaction, checkpoint, worked example,
+   reflection, summary), narration split into beats that can cue a scene step, typed assessment
+   items, and scene artifacts stored apart from the lesson. Strict validation: unknown fields,
+   references, bounds, a text alternative for every learning-critical interaction, no URLs,
+   paths, or markup. Export its JSON Schema to `packages/lesson-ir`.
+2. **Storage and API:** `lessons`, `lesson_segments`, `scene_artifacts`; store a lesson bundle
+   only after the IR validates and every scene passes `scene_policy`; `lessons.*` operations.
+3. **Lesson player** in the renderer: stage (`ScenePlayer` or text), transcript with the current
+   beat, play / pause / replay / previous / next, a segment list, the text fallback when a scene
+   fails. A pure timeline state machine with unit tests; narration behind an interface.
+4. **A hand-written fixture lesson** (one concept of the neural-network course, with real scenes)
+   that the E2E suite plays from start to finish.
+5. **M5:** provider client (OpenAI-compatible, AIHubMix), quota manager with persisted usage,
+   fake provider server for tests, curriculum proposal and lesson generation as jobs (one scene
+   = one request), narration engines, word highlighting where the engine reports boundaries.
 
-Then M4 remainder (Lesson IR, fallback rendering inside a lesson), M5 (provider client, quota
-manager, generation, narration, timeline), M6, M7, M8.
+Then M6 (questions scored and recorded as evidence, misconceptions, next-step policy, progress
+screen), M7 (sample course, export / restore / delete, polish), M8 (packaging, hardening).
 
 ## Known gaps (tracked, not forgotten)
 

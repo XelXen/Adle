@@ -16,7 +16,7 @@ function Screen({ route }: { route: Route }) {
       return <HomeScreen />;
     case 'course':
       // The key resets the screen's state when moving between courses.
-      return <CourseScreen key={route.courseId} courseId={route.courseId} />;
+      return <CourseScreen key={route.courseId} courseId={route.courseId} tab={route.tab} />;
     case 'settings':
       return <SettingsScreen tab={route.tab} />;
   }

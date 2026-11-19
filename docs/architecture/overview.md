@@ -114,6 +114,30 @@ sequenceDiagram
 Text search (`sources.search`) reads the FTS5 index and returns each passage with its source,
 page or heading path, and highlighted segments. See ADR-007.
 
+## Curriculum and what the learner knows
+
+```mermaid
+flowchart LR
+  subgraph Pure rules
+    G["curriculum.graph<br/>loops, order, layers"]
+    T["learner_model.tracing<br/>BKT → state + reason"]
+  end
+  CS["CurriculumService"] -- "would this write leave a learnable graph?" --> G
+  LS["LearnerService.record"] -- "fold one observation" --> T
+  CS --> DB[("concepts, edges,<br/>objectives, source refs")]
+  LS --> OBS[("learner_observations<br/>append-only")]
+  LS --> ST[("learner_concept_states<br/>derived, rebuildable")]
+  UI["Renderer"] -- "curriculum.* / learner.*" --> CS
+  UI --> LS
+```
+
+- A course's concepts form a directed graph. Every write is checked first; a change that would
+  close a loop is refused with the loop named. Reading validates again and reports problems.
+- What a learner has shown about a concept is a list of observations. The state the interface
+  shows (*Not assessed*, *Building understanding*, *Needs more evidence*, *Demonstrated for
+  now*) is computed from them, with a sentence for each change. The numeric estimate behind it
+  never leaves the core. See ADR-009.
+
 ## Data on disk
 
 Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS default):
@@ -122,7 +146,7 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 |---|---|---|
 | `ui-state.json` | Main | Theme and whether the welcome was seen |
 | `credentials.bin` | Main | The provider key, encrypted by the OS |
-| `data/adle.db` (+ `-wal`, `-shm`) | Core | Courses, sources, sections, chunks, jobs, settings |
+| `data/adle.db` (+ `-wal`, `-shm`) | Core | Courses, sources, sections, chunks, jobs, settings, curriculum, learner preferences, observations, and derived states |
 | `data/sources/<source id>.<ext>` | Core | A copy of each imported original, named by its generated id |
 | `data/assets/` | Core | Reserved for generated lesson assets (M5) |
 | `data/backups/` | Core | Automatic database copies made before a migration (five kept) |
@@ -143,7 +167,9 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 | `packages/event-protocol` | Host ↔ player message types, validators, and origin helpers |
 | `packages/contracts` | Generated API types and operation table |
 | `services/core/adle_core/api` | FastAPI app, auth, error contract, routes |
-| `services/core/adle_core/application` | The service container; courses, sources (import and search), background jobs |
+| `services/core/adle_core/application` | The service container; courses, sources (import and search), background jobs, curriculum, learner, retrieval |
+| `services/core/adle_core/curriculum` | Pure rules for the concept graph and for drafting an outline from headings |
+| `services/core/adle_core/learner_model` | Pure rules: knowledge tracing, mastery states, review scheduling, preferences |
 | `services/core/adle_core/infrastructure` | SQLite engine, ORM models, migrations with backup, asset store |
 | `services/core/adle_core/ingestion` | Type detection, parsers, chunking, and the parser worker process |
 | `services/core/adle_core/generation` | Provider credentials, scene policy (model client and quota manager arrive in M5) |

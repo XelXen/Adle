@@ -22,6 +22,9 @@ export interface DialogProps {
 /**
  * A modal dialog built on the native `<dialog>` element, which provides the
  * focus trap, Escape handling, and inert background for free.
+ *
+ * Focus starts on the close button, the safe choice for a confirmation. In a
+ * form, put `data-autofocus` on the field the learner should start typing in.
  */
 export function Dialog({
   open,
@@ -40,8 +43,12 @@ export function Dialog({
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    else if (!open && dialog.open) dialog.close();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      // The browser focuses the first focusable element, which is the close button.
+      // A form dialog marks the field to start in with `data-autofocus` instead.
+      dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+    } else if (!open && dialog.open) dialog.close();
   }, [open]);
 
   const handleCancel = (event: SyntheticEvent<HTMLDialogElement>): void => {

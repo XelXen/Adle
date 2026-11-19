@@ -15,6 +15,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     Float,
     ForeignKey,
@@ -33,6 +34,10 @@ SOURCE_KINDS = ("pdf", "docx", "markdown", "text", "authored")
 SOURCE_STATUSES = ("extracted", "needs_attention")
 SECTION_KINDS = ("document", "page", "heading")
 JOB_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
+CONCEPT_ORIGINS = ("learner", "outline", "model", "sample")
+CONCEPT_TAGS = ("conceptual", "calculation", "visual", "procedural")
+OBSERVATION_KINDS = ("answer", "self_report")
+MASTERY_STATES = ("not_assessed", "building", "needs_evidence", "demonstrated")
 
 
 def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
@@ -173,6 +178,191 @@ class SourceChunk(Base):
 
     source: Mapped[Source] = relationship(back_populates="chunks")
     section: Mapped[SourceSection] = relationship()
+
+
+class Concept(Base):
+    """One thing to learn in a course: a node of the curriculum graph."""
+
+    __tablename__ = "concepts"
+    __table_args__ = (
+        _one_of("origin", CONCEPT_ORIGINS),
+        CheckConstraint("complexity BETWEEN 1 AND 3", name="complexity_range"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    #: The learner's own ordering. The learning order also respects prerequisites.
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Expected lesson size: 1 short, 2 medium, 3 long.
+    complexity: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    #: Kinds of learning involved, from ``CONCEPT_TAGS``.
+    tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    #: Who proposed the concept. Anything not from the learner stays labelled.
+    origin: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
+
+    objectives: Mapped[list[LearningObjective]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="LearningObjective.position",
+    )
+    prerequisite_links: Mapped[list[ConceptEdge]] = relationship(
+        foreign_keys="ConceptEdge.concept_id",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    source_refs: Mapped[list[ConceptSourceRef]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True, order_by="ConceptSourceRef.id"
+    )
+
+
+class LearningObjective(Base):
+    """Something observable a learner should be able to do once they have the concept."""
+
+    __tablename__ = "learning_objectives"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    concept_id: Mapped[str] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    statement: Mapped[str] = mapped_column(String(400), nullable=False)
+
+
+class ConceptEdge(Base):
+    """``concept_id`` needs ``prerequisite_id`` first."""
+
+    __tablename__ = "concept_edges"
+    __table_args__ = (
+        CheckConstraint("concept_id <> prerequisite_id", name="no_self_prerequisite"),
+        _one_of("origin", CONCEPT_ORIGINS),
+    )
+
+    concept_id: Mapped[str] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"), primary_key=True
+    )
+    prerequisite_id: Mapped[str] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    #: Why the prerequisite is needed, in words the learner can read.
+    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    origin: Mapped[str] = mapped_column(String(20), nullable=False)
+
+
+class ConceptSourceRef(Base):
+    """Where in the learner's materials a concept is covered."""
+
+    __tablename__ = "concept_source_refs"
+    __table_args__ = (
+        UniqueConstraint("concept_id", "section_id", name="uq_concept_source_refs_section"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    concept_id: Mapped[str] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_id: Mapped[str] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    section_id: Mapped[str] = mapped_column(
+        ForeignKey("source_sections.id", ondelete="CASCADE"), nullable=False
+    )
+
+    source: Mapped[Source] = relationship()
+    section: Mapped[SourceSection] = relationship()
+
+
+class LearnerPreference(Base):
+    """One explicit choice the learner has made about how they like to learn."""
+
+    __tablename__ = "learner_preferences"
+
+    key: Mapped[str] = mapped_column(String(60), primary_key=True)
+    value: Mapped[Any] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
+
+
+class LearnerObservation(Base):
+    """One piece of evidence about a concept, with the change it caused. Append-only.
+
+    The state of a concept is the fold of these rows (``learner_model.tracing``),
+    so every change of state has a row that caused it and a sentence that
+    explains it.
+    """
+
+    __tablename__ = "learner_observations"
+    __table_args__ = (
+        _one_of("kind", OBSERVATION_KINDS),
+        CheckConstraint(
+            "outcome IS NULL OR outcome IN ('correct', 'partial', 'incorrect', 'skipped')",
+            name="outcome_allowed",
+        ),
+        CheckConstraint(
+            "self_report IS NULL OR self_report IN ('new', 'some', 'confident')",
+            name="self_report_allowed",
+        ),
+        Index("ix_learner_observations_concept", "concept_id", "id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    concept_id: Mapped[str] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"), nullable=False
+    )
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    occurred_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    outcome: Mapped[str | None] = mapped_column(String(20))
+    question_form: Mapped[str | None] = mapped_column(String(30))
+    is_transfer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    hinted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    unsure: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    item_guess: Mapped[float | None] = mapped_column(Float)
+    self_report: Mapped[str | None] = mapped_column(String(20))
+    state_before: Mapped[str] = mapped_column(String(20), nullable=False)
+    state_after: Mapped[str] = mapped_column(String(20), nullable=False)
+    #: What happened and what it means, as shown to the learner.
+    explanation: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Which tracing parameters produced the change (``TracingConfig.version``).
+    config_version: Mapped[str] = mapped_column(String(20), nullable=False)
+
+
+class LearnerConceptState(Base):
+    """What the observations of one concept add up to. Rebuildable from them at any time."""
+
+    __tablename__ = "learner_concept_states"
+    __table_args__ = (_one_of("state", MASTERY_STATES),)
+
+    concept_id: Mapped[str] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"), primary_key=True
+    )
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: Internal estimate. Never sent to the interface.
+    probability: Mapped[float] = mapped_column(Float, nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False)
+    #: What is still needed before the concept counts as demonstrated.
+    missing: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    answered: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    correct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    unaided_correct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    hinted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    forms_correct: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    transfer_correct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    self_report: Mapped[str | None] = mapped_column(String(20))
+    last_observed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    review_interval_days: Mapped[float | None] = mapped_column(Float)
+    review_due_at: Mapped[datetime | None] = mapped_column(UtcDateTime, index=True)
+    review_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
 
 
 class Job(Base):

@@ -87,10 +87,11 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 
 | Component | Purpose | Variants and states |
 |---|---|---|
-| `Button` | An action | `primary`, `secondary` (default), `tertiary`, `destructive`; `small`/`medium`/`large`; hover, pressed, focus, disabled, **loading** (stays focusable, ignores clicks, `aria-busy`); optional leading icon |
+| `Button` | An action | `primary`, `secondary` (default), `tertiary`, `destructive`; `small`/`medium`/`large`; hover, pressed, focus, disabled, **loading** (stays focusable, ignores clicks, `aria-busy`); optional leading icon. A `secondary` button with `aria-pressed` is a toggle and shows when it is on |
 | `IconButton` | An icon-only action | `label` is required |
 | `TextField`, `TextArea`, `Select` | Form input | Label (hideable, never absent), description, **error** (sets `aria-invalid`, announced), disabled, trailing slot |
 | `Switch` | An immediate on/off setting | `role="switch"`, optional description |
+| `Checkbox` | One of several independent choices in a form that is submitted | Native checkbox; label, optional description, disabled |
 | `SegmentedControl` | Two to four exclusive options | Radio group, arrow keys, single tab stop |
 | `Slider` | A bounded number | Native range input; value always shown as text |
 | `Card` | Group related content | `surface` / `subtle`; padding `none`/`compact`/`comfortable`; semantic element via `as` |
@@ -99,7 +100,7 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 | `Callout` | Explain a state or consequence in place | `info`, `success`, `warning`, `danger`; `urgent` to announce immediately; actions |
 | `ProgressBar` | Task or content progress | Determinate, indeterminate; `showLabel`; `valueText` |
 | `Tabs` | Sections of one page | WAI-ARIA tabs; arrows, Home, End |
-| `Dialog` | A decision that must be made now | Native `<dialog>`; `dismissible={false}` while an operation must finish |
+| `Dialog` | A decision that must be made now | Native `<dialog>`; `dismissible={false}` while an operation must finish. Focus starts on the close button; a form marks the field to start in with `data-autofocus` |
 | `ToastProvider` / `useToast` | Confirm something just done | `success`, `info` auto-dismiss (pause on hover/focus); `danger` stays until dismissed |
 | `EmptyState`, `LoadingState`, `ErrorState` | The three non-content states | Title, description, actions; correct live-region role each |
 | `Spinner` | Indeterminate activity | Sizes; slows instead of stopping under reduced motion |
@@ -107,8 +108,12 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 | `Logo` | The mark and wordmark | `medium`/`large`; mark only |
 
 App-level components that are not in the package (they depend on app state):
-`ScenePlayer` (`apps/desktop/renderer/src/components`), which shows a Wanim scene with a loading
-state, mirrored accessible controls, and a text fallback.
+
+- `ScenePlayer` (`apps/desktop/renderer/src/components`): a Wanim scene with a loading state,
+  mirrored accessible controls, and a text fallback.
+- `ConceptMap` (`renderer/src/screens/course`): the curriculum as a picture. Concepts are real
+  buttons laid over a decorative drawing of the links; the list view carries the same
+  information as text.
 
 ## Patterns
 
@@ -124,6 +129,15 @@ state, mirrored accessible controls, and a text fallback.
 `LoadingState` (names what is loading) → content, or `EmptyState` (what belongs here and the next
 step) , or `ErrorState` (what happened, what to try). Use `useResource` in the renderer; do not
 render nothing while waiting.
+
+### Choosing a control for a choice
+
+| The choice | Use |
+|---|---|
+| A setting that applies the moment it changes | `Switch` |
+| One of two to four options, applied at once and harmless to step through | `SegmentedControl` |
+| Several independent options confirmed with a Save button | `Checkbox` |
+| An option whose selection *records* something | Separate `Button`s with `aria-pressed`. Never a control that changes as the arrow keys move through it |
 
 ### Messages
 

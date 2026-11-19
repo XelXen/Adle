@@ -29,13 +29,18 @@ from adle_core.infrastructure.migrate import (
 )
 from adle_core.infrastructure.orm import Course, Source, SourceChunk, SourceSection
 
+#: The newest real revision, read before any test swaps the migration scripts.
+REAL_HEAD = head_revision()
+#: A revision that exists only in tests, one step after the real head.
+TEST_REVISION = "t001"
+
 EXTRA_REVISION = '''"""Add a notes table (test-only revision)."""
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0002"
-down_revision = "0001"
+revision = "t001"
+down_revision = "{previous}"
 branch_labels = None
 depends_on = None
 
@@ -70,8 +75,8 @@ def use_migrations_with_extra_revision(
     copy = tmp_path / "migrations"
     shutil.copytree(real, copy, ignore=shutil.ignore_patterns("__pycache__"))
     failure = 'raise RuntimeError("simulated migration failure")' if failing else ""
-    (copy / "versions" / "0002_test_notes.py").write_text(
-        EXTRA_REVISION.format(failure=failure), encoding="utf-8"
+    (copy / "versions" / "t001_test_notes.py").write_text(
+        EXTRA_REVISION.format(failure=failure, previous=REAL_HEAD), encoding="utf-8"
     )
 
     def config() -> Config:
@@ -155,7 +160,7 @@ def test_an_existing_database_is_backed_up_before_it_is_upgraded(
     use_migrations_with_extra_revision(monkeypatch, tmp_path)
     outcome = migrate(database, backups)
 
-    assert (outcome.previous_revision, outcome.current_revision) == ("0001", "0002")
+    assert (outcome.previous_revision, outcome.current_revision) == (REAL_HEAD, TEST_REVISION)
     assert outcome.backup_path is not None
     assert outcome.backup_path.parent == backups
     # The backup is a complete, openable copy of the data as it was before the upgrade.
@@ -163,7 +168,7 @@ def test_an_existing_database_is_backed_up_before_it_is_upgraded(
     copy = sqlite3.connect(outcome.backup_path)
     try:
         assert copy.execute("SELECT title FROM courses").fetchall() == [("Kept across upgrades",)]
-        assert copy.execute("SELECT version_num FROM alembic_version").fetchone() == ("0001",)
+        assert copy.execute("SELECT version_num FROM alembic_version").fetchone() == (REAL_HEAD,)
     finally:
         copy.close()
     # The live database was upgraded and kept its data.
@@ -188,7 +193,7 @@ def test_a_failed_migration_leaves_the_data_untouched_and_reports_the_backup(
     # The half-applied revision was rolled back: schema and version are as before.
     assert "test_notes" not in table_names(database.path)
     with database.engine.connect() as connection:
-        assert MigrationContext.configure(connection).get_current_revision() == "0001"
+        assert MigrationContext.configure(connection).get_current_revision() == REAL_HEAD
     with database.session() as session:
         assert session.get(Course, "crs_00000000000000000001").title == "Kept across upgrades"
 
@@ -320,7 +325,7 @@ def test_an_older_backup_is_restored_then_upgraded_like_any_database(
     restored = Database(path)
     try:
         outcome = migrate(restored, backups)
-        assert (outcome.previous_revision, outcome.current_revision) == ("0001", "0002")
+        assert (outcome.previous_revision, outcome.current_revision) == (REAL_HEAD, TEST_REVISION)
         assert course_titles(path) == ["From the older version"]
     finally:
         restored.dispose()

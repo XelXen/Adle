@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   Button,
   Callout,
+  Checkbox,
   Dialog,
   EmptyState,
   ErrorState,
@@ -123,6 +124,42 @@ describe('Switch', () => {
     control.focus();
     await userEvent.keyboard(' ');
     expect(control).toHaveAttribute('aria-checked', 'true');
+  });
+});
+
+describe('Checkbox', () => {
+  function Example({ disabled = false }: { disabled?: boolean }) {
+    const [checked, setChecked] = useState(false);
+    return (
+      <Checkbox
+        label="Chain rule"
+        description="Needed for backpropagation."
+        checked={checked}
+        onCheckedChange={setChecked}
+        disabled={disabled}
+      />
+    );
+  }
+
+  it('is a real checkbox with a name, a description, and keyboard support', async () => {
+    render(<Example />);
+    const box = screen.getByRole('checkbox', { name: 'Chain rule' });
+    expect(box).not.toBeChecked();
+    expect(box).toHaveAccessibleDescription('Needed for backpropagation.');
+    box.focus();
+    await userEvent.keyboard(' ');
+    expect(box).toBeChecked();
+    // Clicking the label works too.
+    await userEvent.click(screen.getByText('Chain rule'));
+    expect(box).not.toBeChecked();
+  });
+
+  it('cannot be changed while disabled', async () => {
+    render(<Example disabled />);
+    const box = screen.getByRole('checkbox', { name: 'Chain rule' });
+    await userEvent.click(box);
+    expect(box).toBeDisabled();
+    expect(box).not.toBeChecked();
   });
 });
 
@@ -248,6 +285,16 @@ describe('Dialog', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('starts in the field a form marks, instead of on the close button', () => {
+    render(
+      <Dialog open onClose={() => undefined} title="Add a concept">
+        <TextField label="Name" data-autofocus />
+        <TextField label="Summary" />
+      </Dialog>,
+    );
+    expect(screen.getByLabelText('Name')).toHaveFocus();
   });
 
   it('cannot be dismissed while an operation must finish', () => {

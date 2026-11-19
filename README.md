@@ -8,8 +8,8 @@ curriculum you can inspect, teaches each concept with narrated, interactive visu
 understanding with short questions, and adapts the next step to what you have actually shown.
 
 > **Status: early development.** In place: the desktop shell and design system, secure handling
-> of the AI key, the isolated runtime for interactive scenes, and courses with local document
-> import and search. Curricula, lessons, and adaptation are being built milestone by milestone. See
+> of the AI key, the isolated runtime for interactive scenes, courses with local document import
+> and search, and an editable curriculum. Lessons and adaptation are being built next. See
 > [`docs/engineering/PROJECT_STATE.md`](docs/engineering/PROJECT_STATE.md) for exactly what works.
 
 ## What works today
@@ -22,6 +22,11 @@ understanding with short questions, and adapts the next step to what you have ac
   what it extracted, warns about anything doubtful (for example scanned pages), and explains why
   a file was rejected.
 - **Search your materials** and see the exact file and page or section each passage comes from.
+- **Curriculum:** build the list of concepts a course teaches, by hand or starting from the
+  headings of your materials. Give each one learning objectives, say what it needs first, and
+  see the result as a list or a map. Adle keeps the order learnable and explains when it cannot
+  do what you asked.
+- **Settings → Learning:** pace, explanation depth, narration, captions, and your goal.
 - **Settings → AI provider:** save or remove an AIHubMix key. It is encrypted by your operating
   system and never shown again.
 - **Settings → About & diagnostics:** restart the local service and run a live check of the

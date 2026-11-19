@@ -968,7 +968,7 @@ _Last updated: 2026-11-19._
 | M0 — Foundation | **Done** | npm workspaces + uv; pinned stack (ADR-001); `npm run check` runs format, lint, types, and unit tests for TypeScript and Python; docs, ADRs, nested `AGENTS.md`. CI workflow written but **not run** (no remote). |
 | M1 — Desktop/design system | **Done** | Electron main/preload/renderer separation; supervised Python core with stdin token handshake (ADR-002); `adle://` protocol (ADR-003); Sprout tokens and 20 components with contrast tests (ADR-006); welcome, library, settings. Acceptance shown by `e2e/first-run`, `provider-key`, `security`, `appearance-a11y` specs. |
 | M2 — Persistence/ingestion | **Done** | SQLite with transactional Alembic migrations, automatic backup before any upgrade, tested restore, refusal of newer or foreign databases; local PDF/DOCX/Markdown/text parsers in a killable worker process with type, size, and time limits; structural chunking with page/section provenance; duplicates by SHA-256; FTS5 search; course and materials screens with import by dialog or drop (ADR-007). Acceptance shown by `test_database`, `test_ingestion`, `test_courses_and_sources`, `test_isolated_extraction`, and `e2e/course-materials` (import, provenance, restart, removal, duplicates) with the session's network block proving it works offline. **Not built:** vector search (optional in this plan; deferred to packaging). |
-| M3 — Curriculum/learner model | Not started | Next. |
+| M3 — Curriculum/learner model | **Done** | Pure, property-tested rules for the concept graph (`curriculum/graph.py`) and for knowledge tracing, mastery, and review (`learner_model/`); every write validated, loops refused with the loop named; curriculum screen with list and map, objectives, prerequisites with reasons, links to materials, and an outline drafted from headings without AI; knowledge stored as an append-only record with a sentence for every change, the derived state rebuildable, and no score exposed (ADR-009). Acceptance shown by `test_curriculum_graph`, `test_knowledge_tracing`, `test_review_schedule`, `test_curriculum_api`, `test_learner_api`, and `e2e/curriculum`, `e2e/learning-preferences`. **Deferred:** working memory and the interaction event log arrive with lesson sessions; AI-proposed curricula arrive with the provider client (M5). |
 | M4 — Wanim/IR | **Partly done** | Spike complete and converted into product code: isolated player frame, `WanimPlayerAdapter`, validated host protocol, static scene policy, authoring skill with three tested examples, threat model (ADR-004). `e2e/scene-player` and `security` specs cover: plain and interactive scenes, host- and pointer-driven input, events, pause/resume, theme, unmount, broken and hostile scenes, a stuck scene. **Remaining:** Lesson IR and validation; fallback rendering inside a lesson; packaged-build check (blocked until M8 packaging). |
 | M5 — Generation/audio | Not started | Provider limits re-verified on 2026-11-19: 5 requests/min, 100/day, 1M tokens/day per account. |
 | M6 — Assessment/adaptation | Not started | |
@@ -989,6 +989,12 @@ _Last updated: 2026-11-19._
   ship with a packaged build without extra data-file handling (ADR-007).
 - **Failed imports are not stored as rows.** A rejected file leaves nothing behind; the reason is
   reported in the import summary (ADR-007).
+- **The main window is created visible**, not hidden until `ready-to-show`, which occasionally
+  never came (ADR-008).
+- **A curriculum can be drafted from headings without AI**, and a learner can say how well they
+  already know a concept; neither was in this plan. Working memory and the event log move from
+  M3 to the lesson work, where their events come from (ADR-009).
+- **Work happens on the `dev` branch.** `main` keeps the original plan until the owner merges.
 
 ---
 

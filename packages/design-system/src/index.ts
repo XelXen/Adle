@@ -16,6 +16,8 @@ export {
 export { Callout, type CalloutProps, type CalloutTone } from './components/Callout';
 export { ActionCard, type ActionCardProps, Card, type CardProps } from './components/Card';
 export {
+  Checkbox,
+  type CheckboxProps,
   SegmentedControl,
   type SegmentedControlProps,
   type SegmentedOption,

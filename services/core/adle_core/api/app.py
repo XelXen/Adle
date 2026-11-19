@@ -8,7 +8,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from adle_core import __version__
 from adle_core.api.auth import require_launch_token
 from adle_core.api.errors import ErrorResponse, install_error_handlers
-from adle_core.api.routes import courses, provider, system
+from adle_core.api.routes import courses, curriculum, provider, system
 from adle_core.application.services import Services
 
 API_PREFIX = "/v1"
@@ -39,6 +39,6 @@ def create_app(services: Services) -> FastAPI:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_ALLOWED_HOSTS)
     install_error_handlers(app)
 
-    for module in (system, provider, courses):
+    for module in (system, provider, courses, curriculum):
         app.include_router(module.router, prefix=API_PREFIX)
     return app

@@ -39,6 +39,15 @@ class Limits:
 
 DEFAULT_LIMITS = Limits()
 
+#: Joins the chain of headings above a section into its title: "Chapter 2 › Loss".
+#: Parsers remove the separator from heading text, so a title always splits cleanly.
+HEADING_PATH_SEPARATOR = " › "
+
+
+def heading_leaf(path: str) -> str:
+    """The innermost heading of a stored heading path ("Chapter 2 › Loss" gives "Loss")."""
+    return path.rsplit(HEADING_PATH_SEPARATOR, 1)[-1]
+
 
 @dataclass(frozen=True, slots=True)
 class ExtractedSection:

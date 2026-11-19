@@ -51,6 +51,54 @@ export function Switch({
   );
 }
 
+export interface CheckboxProps {
+  label: ReactNode;
+  description?: ReactNode;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+}
+
+/**
+ * One of several independent choices that take effect when a form is submitted.
+ * For a setting that applies the moment it is flipped, use `Switch`.
+ */
+export function Checkbox({
+  label,
+  description,
+  checked,
+  onCheckedChange,
+  disabled,
+  className,
+}: CheckboxProps) {
+  const id = useId();
+  const descriptionId = description ? `${id}-description` : undefined;
+  return (
+    <div className={cx(styles.checkboxRow, className)}>
+      <input
+        id={id}
+        type="checkbox"
+        className={styles.checkbox}
+        checked={checked}
+        disabled={disabled}
+        aria-describedby={descriptionId}
+        onChange={(event) => onCheckedChange(event.target.checked)}
+      />
+      <div className={styles.checkboxText}>
+        <label htmlFor={id} className={styles.checkboxLabel}>
+          {label}
+        </label>
+        {description ? (
+          <span id={descriptionId} className={styles.checkboxDescription}>
+            {description}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export interface SegmentedOption<Value extends string> {
   value: Value;
   label: string;

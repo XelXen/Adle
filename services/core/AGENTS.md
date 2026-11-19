@@ -26,19 +26,24 @@ Add a dependency with `uv add <name>` (or `uv add --dev <name>`) inside `service
 adle_core/
   errors.py       AdleError and friends (no framework imports; usable everywhere)
   api/            FastAPI app factory, auth, error contract, schemas, routes (no domain logic)
-  application/    service container; courses, sources (import + search), jobs
-  domain/         pure models and rules: no I/O, no framework imports
+  application/    service container; courses, sources, jobs, curriculum, learner, retrieval
+  curriculum/     PURE rules: concept graph (loops, order, layers), outline from headings
+  learner_model/  PURE rules: knowledge tracing, mastery states, review schedule, preferences
+  domain/         pure models shared across areas (empty so far)
   infrastructure/ database, ORM models, migrate (with backup), asset store, ids
   migrations/     Alembic revisions (shipped inside the package)
   ingestion/      type detection, parsers, chunking, the parser worker process
   generation/     provider credentials, scene policy (model client, quota: M5)
-  curriculum/ learner_model/ orchestration/ evaluation/ audio/   (M3–M6)
+  orchestration/ evaluation/ audio/   (M5–M6)
   tools/          developer entry points (contract export)
 tests/unit/        fast, isolated
 tests/integration/ real process, real database, fake provider
 ```
 
-`domain` imports nothing from the other packages. `api` may import everything and decides nothing.
+`curriculum`, `learner_model`, and `domain` are pure: no database, no framework, no clock except
+one passed in. They import nothing from `application`, `infrastructure`, or `api`, and they are
+where rules are decided and property-tested. `application` loads and stores; `api` may import
+everything and decides nothing.
 
 ## Rules
 
@@ -66,6 +71,17 @@ tests/integration/ real process, real database, fake provider
   by hand (virtual tables and triggers are always hand-written).
 - A method named `list` on a class shadows the builtin in that class's later annotations (mypy
   rejects it). Use `list_all`, `list_for_course`, and so on.
+- **The curriculum stays learnable.** Every write goes through `CurriculumService`, which asks
+  `curriculum.graph` first. Do not insert concepts or edges any other way (ADR-009).
+- **Learner knowledge** changes only through `LearnerService.record`. `learner_observations` is
+  append-only and is the source of truth; `learner_concept_states` is derived and rebuildable.
+  Never update a state row by hand.
+- **No score leaves the core.** `api/schemas.py` must not expose the tracing estimate or anything
+  that reads like a percentage. The interface gets a state, a label, and what is missing.
+- **Text shown to the learner about their knowledge** is written in `learner_model/tracing.py`
+  and `mastery.py`. Keep it free of blame and of numbers that imply precision.
+- Tests that need "a later version of the schema" use `use_migrations_with_extra_revision` in
+  `test_database.py`, which chains a test-only revision after the real newest one.
 - No provider call in any test. Use the fake server fixture (added with the client in M5).
 
 ## Style

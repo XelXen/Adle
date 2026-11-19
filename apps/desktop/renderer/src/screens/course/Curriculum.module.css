@@ -1,0 +1,442 @@
+/* ---- Overall layout ------------------------------------------------------ */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ad-space-3) var(--ad-space-5);
+}
+
+.toolbarTitle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ad-space-3);
+}
+
+.toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-3);
+}
+
+.heading {
+  margin: 0;
+  font: var(--ad-text-heading);
+}
+
+.layout {
+  display: grid;
+  gap: var(--ad-space-5);
+  align-items: start;
+}
+
+@media (min-width: 72rem) {
+  .layout {
+    grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+  }
+
+  /* The map needs the whole width; the concept it selects is shown beneath it. */
+  .layout.layoutStacked {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  min-width: 0;
+}
+
+.count {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.issueList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-1);
+  margin: 0;
+  padding-left: var(--ad-space-4);
+}
+
+/* ---- The path as a list -------------------------------------------------- */
+.path {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+  list-style: none;
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--ad-space-1);
+  padding-right: var(--ad-space-2);
+}
+
+.row + .row {
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+}
+
+.rowSelected {
+  background: var(--ad-color-primary-soft);
+}
+
+.rowMain {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--ad-space-3);
+  min-width: 0;
+  padding: var(--ad-space-3) var(--ad-space-2) var(--ad-space-3) var(--ad-space-4);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowMain:hover .rowTitle {
+  text-decoration: underline;
+}
+
+.rowNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-surface-subtle);
+  font: var(--ad-text-caption);
+  color: var(--ad-color-muted);
+}
+
+.rowSelected .rowNumber {
+  background: var(--ad-color-surface);
+  color: var(--ad-color-primary-text);
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rowTitle {
+  font: var(--ad-text-body-strong);
+  overflow-wrap: break-word;
+}
+
+.rowMeta {
+  font: var(--ad-text-caption);
+  color: var(--ad-color-muted);
+  overflow-wrap: break-word;
+}
+
+.rowBadge {
+  display: flex;
+  margin-top: var(--ad-space-2);
+}
+
+/* ---- The map --------------------------------------------------------------- */
+.mapScroller {
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+  overflow: auto;
+}
+
+.map {
+  position: relative;
+  margin: 0 auto;
+}
+
+.mapLinks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mapLink {
+  fill: none;
+  stroke: var(--ad-color-border-strong);
+  stroke-width: 1.5;
+}
+
+.mapLinkActive {
+  stroke: var(--ad-color-primary);
+  stroke-width: 2.5;
+}
+
+.mapArrow {
+  fill: var(--ad-color-border-strong);
+}
+
+.mapArrowActive {
+  fill: var(--ad-color-primary);
+}
+
+.mapNode {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ad-space-1) var(--ad-space-3);
+  border: var(--ad-border-width) solid var(--ad-color-border-strong);
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-surface);
+  color: var(--ad-color-ink);
+  font: var(--ad-text-caption);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background-color var(--ad-duration-fast) var(--ad-ease-out),
+    border-color var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.mapNode:hover {
+  background: var(--ad-color-surface-subtle);
+}
+
+.mapNodeSelected,
+.mapNodeSelected:hover {
+  background: var(--ad-color-primary-soft);
+  border-color: var(--ad-color-primary-text);
+  color: var(--ad-color-primary-text);
+}
+
+.mapNodeTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.mapCaption {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+/* ---- Concept detail -------------------------------------------------------- */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-5);
+  min-width: 0;
+}
+
+.detailHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ad-space-3);
+}
+
+.detailTitle {
+  margin: 0;
+  font: var(--ad-text-heading);
+  overflow-wrap: anywhere;
+}
+
+.detailSummary {
+  max-width: var(--ad-layout-reading-max);
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  min-width: 0;
+}
+
+.blockHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ad-space-2) var(--ad-space-3);
+}
+
+.blockTitle {
+  margin: 0;
+  font: var(--ad-text-body-strong);
+}
+
+.plainList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  margin: 0;
+  padding-left: var(--ad-space-5);
+}
+
+.bareList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.itemRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ad-space-3);
+}
+
+.itemText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.itemTitle {
+  font: var(--ad-text-body-strong);
+}
+
+.knowledge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-4);
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-surface-subtle);
+}
+
+.knowledgeLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2) var(--ad-space-3);
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyWhen {
+  font: var(--ad-text-caption);
+  color: var(--ad-color-muted);
+}
+
+.passage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-3) var(--ad-space-4);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-surface);
+}
+
+.passageText {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  font: var(--ad-text-supporting);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Dialog forms ---------------------------------------------------------- */
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ad-space-3);
+  margin-top: var(--ad-space-2);
+}
+
+.formError {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-danger-text);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.fieldGroupLabel {
+  padding: 0;
+  font: var(--ad-text-body-strong);
+}
+
+.objectiveRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ad-space-2);
+}
+
+.objectiveField {
+  flex: 1;
+  min-width: 0;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  max-height: 22rem;
+  margin: 0;
+  padding: var(--ad-space-1);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.choiceReason {
+  margin: var(--ad-space-2) 0 0 calc(1.25rem + var(--ad-space-3));
+}
+
+.sourceHeading {
+  margin: var(--ad-space-2) 0 0;
+  font: var(--ad-text-caption);
+  color: var(--ad-color-muted);
+}

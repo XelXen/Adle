@@ -81,6 +81,9 @@ async function generateModels(openapi) {
     unreachableDefinitions: true,
     format: false,
     strictIndexSignatures: true,
+    // Bounds on list length are enforced by the core. As types they would become
+    // unions of fixed-length tuples, which no caller can build from an ordinary array.
+    ignoreMinAndMaxItems: true,
   });
   return (
     source

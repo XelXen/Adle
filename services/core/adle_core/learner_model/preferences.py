@@ -1,0 +1,79 @@
+"""What a learner has told Adle about how they like to learn.
+
+Only explicit, non-sensitive choices are kept: pace, how much explanation, and
+whether narration and captions are on. Adle never infers anything about who a
+learner is (PLAN.md 8.1).
+
+Preferences are stored as one row per key so that a value written by a newer
+or older version of Adle can be ignored without losing the others.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, fields
+from enum import StrEnum
+
+MAX_GOAL_LENGTH = 300
+
+
+class Pace(StrEnum):
+    RELAXED = "relaxed"
+    STANDARD = "standard"
+    BRISK = "brisk"
+
+
+class ExplanationDensity(StrEnum):
+    CONCISE = "concise"
+    BALANCED = "balanced"
+    DETAILED = "detailed"
+
+
+@dataclass(frozen=True, slots=True)
+class LearnerPreferences:
+    pace: Pace = Pace.STANDARD
+    explanation_density: ExplanationDensity = ExplanationDensity.BALANCED
+    #: Read lessons aloud.
+    narration: bool = True
+    #: Show the words of the narration as it plays.
+    captions: bool = True
+    #: What the learner wants to get out of their study, in their own words.
+    goal: str = ""
+
+    def __post_init__(self) -> None:
+        if len(self.goal) > MAX_GOAL_LENGTH:
+            raise ValueError(f"A goal can be at most {MAX_GOAL_LENGTH} characters.")
+
+    def to_stored(self) -> dict[str, object]:
+        """One JSON-serialisable value per preference key."""
+        return {
+            key: value.value if isinstance(value, StrEnum) else value
+            for key, value in asdict(self).items()
+        }
+
+
+DEFAULT_PREFERENCES = LearnerPreferences()
+PREFERENCE_KEYS = tuple(field.name for field in fields(LearnerPreferences))
+
+
+def from_stored(stored: Mapping[str, object]) -> LearnerPreferences:
+    """Build preferences from stored values, falling back to the default for anything unusable.
+
+    Unknown keys and values of the wrong kind are ignored rather than raised:
+    a preference is never worth failing to open the app over.
+    """
+    values: dict[str, object] = {}
+    pace = stored.get("pace")
+    if isinstance(pace, str) and pace in Pace:
+        values["pace"] = Pace(pace)
+    density = stored.get("explanation_density")
+    if isinstance(density, str) and density in ExplanationDensity:
+        values["explanation_density"] = ExplanationDensity(density)
+    for key in ("narration", "captions"):
+        flag = stored.get(key)
+        if isinstance(flag, bool):
+            values[key] = flag
+    goal = stored.get("goal")
+    if isinstance(goal, str):
+        values["goal"] = " ".join(goal.split())[:MAX_GOAL_LENGTH]
+    return LearnerPreferences(**values)  # type: ignore[arg-type]

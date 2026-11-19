@@ -22,6 +22,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Each imported file shows what was extracted and flags anything doubtful, such as pages with no
   selectable text. Files that cannot be used are rejected with a reason and a next step.
 - Search your materials and see the file and the page or section every passage comes from.
+- Curriculum: see what a course teaches as a list or a map, in the order it will be taught.
+  Add, rename, reorder, and remove concepts; write learning objectives; say what each concept
+  needs first and why. A change that would make a loop is refused with the loop spelled out.
+- Start a curriculum from the headings of your own materials, choosing which to keep. No AI is
+  involved, and every concept stays linked to the place it came from.
+- Link any concept to the passages in your notes that cover it.
+- Tell Adle how well you already know a concept. It is treated as a claim to check, never as
+  proof, and everything recorded about a concept can be read back with the reason for each
+  change. Adle never shows a score.
+- Settings → Learning: pace, how detailed explanations are, narration, captions, and your goal.
 - Your data is kept safe between versions: a copy is made before its format is ever changed.
 - Interactive visuals run in an isolated frame; if one cannot run, a text explanation is shown
   instead and the rest of the lesson is unaffected.
@@ -29,6 +39,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Notes
 
-- Curricula, lessons, questions, and adaptive teaching are not available yet.
+- Lessons, questions, and adaptive teaching are not available yet, so a curriculum can be built
+  and inspected but not yet studied.
 - Scanned PDFs are not supported: Adle does not run text recognition (OCR).
 - There is no installer yet; the app runs from source.

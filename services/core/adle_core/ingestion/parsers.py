@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from adle_core.ingestion.types import (
+    HEADING_PATH_SEPARATOR,
     DocumentKind,
     ExtractedDocument,
     ExtractedSection,
@@ -30,7 +31,7 @@ LINE_BREAK = chr(10)
 REPLACEMENT_CHARACTER = chr(0xFFFD)
 
 _MAX_TITLE = 300
-_PATH_SEPARATOR = " › "
+_PATH_SEPARATOR = HEADING_PATH_SEPARATOR
 _WHITESPACE_RUN = re.compile(r"[ \t\f\v]+")
 _BLANK_LINES = re.compile(r"\n{3,}")
 

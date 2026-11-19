@@ -102,6 +102,14 @@
   background: var(--ad-color-surface-subtle);
 }
 
+/* A toggle that is on (`aria-pressed`): selected, without competing with the primary action. */
+.secondary[aria-pressed='true'],
+.secondary[aria-pressed='true']:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--ad-color-primary-soft);
+  border-color: var(--ad-color-primary-text);
+  color: var(--ad-color-primary-text);
+}
+
 .tertiary {
   background: transparent;
   color: var(--ad-color-primary-text);

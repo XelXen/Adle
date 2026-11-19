@@ -14,6 +14,7 @@ supersedes the old one and update this index.
 | [006](../decisions/ADR-006-design-tokens-and-theme.md) | Sprout tokens adjusted for AA contrast; theme applied through `nativeTheme` and `prefers-color-scheme` only. |
 | [007](../decisions/ADR-007-persistence-and-ingestion.md) | SQLite with transactional, backed-up migrations; FTS5 search; local parsers run in a `subprocess` worker with JSON I/O (never `multiprocessing`); paths only from the main process. |
 | [008](../decisions/ADR-008-window-shown-immediately.md) | The main window is created visible, on the canvas colour; nothing waits for `ready-to-show`, which occasionally never came. |
+| [009](../decisions/ADR-009-curriculum-and-learner-model.md) | The concept graph is validated on every write; knowledge is an append-only record folded through BKT into four qualitative states; no score ever leaves the core. |
 
 ## Smaller standing choices (no ADR)
 

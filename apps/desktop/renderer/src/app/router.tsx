@@ -8,10 +8,10 @@ import {
   useState,
 } from 'react';
 
-export const SETTINGS_TABS = ['ai', 'appearance', 'privacy', 'about'] as const;
+export const SETTINGS_TABS = ['ai', 'learning', 'appearance', 'privacy', 'about'] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
-export const COURSE_TABS = ['sources'] as const;
+export const COURSE_TABS = ['curriculum', 'sources'] as const;
 export type CourseTab = (typeof COURSE_TABS)[number];
 
 /** Every destination in the app. Adding a screen means adding a variant here. */

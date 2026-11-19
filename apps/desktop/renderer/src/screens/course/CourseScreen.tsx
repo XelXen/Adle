@@ -1,4 +1,4 @@
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, ListTree, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -9,14 +9,22 @@ import {
   LoadingState,
   Page,
   Stack,
+  type TabItem,
+  Tabs,
   useToast,
 } from '@adle/design-system';
 
-import { useRouter } from '../../app/router';
+import { type CourseTab, useRouter } from '../../app/router';
 import { callCore, CoreRequestError, describeError } from '../../lib/core-client';
 import { useResource } from '../../lib/use-resource';
 import styles from './CourseScreen.module.css';
+import { CurriculumPanel } from './CurriculumPanel';
 import { SourcesPanel } from './SourcesPanel';
+
+const TABS: readonly TabItem<CourseTab>[] = [
+  { value: 'curriculum', label: 'Curriculum', icon: <ListTree /> },
+  { value: 'sources', label: 'Materials', icon: <FileText /> },
+];
 
 const ORIGIN_LABEL = {
   sample: 'Sample course',
@@ -24,8 +32,8 @@ const ORIGIN_LABEL = {
   materials: 'From your materials',
 } as const;
 
-/** One course: its materials today; curriculum, lessons, and progress as they are built. */
-export function CourseScreen({ courseId }: { courseId: string }) {
+/** One course: what it teaches and the materials it draws on. */
+export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseTab }) {
   const { navigate } = useRouter();
   const toast = useToast();
   // Opening a course records the visit so the library can sort by recent use.
@@ -117,7 +125,24 @@ export function CourseScreen({ courseId }: { courseId: string }) {
         </Button>
       }
     >
-      <SourcesPanel courseId={courseId} />
+      <Tabs
+        label="Parts of this course"
+        tabs={TABS}
+        value={tab}
+        onValueChange={(next) => {
+          // Importing or removing materials changes what the other tab can offer.
+          course.reload();
+          navigate({ name: 'course', courseId, tab: next });
+        }}
+      >
+        {(current) =>
+          current === 'curriculum' ? (
+            <CurriculumPanel course={data} />
+          ) : (
+            <SourcesPanel courseId={courseId} />
+          )
+        }
+      </Tabs>
 
       <Dialog
         open={confirmingDelete}

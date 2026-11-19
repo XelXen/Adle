@@ -12,7 +12,10 @@ from fastapi import Request
 
 from adle_core.api.auth import LaunchToken
 from adle_core.application.courses import CourseService
+from adle_core.application.curriculum import CurriculumService
 from adle_core.application.jobs import JobRunner
+from adle_core.application.learner import LearnerService
+from adle_core.application.retrieval import FtsRetriever, Retriever
 from adle_core.application.sources import SourceService
 from adle_core.config import Settings
 from adle_core.generation.credentials import CredentialVault
@@ -32,6 +35,9 @@ class Services:
     jobs: JobRunner
     courses: CourseService
     sources: SourceService
+    retriever: Retriever
+    curriculum: CurriculumService
+    learner: LearnerService
 
     def close(self) -> None:
         """Stop background work and release the database. Safe to call more than once."""
@@ -61,6 +67,7 @@ def build_services(
     jobs = JobRunner(database)
     jobs.start()
     source_files = AssetStore(settings.sources_dir)
+    retriever = FtsRetriever(database)
     return Services(
         settings=settings,
         launch_token=launch_token,
@@ -70,6 +77,9 @@ def build_services(
         jobs=jobs,
         courses=CourseService(database, source_files),
         sources=SourceService(database, source_files, jobs, extract=extract),
+        retriever=retriever,
+        curriculum=CurriculumService(database, retriever),
+        learner=LearnerService(database),
     )
 
 

@@ -1,6 +1,140 @@
 {
   "components": {
     "schemas": {
+      "Concept": {
+        "properties": {
+          "complexity": { "title": "Complexity", "type": "integer" },
+          "course_id": { "title": "Course Id", "type": "string" },
+          "id": { "title": "Id", "type": "string" },
+          "knowledge": { "$ref": "#/components/schemas/Knowledge" },
+          "layer": { "anyOf": [{ "type": "integer" }, { "type": "null" }], "title": "Layer" },
+          "objectives": {
+            "items": { "$ref": "#/components/schemas/Objective" },
+            "title": "Objectives",
+            "type": "array"
+          },
+          "origin": {
+            "enum": ["learner", "outline", "model", "sample"],
+            "title": "Origin",
+            "type": "string"
+          },
+          "position": { "title": "Position", "type": "integer" },
+          "prerequisites": {
+            "items": { "$ref": "#/components/schemas/Prerequisite" },
+            "title": "Prerequisites",
+            "type": "array"
+          },
+          "source_refs": {
+            "items": { "$ref": "#/components/schemas/SourceRef" },
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "summary": { "title": "Summary", "type": "string" },
+          "tags": {
+            "items": {
+              "enum": ["conceptual", "calculation", "visual", "procedural"],
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": [
+          "id",
+          "course_id",
+          "title",
+          "summary",
+          "position",
+          "complexity",
+          "tags",
+          "origin",
+          "objectives",
+          "prerequisites",
+          "source_refs",
+          "layer",
+          "knowledge"
+        ],
+        "title": "Concept",
+        "type": "object"
+      },
+      "ConceptCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "objectives": {
+            "items": { "maxLength": 400, "minLength": 1, "type": "string" },
+            "maxItems": 12,
+            "title": "Objectives",
+            "type": "array"
+          },
+          "summary": { "default": "", "maxLength": 4000, "title": "Summary", "type": "string" },
+          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" }
+        },
+        "required": ["title"],
+        "title": "ConceptCreate",
+        "type": "object"
+      },
+      "ConceptEvidence": {
+        "properties": {
+          "concept_id": { "title": "Concept Id", "type": "string" },
+          "history": {
+            "items": { "$ref": "#/components/schemas/ObservationSummary" },
+            "title": "History",
+            "type": "array"
+          },
+          "knowledge": { "$ref": "#/components/schemas/Knowledge" }
+        },
+        "required": ["concept_id", "knowledge", "history"],
+        "title": "ConceptEvidence",
+        "type": "object"
+      },
+      "ConceptOrder": {
+        "additionalProperties": false,
+        "properties": {
+          "concept_ids": {
+            "items": { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            "maxItems": 200,
+            "title": "Concept Ids",
+            "type": "array"
+          }
+        },
+        "required": ["concept_ids"],
+        "title": "ConceptOrder",
+        "type": "object"
+      },
+      "ConceptUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "complexity": {
+            "anyOf": [{ "maximum": 3, "minimum": 1, "type": "integer" }, { "type": "null" }],
+            "title": "Complexity"
+          },
+          "summary": {
+            "anyOf": [{ "maxLength": 4000, "type": "string" }, { "type": "null" }],
+            "title": "Summary"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": ["conceptual", "calculation", "visual", "procedural"],
+                  "type": "string"
+                },
+                "maxItems": 4,
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Tags"
+          },
+          "title": {
+            "anyOf": [{ "maxLength": 200, "minLength": 1, "type": "string" }, { "type": "null" }],
+            "title": "Title"
+          }
+        },
+        "title": "ConceptUpdate",
+        "type": "object"
+      },
       "Course": {
         "properties": {
           "created_at": { "format": "date-time", "title": "Created At", "type": "string" },
@@ -79,6 +213,41 @@
           }
         },
         "title": "CourseUpdate",
+        "type": "object"
+      },
+      "Curriculum": {
+        "properties": {
+          "concepts": {
+            "items": { "$ref": "#/components/schemas/Concept" },
+            "title": "Concepts",
+            "type": "array"
+          },
+          "course_id": { "title": "Course Id", "type": "string" },
+          "issues": {
+            "items": { "$ref": "#/components/schemas/CurriculumIssue" },
+            "title": "Issues",
+            "type": "array"
+          },
+          "learning_order": {
+            "items": { "type": "string" },
+            "title": "Learning Order",
+            "type": "array"
+          },
+          "startable": { "title": "Startable", "type": "boolean" }
+        },
+        "required": ["course_id", "concepts", "learning_order", "issues", "startable"],
+        "title": "Curriculum",
+        "type": "object"
+      },
+      "CurriculumIssue": {
+        "properties": {
+          "code": { "title": "Code", "type": "string" },
+          "concept_ids": { "items": { "type": "string" }, "title": "Concept Ids", "type": "array" },
+          "message": { "title": "Message", "type": "string" },
+          "severity": { "enum": ["error", "warning"], "title": "Severity", "type": "string" }
+        },
+        "required": ["code", "severity", "concept_ids", "message"],
+        "title": "CurriculumIssue",
         "type": "object"
       },
       "ErrorBody": {
@@ -177,6 +346,255 @@
         "title": "Job",
         "type": "object"
       },
+      "Knowledge": {
+        "description": "What the evidence says about the learner and one concept. Deliberately no score.",
+        "properties": {
+          "answered": { "title": "Answered", "type": "integer" },
+          "label": { "title": "Label", "type": "string" },
+          "missing": { "items": { "type": "string" }, "title": "Missing", "type": "array" },
+          "review_due_at": {
+            "anyOf": [{ "format": "date-time", "type": "string" }, { "type": "null" }],
+            "title": "Review Due At"
+          },
+          "self_report": {
+            "anyOf": [
+              { "enum": ["new", "some", "confident"], "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Self Report"
+          },
+          "state": {
+            "enum": ["not_assessed", "building", "needs_evidence", "demonstrated"],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": ["state", "label", "missing", "answered", "self_report", "review_due_at"],
+        "title": "Knowledge",
+        "type": "object"
+      },
+      "LearnerPreferences": {
+        "properties": {
+          "captions": { "title": "Captions", "type": "boolean" },
+          "explanation_density": {
+            "enum": ["concise", "balanced", "detailed"],
+            "title": "Explanation Density",
+            "type": "string"
+          },
+          "goal": { "title": "Goal", "type": "string" },
+          "narration": { "title": "Narration", "type": "boolean" },
+          "pace": { "enum": ["relaxed", "standard", "brisk"], "title": "Pace", "type": "string" }
+        },
+        "required": ["pace", "explanation_density", "narration", "captions", "goal"],
+        "title": "LearnerPreferences",
+        "type": "object"
+      },
+      "LearnerPreferencesUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "captions": { "anyOf": [{ "type": "boolean" }, { "type": "null" }], "title": "Captions" },
+          "explanation_density": {
+            "anyOf": [
+              { "enum": ["concise", "balanced", "detailed"], "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Explanation Density"
+          },
+          "goal": {
+            "anyOf": [{ "maxLength": 600, "type": "string" }, { "type": "null" }],
+            "title": "Goal"
+          },
+          "narration": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Narration"
+          },
+          "pace": {
+            "anyOf": [
+              { "enum": ["relaxed", "standard", "brisk"], "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Pace"
+          }
+        },
+        "title": "LearnerPreferencesUpdate",
+        "type": "object"
+      },
+      "Objective": {
+        "properties": {
+          "id": { "title": "Id", "type": "string" },
+          "statement": { "title": "Statement", "type": "string" }
+        },
+        "required": ["id", "statement"],
+        "title": "Objective",
+        "type": "object"
+      },
+      "ObjectiveInput": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "anyOf": [
+              { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Id"
+          },
+          "statement": { "maxLength": 400, "minLength": 1, "title": "Statement", "type": "string" }
+        },
+        "required": ["statement"],
+        "title": "ObjectiveInput",
+        "type": "object"
+      },
+      "ObjectivesUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "objectives": {
+            "items": { "$ref": "#/components/schemas/ObjectiveInput" },
+            "maxItems": 12,
+            "title": "Objectives",
+            "type": "array"
+          }
+        },
+        "required": ["objectives"],
+        "title": "ObjectivesUpdate",
+        "type": "object"
+      },
+      "ObservationSummary": {
+        "properties": {
+          "explanation": { "title": "Explanation", "type": "string" },
+          "id": { "title": "Id", "type": "integer" },
+          "kind": { "enum": ["answer", "self_report"], "title": "Kind", "type": "string" },
+          "occurred_at": { "format": "date-time", "title": "Occurred At", "type": "string" },
+          "state_after": {
+            "enum": ["not_assessed", "building", "needs_evidence", "demonstrated"],
+            "title": "State After",
+            "type": "string"
+          },
+          "state_before": {
+            "enum": ["not_assessed", "building", "needs_evidence", "demonstrated"],
+            "title": "State Before",
+            "type": "string"
+          }
+        },
+        "required": ["id", "occurred_at", "kind", "state_before", "state_after", "explanation"],
+        "title": "ObservationSummary",
+        "type": "object"
+      },
+      "OutlineCandidate": {
+        "properties": {
+          "section_id": { "title": "Section Id", "type": "string" },
+          "source_id": { "title": "Source Id", "type": "string" },
+          "source_name": { "title": "Source Name", "type": "string" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": ["section_id", "title", "source_id", "source_name"],
+        "title": "OutlineCandidate",
+        "type": "object"
+      },
+      "OutlineCandidates": {
+        "properties": {
+          "candidates": {
+            "items": { "$ref": "#/components/schemas/OutlineCandidate" },
+            "title": "Candidates",
+            "type": "array"
+          }
+        },
+        "required": ["candidates"],
+        "title": "OutlineCandidates",
+        "type": "object"
+      },
+      "OutlineSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "section_ids": {
+            "items": { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Section Ids",
+            "type": "array"
+          }
+        },
+        "required": ["section_ids"],
+        "title": "OutlineSelection",
+        "type": "object"
+      },
+      "Passage": {
+        "properties": {
+          "chunk_id": { "title": "Chunk Id", "type": "integer" },
+          "page_number": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Page Number"
+          },
+          "section_id": { "title": "Section Id", "type": "string" },
+          "section_title": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Section Title"
+          },
+          "source_id": { "title": "Source Id", "type": "string" },
+          "source_name": { "title": "Source Name", "type": "string" },
+          "text": { "title": "Text", "type": "string" }
+        },
+        "required": [
+          "chunk_id",
+          "source_id",
+          "source_name",
+          "section_id",
+          "section_title",
+          "page_number",
+          "text"
+        ],
+        "title": "Passage",
+        "type": "object"
+      },
+      "Passages": {
+        "properties": {
+          "passages": {
+            "items": { "$ref": "#/components/schemas/Passage" },
+            "title": "Passages",
+            "type": "array"
+          }
+        },
+        "required": ["passages"],
+        "title": "Passages",
+        "type": "object"
+      },
+      "Prerequisite": {
+        "properties": {
+          "concept_id": { "title": "Concept Id", "type": "string" },
+          "reason": { "title": "Reason", "type": "string" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": ["concept_id", "title", "reason"],
+        "title": "Prerequisite",
+        "type": "object"
+      },
+      "PrerequisiteInput": {
+        "additionalProperties": false,
+        "properties": {
+          "concept_id": {
+            "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "reason": { "default": "", "maxLength": 500, "title": "Reason", "type": "string" }
+        },
+        "required": ["concept_id"],
+        "title": "PrerequisiteInput",
+        "type": "object"
+      },
+      "PrerequisitesUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "prerequisites": {
+            "items": { "$ref": "#/components/schemas/PrerequisiteInput" },
+            "maxItems": 12,
+            "title": "Prerequisites",
+            "type": "array"
+          }
+        },
+        "required": ["prerequisites"],
+        "title": "PrerequisitesUpdate",
+        "type": "object"
+      },
       "ProviderCredential": {
         "additionalProperties": false,
         "properties": {
@@ -247,6 +665,15 @@
         "title": "SearchResults",
         "type": "object"
       },
+      "SelfRating": {
+        "additionalProperties": false,
+        "properties": {
+          "level": { "enum": ["new", "some", "confident"], "title": "Level", "type": "string" }
+        },
+        "required": ["level"],
+        "title": "SelfRating",
+        "type": "object"
+      },
       "Source": {
         "properties": {
           "char_count": { "title": "Char Count", "type": "integer" },
@@ -312,6 +739,45 @@
         "title": "SourceList",
         "type": "object"
       },
+      "SourceRef": {
+        "properties": {
+          "id": { "title": "Id", "type": "integer" },
+          "page_number": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Page Number"
+          },
+          "section_id": { "title": "Section Id", "type": "string" },
+          "section_title": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Section Title"
+          },
+          "source_id": { "title": "Source Id", "type": "string" },
+          "source_name": { "title": "Source Name", "type": "string" }
+        },
+        "required": [
+          "id",
+          "source_id",
+          "source_name",
+          "section_id",
+          "section_title",
+          "page_number"
+        ],
+        "title": "SourceRef",
+        "type": "object"
+      },
+      "SourceRefCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "section_id": {
+            "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+            "title": "Section Id",
+            "type": "string"
+          }
+        },
+        "required": ["section_id"],
+        "title": "SourceRefCreate",
+        "type": "object"
+      },
       "SourceSection": {
         "properties": {
           "char_count": { "title": "Char Count", "type": "integer" },
@@ -344,6 +810,367 @@
   "info": { "title": "Adle core", "version": "0.1.0" },
   "openapi": "3.1.0",
   "paths": {
+    "/v1/concepts/{concept_id}": {
+      "delete": {
+        "operationId": "curriculum.delete_concept",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Delete Concept",
+        "tags": ["curriculum"]
+      },
+      "patch": {
+        "operationId": "curriculum.update_concept",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ConceptUpdate" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Update Concept",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/concepts/{concept_id}/evidence": {
+      "get": {
+        "operationId": "learner.concept_evidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ConceptEvidence" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Concept Evidence",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/concepts/{concept_id}/objectives": {
+      "put": {
+        "operationId": "curriculum.set_objectives",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ObjectivesUpdate" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Set Objectives",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/concepts/{concept_id}/passages": {
+      "get": {
+        "operationId": "curriculum.related_passages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 6,
+              "maximum": 12,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Passages" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Related Passages",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/concepts/{concept_id}/prerequisites": {
+      "put": {
+        "operationId": "curriculum.set_prerequisites",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PrerequisitesUpdate" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Set Prerequisites",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/concepts/{concept_id}/self-rating": {
+      "post": {
+        "operationId": "learner.self_rate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SelfRating" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ConceptEvidence" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Self Rate",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/concepts/{concept_id}/source-refs": {
+      "post": {
+        "operationId": "curriculum.add_source_ref",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SourceRefCreate" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Add Source Ref",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/concepts/{concept_id}/source-refs/{ref_id}": {
+      "delete": {
+        "operationId": "curriculum.remove_source_ref",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "ref_id",
+            "required": true,
+            "schema": { "title": "Ref Id", "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Remove Source Ref",
+        "tags": ["curriculum"]
+      }
+    },
     "/v1/courses": {
       "get": {
         "operationId": "courses.list",
@@ -514,6 +1341,197 @@
         },
         "summary": "Update Course",
         "tags": ["courses"]
+      }
+    },
+    "/v1/courses/{course_id}/concept-order": {
+      "put": {
+        "operationId": "curriculum.reorder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ConceptOrder" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Reorder Concepts",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/courses/{course_id}/concepts": {
+      "post": {
+        "operationId": "curriculum.create_concept",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ConceptCreate" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Create Concept",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/courses/{course_id}/curriculum": {
+      "get": {
+        "operationId": "curriculum.get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Curriculum",
+        "tags": ["curriculum"]
+      }
+    },
+    "/v1/courses/{course_id}/outline": {
+      "get": {
+        "operationId": "curriculum.outline_candidates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OutlineCandidates" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Outline Candidates",
+        "tags": ["curriculum"]
+      },
+      "post": {
+        "operationId": "curriculum.add_from_outline",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/OutlineSelection" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Curriculum" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Add From Outline",
+        "tags": ["curriculum"]
       }
     },
     "/v1/courses/{course_id}/search": {
@@ -736,6 +1754,70 @@
         },
         "summary": "Cancel Job",
         "tags": ["courses"]
+      }
+    },
+    "/v1/learner/preferences": {
+      "get": {
+        "operationId": "learner.get_preferences",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LearnerPreferences" }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Preferences",
+        "tags": ["curriculum"]
+      },
+      "patch": {
+        "operationId": "learner.update_preferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LearnerPreferencesUpdate" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LearnerPreferences" }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Update Preferences",
+        "tags": ["curriculum"]
       }
     },
     "/v1/provider": {

@@ -3,58 +3,17 @@
  * removing things again. Everything here happens locally: the test session has
  * no network at all (see security.spec.ts).
  */
-import path from 'node:path';
+import type { Page } from '@playwright/test';
 
-import AxeBuilder from '@axe-core/playwright';
-import type { ElectronApplication, Page } from '@playwright/test';
-
-import { desktopDir, expect, launchApp, repoRoot, test, waitForCore } from './support/app';
-
-const DOCUMENTS = path.join(repoRoot, 'fixtures', 'sample-documents');
-const doc = (name: string): string => path.join(DOCUMENTS, name);
-
-/** Make the native file dialog return these paths, as if the learner had picked them. */
-async function chooseInFileDialog(app: ElectronApplication, paths: string[] | null): Promise<void> {
-  await app.evaluate(({ dialog }, chosen) => {
-    dialog.showOpenDialog = () =>
-      Promise.resolve(
-        chosen === null
-          ? { canceled: true, filePaths: [] }
-          : { canceled: false, filePaths: chosen },
-      );
-  }, paths);
-}
-
-async function createCourse(
-  page: Page,
-  name: string,
-  options: { topic?: string } = {},
-): Promise<void> {
-  await page
-    .getByRole('button', { name: /New course|Create your first course/ })
-    .first()
-    .click();
-  const dialog = page.getByRole('dialog', { name: 'New course' });
-  await expect(dialog).toBeVisible();
-  if (options.topic === undefined) {
-    await dialog.getByRole('radio', { name: 'Import my materials' }).click();
-  }
-  await dialog.getByLabel('Course name').fill(name);
-  if (options.topic !== undefined) {
-    await dialog.getByLabel('What do you want to learn?').fill(options.topic);
-  }
-  await dialog.getByRole('button', { name: 'Create course' }).click();
-  await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
-}
-
-async function importWithDialog(
-  app: ElectronApplication,
-  page: Page,
-  names: string[],
-): Promise<void> {
-  await chooseInFileDialog(app, names.map(doc));
-  await page.getByRole('button', { name: 'Choose files' }).click();
-}
+import { expect, launchApp, test, waitForCore } from './support/app';
+import {
+  chooseInFileDialog,
+  createCourse,
+  doc,
+  expectNoAccessibilityViolations,
+  importWithDialog,
+  screenshot,
+} from './support/courses';
 
 const sourceList = (page: Page) => page.getByRole('list', { name: 'Materials in this course' });
 const sourceRow = (page: Page, name: string) =>
@@ -117,15 +76,8 @@ test.describe('course materials', () => {
     await search.fill('xylophone');
     await expect(page.getByText('Nothing in your materials matches “xylophone”.')).toBeVisible();
 
-    const axe = await new AxeBuilder({ page })
-      .setLegacyMode(true)
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-      .analyze();
-    expect(axe.violations.map((violation) => violation.id)).toEqual([]);
-    await page.screenshot({
-      path: path.join(desktopDir, 'test-results', 'screens', 'course-materials.png'),
-      fullPage: false,
-    });
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'course-materials');
     expect(adle.problems).toEqual([]);
   });
 
@@ -147,6 +99,12 @@ test.describe('course materials', () => {
     const card = page.getByRole('button', { name: /Persistent course/ });
     await expect(card).toContainText('2 sources');
     await card.click();
+    // A course that already has materials opens on its curriculum; they are one tab away.
+    await expect(page.getByRole('tab', { name: 'Curriculum' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await page.getByRole('tab', { name: 'Materials' }).click();
     await expect(sourceRow(page, 'study-notes.txt')).toBeVisible();
     await expect(sourceRow(page, 'course-outline.docx')).toContainText('Word document');
 

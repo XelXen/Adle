@@ -86,6 +86,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'Settings' }).click();
       for (const [tab, slug] of [
         ['AI provider', 'settings-ai'],
+        ['Learning', 'settings-learning'],
         ['Appearance', 'settings-appearance'],
         ['Privacy & data', 'settings-privacy'],
         ['About & diagnostics', 'settings-about'],
@@ -94,6 +95,7 @@ for (const theme of ['light', 'dark'] as const) {
         await expect(page.getByRole('tabpanel')).toBeVisible();
         if (tab === 'AI provider')
           await expect(page.getByText('coding-kimi-k3-free')).toBeVisible();
+        if (tab === 'Learning') await expect(page.getByRole('switch').first()).toBeVisible();
         await expectNoAxeViolations(page, tab);
         await capture(page, `${theme}-${slug}`);
       }

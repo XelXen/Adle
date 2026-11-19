@@ -72,4 +72,18 @@ path, a URL, or a directory from the renderer.
 - `getByRole(role, { name })` matches substrings. Add `exact: true` for short names such as
   navigation items; a card on the same screen may contain the same word.
 - Never drive a native dialog. Replace `dialog.showOpenDialog` in the main process with
-  `app.evaluate` (see `course-materials.spec.ts`).
+  `app.evaluate` (`chooseInFileDialog` in `e2e/support/courses.ts`, which also has the shared
+  steps for creating a course, importing, running axe, and saving a screenshot).
+- `getByLabel` also matches `aria-label`s that contain the text ("Objective 1" matches "Remove
+  objective 1"). Ask for the role: `getByRole('textbox', { name: 'Objective 1' })`.
+- Never call `show()` on the app window from a test (ADR-008).
+
+## Renderer conventions
+
+- Logic that can be pure lives beside its screen in a `*-model.ts` file with unit tests
+  (`screens/course/curriculum-model.ts`). Components stay thin.
+- A mutation that returns the whole resource updates it with `setData`; do not refetch.
+- A dialog that contains a form is mounted only while open, so its fields start from the current
+  data, and it marks its first field with `data-autofocus`.
+- A control whose selection *records* something (a self-rating) is a set of buttons with
+  `aria-pressed`, never a radio group or select: those change as the arrow keys pass over them.

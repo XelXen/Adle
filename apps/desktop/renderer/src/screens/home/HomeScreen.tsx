@@ -47,8 +47,13 @@ export function HomeScreen() {
   const keyState = useResource('provider-key', () => getBridge().provider.keyState());
   const aiReady = keyState.resource.status === 'ready' && keyState.resource.data.stored;
 
+  // A course that is waiting for its materials opens on them; any other opens on its curriculum.
   const open = (course: Course): void =>
-    navigate({ name: 'course', courseId: course.id, tab: 'sources' });
+    navigate({
+      name: 'course',
+      courseId: course.id,
+      tab: course.origin === 'materials' && course.source_count === 0 ? 'sources' : 'curriculum',
+    });
 
   const starting = coreStatus.state === 'starting';
   const list = courses.resource;
