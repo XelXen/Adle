@@ -1,6 +1,87 @@
 {
   "components": {
     "schemas": {
+      "AnswerRequest": {
+        "additionalProperties": false,
+        "description": "An answer to a question. Fill in the one field that matches the question's form.",
+        "properties": {
+          "covered": {
+            "anyOf": [
+              { "items": { "maxLength": 16, "type": "string" }, "maxItems": 5, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Covered"
+          },
+          "hinted": { "default": false, "title": "Hinted", "type": "boolean" },
+          "number": { "anyOf": [{ "type": "number" }, { "type": "null" }], "title": "Number" },
+          "option_id": {
+            "anyOf": [{ "maxLength": 16, "type": "string" }, { "type": "null" }],
+            "title": "Option Id"
+          },
+          "order": {
+            "anyOf": [
+              { "items": { "maxLength": 16, "type": "string" }, "maxItems": 6, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Order"
+          },
+          "skipped": { "default": false, "title": "Skipped", "type": "boolean" },
+          "text": {
+            "anyOf": [{ "maxLength": 400, "type": "string" }, { "type": "null" }],
+            "title": "Text"
+          },
+          "truth": { "anyOf": [{ "type": "boolean" }, { "type": "null" }], "title": "Truth" },
+          "unsure": { "default": false, "title": "Unsure", "type": "boolean" }
+        },
+        "title": "AnswerRequest",
+        "type": "object"
+      },
+      "AnswerResult": {
+        "properties": {
+          "attempt_number": { "title": "Attempt Number", "type": "integer" },
+          "change": { "title": "Change", "type": "string" },
+          "correct_answer": { "title": "Correct Answer", "type": "string" },
+          "correct_option": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Correct Option"
+          },
+          "explanation": { "title": "Explanation", "type": "string" },
+          "feedback": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Feedback" },
+          "knowledge": { "$ref": "#/components/schemas/Knowledge" },
+          "outcome": {
+            "enum": ["correct", "partial", "incorrect", "skipped"],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "feedback",
+          "explanation",
+          "correct_answer",
+          "correct_option",
+          "change",
+          "knowledge",
+          "attempt_number"
+        ],
+        "title": "AnswerResult",
+        "type": "object"
+      },
+      "Beat": {
+        "additionalProperties": false,
+        "description": "One breath of narration, and what appears on screen as it starts.",
+        "properties": {
+          "advance_scene": { "default": false, "title": "Advance Scene", "type": "boolean" },
+          "show": {
+            "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+            "title": "Show"
+          },
+          "text": { "maxLength": 700, "minLength": 1, "title": "Text", "type": "string" }
+        },
+        "required": ["text"],
+        "title": "Beat",
+        "type": "object"
+      },
       "Concept": {
         "properties": {
           "complexity": { "title": "Complexity", "type": "integer" },
@@ -270,6 +351,32 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "ExplanationSegment": {
+        "additionalProperties": false,
+        "description": "Narration with key points on the board, and optionally a scene beside it.",
+        "properties": {
+          "estimated_seconds": {
+            "maximum": 900,
+            "minimum": 5,
+            "title": "Estimated Seconds",
+            "type": "integer"
+          },
+          "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+          "narration": {
+            "items": { "$ref": "#/components/schemas/Beat" },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Narration",
+            "type": "array"
+          },
+          "scene": { "anyOf": [{ "$ref": "#/components/schemas/SceneRef" }, { "type": "null" }] },
+          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+          "type": { "const": "explanation", "title": "Type", "type": "string" }
+        },
+        "required": ["id", "title", "estimated_seconds", "narration", "type"],
+        "title": "ExplanationSegment",
+        "type": "object"
+      },
       "Health": {
         "properties": {
           "api_version": { "title": "Api Version", "type": "string" },
@@ -303,6 +410,32 @@
         },
         "required": ["paths"],
         "title": "ImportRequest",
+        "type": "object"
+      },
+      "InteractionSegment": {
+        "additionalProperties": false,
+        "description": "A scene the learner manipulates. Understandable without touching it.",
+        "properties": {
+          "estimated_seconds": {
+            "maximum": 900,
+            "minimum": 5,
+            "title": "Estimated Seconds",
+            "type": "integer"
+          },
+          "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+          "narration": {
+            "items": { "$ref": "#/components/schemas/Beat" },
+            "maxItems": 12,
+            "title": "Narration",
+            "type": "array"
+          },
+          "prompt": { "maxLength": 600, "minLength": 1, "title": "Prompt", "type": "string" },
+          "scene": { "$ref": "#/components/schemas/SceneRef" },
+          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+          "type": { "const": "interaction", "title": "Type", "type": "string" }
+        },
+        "required": ["id", "title", "estimated_seconds", "type", "scene", "prompt"],
+        "title": "InteractionSegment",
         "type": "object"
       },
       "Job": {
@@ -417,6 +550,94 @@
           }
         },
         "title": "LearnerPreferencesUpdate",
+        "type": "object"
+      },
+      "LessonForPlayer": {
+        "description": "Everything the player needs: the validated lesson and the scenes it plays.",
+        "properties": {
+          "lesson": { "$ref": "#/components/schemas/PlayerLesson" },
+          "origin": { "enum": ["sample", "generated"], "title": "Origin", "type": "string" },
+          "progress": { "$ref": "#/components/schemas/LessonProgress" },
+          "scenes": {
+            "items": { "$ref": "#/components/schemas/SceneArtifact" },
+            "title": "Scenes",
+            "type": "array"
+          }
+        },
+        "required": ["lesson", "scenes", "origin", "progress"],
+        "title": "LessonForPlayer",
+        "type": "object"
+      },
+      "LessonList": {
+        "properties": {
+          "lessons": {
+            "items": { "$ref": "#/components/schemas/LessonSummary" },
+            "title": "Lessons",
+            "type": "array"
+          }
+        },
+        "required": ["lessons"],
+        "title": "LessonList",
+        "type": "object"
+      },
+      "LessonObjective": {
+        "additionalProperties": false,
+        "properties": {
+          "objective_id": {
+            "anyOf": [
+              { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Objective Id"
+          },
+          "statement": { "maxLength": 600, "minLength": 1, "title": "Statement", "type": "string" }
+        },
+        "required": ["statement"],
+        "title": "LessonObjective",
+        "type": "object"
+      },
+      "LessonProgress": {
+        "properties": {
+          "completed": { "title": "Completed", "type": "boolean" },
+          "position": { "title": "Position", "type": "integer" },
+          "started": { "title": "Started", "type": "boolean" }
+        },
+        "required": ["position", "completed", "started"],
+        "title": "LessonProgress",
+        "type": "object"
+      },
+      "LessonProgressUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "completed": { "default": false, "title": "Completed", "type": "boolean" },
+          "position": { "maximum": 100, "minimum": 0, "title": "Position", "type": "integer" }
+        },
+        "required": ["position"],
+        "title": "LessonProgressUpdate",
+        "type": "object"
+      },
+      "LessonSummary": {
+        "properties": {
+          "concept_id": { "title": "Concept Id", "type": "string" },
+          "course_id": { "title": "Course Id", "type": "string" },
+          "estimated_minutes": { "title": "Estimated Minutes", "type": "integer" },
+          "id": { "title": "Id", "type": "string" },
+          "origin": { "enum": ["sample", "generated"], "title": "Origin", "type": "string" },
+          "progress": { "$ref": "#/components/schemas/LessonProgress" },
+          "segment_count": { "title": "Segment Count", "type": "integer" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": [
+          "id",
+          "course_id",
+          "concept_id",
+          "title",
+          "origin",
+          "estimated_minutes",
+          "segment_count",
+          "progress"
+        ],
+        "title": "LessonSummary",
         "type": "object"
       },
       "Objective": {
@@ -557,6 +778,195 @@
         "title": "Passages",
         "type": "object"
       },
+      "PlayerCheckpointSegment": {
+        "additionalProperties": false,
+        "properties": {
+          "estimated_seconds": {
+            "maximum": 900,
+            "minimum": 5,
+            "title": "Estimated Seconds",
+            "type": "integer"
+          },
+          "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+          "narration": {
+            "items": { "$ref": "#/components/schemas/Beat" },
+            "maxItems": 12,
+            "title": "Narration",
+            "type": "array"
+          },
+          "question": { "$ref": "#/components/schemas/PlayerQuestion" },
+          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+          "type": { "const": "checkpoint", "title": "Type", "type": "string" }
+        },
+        "required": ["id", "title", "estimated_seconds", "type", "question"],
+        "title": "PlayerCheckpointSegment",
+        "type": "object"
+      },
+      "PlayerLesson": {
+        "additionalProperties": false,
+        "properties": {
+          "concept_ids": {
+            "items": { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            "title": "Concept Ids",
+            "type": "array"
+          },
+          "course_id": {
+            "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+            "title": "Course Id",
+            "type": "string"
+          },
+          "estimated_minutes": { "title": "Estimated Minutes", "type": "integer" },
+          "grounding": {
+            "enum": ["materials", "general_knowledge", "sample"],
+            "title": "Grounding",
+            "type": "string"
+          },
+          "lesson_id": {
+            "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+            "title": "Lesson Id",
+            "type": "string"
+          },
+          "objectives": {
+            "items": { "$ref": "#/components/schemas/LessonObjective" },
+            "title": "Objectives",
+            "type": "array"
+          },
+          "schema_version": { "const": "1.0", "title": "Schema Version", "type": "string" },
+          "segments": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "checkpoint": "#/components/schemas/PlayerCheckpointSegment",
+                  "explanation": "#/components/schemas/ExplanationSegment",
+                  "interaction": "#/components/schemas/InteractionSegment",
+                  "reflection": "#/components/schemas/ReflectionSegment",
+                  "summary": "#/components/schemas/SummarySegment",
+                  "visualization": "#/components/schemas/VisualizationSegment",
+                  "worked_example": "#/components/schemas/WorkedExampleSegment"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                { "$ref": "#/components/schemas/ExplanationSegment" },
+                { "$ref": "#/components/schemas/VisualizationSegment" },
+                { "$ref": "#/components/schemas/InteractionSegment" },
+                { "$ref": "#/components/schemas/PlayerCheckpointSegment" },
+                { "$ref": "#/components/schemas/WorkedExampleSegment" },
+                { "$ref": "#/components/schemas/ReflectionSegment" },
+                { "$ref": "#/components/schemas/SummarySegment" }
+              ]
+            },
+            "title": "Segments",
+            "type": "array"
+          },
+          "source_refs": {
+            "items": { "$ref": "#/components/schemas/SourceCitation" },
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "strategy": {
+            "enum": [
+              "visual",
+              "worked_example",
+              "analogy",
+              "mathematical",
+              "socratic",
+              "computational"
+            ],
+            "title": "Strategy",
+            "type": "string"
+          },
+          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" }
+        },
+        "required": [
+          "schema_version",
+          "lesson_id",
+          "course_id",
+          "title",
+          "concept_ids",
+          "objectives",
+          "source_refs",
+          "grounding",
+          "strategy",
+          "estimated_minutes",
+          "segments"
+        ],
+        "title": "PlayerLesson",
+        "type": "object"
+      },
+      "PlayerOption": {
+        "additionalProperties": false,
+        "properties": {
+          "id": { "pattern": "^[a-z][a-z0-9_]{0,15}$", "title": "Id", "type": "string" },
+          "text": { "maxLength": 200, "minLength": 1, "title": "Text", "type": "string" }
+        },
+        "required": ["id", "text"],
+        "title": "PlayerOption",
+        "type": "object"
+      },
+      "PlayerQuestion": {
+        "additionalProperties": false,
+        "description": "A question as the learner sees it before answering.",
+        "properties": {
+          "concept_id": {
+            "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "difficulty": { "title": "Difficulty", "type": "integer" },
+          "form": {
+            "enum": [
+              "multiple_choice",
+              "true_false",
+              "numeric",
+              "short_answer",
+              "ordering",
+              "prediction",
+              "explanation"
+            ],
+            "title": "Form",
+            "type": "string"
+          },
+          "hint": {
+            "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+            "title": "Hint"
+          },
+          "id": { "pattern": "^q_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+          "is_transfer": { "title": "Is Transfer", "type": "boolean" },
+          "options": {
+            "items": { "$ref": "#/components/schemas/PlayerOption" },
+            "title": "Options",
+            "type": "array"
+          },
+          "rubric": {
+            "items": { "$ref": "#/components/schemas/PlayerRubricPoint" },
+            "title": "Rubric",
+            "type": "array"
+          },
+          "sample_answer": {
+            "anyOf": [{ "maxLength": 1400, "minLength": 1, "type": "string" }, { "type": "null" }],
+            "title": "Sample Answer"
+          },
+          "stem": { "maxLength": 600, "minLength": 1, "title": "Stem", "type": "string" },
+          "unit": {
+            "anyOf": [{ "maxLength": 20, "type": "string" }, { "type": "null" }],
+            "title": "Unit"
+          }
+        },
+        "required": ["id", "form", "concept_id", "stem", "difficulty", "is_transfer"],
+        "title": "PlayerQuestion",
+        "type": "object"
+      },
+      "PlayerRubricPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "id": { "pattern": "^[a-z][a-z0-9_]{0,15}$", "title": "Id", "type": "string" },
+          "text": { "maxLength": 600, "minLength": 1, "title": "Text", "type": "string" }
+        },
+        "required": ["id", "text"],
+        "title": "PlayerRubricPoint",
+        "type": "object"
+      },
       "Prerequisite": {
         "properties": {
           "concept_id": { "title": "Concept Id", "type": "string" },
@@ -620,6 +1030,95 @@
         },
         "required": ["provider_id", "display_name", "base_url", "model", "key_configured"],
         "title": "ProviderStatus",
+        "type": "object"
+      },
+      "ReflectionSegment": {
+        "additionalProperties": false,
+        "description": "A question to think about. Not scored; the learner may write a note or move on.",
+        "properties": {
+          "estimated_seconds": {
+            "maximum": 900,
+            "minimum": 5,
+            "title": "Estimated Seconds",
+            "type": "integer"
+          },
+          "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+          "narration": {
+            "items": { "$ref": "#/components/schemas/Beat" },
+            "maxItems": 12,
+            "title": "Narration",
+            "type": "array"
+          },
+          "prompt": { "maxLength": 600, "minLength": 1, "title": "Prompt", "type": "string" },
+          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+          "type": { "const": "reflection", "title": "Type", "type": "string" }
+        },
+        "required": ["id", "title", "estimated_seconds", "type", "prompt"],
+        "title": "ReflectionSegment",
+        "type": "object"
+      },
+      "SceneArtifact": {
+        "additionalProperties": false,
+        "description": "One complete Wanim scene file, with what the static policy found in it.",
+        "properties": {
+          "content_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "controls": {
+            "items": { "pattern": "^[a-z][a-z0-9_]{0,31}$", "type": "string" },
+            "maxItems": 16,
+            "title": "Controls",
+            "type": "array"
+          },
+          "events": {
+            "items": { "enum": ["passed", "explored", "progress"], "type": "string" },
+            "maxItems": 3,
+            "title": "Events",
+            "type": "array"
+          },
+          "id": { "pattern": "^scn_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+          "interactive": { "title": "Interactive", "type": "boolean" },
+          "purpose": { "maxLength": 600, "minLength": 1, "title": "Purpose", "type": "string" },
+          "scene_class": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            "title": "Scene Class",
+            "type": "string"
+          },
+          "source": { "maxLength": 40000, "minLength": 1, "title": "Source", "type": "string" },
+          "wanim_version": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Wanim Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "purpose",
+          "source",
+          "content_hash",
+          "wanim_version",
+          "scene_class",
+          "interactive"
+        ],
+        "title": "SceneArtifact",
+        "type": "object"
+      },
+      "SceneRef": {
+        "additionalProperties": false,
+        "properties": {
+          "fallback_text": {
+            "maxLength": 1400,
+            "minLength": 1,
+            "title": "Fallback Text",
+            "type": "string"
+          },
+          "scene_id": { "pattern": "^scn_[a-z0-9_]{1,40}$", "title": "Scene Id", "type": "string" }
+        },
+        "required": ["scene_id", "fallback_text"],
+        "title": "SceneRef",
         "type": "object"
       },
       "SearchHit": {
@@ -714,6 +1213,32 @@
         "title": "Source",
         "type": "object"
       },
+      "SourceCitation": {
+        "additionalProperties": false,
+        "description": "A place in the learner's materials that the lesson draws on.",
+        "properties": {
+          "locator": { "maxLength": 200, "minLength": 1, "title": "Locator", "type": "string" },
+          "section_id": {
+            "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+            "title": "Section Id",
+            "type": "string"
+          },
+          "source_id": {
+            "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Name",
+            "type": "string"
+          }
+        },
+        "required": ["source_id", "section_id", "source_name", "locator"],
+        "title": "SourceCitation",
+        "type": "object"
+      },
       "SourceDetail": {
         "properties": {
           "sections": {
@@ -803,6 +1328,83 @@
           "confidence"
         ],
         "title": "SourceSection",
+        "type": "object"
+      },
+      "SummarySegment": {
+        "additionalProperties": false,
+        "properties": {
+          "estimated_seconds": {
+            "maximum": 900,
+            "minimum": 5,
+            "title": "Estimated Seconds",
+            "type": "integer"
+          },
+          "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+          "narration": {
+            "items": { "$ref": "#/components/schemas/Beat" },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Narration",
+            "type": "array"
+          },
+          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+          "type": { "const": "summary", "title": "Type", "type": "string" }
+        },
+        "required": ["id", "title", "estimated_seconds", "narration", "type"],
+        "title": "SummarySegment",
+        "type": "object"
+      },
+      "VisualizationSegment": {
+        "additionalProperties": false,
+        "description": "An animation, narrated.",
+        "properties": {
+          "estimated_seconds": {
+            "maximum": 900,
+            "minimum": 5,
+            "title": "Estimated Seconds",
+            "type": "integer"
+          },
+          "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+          "narration": {
+            "items": { "$ref": "#/components/schemas/Beat" },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Narration",
+            "type": "array"
+          },
+          "scene": { "$ref": "#/components/schemas/SceneRef" },
+          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+          "type": { "const": "visualization", "title": "Type", "type": "string" }
+        },
+        "required": ["id", "title", "estimated_seconds", "narration", "type", "scene"],
+        "title": "VisualizationSegment",
+        "type": "object"
+      },
+      "WorkedExampleSegment": {
+        "additionalProperties": false,
+        "description": "A problem solved step by step: each beat says a step and shows it.",
+        "properties": {
+          "estimated_seconds": {
+            "maximum": 900,
+            "minimum": 5,
+            "title": "Estimated Seconds",
+            "type": "integer"
+          },
+          "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+          "narration": {
+            "items": { "$ref": "#/components/schemas/Beat" },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Narration",
+            "type": "array"
+          },
+          "problem": { "maxLength": 600, "minLength": 1, "title": "Problem", "type": "string" },
+          "scene": { "anyOf": [{ "$ref": "#/components/schemas/SceneRef" }, { "type": "null" }] },
+          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+          "type": { "const": "worked_example", "title": "Type", "type": "string" }
+        },
+        "required": ["id", "title", "estimated_seconds", "narration", "type", "problem"],
+        "title": "WorkedExampleSegment",
         "type": "object"
       }
     }
@@ -1229,6 +1831,34 @@
         "tags": ["courses"]
       }
     },
+    "/v1/courses/sample": {
+      "post": {
+        "description": "Add the sample course that ships with Adle, or return it if it is already there.",
+        "operationId": "courses.install_sample",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Course" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Install Sample Course",
+        "tags": ["lessons"]
+      }
+    },
     "/v1/courses/{course_id}": {
       "delete": {
         "operationId": "courses.delete",
@@ -1458,6 +2088,41 @@
         },
         "summary": "Get Curriculum",
         "tags": ["curriculum"]
+      }
+    },
+    "/v1/courses/{course_id}/lessons": {
+      "get": {
+        "operationId": "lessons.list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LessonList" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List Lessons",
+        "tags": ["lessons"]
       }
     },
     "/v1/courses/{course_id}/outline": {
@@ -1818,6 +2483,160 @@
         },
         "summary": "Update Preferences",
         "tags": ["curriculum"]
+      }
+    },
+    "/v1/lessons/{lesson_id}": {
+      "delete": {
+        "operationId": "lessons.delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Successful Response" },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Delete Lesson",
+        "tags": ["lessons"]
+      },
+      "get": {
+        "operationId": "lessons.get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LessonForPlayer" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Lesson",
+        "tags": ["lessons"]
+      }
+    },
+    "/v1/lessons/{lesson_id}/progress": {
+      "put": {
+        "operationId": "lessons.save_progress",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LessonProgressUpdate" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LessonProgress" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Save Progress",
+        "tags": ["lessons"]
+      }
+    },
+    "/v1/lessons/{lesson_id}/questions/{question_id}/answer": {
+      "post": {
+        "description": "Score an answer, keep it, and record it as evidence about the concept.",
+        "operationId": "lessons.answer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": { "title": "Question Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AnswerRequest" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AnswerResult" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Answer Question",
+        "tags": ["lessons"]
       }
     },
     "/v1/provider": {

@@ -30,5 +30,8 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "vite": "8.3.8"
+  },
+  "dependencies": {
+    "katex": "0.19.1"
   }
 }

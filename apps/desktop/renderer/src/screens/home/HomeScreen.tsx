@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, KeyRound, Library, Plus } from 'lucide-react';
+import { ArrowRight, BookOpen, GraduationCap, KeyRound, Library, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Course } from '@adle/contracts';
@@ -11,6 +11,7 @@ import {
   LoadingState,
   Page,
   Section,
+  useToast,
 } from '@adle/design-system';
 
 import { useApp } from '../../app/AppContext';
@@ -41,7 +42,9 @@ function courseSummary(course: Course): string {
 export function HomeScreen() {
   const { navigate } = useRouter();
   const { coreStatus } = useApp();
+  const toast = useToast();
   const [creating, setCreating] = useState(false);
+  const [addingSample, setAddingSample] = useState(false);
   // Reload when the local service becomes ready (it may still be starting at first paint).
   const courses = useResource(`courses:${coreStatus.state}`, () => callCore('courses.list'));
   const keyState = useResource('provider-key', () => getBridge().provider.keyState());
@@ -55,8 +58,26 @@ export function HomeScreen() {
       tab: course.origin === 'materials' && course.source_count === 0 ? 'sources' : 'curriculum',
     });
 
+  // The sample course is written by Adle and ships with the app: adding it needs no provider.
+  const addSample = async (): Promise<void> => {
+    setAddingSample(true);
+    try {
+      const course = await callCore('courses.install_sample');
+      navigate({ name: 'course', courseId: course.id, tab: 'curriculum' });
+    } catch (error) {
+      toast.show({
+        tone: 'danger',
+        title: 'The sample course could not be added',
+        description: describeError(error),
+      });
+      setAddingSample(false);
+    }
+  };
+
   const starting = coreStatus.state === 'starting';
   const list = courses.resource;
+  const hasSample =
+    list.status === 'ready' && list.data.courses.some((course) => course.origin === 'sample');
 
   return (
     <Page
@@ -81,11 +102,20 @@ export function HomeScreen() {
           <EmptyState
             visual={<Library />}
             title="No courses yet"
-            description="Create a course from a topic you want to learn, or from your own notes and readings."
+            description="Create a course from a topic you want to learn, or from your own notes and readings. Or try the sample course first to see how a lesson works."
             actions={
-              <Button variant="primary" icon={<Plus />} onClick={() => setCreating(true)}>
-                Create your first course
-              </Button>
+              <>
+                <Button variant="primary" icon={<Plus />} onClick={() => setCreating(true)}>
+                  Create your first course
+                </Button>
+                <Button
+                  icon={<GraduationCap />}
+                  loading={addingSample}
+                  onClick={() => void addSample()}
+                >
+                  Try the sample course
+                </Button>
+              </>
             }
           />
         ) : (
@@ -111,6 +141,24 @@ export function HomeScreen() {
           </ul>
         )}
       </Section>
+
+      {list.status === 'ready' && list.data.courses.length > 0 && !hasSample ? (
+        <Section title="See how it works">
+          <ActionCard
+            media={<GraduationCap />}
+            title="Introduction to neural networks"
+            description="A short sample course written by Adle. Add it to try a narrated lesson with a live picture and a few questions."
+            meta={
+              <>
+                <Badge tone="accent">Sample course</Badge>
+                <ArrowRight aria-hidden="true" />
+              </>
+            }
+            disabled={addingSample}
+            onClick={() => void addSample()}
+          />
+        </Section>
+      ) : null}
 
       {keyState.resource.status === 'ready' && !aiReady ? (
         <Section title="Set up">

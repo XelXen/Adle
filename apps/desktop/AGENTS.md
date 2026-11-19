@@ -78,6 +78,26 @@ path, a URL, or a directory from the renderer.
   objective 1"). Ask for the role: `getByRole('textbox', { name: 'Objective 1' })`.
 - Never call `show()` on the app window from a test (ADR-008).
 
+## Lessons
+
+- `renderer/src/lesson/` is plain TypeScript with unit tests and no React: `LessonController`
+  (what is on screen), `Narrator` engines, `SceneCues` (narration to scene), `answers`.
+  `screens/lesson/` only draws what they say.
+- **The narrator is the clock.** Do not add timers to the controller or the screen; a new way of
+  reading a lesson is a new `Narrator`.
+- A narrator calls `onWord` only if it really knows the position. Never fake word highlighting.
+- The renderer has no answer keys. Anything that needs one (what was right, why) comes back from
+  `lessons.answer`. Do not add a field to the player view to "save a round trip".
+- Lesson text is shown with `MathText`, never `dangerouslySetInnerHTML`.
+- A segment with a scene must render something useful in three cases: the scene runs, the scene
+  fails in the player (`ScenePlayer` shows the fallback), and the core withheld the scene
+  (no artifact for the reference).
+- Assets are files. Both Vite configs set `assetsInlineLimit: 0`; a `data:` URI would be
+  refused by the Content Security Policy.
+- React's lint rules forbid writing to a ref passed in as a prop or during render. State that
+  outlives a render and is not React state belongs in a small class created once in
+  `useState(() => …)` (see `openSession` in `LessonScreen.tsx`).
+
 ## Renderer conventions
 
 - Logic that can be pure lives beside its screen in a `*-model.ts` file with unit tests

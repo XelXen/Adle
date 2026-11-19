@@ -18,6 +18,9 @@ export { ActionCard, type ActionCardProps, Card, type CardProps } from './compon
 export {
   Checkbox,
   type CheckboxProps,
+  RadioGroup,
+  type RadioGroupProps,
+  type RadioOption,
   SegmentedControl,
   type SegmentedControlProps,
   type SegmentedOption,

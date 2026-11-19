@@ -15,6 +15,7 @@ supersedes the old one and update this index.
 | [007](../decisions/ADR-007-persistence-and-ingestion.md) | SQLite with transactional, backed-up migrations; FTS5 search; local parsers run in a `subprocess` worker with JSON I/O (never `multiprocessing`); paths only from the main process. |
 | [008](../decisions/ADR-008-window-shown-immediately.md) | The main window is created visible, on the canvas colour; nothing waits for `ready-to-show`, which occasionally never came. |
 | [009](../decisions/ADR-009-curriculum-and-learner-model.md) | The concept graph is validated on every write; knowledge is an append-only record folded through BKT into four qualitative states; no score ever leaves the core. |
+| [010](../decisions/ADR-010-lesson-ir-and-playback.md) | The Lesson IR is defined once in the core and published as JSON Schema; lessons enter through one validating gateway and their scenes are re-checked on every read; answer keys never leave the core; the lesson player takes its clock from the narrator. |
 
 ## Smaller standing choices (no ADR)
 

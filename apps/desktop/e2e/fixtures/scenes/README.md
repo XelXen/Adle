@@ -8,6 +8,7 @@ player fails safely. **They are test fixtures, not examples to copy.**
 | `syntax_error.py` | Compile failure with a line/column message |
 | `bad_import.py` | Import of a Python module Wanim does not provide |
 | `runtime_error.py` | Exception raised while the scene is playing |
+| `stops_half_way.py` | Passes the static policy, then fails while playing: what a lesson sees when a stored scene breaks |
 | `no_scene.py` | A file with no `Scene` subclass |
 | `busy_loop.py` | A scene that never yields (liveness watchdog, process isolation) |
 | `verbatim_js.py` | RapydScript's raw-JavaScript literal (rejected by the static policy; contained by the sandbox) |

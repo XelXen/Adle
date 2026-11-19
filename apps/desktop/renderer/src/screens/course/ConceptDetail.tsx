@@ -1,7 +1,7 @@
-import { Link as LinkIcon, Pencil, Search, Trash2, Unlink } from 'lucide-react';
+import { Link as LinkIcon, Pencil, Play, RotateCcw, Search, Trash2, Unlink } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import type { Concept, ConceptEvidence, Curriculum, Passage } from '@adle/contracts';
+import type { Concept, ConceptEvidence, Curriculum, LessonSummary, Passage } from '@adle/contracts';
 import {
   Badge,
   Button,
@@ -16,7 +16,12 @@ import {
 import { callCore, describeError } from '../../lib/core-client';
 import { formatRelativeDay } from '../../lib/format';
 import styles from './Curriculum.module.css';
-import { describeLocation, directDependents } from './curriculum-model';
+import {
+  describeLesson,
+  describeLocation,
+  directDependents,
+  lessonAction,
+} from './curriculum-model';
 
 type KnowledgeState = Concept['knowledge']['state'];
 type SelfReport = NonNullable<Concept['knowledge']['self_report']>;
@@ -52,11 +57,19 @@ type HistoryState =
   | { status: 'ready'; conceptId: string; evidence: ConceptEvidence }
   | { status: 'error'; message: string };
 
+/** The lessons that teach one concept, or where the course is in finding them. */
+export type ConceptLessons =
+  | { status: 'loading' }
+  | { status: 'error'; message: string; retry: () => void }
+  | { status: 'ready'; lessons: readonly LessonSummary[] };
+
 /** Everything about one concept: what it is, what it needs, where it comes from, what you have shown. */
 export function ConceptDetail({
   concept,
   path,
   hasMaterials,
+  lessons,
+  onOpenLesson,
   onEdit,
   onRemove,
   onEditPrerequisites,
@@ -67,6 +80,8 @@ export function ConceptDetail({
   concept: Concept;
   path: readonly Concept[];
   hasMaterials: boolean;
+  lessons: ConceptLessons;
+  onOpenLesson: (lessonId: string) => void;
   onEdit: () => void;
   onRemove: () => void;
   onEditPrerequisites: () => void;
@@ -195,6 +210,45 @@ export function ConceptDetail({
       {ORIGIN_NOTE[concept.origin] ? (
         <p className={styles.muted}>{ORIGIN_NOTE[concept.origin]}</p>
       ) : null}
+
+      <div className={styles.block}>
+        <h4 className={styles.blockTitle}>Lessons</h4>
+        {lessons.status === 'loading' ? (
+          <Spinner size="small" label="Looking for lessons" />
+        ) : lessons.status === 'error' ? (
+          <div className={styles.itemRow}>
+            <p className={styles.formError}>{lessons.message}</p>
+            <Button size="small" onClick={lessons.retry}>
+              Try again
+            </Button>
+          </div>
+        ) : lessons.lessons.length === 0 ? (
+          <p className={styles.muted}>No lesson has been made for this concept yet.</p>
+        ) : (
+          <ul className={styles.bareList} aria-label="Lessons for this concept">
+            {lessons.lessons.map((lesson) => {
+              const action = lessonAction(lesson.progress);
+              return (
+                <li key={lesson.id} className={styles.itemRow}>
+                  <span className={styles.itemText}>
+                    <span className={styles.itemTitle}>{lesson.title}</span>
+                    <span className={styles.muted}>{describeLesson(lesson)}</span>
+                  </span>
+                  <Button
+                    size="small"
+                    variant={lesson.progress.completed ? 'secondary' : 'primary'}
+                    icon={lesson.progress.completed ? <RotateCcw /> : <Play />}
+                    aria-label={`${action}: ${lesson.title}`}
+                    onClick={() => onOpenLesson(lesson.id)}
+                  >
+                    {action}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
 
       <div className={styles.block}>
         <h4 className={styles.blockTitle}>Learning objectives</h4>

@@ -18,6 +18,7 @@ export type CourseTab = (typeof COURSE_TABS)[number];
 export type Route =
   | { name: 'home' }
   | { name: 'course'; courseId: string; tab: CourseTab }
+  | { name: 'lesson'; courseId: string; lessonId: string }
   | { name: 'settings'; tab: SettingsTab };
 
 interface RouterValue {
@@ -30,10 +31,17 @@ const RouterContext = createContext<RouterValue | null>(null);
 
 function isRoute(value: unknown): value is Route {
   if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as { name?: unknown; tab?: unknown; courseId?: unknown };
+  const candidate = value as {
+    name?: unknown;
+    tab?: unknown;
+    courseId?: unknown;
+    lessonId?: unknown;
+  };
   switch (candidate.name) {
     case 'home':
       return true;
+    case 'lesson':
+      return typeof candidate.courseId === 'string' && typeof candidate.lessonId === 'string';
     case 'settings':
       return (SETTINGS_TABS as readonly unknown[]).includes(candidate.tab);
     case 'course':

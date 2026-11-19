@@ -1,6 +1,52 @@
 // GENERATED FILE — do not edit.
 // Source: services/core (FastAPI). Regenerate with `npm run contracts`.
 
+/**
+ * An answer to a question. Fill in the one field that matches the question's form.
+ *
+ */
+export interface AnswerRequest {
+  covered?: string[] | null;
+  hinted?: boolean;
+  number?: number | null;
+  option_id?: string | null;
+  order?: string[] | null;
+  skipped?: boolean;
+  text?: string | null;
+  truth?: boolean | null;
+  unsure?: boolean;
+}
+export interface AnswerResult {
+  attempt_number: number;
+  change: string;
+  correct_answer: string;
+  correct_option: string | null;
+  explanation: string;
+  feedback: string | null;
+  knowledge: Knowledge;
+  outcome: 'correct' | 'partial' | 'incorrect' | 'skipped';
+}
+/**
+ * What the evidence says about the learner and one concept. Deliberately no score.
+ *
+ */
+export interface Knowledge {
+  answered: number;
+  label: string;
+  missing: string[];
+  review_due_at: string | null;
+  self_report: ('new' | 'some' | 'confident') | null;
+  state: 'not_assessed' | 'building' | 'needs_evidence' | 'demonstrated';
+}
+/**
+ * One breath of narration, and what appears on screen as it starts.
+ *
+ */
+export interface Beat {
+  advance_scene?: boolean;
+  show?: string | null;
+  text: string;
+}
 export interface Concept {
   complexity: number;
   course_id: string;
@@ -15,18 +61,6 @@ export interface Concept {
   summary: string;
   tags: ('conceptual' | 'calculation' | 'visual' | 'procedural')[];
   title: string;
-}
-/**
- * What the evidence says about the learner and one concept. Deliberately no score.
- *
- */
-export interface Knowledge {
-  answered: number;
-  label: string;
-  missing: string[];
-  review_due_at: string | null;
-  self_report: ('new' | 'some' | 'confident') | null;
-  state: 'not_assessed' | 'building' | 'needs_evidence' | 'demonstrated';
 }
 export interface Objective {
   id: string;
@@ -124,6 +158,26 @@ export interface ErrorBody {
 export interface ErrorResponse {
   error: ErrorBody;
 }
+/**
+ * Narration with key points on the board, and optionally a scene beside it.
+ *
+ */
+export interface ExplanationSegment {
+  estimated_seconds: number;
+  id: string;
+  /**
+   * @minItems 1
+   * @maxItems 12
+   */
+  narration: Beat[];
+  scene?: SceneRef | null;
+  title: string;
+  type: 'explanation';
+}
+export interface SceneRef {
+  fallback_text: string;
+  scene_id: string;
+}
 export interface Health {
   api_version: string;
   status: string;
@@ -143,6 +197,22 @@ export interface ImportRequest {
    * @maxItems 50
    */
   paths: string[];
+}
+/**
+ * A scene the learner manipulates. Understandable without touching it.
+ *
+ */
+export interface InteractionSegment {
+  estimated_seconds: number;
+  id: string;
+  /**
+   * @maxItems 12
+   */
+  narration?: Beat[];
+  prompt: string;
+  scene: SceneRef;
+  title: string;
+  type: 'interaction';
 }
 export interface Job {
   course_id: string | null;
@@ -169,6 +239,196 @@ export interface LearnerPreferencesUpdate {
   goal?: string | null;
   narration?: boolean | null;
   pace?: ('relaxed' | 'standard' | 'brisk') | null;
+}
+/**
+ * Everything the player needs: the validated lesson and the scenes it plays.
+ *
+ */
+export interface LessonForPlayer {
+  lesson: PlayerLesson;
+  origin: 'sample' | 'generated';
+  progress: LessonProgress;
+  scenes: SceneArtifact[];
+}
+export interface PlayerLesson {
+  concept_ids: string[];
+  course_id: string;
+  estimated_minutes: number;
+  grounding: 'materials' | 'general_knowledge' | 'sample';
+  lesson_id: string;
+  objectives: LessonObjective[];
+  schema_version: '1.0';
+  segments: (
+    | ExplanationSegment
+    | VisualizationSegment
+    | InteractionSegment
+    | PlayerCheckpointSegment
+    | WorkedExampleSegment
+    | ReflectionSegment
+    | SummarySegment
+  )[];
+  source_refs: SourceCitation[];
+  strategy: 'visual' | 'worked_example' | 'analogy' | 'mathematical' | 'socratic' | 'computational';
+  title: string;
+}
+export interface LessonObjective {
+  objective_id?: string | null;
+  statement: string;
+}
+/**
+ * An animation, narrated.
+ *
+ */
+export interface VisualizationSegment {
+  estimated_seconds: number;
+  id: string;
+  /**
+   * @minItems 1
+   * @maxItems 12
+   */
+  narration: Beat[];
+  scene: SceneRef;
+  title: string;
+  type: 'visualization';
+}
+export interface PlayerCheckpointSegment {
+  estimated_seconds: number;
+  id: string;
+  /**
+   * @maxItems 12
+   */
+  narration?: Beat[];
+  question: PlayerQuestion;
+  title: string;
+  type: 'checkpoint';
+}
+/**
+ * A question as the learner sees it before answering.
+ *
+ */
+export interface PlayerQuestion {
+  concept_id: string;
+  difficulty: number;
+  form:
+    | 'multiple_choice'
+    | 'true_false'
+    | 'numeric'
+    | 'short_answer'
+    | 'ordering'
+    | 'prediction'
+    | 'explanation';
+  hint?: string | null;
+  id: string;
+  is_transfer: boolean;
+  options?: PlayerOption[];
+  rubric?: PlayerRubricPoint[];
+  sample_answer?: string | null;
+  stem: string;
+  unit?: string | null;
+}
+export interface PlayerOption {
+  id: string;
+  text: string;
+}
+export interface PlayerRubricPoint {
+  id: string;
+  text: string;
+}
+/**
+ * A problem solved step by step: each beat says a step and shows it.
+ *
+ */
+export interface WorkedExampleSegment {
+  estimated_seconds: number;
+  id: string;
+  /**
+   * @minItems 1
+   * @maxItems 12
+   */
+  narration: Beat[];
+  problem: string;
+  scene?: SceneRef | null;
+  title: string;
+  type: 'worked_example';
+}
+/**
+ * A question to think about. Not scored; the learner may write a note or move on.
+ *
+ */
+export interface ReflectionSegment {
+  estimated_seconds: number;
+  id: string;
+  /**
+   * @maxItems 12
+   */
+  narration?: Beat[];
+  prompt: string;
+  title: string;
+  type: 'reflection';
+}
+export interface SummarySegment {
+  estimated_seconds: number;
+  id: string;
+  /**
+   * @minItems 1
+   * @maxItems 12
+   */
+  narration: Beat[];
+  title: string;
+  type: 'summary';
+}
+/**
+ * A place in the learner's materials that the lesson draws on.
+ *
+ */
+export interface SourceCitation {
+  locator: string;
+  section_id: string;
+  source_id: string;
+  source_name: string;
+}
+export interface LessonProgress {
+  completed: boolean;
+  position: number;
+  started: boolean;
+}
+/**
+ * One complete Wanim scene file, with what the static policy found in it.
+ *
+ */
+export interface SceneArtifact {
+  content_hash: string;
+  /**
+   * @maxItems 16
+   */
+  controls?: string[];
+  /**
+   * @maxItems 3
+   */
+  events?: ('passed' | 'explored' | 'progress')[];
+  id: string;
+  interactive: boolean;
+  purpose: string;
+  scene_class: string;
+  source: string;
+  wanim_version: string;
+}
+export interface LessonList {
+  lessons: LessonSummary[];
+}
+export interface LessonSummary {
+  concept_id: string;
+  course_id: string;
+  estimated_minutes: number;
+  id: string;
+  origin: 'sample' | 'generated';
+  progress: LessonProgress;
+  segment_count: number;
+  title: string;
+}
+export interface LessonProgressUpdate {
+  completed?: boolean;
+  position: number;
 }
 export interface ObjectiveInput {
   id?: string | null;

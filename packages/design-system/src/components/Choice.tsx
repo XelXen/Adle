@@ -99,6 +99,89 @@ export function Checkbox({
   );
 }
 
+export interface RadioOption<Value extends string> {
+  value: Value;
+  label: ReactNode;
+  description?: ReactNode;
+}
+
+export interface RadioGroupProps<Value extends string> {
+  /** The question the options answer. Rendered as the group's legend. */
+  label: ReactNode;
+  /** Keep the legend for assistive technology but do not show it. */
+  hideLabel?: boolean;
+  /** The chosen option, or null while nothing is chosen. */
+  value: Value | null;
+  options: readonly RadioOption<Value>[];
+  onValueChange: (value: Value) => void;
+  disabled?: boolean;
+  /**
+   * The choice has been made and is now only shown, as after a question has been
+   * checked. It cannot be changed, and every option stays fully legible.
+   */
+  readOnly?: boolean;
+  className?: string;
+}
+
+/**
+ * One choice from a short list of options that may each be a sentence long,
+ * confirmed afterwards with a button. Each option is a full-width row, so the
+ * whole line is the target. For a few one-word options that apply at once, use
+ * `SegmentedControl`.
+ */
+export function RadioGroup<Value extends string>({
+  label,
+  hideLabel = false,
+  value,
+  options,
+  onValueChange,
+  disabled = false,
+  readOnly = false,
+  className,
+}: RadioGroupProps<Value>) {
+  const name = useId();
+  return (
+    <fieldset
+      className={cx(styles.radioGroup, readOnly && styles.radioGroupReadOnly, className)}
+      disabled={disabled || readOnly}
+    >
+      <legend className={cx(styles.radioLegend, hideLabel && 'ad-visually-hidden')}>{label}</legend>
+      {options.map((option) => {
+        const id = `${name}-${option.value}`;
+        const descriptionId = option.description ? `${id}-description` : undefined;
+        return (
+          <label
+            key={option.value}
+            htmlFor={id}
+            className={cx(styles.radioRow, option.value === value && styles.radioRowSelected)}
+          >
+            <input
+              id={id}
+              type="radio"
+              className={styles.radio}
+              name={name}
+              value={option.value}
+              checked={option.value === value}
+              // Named by the option's own text only; the description is announced after it.
+              aria-labelledby={`${id}-label`}
+              aria-describedby={descriptionId}
+              onChange={() => onValueChange(option.value)}
+            />
+            <span className={styles.checkboxText}>
+              <span id={`${id}-label`}>{option.label}</span>
+              {option.description ? (
+                <span id={descriptionId} className={styles.checkboxDescription}>
+                  {option.description}
+                </span>
+              ) : null}
+            </span>
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
+
 export interface SegmentedOption<Value extends string> {
   value: Value;
   label: string;

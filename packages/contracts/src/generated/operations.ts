@@ -2,6 +2,8 @@
 // Source: services/core (FastAPI). Regenerate with `npm run contracts`.
 
 import type {
+  AnswerRequest,
+  AnswerResult,
   ConceptCreate,
   ConceptEvidence,
   ConceptOrder,
@@ -16,6 +18,10 @@ import type {
   Job,
   LearnerPreferences,
   LearnerPreferencesUpdate,
+  LessonForPlayer,
+  LessonList,
+  LessonProgress,
+  LessonProgressUpdate,
   ObjectivesUpdate,
   OutlineCandidates,
   OutlineSelection,
@@ -38,6 +44,7 @@ export const OPERATIONS = {
   'courses.create': { method: 'POST', path: '/v1/courses', internal: false },
   'courses.delete': { method: 'DELETE', path: '/v1/courses/{course_id}', internal: false },
   'courses.get': { method: 'GET', path: '/v1/courses/{course_id}', internal: false },
+  'courses.install_sample': { method: 'POST', path: '/v1/courses/sample', internal: false },
   'courses.list': { method: 'GET', path: '/v1/courses', internal: false },
   'courses.update': { method: 'PATCH', path: '/v1/courses/{course_id}', internal: false },
   'curriculum.add_from_outline': {
@@ -114,6 +121,19 @@ export const OPERATIONS = {
     path: '/v1/learner/preferences',
     internal: false,
   },
+  'lessons.answer': {
+    method: 'POST',
+    path: '/v1/lessons/{lesson_id}/questions/{question_id}/answer',
+    internal: false,
+  },
+  'lessons.delete': { method: 'DELETE', path: '/v1/lessons/{lesson_id}', internal: false },
+  'lessons.get': { method: 'GET', path: '/v1/lessons/{lesson_id}', internal: false },
+  'lessons.list': { method: 'GET', path: '/v1/courses/{course_id}/lessons', internal: false },
+  'lessons.save_progress': {
+    method: 'PUT',
+    path: '/v1/lessons/{lesson_id}/progress',
+    internal: false,
+  },
   'provider.clear_credential': {
     method: 'DELETE',
     path: '/v1/provider/credential',
@@ -152,6 +172,12 @@ export interface OperationTypes {
   'courses.get': {
     path: { course_id: string };
     query: { opened?: boolean } | undefined;
+    body: undefined;
+    result: Course;
+  };
+  'courses.install_sample': {
+    path: undefined;
+    query: undefined;
     body: undefined;
     result: Course;
   };
@@ -274,6 +300,36 @@ export interface OperationTypes {
     query: undefined;
     body: LearnerPreferencesUpdate;
     result: LearnerPreferences;
+  };
+  'lessons.answer': {
+    path: { lesson_id: string; question_id: string };
+    query: undefined;
+    body: AnswerRequest;
+    result: AnswerResult;
+  };
+  'lessons.delete': {
+    path: { lesson_id: string };
+    query: undefined;
+    body: undefined;
+    result: null;
+  };
+  'lessons.get': {
+    path: { lesson_id: string };
+    query: undefined;
+    body: undefined;
+    result: LessonForPlayer;
+  };
+  'lessons.list': {
+    path: { course_id: string };
+    query: undefined;
+    body: undefined;
+    result: LessonList;
+  };
+  'lessons.save_progress': {
+    path: { lesson_id: string };
+    query: undefined;
+    body: LessonProgressUpdate;
+    result: LessonProgress;
   };
   'provider.clear_credential': {
     path: undefined;

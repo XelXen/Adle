@@ -93,6 +93,7 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 | `Switch` | An immediate on/off setting | `role="switch"`, optional description |
 | `Checkbox` | One of several independent choices in a form that is submitted | Native checkbox; label, optional description, disabled |
 | `SegmentedControl` | Two to four exclusive options | Radio group, arrow keys, single tab stop |
+| `RadioGroup` | One of a few options that may each be a sentence long, confirmed with a button | Native radios in a fieldset; the whole row is the target; each option named by its own text, with an optional description; disabled; **`readOnly`**: a settled choice that can be read but not changed, nothing dimmed, the chosen row marked without the action tint |
 | `Slider` | A bounded number | Native range input; value always shown as text |
 | `Card` | Group related content | `surface` / `subtle`; padding `none`/`compact`/`comfortable`; semantic element via `as` |
 | `ActionCard` | A whole-card choice | Media, title, description, meta; hover, pressed, disabled |
@@ -111,6 +112,9 @@ App-level components that are not in the package (they depend on app state):
 
 - `ScenePlayer` (`apps/desktop/renderer/src/components`): a Wanim scene with a loading state,
   mirrored accessible controls, and a text fallback.
+- `MathText` (`renderer/src/components`): text with inline `$…$` mathematics, typeset by KaTeX
+  into DOM nodes with MathML for assistive technology. Text that does not parse is shown as
+  written. Use it for anything that comes from a lesson.
 - `ConceptMap` (`renderer/src/screens/course`): the curriculum as a picture. Concepts are real
   buttons laid over a decorative drawing of the links; the list view carries the same
   information as text.
@@ -138,6 +142,20 @@ render nothing while waiting.
 | One of two to four options, applied at once and harmless to step through | `SegmentedControl` |
 | Several independent options confirmed with a Save button | `Checkbox` |
 | An option whose selection *records* something | Separate `Button`s with `aria-pressed`. Never a control that changes as the arrow keys move through it |
+| One answer to a question, checked with a button | `RadioGroup`; after checking, `readOnly` with a description on the options that says what each turned out to be |
+
+### After an answer
+
+Say what happened in words, not in colour. The chosen option reads "Your answer", the correct one
+"The right answer"; the result is a `Callout` (`success` for right, `info` for anything else,
+never `danger`) inside a live region, with the explanation and what the answer changed. A wrong
+answer is "Not quite", never "Wrong".
+
+### A lesson's controls stay within reach
+
+The lesson's bar (Previous, Start / Pause / Play again, Continue) sticks to the bottom edge of the
+page while a long part scrolls behind it. The primary button is whatever moves the learner on:
+Start before anything has played, Continue once the part has come to rest.
 
 ### Messages
 

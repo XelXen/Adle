@@ -38,6 +38,7 @@ CONCEPT_ORIGINS = ("learner", "outline", "model", "sample")
 CONCEPT_TAGS = ("conceptual", "calculation", "visual", "procedural")
 OBSERVATION_KINDS = ("answer", "self_report")
 MASTERY_STATES = ("not_assessed", "building", "needs_evidence", "demonstrated")
+LESSON_ORIGINS = ("sample", "generated")
 
 
 def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
@@ -363,6 +364,93 @@ class LearnerConceptState(Base):
     review_due_at: Mapped[datetime | None] = mapped_column(UtcDateTime, index=True)
     review_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
+
+
+class StoredLesson(Base):
+    """A validated lesson (``lessons.ir.Lesson``), kept as the document the player loads."""
+
+    __tablename__ = "lessons"
+    __table_args__ = (_one_of("origin", LESSON_ORIGINS),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: The first concept the lesson teaches; lessons are listed under it.
+    concept_id: Mapped[str] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: ``sample`` lessons were written by Adle; ``generated`` ones by the configured model.
+    origin: Mapped[str] = mapped_column(String(20), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(10), nullable=False)
+    estimated_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    segment_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: The lesson exactly as validated. Read back through the IR, never used raw.
+    document: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+
+    scenes: Mapped[list[StoredScene]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True, order_by="StoredScene.position"
+    )
+    progress: Mapped[LessonProgress | None] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True, uselist=False
+    )
+
+
+class StoredScene(Base):
+    """One complete scene file belonging to a lesson (``lessons.ir.SceneArtifact``)."""
+
+    __tablename__ = "lesson_scenes"
+
+    lesson_id: Mapped[str] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), primary_key=True
+    )
+    scene_id: Mapped[str] = mapped_column(String(44), primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    document: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class LessonProgress(Base):
+    """Where the learner is in a lesson, saved at segment boundaries."""
+
+    __tablename__ = "lesson_progress"
+
+    lesson_id: Mapped[str] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), primary_key=True
+    )
+    #: Index of the segment to resume at.
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
+
+
+class Attempt(Base):
+    """One answer (or explicit skip) to a question of a lesson."""
+
+    __tablename__ = "attempts"
+    __table_args__ = (Index("ix_attempts_question", "lesson_id", "question_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    lesson_id: Mapped[str] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False
+    )
+    concept_id: Mapped[str] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id: Mapped[str] = mapped_column(String(44), nullable=False)
+    form: Mapped[str] = mapped_column(String(30), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)
+    hinted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    unsure: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: The kind of mistake the answer suggests, if any. A hypothesis only.
+    misconception: Mapped[str | None] = mapped_column(String(40))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
 
 
 class Job(Base):

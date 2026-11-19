@@ -1,0 +1,8 @@
+.formula {
+  /* Keep a formula on one line where possible; long ones scroll inside their own box. */
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: middle;
+}

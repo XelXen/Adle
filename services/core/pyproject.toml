@@ -31,7 +31,8 @@ packages = ["adle_core"]
 line-length = 100
 target-version = "py312"
 src = ["."]
-extend-exclude = ["migrations/versions"]
+# Scene files are data: Python-like source for the Wanim runtime, never imported here.
+extend-exclude = ["migrations/versions", "adle_core/sample_course/scenes"]
 
 [tool.ruff.lint]
 select = [
@@ -64,6 +65,7 @@ ignore = [
 python_version = "3.12"
 strict = true
 files = ["adle_core"]
+exclude = ["adle_core/sample_course/scenes/"]
 plugins = ["pydantic.mypy"]
 warn_unreachable = true
 

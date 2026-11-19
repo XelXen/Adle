@@ -12,6 +12,9 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from adle_core.lessons import ir as lesson_ir
+from adle_core.lessons.player import PlayerLesson
+
 CourseOrigin = Literal["sample", "topic", "materials"]
 SourceKind = Literal["pdf", "docx", "markdown", "text", "authored"]
 SourceStatus = Literal["extracted", "needs_attention"]
@@ -24,6 +27,7 @@ MasteryStateName = Literal["not_assessed", "building", "needs_evidence", "demons
 SelfReportLevel = Literal["new", "some", "confident"]
 PaceName = Literal["relaxed", "standard", "brisk"]
 DensityName = Literal["concise", "balanced", "detailed"]
+LessonOrigin = Literal["sample", "generated"]
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=4000)]
@@ -321,6 +325,87 @@ class ConceptEvidence(_Output):
     knowledge: Knowledge
     #: Newest first.
     history: list[ObservationSummary]
+
+
+# -- lessons ---------------------------------------------------------------
+
+
+class LessonProgress(_Output):
+    #: Index of the segment to resume at.
+    position: int
+    completed: bool
+    #: False until the learner has opened the lesson at least once.
+    started: bool
+
+
+class LessonSummary(_Output):
+    id: str
+    course_id: str
+    #: The concept the lesson is listed under.
+    concept_id: str
+    title: str
+    #: Written by Adle (``sample``) or by the configured model (``generated``).
+    origin: LessonOrigin
+    estimated_minutes: int
+    segment_count: int
+    progress: LessonProgress
+
+
+class LessonList(_Output):
+    lessons: list[LessonSummary]
+
+
+class LessonForPlayer(_Output):
+    """Everything the player needs: the validated lesson and the scenes it plays."""
+
+    #: The lesson without its answer keys; answers are scored by the core.
+    lesson: PlayerLesson
+    scenes: list[lesson_ir.SceneArtifact]
+    origin: LessonOrigin
+    progress: LessonProgress
+
+
+class LessonProgressUpdate(_Input):
+    position: int = Field(ge=0, le=100)
+    completed: bool = False
+
+
+class AnswerRequest(_Input):
+    """An answer to a question. Fill in the one field that matches the question's form."""
+
+    #: The learner chose not to answer. Nothing else is read.
+    skipped: bool = False
+    option_id: Annotated[str, StringConstraints(max_length=16)] | None = None
+    truth: bool | None = None
+    number: float | None = Field(default=None, allow_inf_nan=False)
+    text: Annotated[str, StringConstraints(max_length=400)] | None = None
+    order: list[Annotated[str, StringConstraints(max_length=16)]] | None = Field(
+        default=None, max_length=6
+    )
+    #: For an explanation: the rubric points the learner says their answer covered.
+    covered: list[Annotated[str, StringConstraints(max_length=16)]] | None = Field(
+        default=None, max_length=5
+    )
+    #: The learner asked for the hint before answering.
+    hinted: bool = False
+    #: The learner said they were not sure of this answer.
+    unsure: bool = False
+
+
+class AnswerResult(_Output):
+    outcome: Literal["correct", "partial", "incorrect", "skipped"]
+    #: About the answer that was given, when there is something specific to say.
+    feedback: str | None
+    #: Why the right answer is right.
+    explanation: str
+    correct_answer: str
+    #: The right one among the options that were offered ("true" / "false" for a
+    #: true-or-false question). Absent for a skipped question and for questions without options.
+    correct_option: str | None
+    #: What the answer changed about what Adle believes, in words.
+    change: str
+    knowledge: Knowledge
+    attempt_number: int
 
 
 # -- jobs ------------------------------------------------------------------

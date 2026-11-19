@@ -1,0 +1,348 @@
+/* ---- Layout ---------------------------------------------------------------- */
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+  min-width: 0;
+}
+
+.where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ad-space-2) var(--ad-space-4);
+}
+
+.segmentTitle {
+  margin: 0;
+  font: var(--ad-text-heading);
+}
+
+.position {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.body {
+  display: grid;
+  gap: var(--ad-space-5);
+  align-items: start;
+}
+
+@media (min-width: 72rem) {
+  .body.withSide {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  min-width: 0;
+}
+
+.sideTitle {
+  margin: 0;
+  font: var(--ad-text-caption);
+  color: var(--ad-color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---- Parts of the lesson ----------------------------------------------------- */
+.parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.part {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 var(--ad-space-2);
+  border: var(--ad-border-width) solid var(--ad-color-border-strong);
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-surface);
+  color: var(--ad-color-ink);
+  font: var(--ad-text-caption);
+  cursor: pointer;
+}
+
+.part:disabled {
+  border-color: var(--ad-color-border);
+  background: transparent;
+  color: var(--ad-color-muted);
+  cursor: default;
+}
+
+.partDone {
+  border-color: var(--ad-color-primary-text);
+  background: var(--ad-color-primary-soft);
+  color: var(--ad-color-primary-text);
+}
+
+.partCurrent,
+.partCurrent:disabled {
+  border-color: var(--ad-color-action);
+  background: var(--ad-color-action);
+  color: var(--ad-color-on-action);
+}
+
+/* ---- The board: what the narration has put on screen so far ------------------ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-5);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+}
+
+.boardEmpty {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.problemStatement {
+  padding-bottom: var(--ad-space-3);
+  border-bottom: var(--ad-border-width) solid var(--ad-color-border);
+  font: var(--ad-text-body-strong);
+}
+
+.points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  margin: 0;
+  padding-left: var(--ad-space-5);
+  font: var(--ad-text-heading);
+  font-weight: 500;
+}
+
+.prompt {
+  font: var(--ad-text-heading);
+  font-weight: 500;
+}
+
+.alternative {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+}
+
+.alternativeText {
+  padding: var(--ad-space-3) var(--ad-space-4);
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-surface-subtle);
+  font: var(--ad-text-supporting);
+}
+
+/* ---- Transcript ---------------------------------------------------------------- */
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beat {
+  padding-left: var(--ad-space-3);
+  border-left: 3px solid transparent;
+  color: var(--ad-color-muted);
+}
+
+.beatSpoken {
+  color: var(--ad-color-ink);
+}
+
+.beatCurrent {
+  border-left-color: var(--ad-color-primary);
+  color: var(--ad-color-ink);
+}
+
+.word {
+  border-radius: calc(var(--ad-radius-small) / 2);
+  background: var(--ad-color-primary-soft);
+  color: var(--ad-color-ink);
+}
+
+/* ---- Controls ------------------------------------------------------------------- */
+/* Always within reach: the bar stays at the bottom edge while a long part scrolls behind it. */
+.controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-3) 0;
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+  background: var(--ad-color-canvas);
+}
+
+.controlGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2);
+}
+
+.status {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.note {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+/* ---- Questions ------------------------------------------------------------------- */
+.question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+  padding: var(--ad-space-5);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+}
+
+.stem {
+  font: var(--ad-text-heading);
+  font-weight: 500;
+}
+
+.answerField {
+  max-width: 20rem;
+}
+
+.ordering {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: order;
+}
+
+.orderingItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-2) var(--ad-space-2) var(--ad-space-2) var(--ad-space-4);
+  border: var(--ad-border-width) solid var(--ad-color-border-strong);
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-surface);
+  counter-increment: order;
+}
+
+.orderingText {
+  flex: 1;
+  min-width: 0;
+}
+
+.orderingText::before {
+  content: counter(order) '. ';
+  color: var(--ad-color-muted);
+}
+
+.compare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+  padding: var(--ad-space-4);
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-surface-subtle);
+}
+
+.compareTitle {
+  margin: 0 0 var(--ad-space-2);
+  padding: 0;
+  font: var(--ad-text-body-strong);
+}
+
+.rubric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.problem {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-danger-text);
+}
+
+.questionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2) var(--ad-space-3);
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+}
+
+.change {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+/* ---- Finished ---------------------------------------------------------------------- */
+.finished {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ad-space-4);
+  padding: var(--ad-space-6);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+}
+
+.finishedTitle {
+  margin: 0;
+  font: var(--ad-text-title);
+}
+
+.finishedLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2) var(--ad-space-3);
+}
+
+.objectives {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-1);
+  margin: var(--ad-space-2) 0 0;
+  padding-left: var(--ad-space-5);
+}

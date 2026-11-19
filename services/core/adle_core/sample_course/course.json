@@ -1,0 +1,213 @@
+{
+  "title": "Introduction to neural networks",
+  "description": "A sample course written by Adle. It follows one idea from a single neuron to backpropagation: how a network of simple units learns from its mistakes. Nothing in it comes from your own materials.",
+  "concepts": [
+    {
+      "key": "weighted_sum",
+      "title": "Weights and bias",
+      "summary": "How a neuron combines its inputs into a single number: multiply each input by a weight, add the results, and add a bias.",
+      "complexity": 2,
+      "tags": ["conceptual", "calculation", "visual"],
+      "objectives": [
+        {
+          "key": "compute",
+          "statement": "Compute a neuron's weighted sum, including the bias, by hand."
+        },
+        {
+          "key": "interpret",
+          "statement": "Say what a large, small, zero, or negative weight means for an input."
+        },
+        {
+          "key": "bias",
+          "statement": "Explain what the bias changes that the weights cannot."
+        }
+      ],
+      "needs": []
+    },
+    {
+      "key": "activation",
+      "title": "Activation functions",
+      "summary": "The function a neuron applies to its weighted sum, and why a network needs one that is not a straight line.",
+      "complexity": 2,
+      "tags": ["conceptual", "visual"],
+      "objectives": [
+        {
+          "key": "apply",
+          "statement": "Apply a step, sigmoid, or ReLU function to a given value."
+        },
+        {
+          "key": "purpose",
+          "statement": "Explain why a network without activation functions can only draw straight lines."
+        },
+        {
+          "key": "compare",
+          "statement": "Describe how sigmoid and ReLU differ for large negative and large positive inputs."
+        }
+      ],
+      "needs": [
+        {
+          "concept": "weighted_sum",
+          "reason": "An activation function is applied to the weighted sum."
+        }
+      ]
+    },
+    {
+      "key": "perceptron",
+      "title": "The perceptron",
+      "summary": "A single neuron used to make a yes-or-no decision, and the boundary it draws between the two answers.",
+      "complexity": 2,
+      "tags": ["conceptual", "visual"],
+      "objectives": [
+        {
+          "key": "decide",
+          "statement": "Decide which answer a perceptron gives for a given input."
+        },
+        {
+          "key": "boundary",
+          "statement": "Describe the decision boundary of a perceptron with two inputs, and how the weights and bias move it."
+        },
+        {
+          "key": "limit",
+          "statement": "Give an example of a problem a single perceptron cannot solve, and say why."
+        }
+      ],
+      "needs": [
+        {
+          "concept": "weighted_sum",
+          "reason": "A perceptron starts by computing a weighted sum."
+        },
+        {
+          "concept": "activation",
+          "reason": "Its yes-or-no answer comes from a step activation."
+        }
+      ]
+    },
+    {
+      "key": "forward",
+      "title": "Forward propagation",
+      "summary": "How an input travels through the layers of a network, each layer's outputs becoming the next layer's inputs.",
+      "complexity": 3,
+      "tags": ["calculation", "procedural", "visual"],
+      "objectives": [
+        {
+          "key": "trace",
+          "statement": "Compute the output of a small two-layer network by hand."
+        },
+        {
+          "key": "layers",
+          "statement": "Explain what a hidden layer is and why its outputs are not seen directly."
+        }
+      ],
+      "needs": [
+        {
+          "concept": "perceptron",
+          "reason": "A network is built from neurons like the perceptron."
+        },
+        {
+          "concept": "activation",
+          "reason": "Every layer applies an activation function."
+        }
+      ]
+    },
+    {
+      "key": "loss",
+      "title": "Loss",
+      "summary": "A single number that says how wrong the network's predictions are, so that \"better\" has a meaning.",
+      "complexity": 2,
+      "tags": ["conceptual", "calculation"],
+      "objectives": [
+        {
+          "key": "compute",
+          "statement": "Compute a mean squared error for a few predictions and targets."
+        },
+        {
+          "key": "meaning",
+          "statement": "Explain why errors are squared before they are averaged."
+        }
+      ],
+      "needs": [
+        {
+          "concept": "forward",
+          "reason": "The loss compares the network's output with the target."
+        }
+      ]
+    },
+    {
+      "key": "chain_rule",
+      "title": "Derivatives and the chain rule",
+      "summary": "How fast one quantity changes when another does, and how to find that rate through a chain of steps.",
+      "complexity": 3,
+      "tags": ["conceptual", "calculation"],
+      "objectives": [
+        {
+          "key": "slope",
+          "statement": "Interpret a derivative as a slope: the change in output for a small change in input."
+        },
+        {
+          "key": "chain",
+          "statement": "Use the chain rule to differentiate a function of a function."
+        }
+      ],
+      "needs": []
+    },
+    {
+      "key": "gradient_descent",
+      "title": "Gradient descent",
+      "summary": "Improving the weights step by step, by moving each one a little in the direction that lowers the loss.",
+      "complexity": 2,
+      "tags": ["conceptual", "procedural", "visual"],
+      "objectives": [
+        {
+          "key": "step",
+          "statement": "Carry out one gradient descent update for a weight."
+        },
+        {
+          "key": "rate",
+          "statement": "Predict what happens when the learning rate is too small or too large."
+        }
+      ],
+      "needs": [
+        {
+          "concept": "loss",
+          "reason": "Gradient descent exists to lower the loss."
+        },
+        {
+          "concept": "chain_rule",
+          "reason": "The direction of each step comes from a derivative."
+        }
+      ]
+    },
+    {
+      "key": "backprop",
+      "title": "Backpropagation",
+      "summary": "Finding how the loss depends on every weight in the network by applying the chain rule backwards, layer by layer.",
+      "complexity": 3,
+      "tags": ["calculation", "procedural"],
+      "objectives": [
+        {
+          "key": "trace",
+          "statement": "Compute the gradient of the loss with respect to a weight in a small network."
+        },
+        {
+          "key": "reuse",
+          "statement": "Explain why working backwards from the loss saves repeated work."
+        }
+      ],
+      "needs": [
+        {
+          "concept": "forward",
+          "reason": "Backpropagation retraces the forward pass in reverse."
+        },
+        {
+          "concept": "chain_rule",
+          "reason": "It is the chain rule applied layer by layer."
+        },
+        {
+          "concept": "gradient_descent",
+          "reason": "It supplies the gradients that gradient descent uses."
+        }
+      ]
+    }
+  ],
+  "lessons": ["weighted_sum"]
+}

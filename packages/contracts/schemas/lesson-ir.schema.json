@@ -1,0 +1,803 @@
+{
+  "$defs": {
+    "Beat": {
+      "additionalProperties": false,
+      "description": "One breath of narration, and what appears on screen as it starts.",
+      "properties": {
+        "advance_scene": { "default": false, "title": "Advance Scene", "type": "boolean" },
+        "show": {
+          "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Show"
+        },
+        "text": { "maxLength": 700, "minLength": 1, "title": "Text", "type": "string" }
+      },
+      "required": ["text"],
+      "title": "Beat",
+      "type": "object"
+    },
+    "CheckpointSegment": {
+      "additionalProperties": false,
+      "description": "A question. The lesson waits until it is answered or explicitly skipped.",
+      "properties": {
+        "estimated_seconds": {
+          "maximum": 900,
+          "minimum": 5,
+          "title": "Estimated Seconds",
+          "type": "integer"
+        },
+        "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "narration": {
+          "items": { "$ref": "#/$defs/Beat" },
+          "maxItems": 12,
+          "title": "Narration",
+          "type": "array"
+        },
+        "question": {
+          "discriminator": {
+            "mapping": {
+              "explanation": "#/$defs/ExplanationItem",
+              "multiple_choice": "#/$defs/ChoiceItem",
+              "numeric": "#/$defs/NumericItem",
+              "ordering": "#/$defs/OrderingItem",
+              "prediction": "#/$defs/ChoiceItem",
+              "short_answer": "#/$defs/ShortAnswerItem",
+              "true_false": "#/$defs/TrueFalseItem"
+            },
+            "propertyName": "form"
+          },
+          "oneOf": [
+            { "$ref": "#/$defs/ChoiceItem" },
+            { "$ref": "#/$defs/TrueFalseItem" },
+            { "$ref": "#/$defs/NumericItem" },
+            { "$ref": "#/$defs/ShortAnswerItem" },
+            { "$ref": "#/$defs/OrderingItem" },
+            { "$ref": "#/$defs/ExplanationItem" }
+          ],
+          "title": "Question"
+        },
+        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+        "type": { "const": "checkpoint", "title": "Type", "type": "string" }
+      },
+      "required": ["id", "title", "estimated_seconds", "type", "question"],
+      "title": "CheckpointSegment",
+      "type": "object"
+    },
+    "ChoiceItem": {
+      "additionalProperties": false,
+      "description": "Choose one. ``prediction`` is the same shape, asked before the lesson shows the answer.",
+      "properties": {
+        "concept_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Concept Id",
+          "type": "string"
+        },
+        "correct_option": {
+          "pattern": "^[a-z][a-z0-9_]{0,15}$",
+          "title": "Correct Option",
+          "type": "string"
+        },
+        "difficulty": {
+          "default": 2,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "explanation": {
+          "maxLength": 1400,
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        },
+        "form": { "enum": ["multiple_choice", "prediction"], "title": "Form", "type": "string" },
+        "hint": {
+          "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Hint"
+        },
+        "id": { "pattern": "^q_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "is_transfer": { "default": false, "title": "Is Transfer", "type": "boolean" },
+        "objective_id": {
+          "anyOf": [
+            { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Objective Id"
+        },
+        "options": {
+          "items": { "$ref": "#/$defs/Option" },
+          "maxItems": 5,
+          "minItems": 2,
+          "title": "Options",
+          "type": "array"
+        },
+        "stem": { "maxLength": 600, "minLength": 1, "title": "Stem", "type": "string" }
+      },
+      "required": ["id", "concept_id", "stem", "explanation", "form", "options", "correct_option"],
+      "title": "ChoiceItem",
+      "type": "object"
+    },
+    "ExplanationItem": {
+      "additionalProperties": false,
+      "description": "Explain in your own words. Judged against a rubric, never by exact wording.",
+      "properties": {
+        "concept_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Concept Id",
+          "type": "string"
+        },
+        "difficulty": {
+          "default": 2,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "explanation": {
+          "maxLength": 1400,
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        },
+        "form": { "const": "explanation", "title": "Form", "type": "string" },
+        "hint": {
+          "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Hint"
+        },
+        "id": { "pattern": "^q_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "is_transfer": { "default": false, "title": "Is Transfer", "type": "boolean" },
+        "objective_id": {
+          "anyOf": [
+            { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Objective Id"
+        },
+        "required_points": {
+          "default": 1,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Required Points",
+          "type": "integer"
+        },
+        "rubric": {
+          "items": { "$ref": "#/$defs/RubricPoint" },
+          "maxItems": 5,
+          "minItems": 1,
+          "title": "Rubric",
+          "type": "array"
+        },
+        "sample_answer": {
+          "maxLength": 1400,
+          "minLength": 1,
+          "title": "Sample Answer",
+          "type": "string"
+        },
+        "stem": { "maxLength": 600, "minLength": 1, "title": "Stem", "type": "string" }
+      },
+      "required": ["id", "concept_id", "stem", "explanation", "form", "rubric", "sample_answer"],
+      "title": "ExplanationItem",
+      "type": "object"
+    },
+    "ExplanationSegment": {
+      "additionalProperties": false,
+      "description": "Narration with key points on the board, and optionally a scene beside it.",
+      "properties": {
+        "estimated_seconds": {
+          "maximum": 900,
+          "minimum": 5,
+          "title": "Estimated Seconds",
+          "type": "integer"
+        },
+        "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "narration": {
+          "items": { "$ref": "#/$defs/Beat" },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Narration",
+          "type": "array"
+        },
+        "scene": { "anyOf": [{ "$ref": "#/$defs/SceneRef" }, { "type": "null" }], "default": null },
+        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+        "type": { "const": "explanation", "title": "Type", "type": "string" }
+      },
+      "required": ["id", "title", "estimated_seconds", "narration", "type"],
+      "title": "ExplanationSegment",
+      "type": "object"
+    },
+    "InteractionSegment": {
+      "additionalProperties": false,
+      "description": "A scene the learner manipulates. Understandable without touching it.",
+      "properties": {
+        "estimated_seconds": {
+          "maximum": 900,
+          "minimum": 5,
+          "title": "Estimated Seconds",
+          "type": "integer"
+        },
+        "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "narration": {
+          "items": { "$ref": "#/$defs/Beat" },
+          "maxItems": 12,
+          "title": "Narration",
+          "type": "array"
+        },
+        "prompt": { "maxLength": 600, "minLength": 1, "title": "Prompt", "type": "string" },
+        "scene": { "$ref": "#/$defs/SceneRef" },
+        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+        "type": { "const": "interaction", "title": "Type", "type": "string" }
+      },
+      "required": ["id", "title", "estimated_seconds", "type", "scene", "prompt"],
+      "title": "InteractionSegment",
+      "type": "object"
+    },
+    "Lesson": {
+      "additionalProperties": false,
+      "properties": {
+        "concept_ids": {
+          "items": { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "course_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Course Id",
+          "type": "string"
+        },
+        "estimated_minutes": {
+          "maximum": 60,
+          "minimum": 1,
+          "title": "Estimated Minutes",
+          "type": "integer"
+        },
+        "grounding": {
+          "enum": ["materials", "general_knowledge", "sample"],
+          "title": "Grounding",
+          "type": "string"
+        },
+        "lesson_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Lesson Id",
+          "type": "string"
+        },
+        "objectives": {
+          "items": { "$ref": "#/$defs/LessonObjective" },
+          "maxItems": 6,
+          "minItems": 1,
+          "title": "Objectives",
+          "type": "array"
+        },
+        "schema_version": { "const": "1.0", "title": "Schema Version", "type": "string" },
+        "segments": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "checkpoint": "#/$defs/CheckpointSegment",
+                "explanation": "#/$defs/ExplanationSegment",
+                "interaction": "#/$defs/InteractionSegment",
+                "reflection": "#/$defs/ReflectionSegment",
+                "summary": "#/$defs/SummarySegment",
+                "visualization": "#/$defs/VisualizationSegment",
+                "worked_example": "#/$defs/WorkedExampleSegment"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              { "$ref": "#/$defs/ExplanationSegment" },
+              { "$ref": "#/$defs/VisualizationSegment" },
+              { "$ref": "#/$defs/InteractionSegment" },
+              { "$ref": "#/$defs/CheckpointSegment" },
+              { "$ref": "#/$defs/WorkedExampleSegment" },
+              { "$ref": "#/$defs/ReflectionSegment" },
+              { "$ref": "#/$defs/SummarySegment" }
+            ]
+          },
+          "maxItems": 14,
+          "minItems": 1,
+          "title": "Segments",
+          "type": "array"
+        },
+        "source_refs": {
+          "items": { "$ref": "#/$defs/SourceCitation" },
+          "maxItems": 12,
+          "title": "Source Refs",
+          "type": "array"
+        },
+        "strategy": {
+          "enum": [
+            "visual",
+            "worked_example",
+            "analogy",
+            "mathematical",
+            "socratic",
+            "computational"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" }
+      },
+      "required": [
+        "schema_version",
+        "lesson_id",
+        "course_id",
+        "title",
+        "concept_ids",
+        "objectives",
+        "grounding",
+        "strategy",
+        "estimated_minutes",
+        "segments"
+      ],
+      "title": "Lesson",
+      "type": "object"
+    },
+    "LessonObjective": {
+      "additionalProperties": false,
+      "properties": {
+        "objective_id": {
+          "anyOf": [
+            { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Objective Id"
+        },
+        "statement": { "maxLength": 600, "minLength": 1, "title": "Statement", "type": "string" }
+      },
+      "required": ["statement"],
+      "title": "LessonObjective",
+      "type": "object"
+    },
+    "NumericItem": {
+      "additionalProperties": false,
+      "properties": {
+        "concept_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Concept Id",
+          "type": "string"
+        },
+        "difficulty": {
+          "default": 2,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "expected": { "title": "Expected", "type": "number" },
+        "explanation": {
+          "maxLength": 1400,
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        },
+        "form": { "const": "numeric", "title": "Form", "type": "string" },
+        "hint": {
+          "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Hint"
+        },
+        "id": { "pattern": "^q_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "is_transfer": { "default": false, "title": "Is Transfer", "type": "boolean" },
+        "objective_id": {
+          "anyOf": [
+            { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Objective Id"
+        },
+        "stem": { "maxLength": 600, "minLength": 1, "title": "Stem", "type": "string" },
+        "tolerance": { "default": 0, "minimum": 0, "title": "Tolerance", "type": "number" },
+        "unit": {
+          "anyOf": [{ "maxLength": 20, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Unit"
+        }
+      },
+      "required": ["id", "concept_id", "stem", "explanation", "form", "expected"],
+      "title": "NumericItem",
+      "type": "object"
+    },
+    "Option": {
+      "additionalProperties": false,
+      "properties": {
+        "feedback": {
+          "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Feedback"
+        },
+        "id": { "pattern": "^[a-z][a-z0-9_]{0,15}$", "title": "Id", "type": "string" },
+        "misconception": {
+          "anyOf": [
+            {
+              "enum": [
+                "prerequisite_gap",
+                "definition_confusion",
+                "notation_confusion",
+                "procedure_order",
+                "causal_confusion",
+                "arithmetic_slip",
+                "misread_question",
+                "overgeneralization"
+              ],
+              "type": "string"
+            },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Misconception"
+        },
+        "text": { "maxLength": 200, "minLength": 1, "title": "Text", "type": "string" }
+      },
+      "required": ["id", "text"],
+      "title": "Option",
+      "type": "object"
+    },
+    "OrderingItem": {
+      "additionalProperties": false,
+      "description": "Put the items in order. They are listed here in the correct order.",
+      "properties": {
+        "concept_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Concept Id",
+          "type": "string"
+        },
+        "difficulty": {
+          "default": 2,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "explanation": {
+          "maxLength": 1400,
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        },
+        "form": { "const": "ordering", "title": "Form", "type": "string" },
+        "hint": {
+          "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Hint"
+        },
+        "id": { "pattern": "^q_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "is_transfer": { "default": false, "title": "Is Transfer", "type": "boolean" },
+        "items": {
+          "items": { "$ref": "#/$defs/Option" },
+          "maxItems": 6,
+          "minItems": 3,
+          "title": "Items",
+          "type": "array"
+        },
+        "objective_id": {
+          "anyOf": [
+            { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Objective Id"
+        },
+        "stem": { "maxLength": 600, "minLength": 1, "title": "Stem", "type": "string" }
+      },
+      "required": ["id", "concept_id", "stem", "explanation", "form", "items"],
+      "title": "OrderingItem",
+      "type": "object"
+    },
+    "ReflectionSegment": {
+      "additionalProperties": false,
+      "description": "A question to think about. Not scored; the learner may write a note or move on.",
+      "properties": {
+        "estimated_seconds": {
+          "maximum": 900,
+          "minimum": 5,
+          "title": "Estimated Seconds",
+          "type": "integer"
+        },
+        "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "narration": {
+          "items": { "$ref": "#/$defs/Beat" },
+          "maxItems": 12,
+          "title": "Narration",
+          "type": "array"
+        },
+        "prompt": { "maxLength": 600, "minLength": 1, "title": "Prompt", "type": "string" },
+        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+        "type": { "const": "reflection", "title": "Type", "type": "string" }
+      },
+      "required": ["id", "title", "estimated_seconds", "type", "prompt"],
+      "title": "ReflectionSegment",
+      "type": "object"
+    },
+    "RubricPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": { "pattern": "^[a-z][a-z0-9_]{0,15}$", "title": "Id", "type": "string" },
+        "text": { "maxLength": 600, "minLength": 1, "title": "Text", "type": "string" }
+      },
+      "required": ["id", "text"],
+      "title": "RubricPoint",
+      "type": "object"
+    },
+    "SceneArtifact": {
+      "additionalProperties": false,
+      "description": "One complete Wanim scene file, with what the static policy found in it.",
+      "properties": {
+        "content_hash": { "pattern": "^[0-9a-f]{64}$", "title": "Content Hash", "type": "string" },
+        "controls": {
+          "items": { "pattern": "^[a-z][a-z0-9_]{0,31}$", "type": "string" },
+          "maxItems": 16,
+          "title": "Controls",
+          "type": "array"
+        },
+        "events": {
+          "items": { "enum": ["passed", "explored", "progress"], "type": "string" },
+          "maxItems": 3,
+          "title": "Events",
+          "type": "array"
+        },
+        "id": { "pattern": "^scn_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "interactive": { "title": "Interactive", "type": "boolean" },
+        "purpose": { "maxLength": 600, "minLength": 1, "title": "Purpose", "type": "string" },
+        "scene_class": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "title": "Scene Class",
+          "type": "string"
+        },
+        "source": { "maxLength": 40000, "minLength": 1, "title": "Source", "type": "string" },
+        "wanim_version": {
+          "maxLength": 20,
+          "minLength": 1,
+          "title": "Wanim Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "purpose",
+        "source",
+        "content_hash",
+        "wanim_version",
+        "scene_class",
+        "interactive"
+      ],
+      "title": "SceneArtifact",
+      "type": "object"
+    },
+    "SceneRef": {
+      "additionalProperties": false,
+      "properties": {
+        "fallback_text": {
+          "maxLength": 1400,
+          "minLength": 1,
+          "title": "Fallback Text",
+          "type": "string"
+        },
+        "scene_id": { "pattern": "^scn_[a-z0-9_]{1,40}$", "title": "Scene Id", "type": "string" }
+      },
+      "required": ["scene_id", "fallback_text"],
+      "title": "SceneRef",
+      "type": "object"
+    },
+    "ShortAnswerItem": {
+      "additionalProperties": false,
+      "description": "A word or short phrase, matched against accepted answers after normalising.",
+      "properties": {
+        "accepted": {
+          "items": { "maxLength": 200, "minLength": 1, "type": "string" },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Accepted",
+          "type": "array"
+        },
+        "concept_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Concept Id",
+          "type": "string"
+        },
+        "difficulty": {
+          "default": 2,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "explanation": {
+          "maxLength": 1400,
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        },
+        "form": { "const": "short_answer", "title": "Form", "type": "string" },
+        "hint": {
+          "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Hint"
+        },
+        "id": { "pattern": "^q_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "is_transfer": { "default": false, "title": "Is Transfer", "type": "boolean" },
+        "objective_id": {
+          "anyOf": [
+            { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Objective Id"
+        },
+        "stem": { "maxLength": 600, "minLength": 1, "title": "Stem", "type": "string" }
+      },
+      "required": ["id", "concept_id", "stem", "explanation", "form", "accepted"],
+      "title": "ShortAnswerItem",
+      "type": "object"
+    },
+    "SourceCitation": {
+      "additionalProperties": false,
+      "description": "A place in the learner's materials that the lesson draws on.",
+      "properties": {
+        "locator": { "maxLength": 200, "minLength": 1, "title": "Locator", "type": "string" },
+        "section_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Section Id",
+          "type": "string"
+        },
+        "source_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "source_name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Source Name",
+          "type": "string"
+        }
+      },
+      "required": ["source_id", "section_id", "source_name", "locator"],
+      "title": "SourceCitation",
+      "type": "object"
+    },
+    "SummarySegment": {
+      "additionalProperties": false,
+      "properties": {
+        "estimated_seconds": {
+          "maximum": 900,
+          "minimum": 5,
+          "title": "Estimated Seconds",
+          "type": "integer"
+        },
+        "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "narration": {
+          "items": { "$ref": "#/$defs/Beat" },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Narration",
+          "type": "array"
+        },
+        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+        "type": { "const": "summary", "title": "Type", "type": "string" }
+      },
+      "required": ["id", "title", "estimated_seconds", "narration", "type"],
+      "title": "SummarySegment",
+      "type": "object"
+    },
+    "TrueFalseItem": {
+      "additionalProperties": false,
+      "properties": {
+        "concept_id": {
+          "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$",
+          "title": "Concept Id",
+          "type": "string"
+        },
+        "correct": { "title": "Correct", "type": "boolean" },
+        "difficulty": {
+          "default": 2,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "explanation": {
+          "maxLength": 1400,
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        },
+        "form": { "const": "true_false", "title": "Form", "type": "string" },
+        "hint": {
+          "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Hint"
+        },
+        "id": { "pattern": "^q_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "is_transfer": { "default": false, "title": "Is Transfer", "type": "boolean" },
+        "objective_id": {
+          "anyOf": [
+            { "pattern": "^[a-z]{2,5}_[0-9a-f]{20}$", "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Objective Id"
+        },
+        "stem": { "maxLength": 600, "minLength": 1, "title": "Stem", "type": "string" }
+      },
+      "required": ["id", "concept_id", "stem", "explanation", "form", "correct"],
+      "title": "TrueFalseItem",
+      "type": "object"
+    },
+    "VisualizationSegment": {
+      "additionalProperties": false,
+      "description": "An animation, narrated.",
+      "properties": {
+        "estimated_seconds": {
+          "maximum": 900,
+          "minimum": 5,
+          "title": "Estimated Seconds",
+          "type": "integer"
+        },
+        "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "narration": {
+          "items": { "$ref": "#/$defs/Beat" },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Narration",
+          "type": "array"
+        },
+        "scene": { "$ref": "#/$defs/SceneRef" },
+        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+        "type": { "const": "visualization", "title": "Type", "type": "string" }
+      },
+      "required": ["id", "title", "estimated_seconds", "narration", "type", "scene"],
+      "title": "VisualizationSegment",
+      "type": "object"
+    },
+    "WorkedExampleSegment": {
+      "additionalProperties": false,
+      "description": "A problem solved step by step: each beat says a step and shows it.",
+      "properties": {
+        "estimated_seconds": {
+          "maximum": 900,
+          "minimum": 5,
+          "title": "Estimated Seconds",
+          "type": "integer"
+        },
+        "id": { "pattern": "^seg_[a-z0-9_]{1,40}$", "title": "Id", "type": "string" },
+        "narration": {
+          "items": { "$ref": "#/$defs/Beat" },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Narration",
+          "type": "array"
+        },
+        "problem": { "maxLength": 600, "minLength": 1, "title": "Problem", "type": "string" },
+        "scene": { "anyOf": [{ "$ref": "#/$defs/SceneRef" }, { "type": "null" }], "default": null },
+        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+        "type": { "const": "worked_example", "title": "Type", "type": "string" }
+      },
+      "required": ["id", "title", "estimated_seconds", "narration", "type", "problem"],
+      "title": "WorkedExampleSegment",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A lesson and the scenes it plays: what is stored and what the player loads.",
+  "properties": {
+    "lesson": { "$ref": "#/$defs/Lesson" },
+    "scenes": {
+      "items": { "$ref": "#/$defs/SceneArtifact" },
+      "maxItems": 14,
+      "title": "Scenes",
+      "type": "array"
+    }
+  },
+  "required": ["lesson"],
+  "title": "Adle Lesson IR 1.0",
+  "type": "object"
+}

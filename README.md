@@ -26,6 +26,11 @@ understanding with short questions, and adapts the next step to what you have ac
   headings of your materials. Give each one learning objectives, say what it needs first, and
   see the result as a list or a map. Adle keeps the order learnable and explains when it cannot
   do what you asked.
+- **A sample course** you can add from the library with one click, without an AI key.
+- **Lessons:** captions at your reading pace, a board that fills in as the lesson goes, live
+  pictures you can pause, replay, try out, or read as a description, and questions that are
+  explained whichever way you answer. A lesson remembers where you stopped, and tells you in
+  words what your answers showed.
 - **Settings → Learning:** pace, explanation depth, narration, captions, and your goal.
 - **Settings → AI provider:** save or remove an AIHubMix key. It is encrypted by your operating
   system and never shown again.

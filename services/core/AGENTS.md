@@ -29,12 +29,15 @@ adle_core/
   application/    service container; courses, sources, jobs, curriculum, learner, retrieval
   curriculum/     PURE rules: concept graph (loops, order, layers), outline from headings
   learner_model/  PURE rules: knowledge tracing, mastery states, review schedule, preferences
+  lessons/        PURE: the Lesson IR, the validating gateway (bundle.py), the player view
+  evaluation/     PURE: deterministic scoring of answers
+  sample_course/  package data: course outline, lesson templates, scene files
   domain/         pure models shared across areas (empty so far)
   infrastructure/ database, ORM models, migrate (with backup), asset store, ids
   migrations/     Alembic revisions (shipped inside the package)
   ingestion/      type detection, parsers, chunking, the parser worker process
   generation/     provider credentials, scene policy (model client, quota: M5)
-  orchestration/ evaluation/ audio/   (M5–M6)
+  orchestration/ audio/   (M5–M6)
   tools/          developer entry points (contract export)
 tests/unit/        fast, isolated
 tests/integration/ real process, real database, fake provider
@@ -76,6 +79,19 @@ everything and decides nothing.
 - **Learner knowledge** changes only through `LearnerService.record`. `learner_observations` is
   append-only and is the source of truth; `learner_concept_states` is derived and rebuildable.
   Never update a state row by hand.
+- **A lesson is stored only through `lessons.bundle.parse_bundle`**, then
+  `LessonService.store`. Never build a `LessonBundle` from input by hand, and never trust what
+  input says about a scene: `inspect_scene` computes it. `LessonService.get` re-checks scenes
+  on every read and withholds what fails (ADR-010).
+- **Answer keys do not leave the core.** `lessons.get` returns `player_view(lesson)`. A new
+  field on a question must be added to `lessons/player.py` deliberately; `test_lesson_ir.py`
+  fails if a key leaks into the player view.
+- **An answer is recorded once, whole:** the attempt and its observation in one transaction
+  (`AssessmentService.answer`). Scoring is deterministic; anything a model helps judge (M6) is
+  bounded by a rubric and marked as such.
+- **Sample content** is addressed by key in templates (`@concept:weighted_sum`) and installed
+  through the ordinary services. Scene files there are excluded from ruff and mypy: they are
+  Wanim scenes, not service code.
 - **No score leaves the core.** `api/schemas.py` must not expose the tracing estimate or anything
   that reads like a percentage. The interface gets a state, a label, and what is missing.
 - **Text shown to the learner about their knowledge** is written in `learner_model/tracing.py`

@@ -14,6 +14,8 @@ export default defineConfig({
     target: 'chrome156',
     sourcemap: false,
     modulePreload: { polyfill: false },
+    // Assets are files on the frame's own origin, never data: URIs (see the frame's CSP).
+    assetsInlineLimit: 0,
     // Wanim (1.5 MB) and its MathJax chunk (2.1 MB) are large by nature; they load from disk.
     chunkSizeWarningLimit: 4096,
   },

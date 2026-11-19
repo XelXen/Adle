@@ -16,5 +16,8 @@ export default defineConfig({
     target: 'chrome156',
     sourcemap: true,
     modulePreload: { polyfill: false },
+    // Every asset is a file served from adle://app. Vite would otherwise inline small ones
+    // (some KaTeX fonts) as data: URIs, which the Content Security Policy rightly refuses.
+    assetsInlineLimit: 0,
   },
 });

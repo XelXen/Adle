@@ -49,6 +49,10 @@ Tests sit beside the code as `*.test.ts(x)`.
 | Main: local state | `apps/desktop/electron/main/local-state.test.ts` | Key validation, encrypted store, Linux fallback refusal, UI state, launch spec |
 | Main: imports | `apps/desktop/electron/main/imports.test.ts` | Course id shape; import paths must be absolute, bounded, NUL-free; no echo of submitted paths |
 | Curriculum screen logic | `apps/desktop/renderer/src/screens/course/curriculum-model.test.ts` | Path order; which neighbour swaps prerequisites allow and the reason given; dependents; map layout (rows, wrapping, no overlap, links); grouped warnings |
+| Lesson playback | `apps/desktop/renderer/src/lesson/controller.test.ts` | Nothing plays unasked; beats in turn; pause and resume through the narrator; late callbacks ignored; a question blocks once and only once; jumping only to reached parts; resume and review; finishing; the silent narrator's clock |
+| Scene cues | `apps/desktop/renderer/src/lesson/scene-cues.test.ts` | A cue is kept until its segment's scene is holding, delivered once, never to another segment, and not kept for a later visit |
+| Answers | `apps/desktop/renderer/src/lesson/answers.test.ts` | Reading a typed number (decimal comma, fractions, typographic minus) without guessing; the request built for each question form; what is still missing |
+| Mathematics | `apps/desktop/renderer/src/components/MathText.test.tsx` | Splitting text and `$…$`; KaTeX output with MathML; text that does not parse is shown as written |
 | Main: core | `apps/desktop/electron/main/core/core.test.ts` | Supervisor against a fake child (ready, fatal, timeout, crash, stubborn, token delivery); HTTP client mapping |
 
 jsdom has no modal `<dialog>` or `matchMedia`; `vitest.setup.ts` supplies minimal stand-ins. The
@@ -74,6 +78,10 @@ Strict mode: warnings are errors.
 | `tests/unit/test_learner_preferences.py` | Defaults, round trip, tolerant loading |
 | `tests/unit/test_curriculum_api.py` | Concepts, objectives with stable ids, order, prerequisites with reasons, loop and cross-course refusal, deletion, outline from headings, links to materials, related passages, retrieval queries and spreading across sources |
 | `tests/unit/test_learner_api.py` | Preferences kept across a restart; self-rating as a claim; states with reasons; **no score in any response**; the derived state rebuilt from the record |
+| `tests/unit/test_lesson_ir.py` | Every segment and question form; unknown fields, links, markup, paths, and control characters refused; bounds; references inside a lesson; a text alternative for every scene; the player view contains no answer key (checked field by field and by searching the output); stable shuffling |
+| `tests/unit/test_lessons_api.py` | The sample course installs complete, once, or not at all; a lesson served for the player; progress and sticky completion; every reference must belong to the course, including citations; an outdated lesson is reported, listed, and removable; **stored scenes are described again from their source and withheld if they may not run**; cascading deletes |
+| `tests/unit/test_scoring.py` | Each question form, tolerance and floating-point noise, sign slips, normalised short answers, partial credit for ordering, self-assessed explanations, malformed responses |
+| `tests/unit/test_answers_api.py` | Outcome, feedback, explanation, and what changed for right, wrong, hinted, unsure, repeated, and skipped answers; the attempt and the evidence are stored together; no blame and no score in any text |
 | `tests/integration/test_process_lifecycle.py` | Real child process: handshake, loopback, shutdown on stdin EOF, bad handshakes, token not in argv or stderr |
 | `tests/integration/test_isolated_extraction.py` | Parsing in a real child process; a parse past its time limit is killed; **regression: an import inside the real service process** (ADR-007) |
 
@@ -95,6 +103,7 @@ dialog, run axe, save a screenshot.
 | `security.spec.ts` | Renderer globals and exact bridge surface; no network/popups/navigation; inline script refused; internal operations refused; hostile scene contained; player has no bridge |
 | `course-materials.spec.ts` | Create a course; import by file dialog and by drop; extraction status, warnings, and rejections; search with file and page or section; persistence across a restart; remove a source; delete a course; duplicates; keyboard-only creation; a course that no longer exists |
 | `curriculum.spec.ts` | Draft from the headings of imported materials; edit objectives; add a concept; prerequisites with a reason; a loop cannot be made; reorder with an explanation when a prerequisite forbids it; self-rating shown as a claim; link and unlink a passage; list and map views; restart in the other theme; remove a concept; a topic course built with the keyboard alone; axe on each view |
+| `lesson.spec.ts` | Add the sample course; a whole lesson: start, pause, resume, a narrated scene and its description in words, an interaction driven from the keyboard, wrong, hinted, and skipped answers, typeset mathematics, a part that ends by itself, the finish panel, the record in the course, review with every part open; resume at the saved part with the scene held until Start; **a scene that breaks while playing and a scene the core withholds** both fall back to words while the lesson goes on; axe on each state |
 | `learning-preferences.spec.ts` | Pace, explanation depth, narration, captions, and goal: changed by mouse and keyboard, remembered across a restart |
 | `appearance-a11y.spec.ts` | Theme through the real mechanism and persisted; **axe (WCAG 2.2 AA) on every screen in both themes**; minimum window size; 200% text; reduced motion |
 
@@ -113,10 +122,15 @@ the window themselves.
 |---|---|
 | `skills/wanim-scene-authoring/examples/` | Known-good scenes; run by E2E and checked by the scene policy tests |
 | `apps/desktop/e2e/fixtures/scenes/` | Broken and hostile scenes (labelled; see its README) |
+| `services/core/adle_core/sample_course/` | The sample course itself: outline, lesson templates, scenes. Product content, validated by `test_lessons_api` and played by `e2e/lesson` |
 | `apps/desktop/electron/main/core/__fixtures__/fake-core.mjs` | Stand-in for the core's launch protocol |
 | `fixtures/sample-documents/` | Real PDF (printed by Chromium), Word, Markdown, and text files, plus encrypted, scanned, damaged, mislabelled, and empty ones. Its README says how each is built. |
 
 No test calls the real AI provider. The fake provider server arrives with the client (M5).
+
+`e2e/lesson.spec.ts` edits the profile's database between two launches (with Node's built-in
+`node:sqlite`) to put a broken scene into a stored lesson. That is the honest way to reach the
+state "a stored scene no longer works": there is deliberately no test hook in the app for it.
 
 ## Current results
 

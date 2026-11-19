@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Concept, Curriculum } from '@adle/contracts';
+import type { Concept, Curriculum, LessonSummary } from '@adle/contracts';
 
 import {
   checkMove,
   dependentsOf,
+  describeLesson,
   describeLocation,
   directDependents,
   layoutMap,
   learningPath,
+  lessonAction,
+  lessonsByConcept,
   MAP_NODE,
   movedOrder,
   summariseIssues,
@@ -249,5 +252,62 @@ describe('summariseIssues', () => {
       ),
     ).toEqual(['cycle for weights', 'cycle for chain', 'no_objective for forward']);
     expect(summariseIssues([], COURSE.concepts)).toEqual([]);
+  });
+});
+
+describe('lessons of a concept', () => {
+  const lesson = (
+    id: string,
+    conceptId: string,
+    progress: Partial<LessonSummary['progress']> = {},
+  ): LessonSummary => ({
+    id,
+    course_id: 'crs_1',
+    concept_id: conceptId,
+    title: `Lesson ${id}`,
+    origin: 'sample',
+    estimated_minutes: 8,
+    segment_count: 10,
+    progress: { started: false, position: 0, completed: false, ...progress },
+  });
+
+  it('groups lessons by the concept they teach, keeping their order', () => {
+    const grouped = lessonsByConcept([
+      lesson('a', 'weights'),
+      lesson('b', 'chain'),
+      lesson('c', 'weights'),
+    ]);
+    expect(grouped.get('weights')?.map((item) => item.id)).toEqual(['a', 'c']);
+    expect(grouped.get('chain')?.map((item) => item.id)).toEqual(['b']);
+    expect(grouped.get('forward')).toBeUndefined();
+  });
+
+  it('names the button after what opening the lesson will do', () => {
+    expect(lessonAction(lesson('a', 'weights').progress)).toBe('Start lesson');
+    expect(lessonAction(lesson('a', 'weights', { started: true, position: 3 }).progress)).toBe(
+      'Continue',
+    );
+    expect(
+      lessonAction(
+        lesson('a', 'weights', { started: true, position: 9, completed: true }).progress,
+      ),
+    ).toBe('Go through it again');
+  });
+
+  it('says how long a lesson takes and how far the learner has got', () => {
+    expect(describeLesson(lesson('a', 'weights'))).toBe('About 8 minutes · Not started');
+    expect(describeLesson(lesson('a', 'weights', { started: true, position: 3 }))).toBe(
+      'About 8 minutes · Part 4 of 10',
+    );
+    // A position past the end (a lesson that was shortened) never reads "Part 12 of 10".
+    expect(describeLesson(lesson('a', 'weights', { started: true, position: 11 }))).toBe(
+      'About 8 minutes · Part 10 of 10',
+    );
+    expect(
+      describeLesson({
+        ...lesson('a', 'weights', { started: true, position: 9, completed: true }),
+        estimated_minutes: 1,
+      }),
+    ).toBe('About 1 minute · Completed');
   });
 });

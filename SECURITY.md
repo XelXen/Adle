@@ -86,7 +86,9 @@ material. The full reasoning is in `docs/decisions/ADR-004-scene-isolation.md`.
 **Layers, outermost first**
 
 1. **Static policy** (`services/core/adle_core/generation/scene_policy.py`). Before a scene is
-   stored: valid Python only, imports limited to `manim`/`numpy`/`math`/`random`/`itertools`, every
+   stored, **and again every time a lesson is opened** (a database can be restored from a file
+   made elsewhere; a scene that no longer passes is withheld and its text description is shown):
+   valid Python only, imports limited to `manim`/`numpy`/`math`/`random`/`itertools`, every
    name resolved against the file's own definitions, a small builtin allowlist, and the manim API
    of the pinned Wanim build; JavaScript and DOM escape attributes refused; closed event
    vocabulary. *Defence in depth, not a sandbox.* (`tests/unit/test_scene_policy.py`)
@@ -142,6 +144,22 @@ Document content is data. Nothing in a file is executed, followed, or treated as
   it has no channel to the renderer or the provider key (the key is not in its memory, its
   arguments, or its environment).
 - A file within the limits can still be slow to parse; the time limit (120 s) bounds it.
+
+## Lessons and answers
+
+Details and reasoning: `docs/decisions/ADR-010-lesson-ir-and-playback.md`.
+
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| A lesson reaches the database only in a validated form | `lessons.bundle.parse_bundle`: strict models, unknown fields refused, every scene through the static policy, descriptions of scenes computed from their source | `test_lesson_ir.py`, `test_lessons_api.py` |
+| Lesson text cannot carry links, markup, paths, or control characters | Text validators in `lessons/ir.py` | `test_lesson_ir.py` |
+| A lesson cannot cite something that is not in the learner's materials | `LessonService.store` resolves every cited section inside the course | `test_lessons_api.py` |
+| The renderer never holds an answer key | `lessons.get` returns the player view; scoring happens in the core | `test_lesson_ir.py` (field by field, and by searching the output); `test_answers_api.py` |
+| A stored scene is not trusted because it is stored | `LessonService.get` re-runs the policy and withholds what fails | `test_lessons_api.py`; `e2e/lesson.spec.ts` |
+| Mathematics is rendered without HTML strings | `MathText`: `katex.render` into DOM nodes, `trust` off, bounded expansion | `MathText.test.tsx`; the app CSP has no `unsafe-inline` |
+| No asset is loaded from a `data:` URI | Builds set `assetsInlineLimit: 0`; the CSP refuses `data:` fonts | `e2e/lesson.spec.ts` (no console errors while mathematics is on screen) |
+
+A learner's answers and written explanations stay in the local database. They are not logged.
 
 ## Model output
 

@@ -138,6 +138,36 @@ flowchart LR
   now*) is computed from them, with a sentence for each change. The numeric estimate behind it
   never leaves the core. See ADR-009.
 
+## Taking a lesson
+
+```mermaid
+sequenceDiagram
+  participant UI as Renderer (LessonScreen)
+  participant C as Core
+  participant P as Player frame
+  UI->>C: lessons.get
+  Note over C: lesson through the IR again,<br/>each scene through the policy again
+  C-->>UI: player view (no answer keys) + scenes that may run
+  UI->>P: load scene (held on its first frame)
+  Note over UI: learner presses Start
+  UI->>UI: narrator speaks beat 1 … n (the narrator is the clock)
+  UI->>P: play / pause with the narration, "next" on a cue
+  P-->>UI: explored / passed (weak evidence only)
+  UI->>C: lessons.answer (question id + response)
+  Note over C: score, store attempt + observation,<br/>fold into the knowledge state
+  C-->>UI: outcome, feedback, explanation, what changed
+  UI->>C: lessons.save_progress (at each part)
+```
+
+- The **Lesson IR** (`adle_core/lessons/ir.py`) is the one definition of a lesson. Whatever wrote
+  it, a lesson is stored only through `parse_bundle`.
+- The renderer's `LessonController` decides what is on screen; it takes its timing from a
+  `Narrator`. Today that is silent captions at reading pace; speech arrives in M5 behind the
+  same interface.
+- If a scene fails in the player, or the core withholds it, the part shows its description in
+  words and the lesson continues.
+- Answers are judged in the core. See ADR-010.
+
 ## Data on disk
 
 Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS default):
@@ -146,7 +176,7 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 |---|---|---|
 | `ui-state.json` | Main | Theme and whether the welcome was seen |
 | `credentials.bin` | Main | The provider key, encrypted by the OS |
-| `data/adle.db` (+ `-wal`, `-shm`) | Core | Courses, sources, sections, chunks, jobs, settings, curriculum, learner preferences, observations, and derived states |
+| `data/adle.db` (+ `-wal`, `-shm`) | Core | Courses, sources, sections, chunks, jobs, settings, curriculum, learner preferences, observations, derived states, lessons with their scenes, lesson progress, and answers |
 | `data/sources/<source id>.<ext>` | Core | A copy of each imported original, named by its generated id |
 | `data/assets/` | Core | Reserved for generated lesson assets (M5) |
 | `data/backups/` | Core | Automatic database copies made before a migration (five kept) |
@@ -159,15 +189,18 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 | `apps/desktop/electron/main` | App lifecycle, protocol, session hardening, core supervision, IPC handlers, key and UI-state storage |
 | `apps/desktop/electron/preload` | The `window.adle` bridge: fixed channels only |
 | `apps/desktop/electron/shared` | The IPC contract (channel names and types) |
-| `apps/desktop/renderer` | React app: router, screens, core client, `ScenePlayer` |
+| `apps/desktop/renderer` | React app: router, screens, core client, `ScenePlayer`, `MathText`; `src/lesson` holds lesson playback (controller, narrators, scene cues, answers) |
 | `apps/desktop/player/frame` | Code that runs inside the sandboxed frame: frame clock, scene run, control mirroring |
 | `apps/desktop/player/host` | `WanimPlayerAdapter`: the only thing the app knows about the player |
 | `apps/desktop/e2e` | Playwright tests against the built app |
 | `packages/design-system` | Sprout tokens and components |
 | `packages/event-protocol` | Host ↔ player message types, validators, and origin helpers |
-| `packages/contracts` | Generated API types and operation table |
+| `packages/contracts` | Generated API types and operation table; the Lesson IR as JSON Schema |
 | `services/core/adle_core/api` | FastAPI app, auth, error contract, routes |
-| `services/core/adle_core/application` | The service container; courses, sources (import and search), background jobs, curriculum, learner, retrieval |
+| `services/core/adle_core/application` | The service container; courses, sources (import and search), background jobs, curriculum, learner, retrieval, lessons, assessment, the sample-course installer |
+| `services/core/adle_core/lessons` | The Lesson IR, the validating gateway for lesson bundles, and the answer-free view for the player |
+| `services/core/adle_core/evaluation` | Deterministic scoring of answers |
+| `services/core/adle_core/sample_course` | The sample course: outline, lesson templates, scene files (package data) |
 | `services/core/adle_core/curriculum` | Pure rules for the concept graph and for drafting an outline from headings |
 | `services/core/adle_core/learner_model` | Pure rules: knowledge tracing, mastery states, review scheduling, preferences |
 | `services/core/adle_core/infrastructure` | SQLite engine, ORM models, migrations with backup, asset store |

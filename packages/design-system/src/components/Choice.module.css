@@ -138,6 +138,114 @@
   color: var(--ad-color-muted);
 }
 
+/* ---- Radio group -------------------------------------------------------- */
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.radioLegend {
+  margin-bottom: var(--ad-space-2);
+  padding: 0;
+  font: var(--ad-text-body-strong);
+}
+
+.radioRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-3) var(--ad-space-4);
+  border: var(--ad-border-width) solid var(--ad-color-border-strong);
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-surface);
+  font: var(--ad-text-body);
+  cursor: pointer;
+  transition:
+    background-color var(--ad-duration-fast) var(--ad-ease-out),
+    border-color var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.radioRow:hover {
+  background: var(--ad-color-surface-subtle);
+}
+
+.radioRowSelected,
+.radioRowSelected:hover {
+  background: var(--ad-color-primary-soft);
+  border-color: var(--ad-color-primary-text);
+}
+
+.radioGroup:disabled .radioRow {
+  cursor: default;
+}
+
+.radioGroup:disabled .radioRow:not(.radioRowSelected) {
+  opacity: 0.6;
+}
+
+.radioGroup:disabled .radioRow:not(.radioRowSelected):hover {
+  background: var(--ad-color-surface);
+}
+
+/* A settled choice is shown, not offered: nothing is dimmed, and the chosen row is
+   marked without the tint that invites an action. */
+.radioGroupReadOnly:disabled .radioRow:not(.radioRowSelected) {
+  opacity: 1;
+}
+
+.radioGroupReadOnly .radioRowSelected,
+.radioGroupReadOnly .radioRowSelected:hover {
+  background: var(--ad-color-surface-subtle);
+  border-color: var(--ad-color-border-strong);
+}
+
+/* The row shows focus, so the ring surrounds the whole target, not just the dot. */
+.radioRow:has(.radio:focus-visible) {
+  outline: 2px solid var(--ad-color-focus);
+  outline-offset: 2px;
+}
+
+.radio {
+  appearance: none;
+  display: grid;
+  place-content: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0.125rem 0 0;
+  border: var(--ad-border-width) solid var(--ad-color-border-strong);
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-surface);
+  cursor: inherit;
+}
+
+.radio:focus-visible {
+  outline: none;
+}
+
+.radio::after {
+  content: '';
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-action);
+  transform: scale(0);
+  transition: transform var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.radio:checked {
+  border-color: var(--ad-color-action);
+}
+
+.radio:checked::after {
+  transform: scale(1);
+}
+
 /* ---- Segmented control -------------------------------------------------- */
 .segmented {
   display: inline-flex;

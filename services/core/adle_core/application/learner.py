@@ -183,9 +183,10 @@ class LearnerService:
         """Store one observation and the change it causes, in one transaction."""
         with self._database.session() as session:
             concept = get_concept_or_404(session, concept_id)
-            return self._record(session, concept, observation)
+            return self.record_in(session, concept, observation)
 
-    def _record(self, session: Session, concept: Concept, observation: Observation) -> Transition:
+    def record_in(self, session: Session, concept: Concept, observation: Observation) -> Transition:
+        """Record inside a transaction the caller owns, so more can be stored with it."""
         state = session.get(LearnerConceptState, concept.id)
         transition = apply(_to_knowledge(state, self._config), observation, self._config)
         session.add(
@@ -222,7 +223,7 @@ class LearnerService:
         """Record how well the learner says they already know a concept."""
         with self._database.session() as session:
             concept = get_concept_or_404(session, concept_id)
-            self._record(
+            self.record_in(
                 session,
                 concept,
                 Observation(

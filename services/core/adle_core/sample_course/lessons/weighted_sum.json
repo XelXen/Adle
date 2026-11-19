@@ -1,0 +1,276 @@
+{
+  "lesson": {
+    "schema_version": "1.0",
+    "lesson_id": "@lesson",
+    "course_id": "@course",
+    "title": "Weights and bias: how a neuron adds things up",
+    "concept_ids": ["@concept:weighted_sum"],
+    "objectives": [
+      {
+        "objective_id": "@objective:weighted_sum.compute",
+        "statement": "Compute a neuron's weighted sum, including the bias, by hand."
+      },
+      {
+        "objective_id": "@objective:weighted_sum.interpret",
+        "statement": "Say what a large, small, zero, or negative weight means for an input."
+      },
+      {
+        "objective_id": "@objective:weighted_sum.bias",
+        "statement": "Explain what the bias changes that the weights cannot."
+      }
+    ],
+    "source_refs": [],
+    "grounding": "sample",
+    "strategy": "visual",
+    "estimated_minutes": 8,
+    "segments": [
+      {
+        "id": "seg_why",
+        "type": "explanation",
+        "title": "Not every input counts the same",
+        "estimated_seconds": 40,
+        "narration": [
+          {
+            "text": "Suppose you are deciding whether to go for a run. You look at the weather, at how tired you are, and at whether a friend is coming along."
+          },
+          {
+            "text": "You do not count those equally. Heavy rain might settle it on its own. Being a little tired might hardly matter.",
+            "show": "Some inputs matter more than others."
+          },
+          {
+            "text": "An artificial neuron makes the same kind of judgement with numbers. It gives each input a weight, and the weight says how much that input counts.",
+            "show": "A weight says how much an input counts."
+          }
+        ]
+      },
+      {
+        "id": "seg_sum",
+        "type": "visualization",
+        "title": "The weighted sum",
+        "estimated_seconds": 35,
+        "narration": [
+          {
+            "text": "Here is a neuron with two inputs. Each input travels along its own connection, and each connection has its own weight."
+          },
+          {
+            "text": "The neuron multiplies every input by its weight and adds the results together. Then it adds one more number, called the bias."
+          },
+          {
+            "text": "The total is usually written as z. It is called the weighted sum.",
+            "show": "$z = w_1 x_1 + w_2 x_2 + b$"
+          }
+        ],
+        "scene": {
+          "scene_id": "scn_weighted_sum",
+          "fallback_text": "A diagram shows two inputs on the left, each joined by a line to one neuron on the right. Below it is the formula $z = w_1 x_1 + w_2 x_2 + b$: each input is multiplied by its weight, the results are added, and the bias $b$ is added at the end."
+        }
+      },
+      {
+        "id": "seg_try",
+        "type": "interaction",
+        "title": "Change a weight yourself",
+        "estimated_seconds": 90,
+        "prompt": "Drag the weight below zero and back. Then switch the bias on. What does each one do to the output?",
+        "narration": [
+          {
+            "text": "Now it is your turn. This neuron has a single input, fixed at one, so the output is simply the weight plus the bias."
+          },
+          {
+            "text": "Change the weight and watch the bar. A negative weight pushes the output below zero. Then switch the bias on, and notice that it shifts the output by the same amount wherever the weight is."
+          }
+        ],
+        "scene": {
+          "scene_id": "scn_neuron_weight",
+          "fallback_text": "A bar shows the output $z = w x + b$ with the input fixed at $x = 1$. A slider sets the weight $w$ between $-2$ and $2$: the bar grows as the weight grows, and drops below the baseline and changes colour when the weight is negative. A switch adds a bias of $0.5$, which raises the bar by the same amount for every weight."
+        }
+      },
+      {
+        "id": "seg_check_weight",
+        "type": "checkpoint",
+        "title": "Which input matters more?",
+        "estimated_seconds": 30,
+        "question": {
+          "id": "q_influence",
+          "form": "multiple_choice",
+          "concept_id": "@concept:weighted_sum",
+          "objective_id": "@objective:weighted_sum.interpret",
+          "stem": "A neuron has two inputs, both equal to $1$. Their weights are $w_1 = 3$ and $w_2 = 0.2$. Which input has more influence on the output?",
+          "options": [
+            {
+              "id": "a",
+              "text": "The first input",
+              "feedback": "Yes. Its weight is fifteen times larger, so a change in that input moves the sum fifteen times as far."
+            },
+            {
+              "id": "b",
+              "text": "The second input",
+              "feedback": "Its weight is the smaller one. A small weight means the input barely moves the sum.",
+              "misconception": "definition_confusion"
+            },
+            {
+              "id": "c",
+              "text": "They have the same influence, because the inputs are equal",
+              "feedback": "The inputs are equal, but each is multiplied by its own weight before being added, and the weights differ.",
+              "misconception": "causal_confusion"
+            }
+          ],
+          "correct_option": "a",
+          "explanation": "Influence comes from the weight. Each input is multiplied by its weight before the sum, so the input with the larger weight changes the result more.",
+          "hint": "Look at what each input is multiplied by.",
+          "difficulty": 1
+        }
+      },
+      {
+        "id": "seg_worked",
+        "type": "worked_example",
+        "title": "A weighted sum by hand",
+        "estimated_seconds": 70,
+        "problem": "Inputs $x_1 = 2$ and $x_2 = 3$. Weights $w_1 = 0.5$ and $w_2 = -1$. Bias $b = 4$. Find $z$.",
+        "narration": [
+          {
+            "text": "Start with the first input. Two times its weight of one half is one.",
+            "show": "$w_1 x_1 = 0.5 \\times 2 = 1$"
+          },
+          {
+            "text": "Now the second. Three times a weight of minus one is minus three. A negative weight makes its input count against the total.",
+            "show": "$w_2 x_2 = -1 \\times 3 = -3$"
+          },
+          {
+            "text": "Add the two products. One plus minus three is minus two.",
+            "show": "$1 + (-3) = -2$"
+          },
+          {
+            "text": "Finally add the bias of four. The weighted sum is two.",
+            "show": "$z = -2 + 4 = 2$"
+          }
+        ]
+      },
+      {
+        "id": "seg_check_compute",
+        "type": "checkpoint",
+        "title": "Your turn to compute",
+        "estimated_seconds": 60,
+        "question": {
+          "id": "q_compute",
+          "form": "numeric",
+          "concept_id": "@concept:weighted_sum",
+          "objective_id": "@objective:weighted_sum.compute",
+          "stem": "Inputs $x_1 = 4$ and $x_2 = 1$. Weights $w_1 = 0.5$ and $w_2 = 2$. Bias $b = -1$. What is $z$?",
+          "expected": 3,
+          "tolerance": 0.001,
+          "explanation": "$0.5 \\times 4 = 2$ and $2 \\times 1 = 2$. Together that is $4$, and adding the bias of $-1$ gives $z = 3$.",
+          "hint": "Multiply each input by its own weight first, add the two results, then add the bias.",
+          "difficulty": 2
+        }
+      },
+      {
+        "id": "seg_bias",
+        "type": "explanation",
+        "title": "What the bias is for",
+        "estimated_seconds": 40,
+        "narration": [
+          {
+            "text": "Why does a neuron need a bias at all? Think about what happens when every input is zero."
+          },
+          {
+            "text": "Zero times any weight is still zero. So without a bias the output would be stuck at zero, whatever the weights were.",
+            "show": "All inputs zero: the weights cannot help."
+          },
+          {
+            "text": "The bias is the part of the output that does not depend on the inputs. It lets the neuron start from a baseline other than zero.",
+            "show": "The bias sets the baseline."
+          }
+        ]
+      },
+      {
+        "id": "seg_check_bias",
+        "type": "checkpoint",
+        "title": "A neuron with nothing coming in",
+        "estimated_seconds": 40,
+        "question": {
+          "id": "q_baseline",
+          "form": "multiple_choice",
+          "concept_id": "@concept:weighted_sum",
+          "objective_id": "@objective:weighted_sum.bias",
+          "stem": "A neuron should output $5$ when all of its inputs are $0$. What must be true?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Its bias is $5$",
+              "feedback": "Yes. With every input at zero, the bias is all that is left."
+            },
+            {
+              "id": "b",
+              "text": "Every weight is $5$",
+              "feedback": "With inputs of zero, every weight is multiplied by zero and contributes nothing.",
+              "misconception": "causal_confusion"
+            },
+            {
+              "id": "c",
+              "text": "Its weights add up to $5$",
+              "feedback": "The weights are each multiplied by an input of zero, so their total does not reach the output.",
+              "misconception": "causal_confusion"
+            },
+            {
+              "id": "d",
+              "text": "It cannot be done",
+              "feedback": "It can: the bias is added whatever the inputs are."
+            }
+          ],
+          "correct_option": "a",
+          "explanation": "When every input is zero, each product $w x$ is zero. Only the bias remains, so $z = b = 5$.",
+          "hint": "Write out $z$ with zeros in place of the inputs.",
+          "difficulty": 2,
+          "is_transfer": true
+        }
+      },
+      {
+        "id": "seg_reflect",
+        "type": "reflection",
+        "title": "Something to think about",
+        "estimated_seconds": 30,
+        "prompt": "A weight of exactly zero: what does that say about its input? Could a network still be useful with some of its weights at zero?",
+        "narration": [
+          {
+            "text": "Before we finish, take a moment with this question. There is nothing to get right or wrong here."
+          }
+        ]
+      },
+      {
+        "id": "seg_recap",
+        "type": "summary",
+        "title": "In short",
+        "estimated_seconds": 30,
+        "narration": [
+          {
+            "text": "A neuron multiplies each input by a weight and adds the results.",
+            "show": "Weighted sum: multiply, then add."
+          },
+          {
+            "text": "A large weight makes an input count for more, a weight of zero ignores it, and a negative weight counts it against the total.",
+            "show": "A weight says how much, and in which direction."
+          },
+          {
+            "text": "The bias is added at the end, and it sets the output when the inputs are all zero.",
+            "show": "The bias sets the baseline."
+          },
+          {
+            "text": "Next, we will see what the neuron does with this sum."
+          }
+        ]
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scn_weighted_sum",
+      "purpose": "Show two inputs being combined into one weighted sum.",
+      "file": "weighted_sum.py"
+    },
+    {
+      "id": "scn_neuron_weight",
+      "purpose": "Let the learner change one weight and switch the bias on and off.",
+      "file": "neuron_weight.py"
+    }
+  ]
+}

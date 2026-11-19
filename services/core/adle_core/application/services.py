@@ -11,11 +11,14 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from adle_core.api.auth import LaunchToken
+from adle_core.application.assessment import AssessmentService
 from adle_core.application.courses import CourseService
 from adle_core.application.curriculum import CurriculumService
 from adle_core.application.jobs import JobRunner
 from adle_core.application.learner import LearnerService
+from adle_core.application.lessons import LessonService
 from adle_core.application.retrieval import FtsRetriever, Retriever
+from adle_core.application.sample_course import SampleCourseService
 from adle_core.application.sources import SourceService
 from adle_core.config import Settings
 from adle_core.generation.credentials import CredentialVault
@@ -38,6 +41,9 @@ class Services:
     retriever: Retriever
     curriculum: CurriculumService
     learner: LearnerService
+    lessons: LessonService
+    assessment: AssessmentService
+    sample_course: SampleCourseService
 
     def close(self) -> None:
         """Stop background work and release the database. Safe to call more than once."""
@@ -68,6 +74,10 @@ def build_services(
     jobs.start()
     source_files = AssetStore(settings.sources_dir)
     retriever = FtsRetriever(database)
+    courses = CourseService(database, source_files)
+    curriculum = CurriculumService(database, retriever)
+    lessons = LessonService(database)
+    learner = LearnerService(database)
     return Services(
         settings=settings,
         launch_token=launch_token,
@@ -75,11 +85,14 @@ def build_services(
         database=database,
         migration=migration,
         jobs=jobs,
-        courses=CourseService(database, source_files),
+        courses=courses,
         sources=SourceService(database, source_files, jobs, extract=extract),
         retriever=retriever,
-        curriculum=CurriculumService(database, retriever),
-        learner=LearnerService(database),
+        curriculum=curriculum,
+        learner=learner,
+        lessons=lessons,
+        assessment=AssessmentService(database, lessons, learner),
+        sample_course=SampleCourseService(database, courses, curriculum, lessons),
     )
 
 

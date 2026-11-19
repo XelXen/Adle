@@ -13,6 +13,7 @@ import {
   IconButton,
   LoadingState,
   ProgressBar,
+  RadioGroup,
   SegmentedControl,
   Select,
   Slider,
@@ -160,6 +161,75 @@ describe('Checkbox', () => {
     await userEvent.click(box);
     expect(box).toBeDisabled();
     expect(box).not.toBeChecked();
+  });
+});
+
+describe('RadioGroup', () => {
+  function Example({ disabled = false }: { disabled?: boolean }) {
+    const [value, setValue] = useState<'a' | 'b' | 'c' | null>(null);
+    return (
+      <RadioGroup
+        label="Which input matters more?"
+        value={value}
+        disabled={disabled}
+        options={[
+          { value: 'a', label: 'The first input' },
+          { value: 'b', label: 'The second input', description: 'Its weight is 0.2.' },
+          { value: 'c', label: 'Both the same' },
+        ]}
+        onValueChange={setValue}
+      />
+    );
+  }
+
+  it('is a named group of real radio buttons with nothing chosen at first', () => {
+    render(<Example />);
+    const group = screen.getByRole('group', { name: 'Which input matters more?' });
+    expect(group).toBeInTheDocument();
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(3);
+    for (const radio of radios) expect(radio).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'The second input' })).toHaveAccessibleDescription(
+      'Its weight is 0.2.',
+    );
+  });
+
+  it('chooses by click on the whole row and moves with the arrow keys', async () => {
+    render(<Example />);
+    await userEvent.click(screen.getByText('The first input'));
+    expect(screen.getByRole('radio', { name: 'The first input' })).toBeChecked();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(screen.getByRole('radio', { name: 'The second input' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'The first input' })).not.toBeChecked();
+  });
+
+  it('cannot be changed while disabled', async () => {
+    render(<Example disabled />);
+    await userEvent.click(screen.getByText('The first input'));
+    expect(screen.getByRole('radio', { name: 'The first input' })).not.toBeChecked();
+  });
+
+  it('shows a settled choice that can be read but no longer changed', async () => {
+    const onValueChange = vi.fn();
+    render(
+      <RadioGroup
+        label="Which input matters more?"
+        value="b"
+        readOnly
+        options={[
+          { value: 'a', label: 'The first input', description: 'The right answer' },
+          { value: 'b', label: 'The second input', description: 'Your answer' },
+        ]}
+        onValueChange={onValueChange}
+      />,
+    );
+    await userEvent.click(screen.getByText('The first input'));
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('radio', { name: 'The second input' })).toBeChecked();
+    // What each option turned out to be is part of what is announced for it.
+    expect(screen.getByRole('radio', { name: 'The first input' })).toHaveAccessibleDescription(
+      'The right answer',
+    );
   });
 });
 

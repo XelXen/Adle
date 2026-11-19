@@ -153,6 +153,8 @@
 
 .rowBadge {
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
   margin-top: var(--ad-space-2);
 }
 

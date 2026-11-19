@@ -1,4 +1,6 @@
-import type { Concept, Curriculum, CurriculumIssue } from '@adle/contracts';
+import type { Concept, Curriculum, CurriculumIssue, LessonSummary } from '@adle/contracts';
+
+import { pluralise } from '../../lib/format';
 
 /**
  * Pure helpers behind the curriculum screen: what order to show, what may be
@@ -267,4 +269,30 @@ export function summariseIssues(
     }
   }
   return messages;
+}
+
+/** The lessons of a course, grouped by the concept each one teaches. */
+export function lessonsByConcept(lessons: readonly LessonSummary[]): Map<string, LessonSummary[]> {
+  const grouped = new Map<string, LessonSummary[]>();
+  for (const lesson of lessons) {
+    grouped.set(lesson.concept_id, [...(grouped.get(lesson.concept_id) ?? []), lesson]);
+  }
+  return grouped;
+}
+
+/** What opening a lesson will do, in the words on its button. */
+export function lessonAction(progress: LessonSummary['progress']): string {
+  if (progress.completed) return 'Go through it again';
+  return progress.started ? 'Continue' : 'Start lesson';
+}
+
+/** One line about a lesson: how long it takes and how far the learner has got. */
+export function describeLesson(lesson: LessonSummary): string {
+  const { progress, segment_count: parts } = lesson;
+  const place = progress.completed
+    ? 'Completed'
+    : progress.started
+      ? `Part ${Math.min(progress.position + 1, parts)} of ${parts}`
+      : 'Not started';
+  return `About ${pluralise(lesson.estimated_minutes, 'minute')} · ${place}`;
 }

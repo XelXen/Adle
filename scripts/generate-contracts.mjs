@@ -9,6 +9,7 @@
  * it for its OpenAPI document and derives:
  *
  *   packages/contracts/schemas/openapi.json        the raw contract
+ *   packages/contracts/schemas/lesson-ir.schema.json  the Lesson IR as JSON Schema
  *   packages/contracts/src/generated/models.ts     TypeScript types for every schema
  *   packages/contracts/src/generated/operations.ts the operation table used as the
  *                                                  renderer's allowlist, plus typed
@@ -32,7 +33,7 @@ const BANNER =
   '// GENERATED FILE — do not edit.\n' +
   '// Source: services/core (FastAPI). Regenerate with `npm run contracts`.\n\n';
 
-function exportOpenApi() {
+function exportContracts() {
   const result = spawnSync(
     'uv',
     ['run', '--project', 'services/core', 'python', '-m', 'adle_core.tools.export_contracts'],
@@ -231,8 +232,11 @@ async function format(source, filePath) {
 }
 
 async function main() {
-  const openapi = exportOpenApi();
+  const { openapi, lesson_ir: lessonIr } = exportContracts();
   const files = new Map();
+
+  const lessonIrPath = path.join(contractsDir, 'schemas', 'lesson-ir.schema.json');
+  files.set(lessonIrPath, await format(JSON.stringify(lessonIr), lessonIrPath));
 
   const openapiPath = path.join(contractsDir, 'schemas', 'openapi.json');
   files.set(openapiPath, await format(JSON.stringify(openapi), openapiPath));

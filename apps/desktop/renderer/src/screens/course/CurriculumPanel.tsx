@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, List, ListTree, Network, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, List, ListTree, Network, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
 
 import type { Concept, Course, Curriculum } from '@adle/contracts';
@@ -17,10 +17,11 @@ import {
   useToast,
 } from '@adle/design-system';
 
+import { useRouter } from '../../app/router';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
 import { useResource } from '../../lib/use-resource';
-import { ConceptDetail, KNOWLEDGE_TONE } from './ConceptDetail';
+import { ConceptDetail, type ConceptLessons, KNOWLEDGE_TONE } from './ConceptDetail';
 import {
   ConceptDialog,
   type ConceptDraft,
@@ -32,6 +33,7 @@ import styles from './Curriculum.module.css';
 import {
   checkMove,
   learningPath,
+  lessonsByConcept,
   type MoveDirection,
   movedOrder,
   summariseIssues,
@@ -55,6 +57,7 @@ type OpenDialog =
 /** Inspect and edit what a course teaches, and in what order. */
 export function CurriculumPanel({ course }: { course: Course }) {
   const toast = useToast();
+  const { navigate } = useRouter();
   const headingId = useId();
   const courseId = course.id;
   const curriculum = useResource(`curriculum:${courseId}`, () =>
@@ -62,6 +65,9 @@ export function CurriculumPanel({ course }: { course: Course }) {
   );
   const outline = useResource(`outline:${courseId}`, () =>
     callCore('curriculum.outline_candidates', { path: { course_id: courseId } }),
+  );
+  const lessons = useResource(`lessons:${courseId}`, () =>
+    callCore('lessons.list', { path: { course_id: courseId } }),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<View>('list');
@@ -92,6 +98,19 @@ export function CurriculumPanel({ course }: { course: Course }) {
   const path = learningPath(data);
   const selected = path.find((concept) => concept.id === selectedId) ?? path[0] ?? null;
   const hasMaterials = course.source_count > 0;
+  const lessonsOf = lessonsByConcept(
+    lessons.resource.status === 'ready' ? lessons.resource.data.lessons : [],
+  );
+  const lessonsFor = (concept: Concept): ConceptLessons =>
+    lessons.resource.status === 'loading'
+      ? { status: 'loading' }
+      : lessons.resource.status === 'error'
+        ? {
+            status: 'error',
+            message: describeError(lessons.resource.error),
+            retry: lessons.reload,
+          }
+        : { status: 'ready', lessons: lessonsOf.get(concept.id) ?? [] };
 
   const saveConcept = async (existing: Concept | null, draft: ConceptDraft): Promise<void> => {
     if (existing === null) {
@@ -300,6 +319,9 @@ export function CurriculumPanel({ course }: { course: Course }) {
                                   <Badge tone={KNOWLEDGE_TONE[concept.knowledge.state]}>
                                     {concept.knowledge.label}
                                   </Badge>
+                                  {lessonsOf.has(concept.id) ? (
+                                    <Badge icon={<BookOpen />}>Lesson ready</Badge>
+                                  ) : null}
                                 </span>
                               </span>
                             </button>
@@ -342,6 +364,8 @@ export function CurriculumPanel({ course }: { course: Course }) {
                   concept={selected}
                   path={path}
                   hasMaterials={hasMaterials}
+                  lessons={lessonsFor(selected)}
+                  onOpenLesson={(lessonId) => navigate({ name: 'lesson', courseId, lessonId })}
                   onEdit={() => setDialog({ kind: 'edit', concept: selected })}
                   onRemove={() => setDialog({ kind: 'remove', concept: selected })}
                   onEditPrerequisites={() =>
