@@ -80,7 +80,9 @@ def _to_observation(row: LearnerObservation) -> Observation:
         hinted=row.hinted,
         unsure=row.unsure,
         item_guess=row.item_guess,
+        slip=row.slip,
         self_report=SelfReport(row.self_report) if row.self_report else None,
+        unresolved_misconception=row.unresolved_misconception,
     )
 
 
@@ -98,6 +100,7 @@ def _to_knowledge(state: LearnerConceptState | None, config: TracingConfig) -> C
         transfer_correct=state.transfer_correct,
         self_report=SelfReport(state.self_report) if state.self_report else None,
         last_observed_at=state.last_observed_at,
+        unresolved_misconception=state.unresolved_misconception,
         review=ReviewState(
             interval_days=state.review_interval_days,
             due_at=state.review_due_at,
@@ -121,6 +124,7 @@ def _store_knowledge(
     state.transfer_correct = knowledge.transfer_correct
     state.self_report = knowledge.self_report.value if knowledge.self_report else None
     state.last_observed_at = knowledge.last_observed_at
+    state.unresolved_misconception = knowledge.unresolved_misconception
     state.review_interval_days = knowledge.review.interval_days
     state.review_due_at = knowledge.review.due_at
     state.review_streak = knowledge.review.streak
@@ -192,10 +196,20 @@ class LearnerService:
             concept = get_concept_or_404(session, concept_id)
             return self.record_in(session, concept, observation)
 
-    def record_in(self, session: Session, concept: Concept, observation: Observation) -> Transition:
-        """Record inside a transaction the caller owns, so more can be stored with it."""
+    def record_in(
+        self,
+        session: Session,
+        concept: Concept,
+        observation: Observation,
+        *,
+        note: str | None = None,
+    ) -> Transition:
+        """Record inside a transaction the caller owns, so more can be stored with it.
+
+        ``note`` is a sentence for the explanation that only the caller can know.
+        """
         state = session.get(LearnerConceptState, concept.id)
-        transition = apply(_to_knowledge(state, self._config), observation, self._config)
+        transition = apply(_to_knowledge(state, self._config), observation, self._config, note=note)
         session.add(
             LearnerObservation(
                 concept_id=concept.id,
@@ -208,7 +222,9 @@ class LearnerService:
                 hinted=observation.hinted,
                 unsure=observation.unsure,
                 item_guess=observation.item_guess,
+                slip=observation.slip,
                 self_report=observation.self_report.value if observation.self_report else None,
+                unresolved_misconception=observation.unresolved_misconception,
                 state_before=transition.state_before.value,
                 state_after=transition.state_after.value,
                 explanation=transition.explanation,

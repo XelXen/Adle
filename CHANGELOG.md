@@ -57,6 +57,24 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Lessons are read aloud with a voice installed on your computer. Nothing is sent anywhere to
   do it. Choose the voice and volume in Settings → Learning, and switch reading aloud on or off
   inside a lesson. Without a voice, narration is shown as text.
+- A course now opens on **Learn**: one suggested next step with the reason for it, other things
+  you could do instead, and where you stand on each concept in words. Adle never gives an order
+  and never shows a score.
+- Practice and review: a few questions on one concept, chosen for what your answers have not
+  shown yet. Reviews come due after a gap that grows each time you recall something, and a
+  question you answered today is not asked again today.
+- When more than one answer points at the same kind of mix-up, Adle says so as a possibility,
+  asks a question that would show it, and lets you set it aside with "That was a slip". One
+  answer is never treated as a diagnosis.
+- A slip (the right number with the wrong sign, for instance) is counted as partly right, not as
+  a gap in understanding.
+- "This did not help" in a lesson: skip to the next question, have the concept explained another
+  way of your choosing, or do something else. Adle does not send you back through the same
+  lesson, and after a run of answers that did not go well it says that stopping is fine.
+- When creating another lesson for a concept you can choose how it should explain: pictures
+  first, a worked example, an everyday comparison, the mathematics step by step, a calculation by
+  hand, or leading questions.
+- A lesson ends with what to do next, not only with what it covered.
 - Your data is kept safe between versions: a copy is made before its format is ever changed.
 - Interactive visuals run in an isolated frame; if one cannot run, a text explanation is shown
   instead and the rest of the lesson is unaffected.

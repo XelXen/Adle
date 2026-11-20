@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, ListTree, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, GraduationCap, ListTree, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -19,9 +19,11 @@ import { callCore, CoreRequestError, describeError } from '../../lib/core-client
 import { useResource } from '../../lib/use-resource';
 import styles from './CourseScreen.module.css';
 import { CurriculumPanel } from './CurriculumPanel';
+import { LearnPanel } from './LearnPanel';
 import { SourcesPanel } from './SourcesPanel';
 
 const TABS: readonly TabItem<CourseTab>[] = [
+  { value: 'learn', label: 'Learn', icon: <GraduationCap /> },
   { value: 'curriculum', label: 'Curriculum', icon: <ListTree /> },
   { value: 'sources', label: 'Materials', icon: <FileText /> },
 ];
@@ -32,7 +34,7 @@ const ORIGIN_LABEL = {
   materials: 'From your materials',
 } as const;
 
-/** One course: what it teaches and the materials it draws on. */
+/** One course: what to do next in it, what it teaches, and the materials it draws on. */
 export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseTab }) {
   const { navigate } = useRouter();
   const toast = useToast();
@@ -136,7 +138,9 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
         }}
       >
         {(current) =>
-          current === 'curriculum' ? (
+          current === 'learn' ? (
+            <LearnPanel course={data} />
+          ) : current === 'curriculum' ? (
             <CurriculumPanel course={data} />
           ) : (
             <SourcesPanel courseId={courseId} />

@@ -112,7 +112,8 @@ The JSON object:
   "title": "short title of the lesson",
   "strategy": one of {", ".join(f'"{name}"' for name in STRATEGIES)},
   "sources": [numbers of the excerpts used, or empty],
-  "segments": [ 7 to 10 segments, in teaching order ]
+  "segments": [ 7 to 10 segments, in teaching order ],
+  "practice": [ 3 more questions, in the same form as a checkpoint's "question" ]
 }}
 
 Every segment has "type" and "title". The types, and what else each needs:
@@ -163,8 +164,25 @@ Requirements for the whole lesson:
 - Three checkpoints, spread through the lesson, in at least two different forms. Each comes
   after the material it checks. The last one has "transfer": true.
 - Between them the questions check every learning objective.
+- "practice" holds three more questions that are not shown during the lesson. Adle asks
+  them days later, as a review. They check the same objectives with different numbers and
+  different situations from the checkpoints. At least one has "transfer": true and at
+  least one is not multiple choice.
 - Every question can be answered from this lesson alone and has one defensible answer.
 - Numbers in worked examples and questions are small and come out exactly."""
+
+#: What each way of teaching means, as an instruction to the writer.
+STRATEGY_BRIEFS: dict[str, str] = {
+    "visual": "lead with pictures: show the idea happening before you name it",
+    "worked_example": "lead with one concrete problem solved step by step, then say what "
+    "the steps have in common",
+    "analogy": "lead with a comparison from everyday life, then say exactly where the "
+    "comparison stops working",
+    "mathematical": "lead with the definition and derive the result one justified step at a time",
+    "socratic": "lead with questions the learner can answer, each a small step towards the idea",
+    "computational": "lead with a tiny procedure carried out by hand, value by value, the "
+    "way a program would run it",
+}
 
 
 def lesson_request(
@@ -174,8 +192,15 @@ def lesson_request(
     learner: LearnerBrief,
     passages: Sequence[Passage],
     problems: Sequence[str] = (),
+    approach: str | None = None,
+    earlier: Sequence[str] = (),
 ) -> ChatRequest:
-    """The request for one lesson draft. ``problems`` lists what was wrong with a first attempt."""
+    """The request for one lesson draft.
+
+    ``problems`` lists what was wrong with a first attempt. ``approach`` is the way of
+    teaching to use, when Adle or the learner has chosen one; ``earlier`` names the ways
+    earlier lessons on this concept used, so that this one is not the same lesson again.
+    """
     system = (
         "You write short lessons for Adle, an app that teaches one concept at a time to one "
         "learner at a desk, with narration, a board, live pictures, and a few questions. "
@@ -212,6 +237,20 @@ def lesson_request(
         about_learner.append("Their goal:\n" + _block("goal", _clip(learner.goal, 300)))
     parts.append("\n".join(about_learner))
     parts.append(_passages(passages))
+    if approach in STRATEGY_BRIEFS:
+        how = [
+            f'Teach it the "{approach}" way: {STRATEGY_BRIEFS[approach]}. '
+            f'Set "strategy" to "{approach}".'
+        ]
+        used = [name for name in earlier if name in STRATEGY_BRIEFS]
+        if used:
+            how.append(
+                "The learner has already had a lesson on this concept ("
+                + ", ".join(f'"{name}"' for name in used)
+                + ") and asked for a different explanation. Do not write that lesson again: "
+                "use different examples, different numbers, and a different way in."
+            )
+        parts.append(" ".join(how))
     parts.append(_LESSON_FORMAT)
     if problems:
         listed = "\n".join(f"- {problem}" for problem in problems[:MAX_PROBLEMS_IN_RETRY])

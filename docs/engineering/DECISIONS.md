@@ -19,6 +19,7 @@ supersedes the old one and update this index.
 | [011](../decisions/ADR-011-brand-mark-and-colour.md) | The mark is the owner's "ad" monogram, drawn as vectors and verified against the artwork; the brand colour is its teal; success keeps a green of its own; app icons are rendered from the vectors by Electron. |
 | [012](../decisions/ADR-012-provider-quota-and-generation.md) | One module sends, one decides the quota, one records; no sampling parameters; a model writes a forgiving draft that is compiled into the Lesson IR, so ids and citations cannot be invented; a fixed, small number of requests per job; a proposal adds nothing until the learner picks. |
 | [013](../decisions/ADR-013-narration-aloud.md) | Narration is read by voices installed on the computer (local voices only), behind the narrator interface; words are highlighted only when the engine reports them; silent captions are always available. No bundled engine and no cloud voice in the first release. |
+| [014](../decisions/ADR-014-adaptation.md) | A pattern of wrong answers is a hypothesis computed from the record (tentative, supported, rejected, resolved) that the learner can set aside; a slip counts as partly right; a repeat counts in full only after a gap; lessons carry questions kept for review; the next step is chosen by readable rules, always with a reason, never the same lesson again after it did not help. No model grading and no model-proposed hypotheses. |
 
 ## Smaller standing choices (no ADR)
 

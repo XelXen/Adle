@@ -12,7 +12,7 @@ from adle_core.errors import NotFoundError
 from adle_core.infrastructure.asset_store import AssetStore
 from adle_core.infrastructure.database import Database, utc_now
 from adle_core.infrastructure.ids import new_id
-from adle_core.infrastructure.orm import Course, Source
+from adle_core.infrastructure.orm import Concept, Course, Source
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +23,7 @@ class CourseRecord:
     origin: str
     topic: str | None
     source_count: int
+    concept_count: int
     created_at: datetime
     updated_at: datetime
     last_opened_at: datetime | None
@@ -35,7 +36,7 @@ def get_course_or_404(session: Session, course_id: str) -> Course:
     return course
 
 
-def _record(course: Course, source_count: int) -> CourseRecord:
+def _record(course: Course, source_count: int, concept_count: int) -> CourseRecord:
     return CourseRecord(
         id=course.id,
         title=course.title,
@@ -43,6 +44,7 @@ def _record(course: Course, source_count: int) -> CourseRecord:
         origin=course.origin,
         topic=course.topic,
         source_count=source_count,
+        concept_count=concept_count,
         created_at=course.created_at,
         updated_at=course.updated_at,
         last_opened_at=course.last_opened_at,
@@ -56,18 +58,39 @@ class CourseService:
 
     def list_all(self) -> list[CourseRecord]:
         """Every course, most recently used first."""
-        counts = (
+        sources = (
             select(Source.course_id, func.count(Source.id).label("source_count"))
             .group_by(Source.course_id)
             .subquery()
         )
+        concepts = (
+            select(Concept.course_id, func.count(Concept.id).label("concept_count"))
+            .group_by(Concept.course_id)
+            .subquery()
+        )
         statement = (
-            select(Course, func.coalesce(counts.c.source_count, 0))
-            .outerjoin(counts, counts.c.course_id == Course.id)
+            select(
+                Course,
+                func.coalesce(sources.c.source_count, 0),
+                func.coalesce(concepts.c.concept_count, 0),
+            )
+            .outerjoin(sources, sources.c.course_id == Course.id)
+            .outerjoin(concepts, concepts.c.course_id == Course.id)
             .order_by(func.coalesce(Course.last_opened_at, Course.created_at).desc(), Course.id)
         )
         with self._database.session() as session:
-            return [_record(course, count) for course, count in session.execute(statement)]
+            return [
+                _record(course, source_count, concept_count)
+                for course, source_count, concept_count in session.execute(statement)
+            ]
+
+    @staticmethod
+    def _counted(session: Session, course: Course) -> CourseRecord:
+        sources = session.scalar(select(func.count(Source.id)).where(Source.course_id == course.id))
+        concepts = session.scalar(
+            select(func.count(Concept.id)).where(Concept.course_id == course.id)
+        )
+        return _record(course, sources or 0, concepts or 0)
 
     def create(
         self, *, title: str, description: str = "", origin: str, topic: str | None = None
@@ -82,7 +105,7 @@ class CourseService:
             )
             session.add(course)
             session.flush()
-            return _record(course, 0)
+            return _record(course, 0, 0)
 
     def get(self, course_id: str, *, mark_opened: bool = False) -> CourseRecord:
         with self._database.session() as session:
@@ -90,10 +113,7 @@ class CourseService:
             if mark_opened:
                 course.last_opened_at = utc_now()
                 session.flush()
-            count = session.scalar(
-                select(func.count(Source.id)).where(Source.course_id == course_id)
-            )
-            return _record(course, count or 0)
+            return self._counted(session, course)
 
     def update(
         self, course_id: str, *, title: str | None = None, description: str | None = None
@@ -105,10 +125,7 @@ class CourseService:
             if description is not None:
                 course.description = description.strip()
             session.flush()
-            count = session.scalar(
-                select(func.count(Source.id)).where(Source.course_id == course_id)
-            )
-            return _record(course, count or 0)
+            return self._counted(session, course)
 
     def delete(self, course_id: str) -> None:
         """Permanently remove a course, everything derived from it, and its stored files."""

@@ -183,6 +183,39 @@
         "title": "ConceptOrder",
         "type": "object"
       },
+      "ConceptProgress": {
+        "properties": {
+          "concept_id": { "title": "Concept Id", "type": "string" },
+          "fresh_questions": { "title": "Fresh Questions", "type": "integer" },
+          "hypotheses": {
+            "items": { "$ref": "#/components/schemas/Hypothesis" },
+            "title": "Hypotheses",
+            "type": "array"
+          },
+          "knowledge": { "$ref": "#/components/schemas/Knowledge" },
+          "lessons_completed": { "title": "Lessons Completed", "type": "integer" },
+          "lessons_total": { "title": "Lessons Total", "type": "integer" },
+          "next_fresh_at": {
+            "anyOf": [{ "format": "date-time", "type": "string" }, { "type": "null" }],
+            "title": "Next Fresh At"
+          },
+          "review_due": { "title": "Review Due", "type": "boolean" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": [
+          "concept_id",
+          "title",
+          "knowledge",
+          "lessons_total",
+          "lessons_completed",
+          "hypotheses",
+          "fresh_questions",
+          "next_fresh_at",
+          "review_due"
+        ],
+        "title": "ConceptProgress",
+        "type": "object"
+      },
       "ConceptUpdate": {
         "additionalProperties": false,
         "properties": {
@@ -218,6 +251,7 @@
       },
       "Course": {
         "properties": {
+          "concept_count": { "title": "Concept Count", "type": "integer" },
           "created_at": { "format": "date-time", "title": "Created At", "type": "string" },
           "description": { "title": "Description", "type": "string" },
           "id": { "title": "Id", "type": "string" },
@@ -242,6 +276,7 @@
           "origin",
           "topic",
           "source_count",
+          "concept_count",
           "created_at",
           "updated_at",
           "last_opened_at"
@@ -394,6 +429,36 @@
         },
         "required": ["text", "highlighted"],
         "title": "HighlightSegment",
+        "type": "object"
+      },
+      "Hypothesis": {
+        "description": "A possible explanation for a pattern of answers. A hypothesis, never a verdict.",
+        "properties": {
+          "can_dismiss": { "title": "Can Dismiss", "type": "boolean" },
+          "description": { "title": "Description", "type": "string" },
+          "is_slip": { "title": "Is Slip", "type": "boolean" },
+          "kind": {
+            "enum": [
+              "prerequisite_gap",
+              "definition_confusion",
+              "notation_confusion",
+              "procedure_order",
+              "causal_confusion",
+              "arithmetic_slip",
+              "misread_question",
+              "overgeneralization"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "enum": ["tentative", "supported", "rejected", "resolved"],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": ["kind", "status", "description", "is_slip", "can_dismiss"],
+        "title": "Hypothesis",
         "type": "object"
       },
       "ImportRequest": {
@@ -595,6 +660,35 @@
         "title": "LearnerPreferencesUpdate",
         "type": "object"
       },
+      "LearningOverview": {
+        "properties": {
+          "concepts": {
+            "items": { "$ref": "#/components/schemas/ConceptProgress" },
+            "title": "Concepts",
+            "type": "array"
+          },
+          "course_id": { "title": "Course Id", "type": "string" },
+          "plan": { "$ref": "#/components/schemas/LearningPlan" },
+          "summary": { "$ref": "#/components/schemas/ProgressSummary" }
+        },
+        "required": ["course_id", "plan", "concepts", "summary"],
+        "title": "LearningOverview",
+        "type": "object"
+      },
+      "LearningPlan": {
+        "properties": {
+          "alternatives": {
+            "items": { "$ref": "#/components/schemas/NextStep" },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "note": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Note" },
+          "recommended": { "$ref": "#/components/schemas/NextStep" }
+        },
+        "required": ["recommended", "alternatives", "note"],
+        "title": "LearningPlan",
+        "type": "object"
+      },
       "LessonForPlayer": {
         "description": "Everything the player needs: the validated lesson and the scenes it plays.",
         "properties": {
@@ -659,6 +753,31 @@
         "title": "LessonProgressUpdate",
         "type": "object"
       },
+      "LessonRequest": {
+        "additionalProperties": false,
+        "description": "How the learner would like a new lesson to teach, when they have a preference.",
+        "properties": {
+          "strategy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "visual",
+                  "worked_example",
+                  "analogy",
+                  "mathematical",
+                  "socratic",
+                  "computational"
+                ],
+                "type": "string"
+              },
+              { "type": "null" }
+            ],
+            "title": "Strategy"
+          }
+        },
+        "title": "LessonRequest",
+        "type": "object"
+      },
       "LessonSummary": {
         "properties": {
           "concept_id": { "title": "Concept Id", "type": "string" },
@@ -681,6 +800,61 @@
           "progress"
         ],
         "title": "LessonSummary",
+        "type": "object"
+      },
+      "NextStep": {
+        "description": "Something worth doing now, with the reason for it. Never an instruction.",
+        "properties": {
+          "about": {
+            "anyOf": [
+              {
+                "enum": [
+                  "prerequisite_gap",
+                  "definition_confusion",
+                  "notation_confusion",
+                  "procedure_order",
+                  "causal_confusion",
+                  "arithmetic_slip",
+                  "misread_question",
+                  "overgeneralization"
+                ],
+                "type": "string"
+              },
+              { "type": "null" }
+            ],
+            "title": "About"
+          },
+          "concept_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Concept Id"
+          },
+          "kind": {
+            "enum": [
+              "add_concepts",
+              "resume_lesson",
+              "revisit_prerequisite",
+              "check",
+              "another_explanation",
+              "review",
+              "practise",
+              "start_lesson",
+              "repeat_lesson",
+              "create_lesson",
+              "nothing_due"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lesson_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Lesson Id"
+          },
+          "needs_key": { "title": "Needs Key", "type": "boolean" },
+          "reason": { "title": "Reason", "type": "string" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": ["kind", "title", "reason", "concept_id", "lesson_id", "about", "needs_key"],
+        "title": "NextStep",
         "type": "object"
       },
       "Objective": {
@@ -726,7 +900,11 @@
         "properties": {
           "explanation": { "title": "Explanation", "type": "string" },
           "id": { "title": "Id", "type": "integer" },
-          "kind": { "enum": ["answer", "self_report"], "title": "Kind", "type": "string" },
+          "kind": {
+            "enum": ["answer", "self_report", "dismissal"],
+            "title": "Kind",
+            "type": "string"
+          },
           "occurred_at": { "format": "date-time", "title": "Occurred At", "type": "string" },
           "state_after": {
             "enum": ["not_assessed", "building", "needs_evidence", "demonstrated"],
@@ -1010,6 +1188,75 @@
         "title": "PlayerRubricPoint",
         "type": "object"
       },
+      "PracticeQuestion": {
+        "properties": {
+          "lesson_id": { "title": "Lesson Id", "type": "string" },
+          "question": { "$ref": "#/components/schemas/PlayerQuestion" }
+        },
+        "required": ["lesson_id", "question"],
+        "title": "PracticeQuestion",
+        "type": "object"
+      },
+      "PracticeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "about": {
+            "anyOf": [
+              {
+                "enum": [
+                  "prerequisite_gap",
+                  "definition_confusion",
+                  "notation_confusion",
+                  "procedure_order",
+                  "causal_confusion",
+                  "arithmetic_slip",
+                  "misread_question",
+                  "overgeneralization"
+                ],
+                "type": "string"
+              },
+              { "type": "null" }
+            ],
+            "title": "About"
+          },
+          "count": { "default": 3, "maximum": 5, "minimum": 1, "title": "Count", "type": "integer" }
+        },
+        "title": "PracticeRequest",
+        "type": "object"
+      },
+      "PracticeSet": {
+        "properties": {
+          "concept_id": { "title": "Concept Id", "type": "string" },
+          "concept_title": { "title": "Concept Title", "type": "string" },
+          "course_id": { "title": "Course Id", "type": "string" },
+          "next_fresh_at": {
+            "anyOf": [{ "format": "date-time", "type": "string" }, { "type": "null" }],
+            "title": "Next Fresh At"
+          },
+          "purpose": {
+            "enum": ["review", "check", "practise"],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "questions": {
+            "items": { "$ref": "#/components/schemas/PracticeQuestion" },
+            "title": "Questions",
+            "type": "array"
+          },
+          "reason": { "title": "Reason", "type": "string" }
+        },
+        "required": [
+          "course_id",
+          "concept_id",
+          "concept_title",
+          "purpose",
+          "reason",
+          "questions",
+          "next_fresh_at"
+        ],
+        "title": "PracticeSet",
+        "type": "object"
+      },
       "Prerequisite": {
         "properties": {
           "concept_id": { "title": "Concept Id", "type": "string" },
@@ -1046,6 +1293,30 @@
         },
         "required": ["prerequisites"],
         "title": "PrerequisitesUpdate",
+        "type": "object"
+      },
+      "ProgressSummary": {
+        "description": "Counts of concepts by what the evidence says. Counts of states, never a score.",
+        "properties": {
+          "concepts": { "title": "Concepts", "type": "integer" },
+          "demonstrated": { "title": "Demonstrated", "type": "integer" },
+          "in_progress": { "title": "In Progress", "type": "integer" },
+          "next_review_at": {
+            "anyOf": [{ "format": "date-time", "type": "string" }, { "type": "null" }],
+            "title": "Next Review At"
+          },
+          "not_assessed": { "title": "Not Assessed", "type": "integer" },
+          "reviews_due": { "title": "Reviews Due", "type": "integer" }
+        },
+        "required": [
+          "concepts",
+          "demonstrated",
+          "in_progress",
+          "not_assessed",
+          "reviews_due",
+          "next_review_at"
+        ],
+        "title": "ProgressSummary",
         "type": "object"
       },
       "ProposalAcceptance": {
@@ -1436,6 +1707,20 @@
         "title": "SummarySegment",
         "type": "object"
       },
+      "UnhelpfulReport": {
+        "additionalProperties": false,
+        "description": "The learner says a part of a lesson did not help.",
+        "properties": {
+          "segment_id": {
+            "pattern": "^seg_[a-z0-9_]{1,40}$",
+            "title": "Segment Id",
+            "type": "string"
+          }
+        },
+        "required": ["segment_id"],
+        "title": "UnhelpfulReport",
+        "type": "object"
+      },
       "VisualizationSegment": {
         "additionalProperties": false,
         "description": "An animation, narrated.",
@@ -1603,8 +1888,64 @@
         "tags": ["curriculum"]
       }
     },
+    "/v1/concepts/{concept_id}/hypotheses/{kind}/dismiss": {
+      "post": {
+        "description": "The learner says a suspected mistake does not describe them.",
+        "operationId": "learning.dismiss_hypothesis",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "prerequisite_gap",
+                "definition_confusion",
+                "notation_confusion",
+                "procedure_order",
+                "causal_confusion",
+                "arithmetic_slip",
+                "misread_question",
+                "overgeneralization"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LearningOverview" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Dismiss Hypothesis",
+        "tags": ["learning"]
+      }
+    },
     "/v1/concepts/{concept_id}/lessons": {
       "post": {
+        "description": "Start writing a lesson. The body is optional: without it Adle chooses how to teach.",
         "operationId": "generation.generate_lesson",
         "parameters": [
           {
@@ -1614,6 +1955,16 @@
             "schema": { "title": "Concept Id", "type": "string" }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [{ "$ref": "#/components/schemas/LessonRequest" }, { "type": "null" }],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
@@ -1722,6 +2073,48 @@
         },
         "summary": "Related Passages",
         "tags": ["curriculum"]
+      }
+    },
+    "/v1/concepts/{concept_id}/practice": {
+      "post": {
+        "description": "Questions worth asking about a concept now. May be empty; the reason says why.",
+        "operationId": "learning.start_practice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": { "title": "Concept Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PracticeRequest" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PracticeSet" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Start Practice",
+        "tags": ["learning"]
       }
     },
     "/v1/concepts/{concept_id}/prerequisites": {
@@ -2306,6 +2699,42 @@
         },
         "summary": "List Active Jobs",
         "tags": ["generation"]
+      }
+    },
+    "/v1/courses/{course_id}/learning": {
+      "get": {
+        "description": "The suggested next step with its reason, the alternatives, and where each concept stands.",
+        "operationId": "learning.overview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LearningOverview" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Learning Overview",
+        "tags": ["learning"]
       }
     },
     "/v1/courses/{course_id}/lessons": {
@@ -2929,6 +3358,43 @@
         },
         "summary": "Answer Question",
         "tags": ["lessons"]
+      }
+    },
+    "/v1/lessons/{lesson_id}/unhelpful": {
+      "post": {
+        "description": "The learner says an explanation did not help. It shapes what is suggested next.",
+        "operationId": "lessons.report_unhelpful",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UnhelpfulReport" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": { "description": "Successful Response" },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Report Unhelpful",
+        "tags": ["learning"]
       }
     },
     "/v1/provider": {

@@ -71,6 +71,16 @@ export async function importAndWait(
   );
 }
 
+/** Open one of a course's tabs. A course with concepts opens on "Learn". */
+export async function openCourseTab(
+  page: Page,
+  name: 'Learn' | 'Curriculum' | 'Materials',
+): Promise<void> {
+  const tab = page.getByRole('tab', { name, exact: true });
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
+}
+
 /** Fail on any WCAG 2.2 AA violation axe can detect on the current screen. */
 export async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   const axe = await new AxeBuilder({ page })

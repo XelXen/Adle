@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Captions,
   Check,
+  MessageCircleQuestion,
   Pause,
   Play,
   RotateCcw,
@@ -26,6 +27,7 @@ import {
 import type { PlayerStatus } from '../../../../player/host/WanimPlayerAdapter';
 import { useRouter } from '../../app/router';
 import { MathText } from '../../components/MathText';
+import { NextSteps } from '../../components/NextSteps';
 import { ScenePlayer, type ScenePlayerHandle } from '../../components/ScenePlayer';
 import {
   canContinue,
@@ -48,6 +50,7 @@ import { useResource } from '../../lib/use-resource';
 import { KNOWLEDGE_TONE } from '../course/ConceptDetail';
 import { CheckpointPanel } from './CheckpointPanel';
 import styles from './Lesson.module.css';
+import { type ReportState, UnhelpfulDialog } from './UnhelpfulDialog';
 
 const GROUNDING_NOTE: Record<LessonForPlayer['lesson']['grounding'], string> = {
   sample: 'A sample lesson written by Adle.',
@@ -71,6 +74,8 @@ interface Session {
   controller: LessonController;
   cues: SceneCues;
   save: (position: number, completed: boolean) => void;
+  /** Resolves once the latest save has been answered, whether or not it worked. */
+  saved: () => Promise<void>;
   /** Shows the narration as text, at reading pace. Always available. */
   silent: Narrator;
   /** Reads the narration aloud. Absent when this computer has no voice to read with. */
@@ -97,8 +102,9 @@ function openSession(
         })
       : null;
   let warned = false;
+  let latest: Promise<unknown> = Promise.resolve();
   const save = (position: number, completed: boolean): void => {
-    callCore('lessons.save_progress', {
+    latest = callCore('lessons.save_progress', {
       path: { lesson_id: lesson.lesson_id },
       body: { position, completed },
     }).catch((error: unknown) => {
@@ -108,6 +114,7 @@ function openSession(
       onSaveFailed(error);
     });
   };
+  const saved = (): Promise<void> => latest.then(() => undefined);
   const controller: LessonController = new LessonController(
     lesson,
     {
@@ -120,7 +127,7 @@ function openSession(
       ? { position: 0, furthest: lesson.segments.length - 1 }
       : { position: progress.position },
   );
-  return { controller, cues, save, silent, spoken };
+  return { controller, cues, save, saved, silent, spoken };
 }
 
 /** One lesson, played from start to finish with the learner in control of the pace. */
@@ -132,7 +139,7 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
   const preferences = useResource('learner-preferences', () => callCore('learner.get_preferences'));
   // Asked once per lesson: the list of voices is short and does not change while one plays.
   const voices = useResource('speech-voices', () => loadLocalVoices(browserSpeech()));
-  const leave = (): void => navigate({ name: 'course', courseId, tab: 'curriculum' });
+  const leave = (): void => navigate({ name: 'course', courseId, tab: 'learn' });
   const back = (
     <Button variant="tertiary" size="small" icon={<ArrowLeft />} onClick={leave}>
       Back to the course
@@ -209,7 +216,7 @@ function LessonPlayer({
 }) {
   const toast = useToast();
   const { lesson, scenes } = data;
-  const [{ controller, cues, save, silent, spoken }] = useState(() =>
+  const [{ controller, cues, save, saved, silent, spoken }] = useState(() =>
     openSession(data, preferences, voices, (error) =>
       toast.show({
         tone: 'danger',
@@ -221,6 +228,8 @@ function LessonPlayer({
   const state = useSyncExternalStore(controller.subscribe, controller.getState);
   const [aloud, setAloud] = useState(preferences.narration && spoken !== null);
   const [wordsShown, setWordsShown] = useState(preferences.captions);
+  /** Set while the learner is choosing what to do after saying a part did not help. */
+  const [unhelpful, setUnhelpful] = useState<ReportState | null>(null);
 
   /** Read aloud, or show the words at reading pace. The choice is kept for next time. */
   const readAloud = (next: boolean): void => {
@@ -253,6 +262,21 @@ function LessonPlayer({
     controller.replay();
   };
 
+  /** Record that this part did not help, and offer other ways forward. */
+  const sayUnhelpful = (): void => {
+    controller.pause();
+    setUnhelpful('saving');
+    const settle = (outcome: ReportState) => (): void =>
+      // Only while the dialog is still open: the learner may already have moved on.
+      setUnhelpful((current) => (current === null ? null : outcome));
+    callCore('lessons.report_unhelpful', {
+      path: { lesson_id: lesson.lesson_id },
+      body: { segment_id: segment.id },
+    }).then(settle('saved'), settle('failed'));
+  };
+  // A question or a pause for thought explains nothing, so there is nothing to report.
+  const explains = segment.type !== 'checkpoint' && segment.type !== 'reflection';
+
   return (
     <Page
       title={lesson.title}
@@ -267,7 +291,12 @@ function LessonPlayer({
       }
     >
       {state.finished ? (
-        <FinishedPanel data={data} onLeave={onLeave} onReview={() => controller.restart()} />
+        <FinishedPanel
+          data={data}
+          whenSaved={saved}
+          onLeave={onLeave}
+          onReview={() => controller.restart()}
+        />
       ) : (
         <div className={styles.player}>
           <ol className={styles.parts} aria-label="Parts of this lesson">
@@ -393,6 +422,11 @@ function LessonPlayer({
               {!allowed ? (
                 <span className={styles.note}>Answer or skip the question to continue.</span>
               ) : null}
+              {explains ? (
+                <Button variant="tertiary" icon={<MessageCircleQuestion />} onClick={sayUnhelpful}>
+                  This did not help
+                </Button>
+              ) : null}
               <Button
                 variant={settled && allowed ? 'primary' : 'secondary'}
                 icon={last ? <Check /> : <ArrowRight />}
@@ -405,6 +439,18 @@ function LessonPlayer({
           </div>
         </div>
       )}
+      {unhelpful !== null ? (
+        <UnhelpfulDialog
+          lesson={lesson}
+          report={unhelpful}
+          canSkipToQuestion={controller.nextQuestionIndex() !== null}
+          onSkipToQuestion={() => {
+            setUnhelpful(null);
+            controller.skipToNextQuestion();
+          }}
+          onClose={() => setUnhelpful(null)}
+        />
+      ) : null}
     </Page>
   );
 }
@@ -613,10 +659,13 @@ function Points({ ordered, items }: { ordered: boolean; items: string[] }) {
 /** Shown when the last part is done: what the lesson was for, and what it changed. */
 function FinishedPanel({
   data,
+  whenSaved,
   onLeave,
   onReview,
 }: {
   data: LessonForPlayer;
+  /** Resolves once the lesson has been recorded as finished. */
+  whenSaved: () => Promise<void>;
   onLeave: () => void;
   onReview: () => void;
 }) {
@@ -625,6 +674,12 @@ function FinishedPanel({
     callCore('learner.concept_evidence', { path: { concept_id: conceptId } }),
   );
   const knowledge = evidence.resource.status === 'ready' ? evidence.resource.data.knowledge : null;
+  // Asked for only once the lesson is recorded as finished: asked any sooner, the answer
+  // could still say "continue this lesson".
+  const overview = useResource(`lesson-next:${data.lesson.lesson_id}`, async () => {
+    await whenSaved();
+    return callCore('learning.overview', { path: { course_id: data.lesson.course_id } });
+  });
 
   return (
     <section className={styles.finished} aria-labelledby="lesson-finished">
@@ -665,11 +720,25 @@ function FinishedPanel({
           )}
         </div>
       ) : null}
+      {overview.resource.status === 'loading' ? (
+        <p className={styles.note} role="status">
+          Working out what to do next…
+        </p>
+      ) : overview.resource.status === 'ready' ? (
+        <div className={styles.finishedNext}>
+          <NextSteps plan={overview.resource.data.plan} courseId={data.lesson.course_id} />
+        </div>
+      ) : null}
       <div className={styles.controlGroup}>
-        <Button variant="primary" onClick={onLeave}>
+        {/* With a suggestion on screen, going back is the quieter choice; without one it
+            is the way forward. */}
+        <Button
+          variant={overview.resource.status === 'ready' ? 'secondary' : 'primary'}
+          onClick={onLeave}
+        >
           Back to the course
         </Button>
-        <Button icon={<RotateCcw />} onClick={onReview}>
+        <Button variant="tertiary" icon={<RotateCcw />} onClick={onReview}>
           Go through it again
         </Button>
       </div>

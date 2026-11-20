@@ -159,7 +159,14 @@ Details and reasoning: `docs/decisions/ADR-010-lesson-ir-and-playback.md`.
 | Mathematics is rendered without HTML strings | `MathText`: `katex.render` into DOM nodes, `trust` off, bounded expansion | `MathText.test.tsx`; the app CSP has no `unsafe-inline` |
 | No asset is loaded from a `data:` URI | Builds set `assetsInlineLimit: 0`; the CSP refuses `data:` fonts | `e2e/lesson.spec.ts` (no console errors while mathematics is on screen) |
 
+| Practice and review questions arrive without their answers too | `learning.start_practice` returns the same player view of a question; answers go to `lessons.answer` | `test_learning_api.py` (searches the response for every key field) |
+| Questions kept for practice are not in the lesson the player is given | `player_view` leaves `practice` out | `test_practice_questions_and_strategies.py` |
+
 A learner's answers and written explanations stay in the local database. They are not logged.
+So does everything else the learner tells Adle: that a suspected mix-up was a slip, that an
+explanation did not help. None of it is sent to the provider; a request for another explanation
+carries the concept, its objectives, and the names of the ways it was taught before, and nothing
+about how the learner did.
 
 ## The model provider and its output
 

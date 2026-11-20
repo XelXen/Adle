@@ -95,7 +95,7 @@ export interface ConceptEvidence {
 export interface ObservationSummary {
   explanation: string;
   id: number;
-  kind: 'answer' | 'self_report';
+  kind: 'answer' | 'self_report' | 'dismissal';
   occurred_at: string;
   state_after: 'not_assessed' | 'building' | 'needs_evidence' | 'demonstrated';
   state_before: 'not_assessed' | 'building' | 'needs_evidence' | 'demonstrated';
@@ -106,6 +106,36 @@ export interface ConceptOrder {
    */
   concept_ids: string[];
 }
+export interface ConceptProgress {
+  concept_id: string;
+  fresh_questions: number;
+  hypotheses: Hypothesis[];
+  knowledge: Knowledge;
+  lessons_completed: number;
+  lessons_total: number;
+  next_fresh_at: string | null;
+  review_due: boolean;
+  title: string;
+}
+/**
+ * A possible explanation for a pattern of answers. A hypothesis, never a verdict.
+ *
+ */
+export interface Hypothesis {
+  can_dismiss: boolean;
+  description: string;
+  is_slip: boolean;
+  kind:
+    | 'prerequisite_gap'
+    | 'definition_confusion'
+    | 'notation_confusion'
+    | 'procedure_order'
+    | 'causal_confusion'
+    | 'arithmetic_slip'
+    | 'misread_question'
+    | 'overgeneralization';
+  status: 'tentative' | 'supported' | 'rejected' | 'resolved';
+}
 export interface ConceptUpdate {
   complexity?: number | null;
   summary?: string | null;
@@ -113,6 +143,7 @@ export interface ConceptUpdate {
   title?: string | null;
 }
 export interface Course {
+  concept_count: number;
   created_at: string;
   description: string;
   id: string;
@@ -250,6 +281,64 @@ export interface LearnerPreferencesUpdate {
   pace?: ('relaxed' | 'standard' | 'brisk') | null;
   voice?: string | null;
   volume?: number | null;
+}
+export interface LearningOverview {
+  concepts: ConceptProgress[];
+  course_id: string;
+  plan: LearningPlan;
+  summary: ProgressSummary;
+}
+export interface LearningPlan {
+  alternatives: NextStep[];
+  note: string | null;
+  recommended: NextStep;
+}
+/**
+ * Something worth doing now, with the reason for it. Never an instruction.
+ *
+ */
+export interface NextStep {
+  about:
+    | (
+        | 'prerequisite_gap'
+        | 'definition_confusion'
+        | 'notation_confusion'
+        | 'procedure_order'
+        | 'causal_confusion'
+        | 'arithmetic_slip'
+        | 'misread_question'
+        | 'overgeneralization'
+      )
+    | null;
+  concept_id: string | null;
+  kind:
+    | 'add_concepts'
+    | 'resume_lesson'
+    | 'revisit_prerequisite'
+    | 'check'
+    | 'another_explanation'
+    | 'review'
+    | 'practise'
+    | 'start_lesson'
+    | 'repeat_lesson'
+    | 'create_lesson'
+    | 'nothing_due';
+  lesson_id: string | null;
+  needs_key: boolean;
+  reason: string;
+  title: string;
+}
+/**
+ * Counts of concepts by what the evidence says. Counts of states, never a score.
+ *
+ */
+export interface ProgressSummary {
+  concepts: number;
+  demonstrated: number;
+  in_progress: number;
+  next_review_at: string | null;
+  not_assessed: number;
+  reviews_due: number;
 }
 /**
  * Everything the player needs: the validated lesson and the scenes it plays.
@@ -441,6 +530,15 @@ export interface LessonProgressUpdate {
   completed?: boolean;
   position: number;
 }
+/**
+ * How the learner would like a new lesson to teach, when they have a preference.
+ *
+ */
+export interface LessonRequest {
+  strategy?:
+    | ('visual' | 'worked_example' | 'analogy' | 'mathematical' | 'socratic' | 'computational')
+    | null;
+}
 export interface ObjectiveInput {
   id?: string | null;
   statement: string;
@@ -478,6 +576,34 @@ export interface Passage {
 }
 export interface Passages {
   passages: Passage[];
+}
+export interface PracticeQuestion {
+  lesson_id: string;
+  question: PlayerQuestion;
+}
+export interface PracticeRequest {
+  about?:
+    | (
+        | 'prerequisite_gap'
+        | 'definition_confusion'
+        | 'notation_confusion'
+        | 'procedure_order'
+        | 'causal_confusion'
+        | 'arithmetic_slip'
+        | 'misread_question'
+        | 'overgeneralization'
+      )
+    | null;
+  count?: number;
+}
+export interface PracticeSet {
+  concept_id: string;
+  concept_title: string;
+  course_id: string;
+  next_fresh_at: string | null;
+  purpose: 'review' | 'check' | 'practise';
+  questions: PracticeQuestion[];
+  reason: string;
 }
 export interface PrerequisiteInput {
   concept_id: string;
@@ -571,4 +697,11 @@ export interface SourceList {
 }
 export interface SourceRefCreate {
   section_id: string;
+}
+/**
+ * The learner says a part of a lesson did not help.
+ *
+ */
+export interface UnhelpfulReport {
+  segment_id: string;
 }

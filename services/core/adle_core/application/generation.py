@@ -23,6 +23,7 @@ from typing import Any
 
 from pydantic import ValidationError
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from adle_core.application.courses import get_course_or_404
 from adle_core.application.curriculum import (
@@ -63,11 +64,12 @@ from adle_core.generation.provider import (
 )
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.ids import new_id
-from adle_core.infrastructure.orm import Concept, Course
+from adle_core.infrastructure.orm import Concept, Course, StoredLesson
 from adle_core.ingestion.types import heading_leaf
+from adle_core.learner_model.next_step import MAX_LESSONS_PER_CONCEPT
 from adle_core.learner_model.preferences import LearnerPreferences
 from adle_core.lessons.bundle import SceneRejectedError, inspect_scene, parse_bundle
-from adle_core.lessons.ir import Lesson, SceneArtifact
+from adle_core.lessons.ir import STRATEGIES, Lesson, SceneArtifact
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +103,29 @@ class _LessonInputs:
     learner: prompts.LearnerBrief
     passages: list[prompts.Passage]
     context: LessonContext
+    #: The way of teaching asked for, if one was chosen.
+    approach: str | None = None
+    #: The ways earlier lessons on this concept used.
+    earlier: tuple[str, ...] = ()
+
+
+#: When another explanation is wanted and the learner has not said which kind, the first
+#: of these that the concept's lessons have not used yet.
+STRATEGY_ROTATION = (
+    "visual",
+    "worked_example",
+    "analogy",
+    "mathematical",
+    "computational",
+    "socratic",
+)
+
+
+def next_strategy(used: Sequence[str]) -> str | None:
+    """A way of teaching the concept has not had yet. ``None`` for a first lesson: no constraint."""
+    if not used:
+        return None
+    return next((name for name in STRATEGY_ROTATION if name not in used), None)
 
 
 def _locator(passage: StoredPassage) -> str:
@@ -345,8 +370,15 @@ class GenerationService:
 
     # -- lessons ---------------------------------------------------------------
 
-    def generate_lesson(self, concept_id: str) -> JobSnapshot:
-        """Start a job that writes a lesson for one concept."""
+    def generate_lesson(self, concept_id: str, *, strategy: str | None = None) -> JobSnapshot:
+        """Start a job that writes a lesson for one concept.
+
+        ``strategy`` is the way of teaching the learner asked for. Without one, a first
+        lesson is left to the writer, and a further lesson uses a way the concept has not
+        had yet, so that "another explanation" is never the same explanation.
+        """
+        if strategy is not None and strategy not in STRATEGIES:
+            raise ValidationFailedError("That is not a way of teaching Adle knows.")
         with self._database.session() as session:
             concept = get_concept_or_404(session, concept_id)
             course_id = concept.course_id
@@ -355,22 +387,43 @@ class GenerationService:
                     "Give this concept at least one learning objective first, "
                     "so the lesson has something to aim at."
                 )
-        self._require_key()
+            existing = len(self._strategies_used(session, concept_id))
         running = self._jobs.find_active(KIND_LESSON, concept_id)
         if running is not None:
             return running
+        if existing >= MAX_LESSONS_PER_CONCEPT:
+            # More explanations of one thing stop helping, and each costs requests.
+            raise ConflictError(
+                f"This concept already has {existing} lessons. "
+                "Remove one you no longer want before creating another."
+            )
+        self._require_key()
         return self._jobs.submit(
             KIND_LESSON,
-            lambda context: self._write_lesson(concept_id, context),
+            lambda context: self._write_lesson(concept_id, context, strategy),
             course_id=course_id,
             subject_id=concept_id,
         )
 
-    def _lesson_inputs(self, concept_id: str) -> _LessonInputs:
+    @staticmethod
+    def _strategies_used(session: Session, concept_id: str) -> list[str]:
+        """The way of teaching of each lesson listed under a concept, oldest first."""
+        documents = session.scalars(
+            select(StoredLesson.document)
+            .where(StoredLesson.concept_id == concept_id)
+            .order_by(StoredLesson.created_at, StoredLesson.id)
+        )
+        return [str(document.get("strategy", "")) for document in documents]
+
+    def _lesson_inputs(self, concept_id: str, strategy: str | None = None) -> _LessonInputs:
         with self._database.session() as session:
             concept_row = get_concept_or_404(session, concept_id)
             course: Course = get_course_or_404(session, concept_row.course_id)
             course_id, course_title = course.id, course.title
+            used = [
+                name for name in self._strategies_used(session, concept_id) if name in STRATEGIES
+            ]
+        approach = strategy or next_strategy(used)
         curriculum = self._curriculum.get(course_id)
         concept = next((item for item in curriculum.concepts if item.id == concept_id), None)
         if concept is None:
@@ -409,7 +462,10 @@ class GenerationService:
                     )
                     for passage in stored
                 ],
+                strategy=approach,
             ),
+            approach=approach,
+            earlier=tuple(dict.fromkeys(used)),
         )
 
     @staticmethod
@@ -429,8 +485,10 @@ class GenerationService:
             goal=preferences.goal,
         )
 
-    def _write_lesson(self, concept_id: str, context: JobContext) -> dict[str, Any]:
-        inputs = self._lesson_inputs(concept_id)
+    def _write_lesson(
+        self, concept_id: str, context: JobContext, strategy: str | None = None
+    ) -> dict[str, Any]:
+        inputs = self._lesson_inputs(concept_id, strategy)
         # One request for the lesson and, usually, two for its pictures.
         planned = 3
 
@@ -452,6 +510,8 @@ class GenerationService:
                 learner=inputs.learner,
                 passages=inputs.passages,
                 problems=problems,
+                approach=inputs.approach,
+                earlier=inputs.earlier,
             )
             result = self._ask(request, context, 0, planned)
             try:

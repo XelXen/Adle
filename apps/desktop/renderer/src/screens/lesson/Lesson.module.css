@@ -339,6 +339,41 @@
   gap: var(--ad-space-2) var(--ad-space-3);
 }
 
+.finishedNext {
+  align-self: stretch;
+  min-width: 0;
+}
+
+/* ---- "This did not help" ------------------------------------------------------------ */
+.ways {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.way {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-4);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-control);
+}
+
+.wayTitle {
+  margin: 0;
+  font: var(--ad-text-body-strong);
+}
+
+.wayField {
+  align-self: stretch;
+  max-width: 24rem;
+}
+
 .objectives {
   display: flex;
   flex-direction: column;

@@ -68,8 +68,14 @@ def accept_proposal(
     response_model=schemas.Job,
     status_code=202,
 )
-def generate_lesson(concept_id: str, services: ServicesDep) -> schemas.Job:
-    return schemas.Job.model_validate(services.generation.generate_lesson(concept_id))
+def generate_lesson(
+    concept_id: str, services: ServicesDep, body: schemas.LessonRequest | None = None
+) -> schemas.Job:
+    """Start writing a lesson. The body is optional: without it Adle chooses how to teach."""
+    strategy = body.strategy if body is not None else None
+    return schemas.Job.model_validate(
+        services.generation.generate_lesson(concept_id, strategy=strategy)
+    )
 
 
 @router.get(

@@ -20,14 +20,18 @@ import type {
   LatestJob,
   LearnerPreferences,
   LearnerPreferencesUpdate,
+  LearningOverview,
   LessonForPlayer,
   LessonList,
   LessonProgress,
   LessonProgressUpdate,
+  LessonRequest,
   ObjectivesUpdate,
   OutlineCandidates,
   OutlineSelection,
   Passages,
+  PracticeRequest,
+  PracticeSet,
   PrerequisitesUpdate,
   ProposalAcceptance,
   ProviderCredential,
@@ -38,6 +42,7 @@ import type {
   SourceDetail,
   SourceList,
   SourceRefCreate,
+  UnhelpfulReport,
 } from './models';
 
 /**
@@ -151,6 +156,17 @@ export const OPERATIONS = {
     path: '/v1/learner/preferences',
     internal: false,
   },
+  'learning.dismiss_hypothesis': {
+    method: 'POST',
+    path: '/v1/concepts/{concept_id}/hypotheses/{kind}/dismiss',
+    internal: false,
+  },
+  'learning.overview': { method: 'GET', path: '/v1/courses/{course_id}/learning', internal: false },
+  'learning.start_practice': {
+    method: 'POST',
+    path: '/v1/concepts/{concept_id}/practice',
+    internal: false,
+  },
   'lessons.answer': {
     method: 'POST',
     path: '/v1/lessons/{lesson_id}/questions/{question_id}/answer',
@@ -159,6 +175,11 @@ export const OPERATIONS = {
   'lessons.delete': { method: 'DELETE', path: '/v1/lessons/{lesson_id}', internal: false },
   'lessons.get': { method: 'GET', path: '/v1/lessons/{lesson_id}', internal: false },
   'lessons.list': { method: 'GET', path: '/v1/courses/{course_id}/lessons', internal: false },
+  'lessons.report_unhelpful': {
+    method: 'POST',
+    path: '/v1/lessons/{lesson_id}/unhelpful',
+    internal: false,
+  },
   'lessons.save_progress': {
     method: 'PUT',
     path: '/v1/lessons/{lesson_id}/progress',
@@ -311,7 +332,7 @@ export interface OperationTypes {
   'generation.generate_lesson': {
     path: { concept_id: string };
     query: undefined;
-    body: undefined;
+    body: LessonRequest | null;
     result: Job;
   };
   'generation.latest_proposal': {
@@ -368,6 +389,35 @@ export interface OperationTypes {
     body: LearnerPreferencesUpdate;
     result: LearnerPreferences;
   };
+  'learning.dismiss_hypothesis': {
+    path: {
+      concept_id: string;
+      kind:
+        | 'prerequisite_gap'
+        | 'definition_confusion'
+        | 'notation_confusion'
+        | 'procedure_order'
+        | 'causal_confusion'
+        | 'arithmetic_slip'
+        | 'misread_question'
+        | 'overgeneralization';
+    };
+    query: undefined;
+    body: undefined;
+    result: LearningOverview;
+  };
+  'learning.overview': {
+    path: { course_id: string };
+    query: undefined;
+    body: undefined;
+    result: LearningOverview;
+  };
+  'learning.start_practice': {
+    path: { concept_id: string };
+    query: undefined;
+    body: PracticeRequest;
+    result: PracticeSet;
+  };
   'lessons.answer': {
     path: { lesson_id: string; question_id: string };
     query: undefined;
@@ -391,6 +441,12 @@ export interface OperationTypes {
     query: undefined;
     body: undefined;
     result: LessonList;
+  };
+  'lessons.report_unhelpful': {
+    path: { lesson_id: string };
+    query: undefined;
+    body: UnhelpfulReport;
+    result: null;
   };
   'lessons.save_progress': {
     path: { lesson_id: string };

@@ -19,6 +19,9 @@ class MasteryState(StrEnum):
     DEMONSTRATED = "demonstrated"
 
 
+#: How an unresolved misunderstanding is named among the things still needed.
+MISUNDERSTANDING_TO_CLEAR = "a possible misunderstanding to clear up"
+
 STATE_LABELS: dict[MasteryState, str] = {
     MasteryState.NOT_ASSESSED: "Not assessed",
     MasteryState.BUILDING: "Building understanding",
@@ -111,7 +114,7 @@ def assess(evidence: Evidence, criteria: MasteryCriteria = DEFAULT_CRITERIA) -> 
     if criteria.require_transfer and evidence.transfer_applicable and evidence.transfer_correct < 1:
         missing.append("a correct answer that applies the idea to a new situation")
     if evidence.unresolved_misconception:
-        missing.append("a possible misunderstanding to clear up")
+        missing.append(MISUNDERSTANDING_TO_CLEAR)
     if not missing and evidence.probability < criteria.demonstrated_probability:
         missing.append("more consistent correct answers")
 

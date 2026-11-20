@@ -8,10 +8,11 @@ import { CoreStatusIndicator } from './components/CoreStatusIndicator';
 import { CourseScreen } from './screens/course/CourseScreen';
 import { HomeScreen } from './screens/home/HomeScreen';
 import { LessonScreen } from './screens/lesson/LessonScreen';
+import { PracticeScreen } from './screens/practice/PracticeScreen';
 import { SettingsScreen } from './screens/settings/SettingsScreen';
 import { WelcomeScreen } from './screens/welcome/WelcomeScreen';
 
-function Screen({ route }: { route: Route }) {
+function Screen({ route, visit }: { route: Route; visit: number }) {
   switch (route.name) {
     case 'home':
       return <HomeScreen />;
@@ -22,6 +23,16 @@ function Screen({ route }: { route: Route }) {
       return (
         <LessonScreen key={route.lessonId} courseId={route.courseId} lessonId={route.lessonId} />
       );
+    case 'practice':
+      // Opening practice again, even on the same concept, asks for a fresh set of questions.
+      return (
+        <PracticeScreen
+          key={visit}
+          courseId={route.courseId}
+          conceptId={route.conceptId}
+          about={route.about}
+        />
+      );
     case 'settings':
       return <SettingsScreen tab={route.tab} />;
   }
@@ -29,7 +40,7 @@ function Screen({ route }: { route: Route }) {
 
 export function App() {
   const { ui } = useApp();
-  const { route, navigate } = useRouter();
+  const { route, visit, navigate } = useRouter();
 
   return (
     <ToastProvider>
@@ -54,7 +65,7 @@ export function App() {
           }
           footer={<CoreStatusIndicator />}
         >
-          <Screen route={route} />
+          <Screen route={route} visit={visit} />
         </AppShell>
       ) : (
         <WelcomeScreen />

@@ -1,0 +1,124 @@
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-5);
+  min-width: 0;
+}
+
+/* ---- The suggestion -------------------------------------------------------- */
+.recommended {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-5) var(--ad-space-6);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-left: var(--ad-space-1) solid var(--ad-color-primary);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-1);
+}
+
+.eyebrow {
+  margin: 0;
+  font: var(--ad-text-caption);
+  color: var(--ad-color-primary-text);
+}
+
+.title {
+  margin: 0;
+  font: var(--ad-text-title);
+  overflow-wrap: anywhere;
+}
+
+.reason {
+  margin: 0;
+  max-width: var(--ad-layout-reading-max);
+}
+
+.why {
+  font: var(--ad-text-body-strong);
+}
+
+.note {
+  margin: 0;
+  max-width: var(--ad-layout-reading-max);
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2) var(--ad-space-3);
+}
+
+.hint {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+/* A control that asks the provider for something brings its own explanation and progress. */
+.generation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  align-self: stretch;
+  min-width: 0;
+}
+
+/* ---- What could be done instead ---------------------------------------------- */
+.others {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+}
+
+.othersTitle {
+  margin: 0;
+  font: var(--ad-text-body-strong);
+  color: var(--ad-color-muted);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+}
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ad-space-3) var(--ad-space-5);
+  padding: var(--ad-space-4) var(--ad-space-5);
+}
+
+.item + .item {
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+}
+
+.itemText {
+  display: flex;
+  flex: 1 1 18rem;
+  flex-direction: column;
+  gap: var(--ad-space-1);
+  min-width: 0;
+}
+
+.itemTitle {
+  font: var(--ad-text-body-strong);
+  overflow-wrap: anywhere;
+}
+
+.itemReason {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}

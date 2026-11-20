@@ -157,6 +157,24 @@ Say what happened in words, not in colour. The chosen option reads "Your answer"
 never `danger`) inside a live region, with the explanation and what the answer changed. A wrong
 answer is "Not quite", never "Wrong".
 
+### What next
+
+A suggestion is shown the same way everywhere (`NextSteps`, in the app): the Learn tab, the end
+of a lesson, the end of a set of questions. One card with "Suggested next step", the step as a
+heading, **Why:** and the reason, and one primary button. Under it, "Or instead": the
+alternatives as a quiet list, each with its own reason and a secondary button. A suggestion is
+never the only way forward and never a blocker.
+
+- The button says what it does ("Start lesson", "Start review", "Answer a few questions"); the
+  heading says what with. The button is described by the heading, so two "Start lesson" buttons
+  on one screen are told apart by a screen reader.
+- A step that needs something the learner has not set up says so beside its button and leads
+  there. It is never hidden, and never placed before a step that can be done.
+- A step with nothing to do ("Nothing is due") has no button.
+- What Adle has noticed about a concept is a `Badge` for how far the evidence goes
+  ("Suspected, not established", "Seen more than once", "Set aside", "Sorted") and a sentence.
+  Never `danger`: a hypothesis is not an error.
+
 ### Work the AI is doing
 
 Anything the provider is asked to do takes a while and may fail, so it is always shown the same

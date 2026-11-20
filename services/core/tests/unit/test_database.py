@@ -9,6 +9,7 @@ from importlib import resources
 from pathlib import Path
 
 import pytest
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
@@ -27,7 +28,13 @@ from adle_core.infrastructure.migrate import (
     migrate,
     restore_database,
 )
-from adle_core.infrastructure.orm import Course, Source, SourceChunk, SourceSection
+from adle_core.infrastructure.orm import (
+    Course,
+    LearnerEvent,
+    Source,
+    SourceChunk,
+    SourceSection,
+)
 
 #: The newest real revision, read before any test swaps the migration scripts.
 REAL_HEAD = head_revision()
@@ -577,3 +584,124 @@ def test_the_same_file_cannot_be_stored_twice_in_one_course(
                 char_count=4,
             )
         )
+
+
+# -- upgrading real data across a table rebuild ----------------------------------
+
+
+def _upgrade_to(database: Database, revision: str) -> None:
+    config = migrate_module._alembic_config()
+    with database.engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, revision)
+
+
+def test_learner_evidence_survives_the_rebuild_that_adds_dismissals(
+    database: Database, backups: Path
+) -> None:
+    """Revision 0005 rebuilds ``learner_observations``. Nothing recorded before it may be lost."""
+    _upgrade_to(database, "0004")
+    stamp = "2026-11-01 10:00:00.000000"
+    with database.engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO courses (id, title, description, origin, created_at, updated_at) "
+                "VALUES ('crs_00000000000000000001', 'Kept', '', 'topic', :at, :at)"
+            ),
+            {"at": stamp},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO concepts (id, course_id, title, summary, position, complexity, "
+                "tags, origin, created_at, updated_at) VALUES ('con_00000000000000000001', "
+                "'crs_00000000000000000001', 'Weights', '', 0, 2, '[]', 'learner', :at, :at)"
+            ),
+            {"at": stamp},
+        )
+        for outcome in ("correct", "incorrect"):
+            connection.execute(
+                text(
+                    "INSERT INTO learner_observations (concept_id, course_id, occurred_at, kind, "
+                    "outcome, question_form, is_transfer, hinted, unsure, item_guess, "
+                    "state_before, state_after, explanation, config_version) VALUES "
+                    "('con_00000000000000000001', 'crs_00000000000000000001', :at, 'answer', "
+                    ":outcome, 'numeric', 0, 1, 0, 0.02, 'not_assessed', 'building', "
+                    "'An explanation worth keeping.', 'bkt-1')"
+                ),
+                {"at": stamp, "outcome": outcome},
+            )
+        connection.execute(
+            text(
+                "INSERT INTO learner_concept_states (concept_id, course_id, probability, state, "
+                "missing, answered, correct, unaided_correct, hinted, skipped, forms_correct, "
+                "transfer_correct, review_streak, updated_at) VALUES ('con_00000000000000000001', "
+                "'crs_00000000000000000001', 0.4, 'building', '[]', 2, 1, 0, 2, 0, '[]', 0, 0, :at)"
+            ),
+            {"at": stamp},
+        )
+
+    outcome = migrate(database, backups)
+    assert (outcome.previous_revision, outcome.current_revision) == ("0004", head_revision())
+    assert outcome.backup_path is not None
+    assert outcome.backup_path.exists()
+
+    with database.engine.begin() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT id, outcome, hinted, explanation, config_version, slip, "
+                "unresolved_misconception FROM learner_observations ORDER BY id"
+            )
+        ).all()
+        assert [tuple(row) for row in rows] == [
+            (1, "correct", 1, "An explanation worth keeping.", "bkt-1", 0, None),
+            (2, "incorrect", 1, "An explanation worth keeping.", "bkt-1", 0, None),
+        ]
+        state = connection.execute(
+            text("SELECT answered, unresolved_misconception FROM learner_concept_states")
+        ).one()
+        assert tuple(state) == (2, 0)
+        indexes = {
+            row[1] for row in connection.execute(text("PRAGMA index_list('learner_observations')"))
+        }
+        assert {"ix_learner_observations_concept", "ix_learner_observations_course_id"} <= indexes
+
+        # The new kind is accepted, and the rule that there are only a few kinds still holds.
+        insert = text(
+            "INSERT INTO learner_observations (concept_id, course_id, occurred_at, kind, "
+            "is_transfer, hinted, unsure, slip, unresolved_misconception, state_before, "
+            "state_after, explanation, config_version) VALUES ('con_00000000000000000001', "
+            "'crs_00000000000000000001', :at, :kind, 0, 0, 0, 0, 0, 'building', 'building', "
+            "'x', 'bkt-2')"
+        )
+        connection.execute(insert, {"at": stamp, "kind": "dismissal"})
+        with pytest.raises(Exception, match="kind_allowed"):
+            connection.execute(insert, {"at": stamp, "kind": "rumour"})
+
+
+def test_removing_a_course_removes_what_the_learner_did_in_it(
+    database: Database, backups: Path
+) -> None:
+    migrate(database, backups)
+    add_course(database)
+    with database.session() as session:
+        session.add(
+            LearnerEvent(
+                course_id="crs_00000000000000000001",
+                occurred_at=datetime(2026, 11, 19, 12, 0, tzinfo=UTC),
+                kind="lesson_completed",
+                detail={},
+            )
+        )
+    with pytest.raises(Exception, match="kind_allowed"), database.session() as session:
+        session.add(
+            LearnerEvent(
+                course_id="crs_00000000000000000001",
+                occurred_at=datetime(2026, 11, 19, 12, 0, tzinfo=UTC),
+                kind="mood_inferred",
+                detail={},
+            )
+        )
+    with database.session() as session:
+        session.delete(session.get(Course, "crs_00000000000000000001"))
+    with database.engine.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM learner_events")).scalar_one() == 0

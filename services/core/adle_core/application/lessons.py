@@ -16,10 +16,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from adle_core.application.courses import get_course_or_404
+from adle_core.application.evidence import EVENT_LESSON_COMPLETED
 from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
-from adle_core.infrastructure.database import Database
+from adle_core.infrastructure.database import Database, utc_now
 from adle_core.infrastructure.orm import (
     Concept,
+    LearnerEvent,
     LearningObjective,
     LessonProgress,
     Source,
@@ -173,7 +175,7 @@ class LessonService:
 
         objective_ids = {
             objective.objective_id for objective in lesson.objectives if objective.objective_id
-        } | {question.objective_id for question in lesson.questions() if question.objective_id}
+        } | {question.objective_id for question in lesson.all_questions() if question.objective_id}
         if objective_ids:
             known = set(
                 session.scalars(
@@ -263,6 +265,19 @@ class LessonService:
                 progress = LessonProgress(lesson_id=lesson_id, position=position, completed=False)
                 session.add(progress)
             progress.position = position
+            if completed and not progress.completed:
+                # Kept as an event because the progress row moves on when the lesson is
+                # opened again, and "when was this finished" would be lost with it.
+                session.add(
+                    LearnerEvent(
+                        course_id=row.course_id,
+                        concept_id=row.concept_id,
+                        lesson_id=row.id,
+                        occurred_at=utc_now(),
+                        kind=EVENT_LESSON_COMPLETED,
+                        detail={},
+                    )
+                )
             progress.completed = progress.completed or completed
             session.flush()
             return _progress(progress)

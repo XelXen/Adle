@@ -53,6 +53,7 @@ def test_course_lifecycle(client: TestClient) -> None:
     assert course["description"] == "From my lecture notes"
     assert course["origin"] == "materials"
     assert course["source_count"] == 0
+    assert course["concept_count"] == 0
     assert course["last_opened_at"] is None
 
     opened = client.get(f"/v1/courses/{course['id']}", params={"opened": True}).json()

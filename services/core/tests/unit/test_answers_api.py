@@ -111,7 +111,7 @@ def test_answering_again_after_seeing_the_explanation_counts_as_aided(
     second = answer(client, lesson, "q_influence", option_id="a").json()
     assert (first["attempt_number"], second["attempt_number"]) == (1, 2)
     assert second["outcome"] == "correct"
-    assert "after a hint" in second["change"]
+    assert "seen its explanation a short while ago" in second["change"]
     assert "3 more correct answers without a hint" in second["knowledge"]["missing"]
     with services.database.session() as session:
         attempts = session.scalars(select(Attempt).order_by(Attempt.id)).all()

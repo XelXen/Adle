@@ -15,6 +15,7 @@ import type {
   ConceptEvidence,
   Curriculum,
   Job,
+  LessonRequest,
   LessonSummary,
   Passage,
 } from '@adle/contracts';
@@ -24,6 +25,7 @@ import {
   Callout,
   Card,
   IconButton,
+  Select,
   Spinner,
   type Tone,
   useToast,
@@ -82,6 +84,19 @@ export type ConceptLessons =
   | { status: 'error'; message: string; retry: () => void }
   | { status: 'ready'; lessons: readonly LessonSummary[] };
 
+/** A way of teaching a lesson can be asked to use. */
+export type TeachingStrategy = NonNullable<NonNullable<LessonRequest['strategy']>>;
+
+export const STRATEGY_CHOICES: readonly { value: TeachingStrategy | ''; label: string }[] = [
+  { value: '', label: 'Let Adle choose' },
+  { value: 'visual', label: 'Pictures first' },
+  { value: 'worked_example', label: 'A worked example' },
+  { value: 'analogy', label: 'An everyday comparison' },
+  { value: 'mathematical', label: 'The mathematics, step by step' },
+  { value: 'computational', label: 'A calculation carried out by hand' },
+  { value: 'socratic', label: 'Questions that lead to the idea' },
+];
+
 /** Where the making of a lesson for one concept stands. */
 export interface LessonGeneration {
   /** The job writing a lesson for this concept, if this screen knows of one. */
@@ -92,7 +107,8 @@ export interface LessonGeneration {
   refusal: JobFailure | null;
   /** The provider the request goes to, as the learner knows it. */
   providerName: string;
-  onCreate: () => void;
+  /** Ask for a lesson, in a chosen way of teaching or (with null) in whichever suits. */
+  onCreate: (strategy: TeachingStrategy | null) => void;
   onCancel: () => void;
   onDismiss: () => void;
 }
@@ -134,6 +150,7 @@ export function ConceptDetail({
   const [passages, setPassages] = useState<PassageState>({ status: 'idle' });
   const [history, setHistory] = useState<HistoryState>({ status: 'closed' });
   const [linking, setLinking] = useState<string | null>(null);
+  const [strategy, setStrategy] = useState<TeachingStrategy | ''>('');
 
   const dependents = directDependents(path, concept.id);
   const linkedSections = new Set(concept.source_refs.map((ref) => ref.section_id));
@@ -291,7 +308,7 @@ export function ConceptDetail({
           subject="the lesson"
           waitingText="Waiting for its turn"
           onCancel={generation.onCancel}
-          onRetry={generation.onCreate}
+          onRetry={() => generation.onCreate(strategy || null)}
           onDismiss={generation.onDismiss}
         />
         {/* While work is under way, or its failure is on screen with its own way forward,
@@ -302,12 +319,25 @@ export function ConceptDetail({
         generation.job?.status === 'failed' ||
         generation.job?.status === 'cancelled' ? null : (
           <div className={styles.generation}>
+            {/* A first lesson is left to the writer. For another one, the learner can say
+                what kind of explanation they want this time. */}
+            {lessons.status === 'ready' && lessons.lessons.length > 0 ? (
+              <div className={styles.strategy}>
+                <Select
+                  label="How should it explain?"
+                  value={strategy}
+                  options={STRATEGY_CHOICES}
+                  description="Left to Adle, it uses a way this concept has not been taught in yet."
+                  onValueChange={setStrategy}
+                />
+              </div>
+            ) : null}
             <div>
               <Button
                 size="small"
                 icon={<Sparkles />}
                 disabled={concept.objectives.length === 0}
-                onClick={generation.onCreate}
+                onClick={() => generation.onCreate(strategy || null)}
               >
                 {lessons.status === 'ready' && lessons.lessons.length > 0
                   ? 'Create another lesson with AI'

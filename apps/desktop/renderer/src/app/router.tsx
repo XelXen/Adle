@@ -8,21 +8,30 @@ import {
   useState,
 } from 'react';
 
+import type { Hypothesis } from '@adle/contracts';
+
 export const SETTINGS_TABS = ['ai', 'learning', 'appearance', 'privacy', 'about'] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
-export const COURSE_TABS = ['curriculum', 'sources'] as const;
+export const COURSE_TABS = ['learn', 'curriculum', 'sources'] as const;
 export type CourseTab = (typeof COURSE_TABS)[number];
+
+/** A kind of mistake a set of questions can be about. */
+export type MistakeKind = Hypothesis['kind'];
 
 /** Every destination in the app. Adding a screen means adding a variant here. */
 export type Route =
   | { name: 'home' }
   | { name: 'course'; courseId: string; tab: CourseTab }
   | { name: 'lesson'; courseId: string; lessonId: string }
+  /** A few questions on one concept: practice, a review, or a check on a suspected mistake. */
+  | { name: 'practice'; courseId: string; conceptId: string; about?: MistakeKind }
   | { name: 'settings'; tab: SettingsTab };
 
 interface RouterValue {
   route: Route;
+  /** Goes up with every navigation, so a screen can start afresh when it is opened again. */
+  visit: number;
   navigate: (route: Route) => void;
   back: () => void;
 }
@@ -36,12 +45,20 @@ function isRoute(value: unknown): value is Route {
     tab?: unknown;
     courseId?: unknown;
     lessonId?: unknown;
+    conceptId?: unknown;
+    about?: unknown;
   };
   switch (candidate.name) {
     case 'home':
       return true;
     case 'lesson':
       return typeof candidate.courseId === 'string' && typeof candidate.lessonId === 'string';
+    case 'practice':
+      return (
+        typeof candidate.courseId === 'string' &&
+        typeof candidate.conceptId === 'string' &&
+        (candidate.about === undefined || typeof candidate.about === 'string')
+      );
     case 'settings':
       return (SETTINGS_TABS as readonly unknown[]).includes(candidate.tab);
     case 'course':
@@ -62,11 +79,14 @@ export function RouterProvider({ initial, children }: { initial: Route; children
   const [route, setRoute] = useState<Route>(() =>
     isRoute(window.history.state) ? window.history.state : initial,
   );
+  const [visit, setVisit] = useState(0);
 
   useEffect(() => {
     if (!isRoute(window.history.state)) window.history.replaceState(initial, '');
     const onPopState = (event: PopStateEvent): void => {
-      if (isRoute(event.state)) setRoute(event.state);
+      if (!isRoute(event.state)) return;
+      setRoute(event.state);
+      setVisit((count) => count + 1);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -75,6 +95,7 @@ export function RouterProvider({ initial, children }: { initial: Route; children
   const navigate = useCallback((next: Route) => {
     window.history.pushState(next, '');
     setRoute(next);
+    setVisit((count) => count + 1);
     // Each navigation starts at the top with focus on the new page.
     document.getElementById('ad-main')?.focus({ preventScroll: true });
     document.getElementById('ad-main')?.scrollTo({ top: 0 });
@@ -82,7 +103,7 @@ export function RouterProvider({ initial, children }: { initial: Route; children
 
   const back = useCallback(() => window.history.back(), []);
 
-  const value = useMemo(() => ({ route, navigate, back }), [route, navigate, back]);
+  const value = useMemo(() => ({ route, visit, navigate, back }), [route, visit, navigate, back]);
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }
 

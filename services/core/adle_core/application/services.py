@@ -18,6 +18,7 @@ from adle_core.application.curriculum import CurriculumService
 from adle_core.application.generation import GenerationService
 from adle_core.application.jobs import JobRunner
 from adle_core.application.learner import LearnerService
+from adle_core.application.learning import LearningService
 from adle_core.application.lessons import LessonService
 from adle_core.application.model_gateway import ModelGateway
 from adle_core.application.retrieval import FtsRetriever, Retriever
@@ -48,6 +49,7 @@ class Services:
     learner: LearnerService
     lessons: LessonService
     assessment: AssessmentService
+    learning: LearningService
     sample_course: SampleCourseService
     provider_client: ChatClient
     gateway: ModelGateway
@@ -106,6 +108,7 @@ def build_services(
         learner=learner,
         lessons=lessons,
         assessment=AssessmentService(database, lessons, learner),
+        learning=LearningService(database, curriculum, learner, credentials),
         sample_course=SampleCourseService(database, courses, curriculum, lessons),
         provider_client=provider_client,
         gateway=gateway,

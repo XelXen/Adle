@@ -1,29 +1,46 @@
-"""Answering a lesson's questions.
+"""Answering a question, in a lesson or in practice.
 
-One call does three things in one transaction: scores the answer by the
-question's rule, keeps the attempt, and records it as evidence about the
-concept. What comes back is what the learner should see: whether it was right,
-why the right answer is right, and what the answer changed.
+One call does four things in one transaction: scores the answer by the
+question's rule, works out what it changes about any suspected mistake, keeps
+the attempt, and records it as evidence about the concept. What comes back is
+what the learner should see: whether it was right, why the right answer is
+right, and what the answer changed.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from adle_core.application.curriculum import (
     KnowledgeRecord,
     get_concept_or_404,
     knowledge_record,
 )
+from adle_core.application.evidence import concept_events, question_key
 from adle_core.application.learner import LearnerService
 from adle_core.application.lessons import LessonService
 from adle_core.errors import NotFoundError, ValidationFailedError
-from adle_core.evaluation.scoring import MalformedResponseError, Response, Score, score
+from adle_core.evaluation.scoring import (
+    MalformedResponseError,
+    Response,
+    Score,
+    reveals,
+    score,
+)
 from adle_core.infrastructure.database import Database, utc_now
 from adle_core.infrastructure.orm import Attempt, LearnerConceptState
 from adle_core.learner_model.bkt import Outcome
+from adle_core.learner_model.misconceptions import (
+    SLIPS,
+    Answer,
+    blocks_mastery,
+    describe_change,
+    fold,
+)
+from adle_core.learner_model.practice import FRESH_AGAIN_AFTER
 from adle_core.learner_model.tracing import Observation, ObservationKind
 from adle_core.lessons.ir import guess_probability
 
@@ -59,11 +76,13 @@ class AssessmentService:
         *,
         hinted: bool = False,
         unsure: bool = False,
+        now: datetime | None = None,
     ) -> AnswerResult:
         """Score an answer and record it. ``response`` is ``None`` for an explicit skip."""
+        moment = now or utc_now()
         lesson = self._lessons.get_lesson(lesson_id)
         item = next(
-            (question for question in lesson.questions() if question.id == question_id), None
+            (question for question in lesson.all_questions() if question.id == question_id), None
         )
         if item is None:
             raise NotFoundError("That question is not part of this lesson.")
@@ -75,36 +94,63 @@ class AssessmentService:
                 result = score(item, response)
             except MalformedResponseError as error:
                 raise ValidationFailedError(str(error)) from error
+        skipped = result.outcome is Outcome.SKIPPED
+        can_reveal = reveals(item)
 
         with self._database.session() as session:
             concept = get_concept_or_404(session, item.concept_id)
-            earlier = (
-                session.scalar(
-                    select(func.count(Attempt.id)).where(
-                        Attempt.lesson_id == lesson_id,
-                        Attempt.question_id == question_id,
-                        Attempt.outcome != Outcome.SKIPPED.value,
-                    )
+            earlier = session.scalars(
+                select(Attempt)
+                .where(
+                    Attempt.lesson_id == lesson_id,
+                    Attempt.question_id == question_id,
+                    Attempt.outcome != Outcome.SKIPPED.value,
                 )
-                or 0
-            )
-            # After a first answer the learner has seen the explanation, so a repeat
-            # shows recall of that explanation at best. It counts as an aided answer.
-            aided = hinted or earlier > 0
-            skipped = result.outcome is Outcome.SKIPPED
+                .order_by(Attempt.id)
+            ).all()
+            # A little while after a first answer the learner still has its explanation in
+            # mind, so a repeat shows recall of that explanation at best. It counts as an
+            # aided answer. After a real gap, answering again is recall, and counts in full.
+            repeated = bool(earlier) and moment - earlier[-1].created_at < FRESH_AGAIN_AFTER
+            aided = hinted or repeated
+            doubtful = unsure or result.self_assessed
+
+            history = concept_events(session, concept.id)
+            before = fold(history)
+            after = before
+            if not skipped:
+                after = fold(
+                    [
+                        *history,
+                        Answer(
+                            occurred_at=moment,
+                            question_id=question_key(lesson_id, question_id),
+                            outcome=result.outcome,
+                            hinted=aided,
+                            unsure=doubtful,
+                            suggests=result.misconception,
+                            reveals=can_reveal,
+                        ),
+                    ]
+                )
+
             transition = self._learner.record_in(
                 session,
                 concept,
                 Observation(
                     kind=ObservationKind.ANSWER,
-                    occurred_at=utc_now(),
+                    occurred_at=moment,
                     outcome=result.outcome,
                     question_form=None if skipped else item.form,
                     is_transfer=item.is_transfer and not skipped,
                     hinted=aided and not skipped,
-                    unsure=(unsure or result.self_assessed) and not skipped,
+                    unsure=doubtful and not skipped,
                     item_guess=None if skipped else guess_probability(item),
+                    slip=result.outcome is Outcome.INCORRECT and result.misconception in SLIPS,
+                    repeated=repeated and not hinted and not skipped,
+                    unresolved_misconception=None if skipped else blocks_mastery(after.values()),
                 ),
+                note=describe_change(before, after) or None,
             )
             session.flush()
             session.add(
@@ -118,6 +164,8 @@ class AssessmentService:
                     hinted=aided and not skipped,
                     unsure=unsure and not skipped,
                     misconception=result.misconception,
+                    reveals=sorted(can_reveal),
+                    created_at=moment,
                 )
             )
             session.flush()
@@ -130,5 +178,5 @@ class AssessmentService:
                 correct_option=result.correct_option,
                 change=transition.explanation,
                 knowledge=knowledge_record(state),
-                attempt_number=earlier + (0 if skipped else 1),
+                attempt_number=len(earlier) + (0 if skipped else 1),
             )

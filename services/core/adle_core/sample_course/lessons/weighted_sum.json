@@ -4,7 +4,9 @@
     "lesson_id": "@lesson",
     "course_id": "@course",
     "title": "Weights and bias: how a neuron adds things up",
-    "concept_ids": ["@concept:weighted_sum"],
+    "concept_ids": [
+      "@concept:weighted_sum"
+    ],
     "objectives": [
       {
         "objective_id": "@objective:weighted_sum.compute",
@@ -258,6 +260,99 @@
             "text": "Next, we will see what the neuron does with this sum."
           }
         ]
+      }
+    ],
+    "practice": [
+      {
+        "id": "q_zero_weight",
+        "form": "true_false",
+        "concept_id": "@concept:weighted_sum",
+        "objective_id": "@objective:weighted_sum.interpret",
+        "stem": "True or false: if an input's weight is $0$, changing that input does not change the weighted sum.",
+        "correct": true,
+        "explanation": "The input is multiplied by its weight before anything is added. Anything times zero is zero, so that input contributes nothing, whatever its value.",
+        "hint": "What is any number multiplied by zero?",
+        "difficulty": 1
+      },
+      {
+        "id": "q_negative_weight",
+        "form": "multiple_choice",
+        "concept_id": "@concept:weighted_sum",
+        "objective_id": "@objective:weighted_sum.interpret",
+        "stem": "A neuron has one input, with weight $w = -2$ and bias $b = 0$. The input rises from $1$ to $3$. What happens to $z$?",
+        "options": [
+          {
+            "id": "a",
+            "text": "It falls from $-2$ to $-6$",
+            "feedback": "Yes. A negative weight turns a rise in the input into a fall in the sum."
+          },
+          {
+            "id": "b",
+            "text": "It rises from $2$ to $6$",
+            "feedback": "That would be a weight of $2$. With a weight of $-2$ each product is negative, so a larger input pulls the sum further down.",
+            "misconception": "causal_confusion"
+          },
+          {
+            "id": "c",
+            "text": "It stays the same",
+            "feedback": "The part that stays the same whatever the input does is the bias. This input is multiplied by a weight that is not zero, so changing it changes the sum.",
+            "misconception": "definition_confusion"
+          }
+        ],
+        "correct_option": "a",
+        "explanation": "$z = w x + b$. At $x = 1$ that is $-2$, and at $x = 3$ it is $-6$. With a negative weight, the more of the input there is, the lower the sum.",
+        "hint": "Work out $z$ for each value of the input.",
+        "difficulty": 2,
+        "is_transfer": true
+      },
+      {
+        "id": "q_three_inputs",
+        "form": "numeric",
+        "concept_id": "@concept:weighted_sum",
+        "objective_id": "@objective:weighted_sum.compute",
+        "stem": "Inputs $x_1 = 2$, $x_2 = -1$ and $x_3 = 3$. Weights $w_1 = 1$, $w_2 = 4$ and $w_3 = 0.5$. Bias $b = 2$. What is $z$?",
+        "expected": 1.5,
+        "tolerance": 0.001,
+        "explanation": "$1 \\times 2 = 2$, $4 \\times (-1) = -4$ and $0.5 \\times 3 = 1.5$. Together that is $-0.5$, and adding the bias of $2$ gives $z = 1.5$.",
+        "hint": "There are three products to add before the bias. One of them is negative.",
+        "difficulty": 3
+      },
+      {
+        "id": "q_only_the_bias",
+        "form": "short_answer",
+        "concept_id": "@concept:weighted_sum",
+        "objective_id": "@objective:weighted_sum.bias",
+        "stem": "Every input of a neuron is $0$, and its weighted sum $z$ is $-4$. Which part of the neuron has the value $-4$? Answer in one word.",
+        "accepted": [
+          "bias",
+          "the bias",
+          "its bias",
+          "b"
+        ],
+        "explanation": "With every input at zero, each product $w x$ is zero. Only the bias is left, so the bias is $-4$.",
+        "hint": "Write out $z$ with zeros in place of the inputs and see what remains.",
+        "difficulty": 1
+      },
+      {
+        "id": "q_why_a_bias",
+        "form": "explanation",
+        "concept_id": "@concept:weighted_sum",
+        "objective_id": "@objective:weighted_sum.bias",
+        "stem": "In your own words: what can the bias do that the weights cannot?",
+        "rubric": [
+          {
+            "id": "shift",
+            "text": "It shifts the sum by a fixed amount, whatever the inputs are"
+          },
+          {
+            "id": "zero",
+            "text": "It lets the neuron give something other than zero when every input is zero"
+          }
+        ],
+        "required_points": 1,
+        "sample_answer": "A weight only scales its input, so when every input is zero the weights contribute nothing. The bias is added whatever the inputs are, so it shifts the whole sum up or down and sets what the neuron gives when nothing is coming in.",
+        "explanation": "Weights scale inputs; the bias is added regardless of them. That is why a neuron can have a baseline other than zero.",
+        "difficulty": 2
       }
     ]
   },

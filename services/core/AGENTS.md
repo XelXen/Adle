@@ -28,7 +28,8 @@ adle_core/
   api/            FastAPI app factory, auth, error contract, schemas, routes (no domain logic)
   application/    service container; courses, sources, jobs, curriculum, learner, retrieval
   curriculum/     PURE rules: concept graph (loops, order, layers), outline from headings
-  learner_model/  PURE rules: knowledge tracing, mastery states, review schedule, preferences
+  learner_model/  PURE rules: knowledge tracing, mastery states, review schedule, preferences,
+                  hypotheses about mistakes, which questions to practise, the next step
   lessons/        PURE: the Lesson IR, the validating gateway (bundle.py), the player view
   evaluation/     PURE: deterministic scoring of answers
   sample_course/  package data: course outline, lesson templates, scene files
@@ -90,6 +91,22 @@ everything and decides nothing.
 - **An answer is recorded once, whole:** the attempt and its observation in one transaction
   (`AssessmentService.answer`). Scoring is deterministic; anything a model helps judge (M6) is
   bounded by a rubric and marked as such.
+- **A hypothesis about a mistake is never stored.** It is folded from attempts and dismissals
+  by `learner_model.misconceptions.fold` (read them with `application/evidence.py`). Do not add
+  a table or a cache for it. What reaches the knowledge state is one flag on the observation.
+- **What to do next, and which questions to ask, are decided in `learner_model/next_step.py`
+  and `practice.py`.** `LearningService` gathers and translates; it must not grow an `if` that
+  chooses. Every `Step` needs a reason a learner could disagree with, with no score in it
+  (`test_practice_and_next_step.py` checks every reason).
+- **Never suggest the same lesson again after it did not work**, and never suggest practice for
+  something practice cannot supply. Both are tests; keep them passing rather than special-casing.
+- **Time is an argument.** Anything that depends on "now" (`AssessmentService.answer`,
+  `LearningService`) takes `now`; routes do not pass it. Tests move the clock that way.
+- **`learner_events` is append-only** and holds only events something reads. Adding a kind means
+  a migration (the kinds are a CHECK constraint) and a reader.
+- **A question's `reveals` is stored with each attempt** (`evaluation.scoring.reveals`), as it
+  was when answered. A right answer counts against a hypothesis only if the question could have
+  shown it.
 - **Sample content** is addressed by key in templates (`@concept:weighted_sum`) and installed
   through the ordinary services. Scene files there are excluded from ruff and mypy: they are
   Wanim scenes, not service code.

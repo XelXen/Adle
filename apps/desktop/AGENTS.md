@@ -101,10 +101,29 @@ path, a URL, or a directory from the renderer.
   outlives a render and is not React state belongs in a small class created once in
   `useState(() => …)` (see `openSession` in `LessonScreen.tsx`).
 
+## What next, practice, and progress
+
+- The renderer shows what the core decided and decides nothing: the step, its reason, the
+  alternatives, the questions, and every sentence about a hypothesis come from
+  `learning.overview` and `learning.start_practice`. `lib/learning.ts` only maps a step to a
+  destination and puts counts and waits into words.
+- Show a plan with `NextSteps` wherever there is one. Do not build a second way of presenting a
+  suggestion.
+- Practice reuses `CheckpointPanel` and `lessons.answer`. A practice question is answered at the
+  lesson it belongs to (`lesson_id` comes with it).
+- Opening a route again must be able to start afresh: `useRouter().visit` goes up with every
+  navigation; key a screen on it when "the same place again" means "a new run"
+  (`PracticeScreen`).
+- Words for progress are states and counts. No percentage, no bar that reads as a score.
+- "This did not help" is recorded first and never argued with. What it offers must not include
+  the same content again.
+- A course with concepts opens on the Learn tab. End-to-end journeys that are about the
+  curriculum call `openCourseTab(page, 'Curriculum')`.
+
 ## Generation and narration
 
-- Work the AI provider does is a **job**. Start it, then follow it with `useCourseJobs`
-  (`lib/use-course-jobs.ts`), which also picks up work that was already under way. Show it with
+- Work the AI provider does is a **job**. Start it and follow it with `useGeneration`
+  (`lib/use-generation.ts`), which also picks up work that was already under way. Show it with
   `GenerationStatus`, which has every state: waiting, running with a way to cancel, refused
   before it started, failed with what to do next, cancelled.
 - Read a job's `result` only through `lib/generation.ts`. It is free-form in the contract and is

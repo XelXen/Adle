@@ -1,0 +1,116 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-7);
+  min-width: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+  min-width: 0;
+}
+
+.heading {
+  margin: 0;
+  font: var(--ad-text-heading);
+}
+
+.summary {
+  margin: 0;
+}
+
+.aiNote {
+  margin: 0;
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.footnote {
+  margin: 0;
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+/* ---- Concepts, in learning order ------------------------------------------ */
+.concepts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+}
+
+.concept {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ad-space-3) var(--ad-space-5);
+  padding: var(--ad-space-4) var(--ad-space-5);
+}
+
+.concept + .concept {
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+}
+
+.conceptMain {
+  display: flex;
+  flex: 1 1 20rem;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  min-width: 0;
+}
+
+.conceptHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2) var(--ad-space-3);
+}
+
+.conceptTitle {
+  font: var(--ad-text-body-strong);
+  overflow-wrap: anywhere;
+}
+
+.conceptAction {
+  display: flex;
+  align-items: center;
+}
+
+.meta {
+  margin: 0;
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+/* ---- What has been noticed about a concept -------------------------------- */
+.hypotheses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hypothesis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2) var(--ad-space-3);
+  padding: var(--ad-space-3);
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-surface-subtle);
+}
+
+.hypothesisText {
+  flex: 1 1 16rem;
+  min-width: 0;
+  font: var(--ad-text-supporting);
+}

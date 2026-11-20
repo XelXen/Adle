@@ -194,3 +194,22 @@ def score(item: AssessmentItem, response: Response) -> Score:
     if isinstance(item, OrderingItem):
         return _score_ordering(item, response)
     return _score_explanation(item, response)
+
+
+def reveals(item: AssessmentItem) -> frozenset[str]:
+    """The kinds of mistake an answer to this question is able to point at.
+
+    Recorded with every answer: a right answer counts against a suspected
+    mistake only if the question could have shown it.
+    """
+    if isinstance(item, ChoiceItem):
+        return frozenset(
+            option.misconception
+            for option in item.options
+            if option.misconception and option.id != item.correct_option
+        )
+    if isinstance(item, NumericItem):
+        return frozenset({"arithmetic_slip"}) if item.expected != 0 else frozenset()
+    if isinstance(item, OrderingItem):
+        return frozenset({"procedure_order"})
+    return frozenset()

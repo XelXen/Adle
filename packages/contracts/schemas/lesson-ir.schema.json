@@ -273,6 +273,33 @@
           "title": "Objectives",
           "type": "array"
         },
+        "practice": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "explanation": "#/$defs/ExplanationItem",
+                "multiple_choice": "#/$defs/ChoiceItem",
+                "numeric": "#/$defs/NumericItem",
+                "ordering": "#/$defs/OrderingItem",
+                "prediction": "#/$defs/ChoiceItem",
+                "short_answer": "#/$defs/ShortAnswerItem",
+                "true_false": "#/$defs/TrueFalseItem"
+              },
+              "propertyName": "form"
+            },
+            "oneOf": [
+              { "$ref": "#/$defs/ChoiceItem" },
+              { "$ref": "#/$defs/TrueFalseItem" },
+              { "$ref": "#/$defs/NumericItem" },
+              { "$ref": "#/$defs/ShortAnswerItem" },
+              { "$ref": "#/$defs/OrderingItem" },
+              { "$ref": "#/$defs/ExplanationItem" }
+            ]
+          },
+          "maxItems": 8,
+          "title": "Practice",
+          "type": "array"
+        },
         "schema_version": { "const": "1.0", "title": "Schema Version", "type": "string" },
         "segments": {
           "items": {

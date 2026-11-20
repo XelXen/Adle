@@ -485,3 +485,37 @@ describe('TimedNarrator', () => {
     expect(onEnd).not.toHaveBeenCalled();
   });
 });
+
+describe('going straight to the next question', () => {
+  it('leaves out what lies between, keeps it reachable, and saves the new place', () => {
+    const { controller, narrator, host } = setup();
+    controller.play();
+    expect(controller.nextQuestionIndex()).toBe(2);
+
+    expect(controller.skipToNextQuestion()).toBe(true);
+    expect(controller.getState()).toMatchObject({ segmentIndex: 2, furthest: 2 });
+    expect(controller.segment.type).toBe('checkpoint');
+    // The explanation that was being read stops, and nothing else starts by itself.
+    expect(narrator.log).toContain('cancel');
+    expect(narrator.speaking).toBe(false);
+    expect(host.saved).toEqual([[2, false]]);
+
+    // What was skipped can still be opened.
+    controller.goTo(1);
+    expect(controller.getState().segmentIndex).toBe(1);
+  });
+
+  it('does not jump past a question that is still waiting for an answer', () => {
+    const { controller } = setup(2);
+    expect(controller.nextQuestionIndex()).toBeNull();
+    expect(controller.skipToNextQuestion()).toBe(false);
+    expect(controller.getState().segmentIndex).toBe(2);
+  });
+
+  it('says so when there is no question ahead', () => {
+    const { controller, host } = setup(3);
+    expect(controller.nextQuestionIndex()).toBeNull();
+    expect(controller.skipToNextQuestion()).toBe(false);
+    expect(host.saved).toEqual([]);
+  });
+});

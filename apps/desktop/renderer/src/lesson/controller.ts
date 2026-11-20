@@ -149,6 +149,32 @@ export class LessonController {
   }
 
   /**
+   * Where the next question is, if there is one ahead and the learner is free to
+   * move on. A learner who has had enough of an explanation can go straight to
+   * being asked about it.
+   */
+  nextQuestionIndex(): number | null {
+    if (!canContinue(this.state, this.segment)) return null;
+    const from = this.state.segmentIndex + 1;
+    const index = this.lesson.segments.findIndex(
+      (segment, position) => position >= from && segment.type === 'checkpoint',
+    );
+    return index === -1 ? null : index;
+  }
+
+  /**
+   * Leave out what lies between here and the next question. What was skipped
+   * stays reachable. Returns false when there is no question to go to.
+   */
+  skipToNextQuestion(): boolean {
+    const index = this.nextQuestionIndex();
+    if (index === null) return false;
+    this.enter(index, false);
+    this.host.saveProgress(index, false);
+    return true;
+  }
+
+  /**
    * Go back to the first segment after finishing, to go through the lesson
    * again. Everything stays reachable and nothing plays until asked.
    */

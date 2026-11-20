@@ -170,6 +170,32 @@ sequenceDiagram
 - Narration is read by a voice installed on the computer (`lesson/speech.ts`), or shown as text
   at reading pace. Either way the narrator is the lesson's clock. See ADR-013.
 
+## Deciding what next
+
+```mermaid
+flowchart LR
+  subgraph Pure rules
+    M["learner_model.misconceptions<br/>answers + dismissals → hypotheses"]
+    P["learner_model.practice<br/>which questions, and why"]
+    N["learner_model.next_step<br/>one step, its reason, alternatives"]
+  end
+  A[("attempts<br/>with what each question could reveal")] --> L
+  E[("learner_events<br/>set aside, did not help, finished")] --> L
+  S[("states, lessons, progress")] --> L
+  L["LearningService<br/>gathers; decides nothing"] --> M --> N
+  L --> P
+  N --> UI["Renderer: Learn tab,<br/>end of a lesson, end of practice"]
+  P --> PR["Renderer: practice screen<br/>(questions without answers)"]
+  PR -- "lessons.answer" --> AS["AssessmentService<br/>score, fold, record"] --> A
+```
+
+- A hypothesis about a mistake is never stored. It is computed from the answers and from what
+  the learner set aside, every time, so it cannot disagree with the record.
+- The next step is chosen by rules over states, counts, and dates. It comes with a reason and
+  with alternatives, and the learner may ignore it.
+- Practice and review answer through the same operation as a lesson's questions. There is one
+  scoring path and one place where evidence is recorded. See ADR-014.
+
 ## Asking the model
 
 ```mermaid

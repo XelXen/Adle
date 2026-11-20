@@ -39,6 +39,7 @@ SCHEMA_VERSION = "1.0"
 
 MAX_SEGMENTS = 14
 MAX_BEATS = 12
+MAX_PRACTICE_ITEMS = 8
 MAX_SCENE_SOURCE_CHARACTERS = 40_000
 
 QUESTION_FORMS = (
@@ -454,6 +455,9 @@ class Lesson(_Strict):
     strategy: Strategy
     estimated_minutes: int = Field(ge=1, le=60)
     segments: list[Segment] = Field(min_length=1, max_length=MAX_SEGMENTS)
+    #: Questions that are not part of the lesson's flow. They are asked when the learner
+    #: practises or reviews, so that a review is more than the lesson's questions again.
+    practice: list[AssessmentItem] = Field(default_factory=list, max_length=MAX_PRACTICE_ITEMS)
 
     @model_validator(mode="after")
     def _is_coherent(self) -> Lesson:
@@ -462,9 +466,7 @@ class Lesson(_Strict):
         segment_ids = [segment.id for segment in self.segments]
         if len(set(segment_ids)) != len(segment_ids):
             raise ValueError("segment ids must be different")
-        questions = [
-            segment.question for segment in self.segments if isinstance(segment, CheckpointSegment)
-        ]
+        questions = self.all_questions()
         question_ids = [question.id for question in questions]
         if len(set(question_ids)) != len(question_ids):
             raise ValueError("question ids must be different")
@@ -489,9 +491,14 @@ class Lesson(_Strict):
         return list(seen)
 
     def questions(self) -> list[AssessmentItem]:
+        """The questions asked in the course of the lesson, in order."""
         return [
             segment.question for segment in self.segments if isinstance(segment, CheckpointSegment)
         ]
+
+    def all_questions(self) -> list[AssessmentItem]:
+        """Every question the lesson carries: those in its flow, then those kept for practice."""
+        return [*self.questions(), *self.practice]
 
 
 # -- scenes and the bundle ----------------------------------------------------

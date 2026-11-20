@@ -9,9 +9,10 @@ and teaches what you need next. Give it a topic or your own course materials; it
 curriculum you can inspect, teaches each concept with narrated, interactive visuals, checks your
 understanding with short questions, and adapts the next step to what you have actually shown.
 
-> **Status: early development.** In place: the desktop shell and design system, secure handling
-> of the AI key, the isolated runtime for interactive scenes, courses with local document import
-> and search, and an editable curriculum. Lessons and adaptation are being built next. See
+> **Status: in development.** The whole learning loop works on the sample course: a curriculum,
+> lessons with live pictures and questions, evidence about what you know, a suggested next step
+> with its reason, practice, and reviews that come due. Still to come: lessons for the rest of
+> the sample course, export and restore, and an installer. See
 > [`docs/engineering/PROJECT_STATE.md`](docs/engineering/PROJECT_STATE.md) for exactly what works.
 
 ## What works today
@@ -33,9 +34,20 @@ understanding with short questions, and adapts the next step to what you have ac
   pictures you can pause, replay, try out, or read as a description, and questions that are
   explained whichever way you answer. A lesson remembers where you stopped, and tells you in
   words what your answers showed.
+- **What next:** a course opens on one suggested step and the reason for it, with other things
+  you could do instead. It is a suggestion; nothing is locked.
+- **Where you are:** each concept is described in words (*Not assessed*, *Building
+  understanding*, *Needs more evidence*, *Demonstrated for now*) with what is still missing.
+  Never a score, and never from one answer.
+- **Practice and review:** a few questions chosen for what your answers have not shown yet.
+  Reviews come due after a gap that grows as you remember.
+- **Mix-ups are possibilities, not verdicts:** when more than one answer points the same way,
+  Adle says so, asks a question that would show it, and lets you set it aside.
+- **"This did not help":** skip ahead, ask for another kind of explanation, or do something
+  else. You are never sent back through the same lesson.
 - **With an AI key:** ask for a list of concepts for a course and choose which to keep; have a
-  lesson written for any concept. You are told what is sent, you can cancel, and nothing is
-  added without you.
+  lesson written for any concept, in the way of explaining you choose. You are told what is
+  sent, you can cancel, and nothing is added without you.
 - **Read aloud:** lessons are read by a voice installed on your computer, with nothing sent
   anywhere. Without a voice, narration is shown as text.
 - **Settings → Learning:** pace, explanation depth, narration, voice and volume, captions, and

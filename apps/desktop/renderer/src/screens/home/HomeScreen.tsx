@@ -50,12 +50,19 @@ export function HomeScreen() {
   const keyState = useResource('provider-key', () => getBridge().provider.keyState());
   const aiReady = keyState.resource.status === 'ready' && keyState.resource.data.stored;
 
-  // A course that is waiting for its materials opens on them; any other opens on its curriculum.
+  // A course with something to learn opens on what to do next. One that is still being set
+  // up opens where the setting up happens: its materials if it is waiting for them, else its
+  // curriculum.
   const open = (course: Course): void =>
     navigate({
       name: 'course',
       courseId: course.id,
-      tab: course.origin === 'materials' && course.source_count === 0 ? 'sources' : 'curriculum',
+      tab:
+        course.concept_count > 0
+          ? 'learn'
+          : course.origin === 'materials' && course.source_count === 0
+            ? 'sources'
+            : 'curriculum',
     });
 
   // The sample course is written by Adle and ships with the app: adding it needs no provider.
@@ -63,7 +70,7 @@ export function HomeScreen() {
     setAddingSample(true);
     try {
       const course = await callCore('courses.install_sample');
-      navigate({ name: 'course', courseId: course.id, tab: 'curriculum' });
+      navigate({ name: 'course', courseId: course.id, tab: 'learn' });
     } catch (error) {
       toast.show({
         tone: 'danger',

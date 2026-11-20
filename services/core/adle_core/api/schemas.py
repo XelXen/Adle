@@ -13,7 +13,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from adle_core.lessons import ir as lesson_ir
-from adle_core.lessons.player import PlayerLesson
+from adle_core.lessons.player import PlayerLesson, PlayerQuestion
 
 CourseOrigin = Literal["sample", "topic", "materials"]
 SourceKind = Literal["pdf", "docx", "markdown", "text", "authored"]
@@ -28,6 +28,21 @@ SelfReportLevel = Literal["new", "some", "confident"]
 PaceName = Literal["relaxed", "standard", "brisk"]
 DensityName = Literal["concise", "balanced", "detailed"]
 LessonOrigin = Literal["sample", "generated"]
+HypothesisStatus = Literal["tentative", "supported", "rejected", "resolved"]
+StepKindName = Literal[
+    "add_concepts",
+    "resume_lesson",
+    "revisit_prerequisite",
+    "check",
+    "another_explanation",
+    "review",
+    "practise",
+    "start_lesson",
+    "repeat_lesson",
+    "create_lesson",
+    "nothing_due",
+]
+PracticePurposeName = Literal["review", "check", "practise"]
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=4000)]
@@ -68,6 +83,7 @@ class Course(_Output):
     origin: CourseOrigin
     topic: str | None
     source_count: int
+    concept_count: int
     created_at: datetime
     updated_at: datetime
     last_opened_at: datetime | None
@@ -318,7 +334,7 @@ class SelfRating(_Input):
 class ObservationSummary(_Output):
     id: int
     occurred_at: datetime
-    kind: Literal["answer", "self_report"]
+    kind: Literal["answer", "self_report", "dismissal"]
     state_before: MasteryStateName
     state_after: MasteryStateName
     #: What happened and what it means, in words for the learner.
@@ -413,6 +429,109 @@ class AnswerResult(_Output):
     attempt_number: int
 
 
+# -- what next, progress, and practice ---------------------------------------
+
+
+class NextStep(_Output):
+    """Something worth doing now, with the reason for it. Never an instruction."""
+
+    kind: StepKindName
+    #: What the button says.
+    title: str
+    #: Why this step, in a sentence or two.
+    reason: str
+    concept_id: str | None
+    lesson_id: str | None
+    #: The kind of mistake a check is about, when it is about one.
+    about: lesson_ir.MisconceptionKind | None
+    #: The step needs the AI provider, and no key is set up.
+    needs_key: bool
+
+
+class LearningPlan(_Output):
+    recommended: NextStep
+    #: Other reasonable things to do instead, the most useful first.
+    alternatives: list[NextStep]
+    #: Something worth saying beside the suggestion (that stopping is fine, for one).
+    note: str | None
+
+
+class Hypothesis(_Output):
+    """A possible explanation for a pattern of answers. A hypothesis, never a verdict."""
+
+    kind: lesson_ir.MisconceptionKind
+    status: HypothesisStatus
+    #: Where it stands, in a sentence for the learner.
+    description: str
+    #: A slip of execution: noted, and never treated as a gap in understanding.
+    is_slip: bool
+    #: Still open, so the learner can say it does not describe them.
+    can_dismiss: bool
+
+
+class ConceptProgress(_Output):
+    concept_id: str
+    title: str
+    knowledge: Knowledge
+    lessons_total: int
+    lessons_completed: int
+    hypotheses: list[Hypothesis]
+    #: Questions that could be asked now and would count as evidence.
+    fresh_questions: int
+    #: When a question that is being kept back becomes worth asking again.
+    next_fresh_at: datetime | None
+    review_due: bool
+
+
+class ProgressSummary(_Output):
+    """Counts of concepts by what the evidence says. Counts of states, never a score."""
+
+    concepts: int
+    demonstrated: int
+    in_progress: int
+    not_assessed: int
+    reviews_due: int
+    next_review_at: datetime | None
+
+
+class LearningOverview(_Output):
+    course_id: str
+    plan: LearningPlan
+    #: In an order that respects what each concept needs first.
+    concepts: list[ConceptProgress]
+    summary: ProgressSummary
+
+
+class PracticeRequest(_Input):
+    #: The kind of mistake to check for first, when the learner came from a suggestion about one.
+    about: lesson_ir.MisconceptionKind | None = None
+    count: int = Field(default=3, ge=1, le=5)
+
+
+class PracticeQuestion(_Output):
+    #: The lesson the question belongs to. Answers go to ``lessons.answer`` with it.
+    lesson_id: str
+    question: PlayerQuestion
+
+
+class PracticeSet(_Output):
+    course_id: str
+    concept_id: str
+    concept_title: str
+    purpose: PracticePurposeName
+    #: Why these questions, or why there are none right now.
+    reason: str
+    questions: list[PracticeQuestion]
+    #: When there will be something to ask, if nothing can be asked now.
+    next_fresh_at: datetime | None
+
+
+class UnhelpfulReport(_Input):
+    """The learner says a part of a lesson did not help."""
+
+    segment_id: Annotated[str, StringConstraints(pattern=r"^seg_[a-z0-9_]{1,40}$")]
+
+
 # -- jobs ------------------------------------------------------------------
 
 
@@ -442,6 +561,12 @@ class LatestJob(_Output):
 
 
 # -- generation --------------------------------------------------------------
+
+
+class LessonRequest(_Input):
+    """How the learner would like a new lesson to teach, when they have a preference."""
+
+    strategy: lesson_ir.Strategy | None = None
 
 
 class ProposalAcceptance(_Input):

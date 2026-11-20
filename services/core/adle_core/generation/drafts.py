@@ -23,14 +23,16 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from adle_core.lessons.ir import (
     MAX_BEATS,
+    MAX_PRACTICE_ITEMS,
     MAX_SEGMENTS,
     MISCONCEPTION_KINDS,
     SCHEMA_VERSION,
     STRATEGIES,
+    AssessmentItem,
 )
 
 #: A lesson asks for at most this many scenes: each one is a separate model request.
@@ -169,6 +171,8 @@ class LessonDraft(_Draft):
     title: str = Field(min_length=1)
     strategy: str = "visual"
     segments: list[SegmentDraft] = Field(min_length=1)
+    #: Questions that are not part of the lesson's flow, kept for practice and review.
+    practice: list[QuestionDraft] = Field(default_factory=list)
     #: The numbers of the supplied passages the lesson draws on.
     sources: list[int] = Field(default_factory=list)
 
@@ -197,6 +201,9 @@ class LessonContext:
     objectives: list[ObjectiveRef]
     #: In the order they were numbered in the prompt, starting at 1.
     passages: list[PassageRef] = field(default_factory=list)
+    #: The way of teaching that was asked for. When set it is what the lesson records,
+    #: whatever the draft says about itself.
+    strategy: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -404,7 +411,17 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
     if problems:
         raise DraftError(problems[:12])
 
+    practice: list[dict[str, Any]] = []
+    for index, extra in enumerate(draft.practice[:MAX_PRACTICE_ITEMS], start=1):
+        # Extra questions are a bonus. One that cannot be used is left out; it is never a
+        # reason to write the lesson again.
+        item = _question(extra, f"q_practice_{index}", context, [], f"practice.{index - 1}")
+        if item is not None and _is_usable(item):
+            practice.append(item)
+
     strategy = draft.strategy.strip().lower().replace("-", "_").replace(" ", "_")
+    if context.strategy in STRATEGIES:
+        strategy = context.strategy
     cited: dict[str, PassageRef] = {}
     for number in draft.sources:
         # Only passages that were actually supplied can be cited.
@@ -436,8 +453,21 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
         "strategy": strategy if strategy in STRATEGIES else "visual",
         "estimated_minutes": max(1, min(60, math.ceil(total_seconds / 60))),
         "segments": segments,
+        "practice": practice,
     }
     return CompiledLesson(lesson=lesson, scenes=scenes)
+
+
+_QUESTION = TypeAdapter(AssessmentItem)
+
+
+def _is_usable(item: dict[str, Any]) -> bool:
+    """Whether a compiled question would be accepted as part of a lesson."""
+    try:
+        _QUESTION.validate_python(item)
+    except ValidationError:
+        return False
+    return True
 
 
 def _as_explanation(segment: dict[str, Any], described: str | None) -> dict[str, Any]:

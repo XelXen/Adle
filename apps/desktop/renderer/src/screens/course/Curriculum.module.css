@@ -483,6 +483,10 @@
   gap: var(--ad-space-3);
 }
 
+.strategy {
+  max-width: 24rem;
+}
+
 .aiNote {
   font: var(--ad-text-supporting);
   color: var(--ad-color-muted);

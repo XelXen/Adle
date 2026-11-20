@@ -47,6 +47,8 @@ class ObservationKind(StrEnum):
     ANSWER = "answer"
     #: The learner's own statement of how well they know the concept.
     SELF_REPORT = "self_report"
+    #: The learner said a suspected misunderstanding does not describe them.
+    DISMISSAL = "dismissal"
 
 
 class SelfReport(StrEnum):
@@ -94,12 +96,29 @@ class Observation:
     unsure: bool = False
     #: Chance of a correct answer by guessing, when the question defines one.
     item_guess: float | None = None
+    #: A wrong answer that shows the method was right and the execution slipped (the right
+    #: number with the wrong sign). It is counted as partly right.
+    slip: bool = False
+    #: The same question was answered a short while ago, so its explanation is fresh in
+    #: mind. Only changes the wording; the answer is recorded as an aided one (``hinted``).
+    repeated: bool = False
     # -- self-reports --
     self_report: SelfReport | None = None
+    # -- answers and dismissals --
+    #: Whether, with this observation taken into account, a misunderstanding supported by
+    #: more than one answer still stands (``learner_model.misconceptions``). ``None``
+    #: leaves what was known unchanged.
+    unresolved_misconception: bool | None = None
 
     def __post_init__(self) -> None:
         if self.occurred_at.tzinfo is None:
             raise ValueError("Observations must carry a timezone-aware time.")
+        if self.kind is ObservationKind.DISMISSAL:
+            if self.outcome is not None or self.self_report is not None:
+                raise ValueError("A dismissal has no outcome and no self-report.")
+            if self.unresolved_misconception is None:
+                raise ValueError("A dismissal must say what still stands after it.")
+            return
         if self.kind is ObservationKind.ANSWER:
             if self.outcome is None or self.self_report is not None:
                 raise ValueError("An answer needs an outcome and no self-report.")
@@ -109,6 +128,8 @@ class Observation:
                 raise ValueError("Unknown question form.")
             if self.item_guess is not None and not 0.0 <= self.item_guess < 1.0:
                 raise ValueError("item_guess must be a probability below 1.")
+            if self.slip and self.outcome is not Outcome.INCORRECT:
+                raise ValueError("Only a wrong answer can be a slip.")
         elif self.self_report is None or self.outcome is not None:
             raise ValueError("A self-report needs a level and no outcome.")
 
@@ -128,8 +149,10 @@ class ConceptKnowledge:
     self_report: SelfReport | None = None
     last_observed_at: datetime | None = None
     review: ReviewState = NOT_SCHEDULED
+    #: A misunderstanding supported by more than one answer has not been cleared up.
+    unresolved_misconception: bool = False
 
-    def evidence(self, *, unresolved_misconception: bool = False) -> Evidence:
+    def evidence(self) -> Evidence:
         return Evidence(
             probability=self.probability,
             answered=self.answered,
@@ -137,7 +160,7 @@ class ConceptKnowledge:
             forms_correct=self.forms_correct,
             transfer_correct=self.transfer_correct,
             claims_to_know=self.self_report is SelfReport.CONFIDENT,
-            unresolved_misconception=unresolved_misconception,
+            unresolved_misconception=self.unresolved_misconception,
         )
 
 
@@ -167,7 +190,7 @@ class TracingConfig:
     criteria: MasteryCriteria = DEFAULT_CRITERIA
     review: ReviewParameters = DEFAULT_REVIEW_PARAMETERS
     #: Stored with every observation so a later change of parameters is visible in the record.
-    version: str = "bkt-1"
+    version: str = "bkt-2"
 
 
 DEFAULT_CONFIG = TracingConfig()
@@ -188,7 +211,9 @@ def _apply_answer(
 
     probability = update(
         knowledge.probability,
-        outcome,
+        # A slip shows the method and misses the result: ambiguous evidence, like an
+        # answer that is partly right, and not a sign that the idea is missing.
+        Outcome.PARTIAL if observation.slip else outcome,
         config.bkt,
         item_guess=observation.item_guess,
         hinted=observation.hinted,
@@ -244,12 +269,20 @@ def _what_happened(observation: Observation) -> str:
             None: "",
         }[observation.self_report]
 
+    if observation.kind is ObservationKind.DISMISSAL:
+        return "You said a suspected mix-up was only a slip, so it has been set aside."
+
     question = QUESTION_FORM_LABELS.get(observation.question_form or "", "a question")
     if observation.is_transfer:
         question += " that applied the idea to a new situation"
     if observation.outcome is Outcome.SKIPPED:
         return "You skipped a question. Skipping is not counted either way."
     if observation.outcome is Outcome.CORRECT:
+        if observation.repeated:
+            return (
+                f"You answered {question} correctly. You had seen its explanation a short "
+                "while ago, so it counts as lighter evidence."
+            )
         if observation.hinted:
             return (
                 f"You answered {question} correctly after a hint, which counts as lighter evidence."
@@ -262,6 +295,11 @@ def _what_happened(observation: Observation) -> str:
         return f"You answered {question} correctly."
     if observation.outcome is Outcome.PARTIAL:
         return f"Your answer to {question} was partly right."
+    if observation.slip:
+        return (
+            f"Your answer to {question} was not right, but it looks like a slip rather than "
+            "a gap in understanding. It counts as partly right."
+        )
     return f"Your answer to {question} was not right yet."
 
 
@@ -281,24 +319,31 @@ def apply(
     observation: Observation,
     config: TracingConfig = DEFAULT_CONFIG,
     *,
-    unresolved_misconception: bool = False,
+    note: str | None = None,
 ) -> Transition:
-    """Fold one observation into what is known about a concept."""
-    state_before = assess(
-        knowledge.evidence(unresolved_misconception=unresolved_misconception), config.criteria
-    ).state
+    """Fold one observation into what is known about a concept.
+
+    ``note`` is a sentence about what the observation changed that this module cannot
+    know (a suspected mistake opened or settled). It is placed in the explanation after
+    what happened.
+    """
+    state_before = assess(knowledge.evidence(), config.criteria).state
 
     review_note: str | None = None
     if observation.kind is ObservationKind.ANSWER:
         after, review_note = _apply_answer(knowledge, observation, config)
-    else:
+    elif observation.kind is ObservationKind.SELF_REPORT:
         after = _apply_self_report(knowledge, observation)
-    after = replace(after, last_observed_at=observation.occurred_at)
+    else:
+        after = knowledge
+    if observation.unresolved_misconception is not None:
+        after = replace(after, unresolved_misconception=observation.unresolved_misconception)
+    if observation.kind is not ObservationKind.DISMISSAL:
+        # Setting a suspicion aside is not practice: it leaves "last practised" alone.
+        after = replace(after, last_observed_at=observation.occurred_at)
 
-    assessment = assess(
-        after.evidence(unresolved_misconception=unresolved_misconception), config.criteria
-    )
-    parts = [_what_happened(observation), _what_it_means(state_before, assessment)]
+    assessment = assess(after.evidence(), config.criteria)
+    parts = [_what_happened(observation), note or "", _what_it_means(state_before, assessment)]
     if review_note:
         parts.append(review_note)
     return Transition(

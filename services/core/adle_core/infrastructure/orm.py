@@ -24,6 +24,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,7 +37,8 @@ SECTION_KINDS = ("document", "page", "heading")
 JOB_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
 CONCEPT_ORIGINS = ("learner", "outline", "model", "sample")
 CONCEPT_TAGS = ("conceptual", "calculation", "visual", "procedural")
-OBSERVATION_KINDS = ("answer", "self_report")
+OBSERVATION_KINDS = ("answer", "self_report", "dismissal")
+LEARNER_EVENT_KINDS = ("misconception_dismissed", "explanation_unhelpful", "lesson_completed")
 MASTERY_STATES = ("not_assessed", "building", "needs_evidence", "demonstrated")
 LESSON_ORIGINS = ("sample", "generated")
 MODEL_USAGE_OUTCOMES = (
@@ -335,6 +337,13 @@ class LearnerObservation(Base):
     unsure: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     item_guess: Mapped[float | None] = mapped_column(Float)
     self_report: Mapped[str | None] = mapped_column(String(20))
+    #: A wrong answer that was a slip of execution; counted as partly right.
+    slip: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    #: Whether a supported misunderstanding still stood once this was taken into account.
+    #: ``NULL`` for observations that say nothing about it (self-reports, older rows).
+    unresolved_misconception: Mapped[bool | None] = mapped_column(Boolean)
     state_before: Mapped[str] = mapped_column(String(20), nullable=False)
     state_after: Mapped[str] = mapped_column(String(20), nullable=False)
     #: What happened and what it means, as shown to the learner.
@@ -368,6 +377,10 @@ class LearnerConceptState(Base):
     forms_correct: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     transfer_correct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     self_report: Mapped[str | None] = mapped_column(String(20))
+    #: A misunderstanding supported by more than one answer has not been cleared up.
+    unresolved_misconception: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     last_observed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     review_interval_days: Mapped[float | None] = mapped_column(Float)
     review_due_at: Mapped[datetime | None] = mapped_column(UtcDateTime, index=True)
@@ -459,7 +472,36 @@ class Attempt(Base):
     unsure: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     #: The kind of mistake the answer suggests, if any. A hypothesis only.
     misconception: Mapped[str | None] = mapped_column(String(40))
+    #: Every kind of mistake the question could have shown, as it was when answered. A
+    #: right answer counts against a hypothesis only if the question could have shown it.
+    reveals: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, server_default="[]"
+    )
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+
+
+class LearnerEvent(Base):
+    """Something the learner did that is not an answer. Append-only.
+
+    ``misconception_dismissed`` (``detail.kind``) takes part in working out the
+    hypotheses about a concept; ``explanation_unhelpful`` (``detail.segment_id``)
+    in choosing what to suggest next; ``lesson_completed`` records when.
+    """
+
+    __tablename__ = "learner_events"
+    __table_args__ = (_one_of("kind", LEARNER_EVENT_KINDS),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    concept_id: Mapped[str | None] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"), index=True
+    )
+    lesson_id: Mapped[str | None] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"))
+    occurred_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
 
 
 class ModelUsage(Base):

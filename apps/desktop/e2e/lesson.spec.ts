@@ -11,6 +11,7 @@ import type { Locator, Page } from '@playwright/test';
 import { expect, launchApp, test, waitForCore } from './support/app';
 import {
   expectNoAccessibilityViolations,
+  openCourseTab,
   screenshot,
   showNarrationAsText,
 } from './support/courses';
@@ -31,6 +32,8 @@ async function addSampleCourse(page: Page): Promise<void> {
   await showNarrationAsText(page);
   await page.getByRole('button', { name: 'Try the sample course' }).click();
   await expect(page.getByRole('heading', { name: COURSE, level: 1 })).toBeVisible();
+  // These journeys are about the lesson itself; they start from the list of concepts.
+  await openCourseTab(page, 'Curriculum');
 }
 
 async function expectPart(page: Page, number: number, title: string): Promise<void> {
@@ -193,12 +196,16 @@ test.describe('lesson', () => {
     await expect(finished).toContainText('Where this concept stands:');
     await expect(finished).toContainText('Building understanding');
     await expect(finished).toContainText('Still needed:');
+    // It also says what to do next, and why.
+    await expect(finished.getByText('Suggested next step')).toBeVisible();
+    await expect(finished.getByText('Why:', { exact: false }).first()).toBeVisible();
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'lesson-finished');
 
     // ---- Back in the course, the record shows what happened and why ----
     await finished.getByRole('button', { name: 'Back to the course' }).click();
     await expect(page.getByRole('heading', { name: COURSE, level: 1 })).toBeVisible();
+    await openCourseTab(page, 'Curriculum');
     await expect(learningPath.getByRole('listitem').first()).toContainText(
       'Building understanding',
     );
@@ -254,6 +261,7 @@ test.describe('lesson', () => {
     expect(Buffer.compare(held, await picture.screenshot())).not.toBe(0);
 
     await first.page.getByRole('button', { name: 'Back to the course' }).click();
+    await openCourseTab(first.page, 'Curriculum');
     await expect(lessons(first.page)).toContainText('About 8 minutes · Part 2 of 10');
     await expect(lessons(first.page).getByRole('button', { name: /^Continue: / })).toBeVisible();
     expect(first.problems).toEqual([]);
@@ -267,6 +275,7 @@ test.describe('lesson', () => {
     const { page } = second;
     await waitForCore(page);
     await page.getByRole('button', { name: new RegExp(COURSE) }).click();
+    await openCourseTab(page, 'Curriculum');
     await lessons(page)
       .getByRole('button', { name: /^Continue: / })
       .click();

@@ -30,18 +30,16 @@ import { useRouter } from '../../app/router';
 import { GenerationStatus } from '../../components/GenerationStatus';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
-import {
-  type JobFailure,
-  KIND_LESSON,
-  KIND_PROPOSAL,
-  readLessonOutcome,
-  readProposal,
-  refusalOf,
-} from '../../lib/generation';
-import { useCourseJobs } from '../../lib/use-course-jobs';
+import { KIND_LESSON, KIND_PROPOSAL, readLessonOutcome, readProposal } from '../../lib/generation';
+import { useGeneration } from '../../lib/use-generation';
 import { isJobActive } from '../../lib/use-job';
 import { useResource } from '../../lib/use-resource';
-import { ConceptDetail, type ConceptLessons, KNOWLEDGE_TONE } from './ConceptDetail';
+import {
+  ConceptDetail,
+  type ConceptLessons,
+  KNOWLEDGE_TONE,
+  type TeachingStrategy,
+} from './ConceptDetail';
 import {
   ConceptDialog,
   type ConceptDraft,
@@ -97,11 +95,8 @@ export function CurriculumPanel({ course }: { course: Course }) {
   const [view, setView] = useState<View>('list');
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [removing, setRemoving] = useState(false);
-  /** What is being started right now, by what it is about: the course, or a concept. */
-  const [starting, setStarting] = useState<ReadonlySet<string>>(new Set());
-  const [refusals, setRefusals] = useState<ReadonlyMap<string, JobFailure>>(new Map());
 
-  const jobs = useCourseJobs(courseId, (job) => {
+  const generation = useGeneration(courseId, (job) => {
     if (job.kind === KIND_LESSON) {
       lessons.reload();
       const outcome = readLessonOutcome(job);
@@ -116,6 +111,9 @@ export function CurriculumPanel({ course }: { course: Course }) {
       setDialog((open) => open ?? { kind: 'proposal', job });
     }
   });
+
+  const { jobs, starting, refusals, begin, putAway } = generation;
+  const cancelJob = generation.cancel;
 
   // Suggestions that arrived while this screen was closed are still waiting to be looked at.
   const { track } = jobs;
@@ -139,54 +137,16 @@ export function CurriculumPanel({ course }: { course: Course }) {
   const providerName =
     provider.resource.status === 'ready' ? provider.resource.data.display_name : 'the AI provider';
 
-  /** Start a job about `subject`, and remember why if it could not be started. */
-  const begin = async (subject: string, start: () => Promise<Job>): Promise<void> => {
-    setRefusals((current) => {
-      const next = new Map(current);
-      next.delete(subject);
-      return next;
-    });
-    setStarting((current) => new Set(current).add(subject));
-    try {
-      track(await start());
-    } catch (error) {
-      setRefusals((current) => new Map(current).set(subject, refusalOf(error)));
-    } finally {
-      setStarting((current) => {
-        const next = new Set(current);
-        next.delete(subject);
-        return next;
-      });
-    }
-  };
-
-  const putAway = (subject: string, job: Job | null): void => {
-    if (job) jobs.forget(job.id);
-    setRefusals((current) => {
-      const next = new Map(current);
-      next.delete(subject);
-      return next;
-    });
-  };
-
-  const cancelJob = (job: Job | null): void => {
-    if (!job) return;
-    callCore('jobs.cancel', { path: { job_id: job.id } }).catch((error: unknown) => {
-      toast.show({
-        tone: 'danger',
-        title: 'It could not be cancelled',
-        description: describeError(error),
-      });
-    });
-  };
-
   const suggest = (): Promise<void> =>
     begin(courseId, () =>
       callCore('generation.propose_curriculum', { path: { course_id: courseId } }),
     );
-  const createLesson = (conceptId: string): Promise<void> =>
+  const createLesson = (conceptId: string, strategy: TeachingStrategy | null): Promise<void> =>
     begin(conceptId, () =>
-      callCore('generation.generate_lesson', { path: { concept_id: conceptId } }),
+      callCore('generation.generate_lesson', {
+        path: { concept_id: conceptId },
+        body: strategy ? { strategy } : null,
+      }),
     );
 
   const proposalJob = jobs.find(KIND_PROPOSAL, courseId);
@@ -530,7 +490,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
                     starting: starting.has(selected.id),
                     refusal: refusals.get(selected.id) ?? null,
                     providerName,
-                    onCreate: () => void createLesson(selected.id),
+                    onCreate: (strategy) => void createLesson(selected.id, strategy),
                     onCancel: () => cancelJob(jobs.find(KIND_LESSON, selected.id)),
                     onDismiss: () => putAway(selected.id, jobs.find(KIND_LESSON, selected.id)),
                   }}

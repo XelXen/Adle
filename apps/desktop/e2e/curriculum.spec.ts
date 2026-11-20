@@ -10,6 +10,7 @@ import {
   createCourse,
   expectNoAccessibilityViolations,
   importAndWait,
+  openCourseTab,
   screenshot,
 } from './support/courses';
 
@@ -230,6 +231,12 @@ test.describe('curriculum', () => {
     const second = await launchApp(profileDir, { onboarded: true, theme: 'dark' });
     await waitForCore(second.page);
     await second.page.getByRole('button', { name: /Neural networks 101/ }).click();
+    // A course with concepts opens on what to do next; the curriculum is one tab away.
+    await expect(second.page.getByRole('tab', { name: 'Learn', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await openCourseTab(second.page, 'Curriculum');
     await expect(pathList(second.page).getByRole('listitem')).toHaveCount(6);
     expect(await pathTitles(second.page)).toEqual(settled);
     await expect(pathRow(second.page, 'Backpropagation')).toContainText('Needs more evidence');
