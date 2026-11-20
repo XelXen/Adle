@@ -6,9 +6,17 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Last updated:** 2026-11-19
 - **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
 - **Last commit:** see `git log -1`
-- **Active milestone:** M6 — assessment, misconceptions, the next step
+- **Active milestone:** M7 — the rest of the sample course, export and restore, polish
 - **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
   `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
+
+## Work in progress outside the tracked files
+
+M7 has been started. `var/wip/sample-lessons/` (git-ignored, so it is on this computer only)
+holds a small generator and the full text of the seven remaining sample lessons
+(`content_a.py`, `content_b.py`, `content_c.py`). `build.py` there writes them into
+`services/core/adle_core/sample_course/lessons/` and updates the outline's list of lessons.
+Once the lessons and their scenes are in the repository and tested, that folder can go.
 
 ## Milestone status
 
@@ -20,7 +28,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 | M3 — Curriculum and learner model | **Done** | Concept graph validated on every write (loops, references, order, layers); curriculum screen (list and map; add, edit, reorder, remove; objectives; prerequisites with reasons; links to materials; outline from headings); learner preferences; knowledge as an append-only record folded through BKT into four states with reasons; review scheduling; retrieval with provenance (ADR-009). **Deferred to the lesson work:** working memory and the interaction event log. Answer evidence is exercised through the service in tests; in the app only self-rating can create evidence until questions exist. |
 | M4 — Wanim and Lesson IR | **Done** | Player frame, adapter, static scene policy, skill, threat model (ADR-004). Lesson IR 1.0 with a generated JSON Schema; one validating gateway; scenes re-checked on every read; answer keys kept in the core with deterministic scoring; the lesson player; the first lesson of the sample course (ADR-010). The packaged-build check is BLOCKED on M8 packaging. |
 | M5 — Generation, audio, timeline | **Done** (real provider BLOCKED) | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Every path is tested against a fake provider. **The real model has not produced a lesson yet:** the provider failed every request upstream on 2026-11-19, so the prompts are unchecked. |
-| M6 — Assessment and adaptation | Not started | — |
+| M6 — Assessment and adaptation | **Done** | Hypotheses about mistakes computed from the record (tentative, supported, rejected, resolved), checked with questions that would show them, and dismissible by the learner; slips counted as partly right; repeats counted in full only after a gap; questions kept for practice in the Lesson IR; a next-step policy with a reason for every step; the Learn tab, practice and review, "what next" after a lesson, "This did not help"; teaching strategy chosen or rotated (ADR-014). Not built by decision: model grading of open answers and model-proposed hypotheses. |
 | M7 — Complete UX and sample course | Not started | — |
 | M8 — Release hardening | Not started | — |
 
@@ -34,7 +42,22 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   dropping them; progress while importing; per-file outcome (imported, already imported,
   rejected with a reason); extraction warnings; remove a source; search with file and page or
   section for every hit.
-- **Course → Curriculum** (the tab a course opens on once it has materials or a topic): the
+- **Course → Learn** (the tab a course with concepts opens on): one suggested next step with
+  the reason for it, the alternatives ("Or instead"), a note that stopping is fine when things
+  are going badly, and each concept in learning order with its state in words, what is still
+  missing, when it is next reviewed, and what Adle has noticed about it.
+- **Hypotheses:** two answers pointing the same way show as "Seen more than once" with a
+  sentence; one answer shows as "Suspected, not established". "That was a slip" sets one aside.
+  A slip of sign shows as a slip and is counted as partly right.
+- **Practice and review:** a few questions on one concept, with why these questions, answered
+  and explained as in a lesson, then a summary and what to do next. Nothing answered in the
+  last twelve hours is asked again; if nothing can be asked, the screen says when it can.
+- **Reviews:** scheduled by the core after answers; due ones are suggested first among routine
+  steps and marked on the concept. Doing one moves the next further away.
+- **"This did not help"** in a lesson: skip to the next question, have the concept explained
+  another way (a chosen way of teaching; needs a key), or go to the course. The suggestion on
+  the Learn tab changes accordingly and says why.
+- **Course → Curriculum** (where a course without concepts opens, once it has a topic or materials): the
   concepts as a list in teaching order or as a map; add, edit, reorder, and remove concepts;
   learning objectives; what each concept needs first and why, with loops refused and explained;
   "Start from your materials" offers the headings of imported files as concepts; link a concept
@@ -53,16 +76,19 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   the attempt and the evidence, and says in words what changed. After checking, options read
   "Your answer" / "The right answer".
 - **Resume and review:** a lesson reopens at the part where it was left; a finished one reopens
-  from the start with every part open and no question blocking.
+  from the start with every part open and no question blocking. A finished lesson ends with
+  what to do next.
 - **When a scene cannot run:** if it fails in the player, or the core withholds it, the part
   shows its description in words and the lesson goes on.
 - **Suggested concepts:** "Suggest concepts with AI" on the curriculum says what will be sent,
   runs as a job with progress and Cancel, and ends in a review dialog where the learner picks
   what to add. Suggestions that finish while the learner is elsewhere wait to be reviewed or
   discarded. Nothing is added without the learner choosing it.
-- **Generated lessons:** "Create a lesson with AI" on a concept says what is sent and what it
-  costs of the day's requests, shows progress and Cancel, and adds a lesson that plays like any
-  other. No key, a rate-limit wait, a used-up day, a provider failure, and a cancelled job each
+- **Generated lessons:** "Create a lesson with AI" on a concept (and "Create the lesson" on
+  the Learn tab) says what is sent and what it costs of the day's requests, shows progress and
+  Cancel, and adds a lesson that plays like any other. For another lesson on the same concept
+  the learner can choose how it should explain; left alone, Adle uses a way not used yet. A
+  concept has at most four lessons. No key, a rate-limit wait, a used-up day, a provider failure, and a cancelled job each
   have their own words and their own way forward.
 - **Narration aloud:** the lesson is read by a voice installed on the computer (never an online
   one), with "Read aloud" and "Transcript" switches in the lesson. Without a voice, or if the
@@ -78,9 +104,9 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   database (with a backup first), and exits with the app.
 
 Not present yet (do not assume): a lesson written by the real model (see "The real provider"),
-lessons for the other seven sample concepts, misconception handling, a chosen next step,
-practice and review sessions, a progress screen, export and restore in the interface,
-packaging.
+lessons for the other seven sample concepts (so on the sample course, after the first lesson,
+the suggestions are practice, reviews, and "create a lesson", which needs a key), a session
+summary, export and restore in the interface, packaging.
 
 Built and tested but not yet reachable from the interface: `restore_database`
 (`infrastructure/migrate.py`). The restore screen arrives with export in M7.
@@ -88,7 +114,7 @@ Built and tested but not yet reachable from the interface: `restore_database`
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the M5 interface and narration commit.
+`node scripts/check.mjs --e2e` on the tree that became the M6 commit.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -98,11 +124,11 @@ Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 358 tests, 17 files |
+| Vitest | PASS | 374 tests, 18 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 78 source files |
-| pytest | PASS | 830 tests |
-| Playwright + Electron (E2E) | PASS | 50 tests, none flaky |
+| mypy (strict) | PASS | 85 source files |
+| pytest | PASS | 952 tests |
+| Playwright + Electron (E2E) | PASS | 53 tests, none flaky. The run before the database fix of ADR-015 had one flaky test, which is how that bug was found |
 | `npm audit` (all dependencies) | NOT RUN | Last run before KaTeX was added; run again before release |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
 | Packaged build | BLOCKED | No packager chosen yet (M8) |
@@ -158,6 +184,13 @@ investigated, not ignored.
 - React's lint rules (`react-hooks/immutability`, `refs`) reject writing to a ref received as
   a prop and reading refs in a `useState` initialiser. Long-lived non-React state goes in a
   small class created once (`openSession`, `SceneCues`).
+- Patch scripts written in Python on Windows turn LF into CRLF unless they write with
+  `newline="\n"`. Git normalises on commit, but the working tree is left mixed. Node's
+  `writeFileSync` does not do this.
+- A course's sample lesson has three questions; without more, a review can only repeat them.
+  Lessons now carry up to eight further questions (`Lesson.practice`) for practice and review.
+- On a question that is hard to guess, a slip of sign moves the estimate more than a right
+  answer after a hint that gave the method away. That is intended (ADR-014) and tested.
 - An animation-only scene starts blank and is over in a few seconds, while its narration takes
   half a minute. Scenes follow the narration only at segment level today (start, pause, and a
   cue to leave a live page). Finer synchronisation needs Wanim's slides mode
@@ -182,25 +215,22 @@ day's 80 budgeted requests were used on 2026-11-19.) When it answers: run it wit
 and `lesson`, read what the model actually writes, and adjust the prompts and the leniency of
 `generation/drafts.py` to it. Do not loosen the Lesson IR or the scene policy to fit the model.
 
-## Next actions (M6), in order
+## Next actions (M7), in order
 
-1. **Hypotheses about mistakes** (`learner_model/misconceptions.py`): fold a concept's attempts
-   and the learner's dismissals into tentative / supported / rejected / resolved hypotheses;
-   only a supported one about the idea itself stands in the way of "Demonstrated for now";
-   slips never do. Store what each question can reveal with the attempt.
-2. **Practice and review** (`learner_model/practice.py`): choose questions by what the evidence
-   still lacks; keep back a question answered in the last twelve hours; a repeat inside that
-   window counts as aided.
-3. **The next step** (`learner_model/next_step.py`): one recommendation with its reason in
-   words, and alternatives; never a repeat of the same lesson after a run of misses.
-4. **In the app:** a "Learn" tab on the course (next step, why, alternatives, progress in
-   words), a practice and review screen, hypotheses shown with a way to say "that was a slip",
-   and "what next" when a lesson ends.
-5. **Tests:** unit and property tests for the three modules, API tests, and an end-to-end
-   journey including a review that becomes due.
+1. **The rest of the sample course:** a lesson with scenes, questions tagged with the mistakes
+   their wrong options point at, and practice questions for each of the other seven concepts
+   (`services/core/adle_core/sample_course/`). With them the next-step policy has real
+   choices on the sample course: advance, revisit a prerequisite, review.
+2. **Export, restore, and delete:** a screen for backup and restore (`restore_database` is
+   built and tested), an export of the learner's data, and deleting everything.
+3. **Session summary** (PLAN.md 3.1 step 10): what was demonstrated, what needs more evidence,
+   what is planned for review. `learner_events` and attempts hold what it needs.
+4. **Polish:** onboarding, empty and error states, keyboard and screen-reader pass, visual
+   baselines; try Wanim's slides mode for finer narration and animation timing.
+5. **Retry the real provider** (see above) and adjust the prompts, including the request for
+   practice questions and for a way of teaching.
 
-Then M7 (the rest of the sample course, export / restore / delete, polish) and M8 (packaging,
-hardening).
+Then M8 (packaging, hardening, performance report, release checklist).
 
 ## Known gaps (tracked, not forgotten)
 
@@ -210,9 +240,10 @@ hardening).
 | The parser worker has no OS-level sandbox | M8, with packaging (SECURITY.md) |
 | Restore and export exist in code or are planned but have no screen | M7 |
 | Only one of the eight sample concepts has a lesson | M7 |
-| A lesson returns to the first concept of the course, not the one it taught, and nothing suggests what to do next | M6 (next-step policy) |
 | Narration and animation are synchronised per segment, not per sentence | M7, after testing Wanim's slides mode |
-| The interaction event log and working memory from the plan are not stored; attempts and observations are | M6 |
+| Working memory from the plan is not a stored thing: what a session needs is rebuilt from attempts, observations, and `learner_events` on every request | By decision (ADR-014) |
+| Open answers are self-assessed against a rubric, not graded by the model | By decision (ADR-014); revisit if the provider's allowance grows |
+| The next-step policy has few choices on the sample course until its other lessons exist | M7 |
 | Extraction quality on complex PDFs (columns, tables, equations) is whatever `pypdf` gives | When retrieval quality is evaluated |
 
 ## Open questions for the owner

@@ -58,6 +58,9 @@ Full diagram: `docs/architecture/overview.md`.
 
 Loopback traffic is unencrypted HTTP. See "Out of scope".
 
+Reads and writes of the database are separate kinds of connection (ADR-015): code that only
+reads runs where SQLite refuses any write.
+
 ## The provider key
 
 1. Entered in Settings and sent once over IPC to the main process.

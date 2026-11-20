@@ -162,7 +162,7 @@ class ModelGateway:
 
     def _entries(self) -> list[UsageEntry]:
         since = self._clock() - _LOOK_BACK
-        with self._database.session() as session:
+        with self._database.read() as session:
             rows = session.execute(
                 select(
                     ModelUsage.started_at, ModelUsage.prompt_tokens, ModelUsage.completion_tokens

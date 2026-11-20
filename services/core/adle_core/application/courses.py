@@ -78,7 +78,7 @@ class CourseService:
             .outerjoin(concepts, concepts.c.course_id == Course.id)
             .order_by(func.coalesce(Course.last_opened_at, Course.created_at).desc(), Course.id)
         )
-        with self._database.session() as session:
+        with self._database.read() as session:
             return [
                 _record(course, source_count, concept_count)
                 for course, source_count, concept_count in session.execute(statement)
@@ -108,7 +108,8 @@ class CourseService:
             return _record(course, 0, 0)
 
     def get(self, course_id: str, *, mark_opened: bool = False) -> CourseRecord:
-        with self._database.session() as session:
+        unit = self._database.session() if mark_opened else self._database.read()
+        with unit as session:
             course = get_course_or_404(session, course_id)
             if mark_opened:
                 course.last_opened_at = utc_now()

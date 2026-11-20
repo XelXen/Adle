@@ -122,7 +122,7 @@ class FtsRetriever:
             """
         )
         limit = max(1, min(limit, MAX_PASSAGES))
-        with self._database.session() as session:
+        with self._database.read() as session:
             rows = session.execute(
                 statement,
                 # More than asked for, so that one long document cannot fill every place.

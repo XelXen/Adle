@@ -396,7 +396,7 @@ class LearningService:
 
     def overview(self, course_id: str, *, now: datetime | None = None) -> LearningOverview:
         moment = now or utc_now()
-        with self._database.session() as session:
+        with self._database.read() as session:
             get_course_or_404(session, course_id)
             pictures = self._pictures(session, course_id, moment)
 
@@ -466,7 +466,7 @@ class LearningService:
                 f"A practice set has between 1 and {MAX_PRACTICE_QUESTIONS} questions."
             )
         moment = now or utc_now()
-        with self._database.session() as session:
+        with self._database.read() as session:
             concept = get_concept_or_404(session, concept_id)
             course_id = concept.course_id
             pictures = self._pictures(session, course_id, moment)

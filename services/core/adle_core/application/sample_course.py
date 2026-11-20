@@ -94,7 +94,7 @@ class SampleCourseService:
 
     def install(self) -> CourseRecord:
         """Create the sample course, or return it if it is already there."""
-        with self._database.session() as session:
+        with self._database.read() as session:
             existing = session.scalar(
                 select(Course.id).where(Course.origin == "sample").order_by(Course.created_at)
             )

@@ -227,7 +227,7 @@ class GenerationService:
 
     def propose_curriculum(self, course_id: str) -> JobSnapshot:
         """Start a job that asks the model for concepts this course could teach."""
-        with self._database.session() as session:
+        with self._database.read() as session:
             get_course_or_404(session, course_id)
         self._require_key()
         running = self._jobs.find_active(KIND_CURRICULUM, course_id)
@@ -241,7 +241,7 @@ class GenerationService:
         )
 
     def _propose(self, course_id: str, context: JobContext) -> dict[str, Any]:
-        with self._database.session() as session:
+        with self._database.read() as session:
             course = get_course_or_404(session, course_id)
             title, topic, description = course.title, course.topic or "", course.description
             existing = list(
@@ -309,7 +309,7 @@ class GenerationService:
 
     def latest_proposal(self, course_id: str) -> JobSnapshot | None:
         """The newest proposal job for a course: under way, waiting to be reviewed, or done with."""
-        with self._database.session() as session:
+        with self._database.read() as session:
             get_course_or_404(session, course_id)
         return self._jobs.latest(KIND_CURRICULUM, course_id)
 
@@ -379,7 +379,7 @@ class GenerationService:
         """
         if strategy is not None and strategy not in STRATEGIES:
             raise ValidationFailedError("That is not a way of teaching Adle knows.")
-        with self._database.session() as session:
+        with self._database.read() as session:
             concept = get_concept_or_404(session, concept_id)
             course_id = concept.course_id
             if not concept.objectives:
@@ -416,7 +416,7 @@ class GenerationService:
         return [str(document.get("strategy", "")) for document in documents]
 
     def _lesson_inputs(self, concept_id: str, strategy: str | None = None) -> _LessonInputs:
-        with self._database.session() as session:
+        with self._database.read() as session:
             concept_row = get_concept_or_404(session, concept_id)
             course: Course = get_course_or_404(session, concept_row.course_id)
             course_id, course_title = course.id, course.title

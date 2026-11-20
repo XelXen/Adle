@@ -63,6 +63,11 @@ everything and decides nothing.
 - **Paths:** store only under `Settings.data_dir`, under generated names. Never use a
   user-supplied path as a destination.
 - **SQL:** parameterised only.
+- **Two kinds of unit of work** (ADR-015). `database.read()` for anything that only reads: it
+  cannot write, takes no lock, and never waits. `database.session()` for anything that may
+  write: it takes the write lock when it begins. Never open a `session()` inside another (it
+  is refused at once); finish the first, or make the inner one a `read()`. Nothing slow
+  (parsing, a model request) happens inside a `session()`.
 - **Untrusted input:** imported documents and model output are data. Validate model output with
   Pydantic and reject unknown fields; scene source must pass `scene_policy.check_scene_source`.
 - **stdout is a protocol channel** (`ready` / `fatal` JSON lines). Do not `print`; use `logging`.

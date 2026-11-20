@@ -165,7 +165,7 @@ class JobRunner:
 
     def find_active(self, kind: str, subject_id: str) -> JobSnapshot | None:
         """The job of this kind already working on this subject, if there is one."""
-        with self._database.session() as session:
+        with self._database.read() as session:
             job = session.scalars(
                 select(Job)
                 .where(
@@ -179,7 +179,7 @@ class JobRunner:
 
     def latest(self, kind: str, subject_id: str) -> JobSnapshot | None:
         """The most recent job of this kind about this subject, whatever became of it."""
-        with self._database.session() as session:
+        with self._database.read() as session:
             job = session.scalars(
                 select(Job)
                 .where(Job.kind == kind, Job.subject_id == subject_id)
@@ -189,7 +189,7 @@ class JobRunner:
 
     def list_active(self, course_id: str) -> list[JobSnapshot]:
         """Jobs of a course that are waiting or running, oldest first."""
-        with self._database.session() as session:
+        with self._database.read() as session:
             jobs = session.scalars(
                 select(Job)
                 .where(Job.course_id == course_id, Job.status.in_(ACTIVE_STATUSES))
@@ -202,7 +202,7 @@ class JobRunner:
         self._update(job_id, result=result)
 
     def get(self, job_id: str) -> JobSnapshot:
-        with self._database.session() as session:
+        with self._database.read() as session:
             job = session.get(Job, job_id)
             if job is None:
                 raise NotFoundError("That task no longer exists.")

@@ -202,12 +202,12 @@ class SourceService:
         ]
 
     def list_for_course(self, course_id: str) -> list[SourceRecord]:
-        with self._database.session() as session:
+        with self._database.read() as session:
             get_course_or_404(session, course_id)
             return self._records(session, Source.course_id == course_id)
 
     def get(self, source_id: str) -> SourceDetail:
-        with self._database.session() as session:
+        with self._database.read() as session:
             records = self._records(session, Source.id == source_id)
             if not records:
                 raise NotFoundError("That source no longer exists.")
@@ -250,7 +250,7 @@ class SourceService:
             raise ValidationFailedError("Choose at least one file to import.")
         if len(paths) > MAX_FILES_PER_IMPORT:
             raise ValidationFailedError(f"Import at most {MAX_FILES_PER_IMPORT} files at a time.")
-        with self._database.session() as session:
+        with self._database.read() as session:
             get_course_or_404(session, course_id)
 
         def work(context: JobContext) -> dict[str, Any]:
@@ -402,7 +402,7 @@ class SourceService:
         slightly-off query still finds something.
         """
         limit = max(1, min(limit, MAX_SEARCH_RESULTS))
-        with self._database.session() as session:
+        with self._database.read() as session:
             get_course_or_404(session, course_id)
             for require_all in (True, False):
                 match = build_match_query(query, require_all=require_all)

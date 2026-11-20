@@ -225,6 +225,14 @@ sequenceDiagram
 - A curriculum proposal works the same way, in one request, and adds nothing until the learner
   has chosen from it. See ADR-012.
 
+## Reading and writing the database
+
+Every unit of work is one of two kinds. One that may write (`Database.session()`) takes
+SQLite's write lock when it begins, so writers queue instead of colliding. One that only reads
+(`Database.read()`) runs on connections that cannot write; it sees a consistent snapshot and
+never waits. The interface's polling and first loads are reads, so a job that is writing never
+holds the screen up. See ADR-015.
+
 ## Data on disk
 
 Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS default):

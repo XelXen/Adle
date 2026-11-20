@@ -208,7 +208,7 @@ class LessonService:
     # -- reading -----------------------------------------------------------
 
     def list_for_course(self, course_id: str) -> list[LessonSummary]:
-        with self._database.session() as session:
+        with self._database.read() as session:
             get_course_or_404(session, course_id)
             rows = session.scalars(
                 select(StoredLesson)
@@ -221,7 +221,7 @@ class LessonService:
 
     def get_lesson(self, lesson_id: str) -> Lesson:
         """The lesson without its scenes: all that scoring an answer needs."""
-        with self._database.session() as session:
+        with self._database.read() as session:
             return _read_lesson(_get_or_404(session, lesson_id))
 
     def get(self, lesson_id: str) -> LessonForPlayer:
@@ -233,7 +233,7 @@ class LessonService:
         not pass is withheld. The player then shows that part's description in
         words, and the rest of the lesson is unaffected.
         """
-        with self._database.session() as session:
+        with self._database.read() as session:
             row = _get_or_404(session, lesson_id)
             lesson = _read_lesson(row)
             scenes = []

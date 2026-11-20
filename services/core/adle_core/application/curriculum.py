@@ -189,7 +189,7 @@ class CurriculumService:
     # -- reading -----------------------------------------------------------
 
     def get(self, course_id: str) -> CurriculumRecord:
-        with self._database.session() as session:
+        with self._database.read() as session:
             return self._load(session, get_course_or_404(session, course_id))
 
     def _concepts(self, session: Session, course_id: str) -> list[Concept]:
@@ -675,7 +675,7 @@ class CurriculumService:
 
     def related_passages(self, concept_id: str, limit: int = 6) -> list[Passage]:
         """Passages of the course's materials that bear on a concept, best first."""
-        with self._database.session() as session:
+        with self._database.read() as session:
             concept = get_concept_or_404(session, concept_id)
             course_id = concept.course_id
             objectives = session.scalars(
@@ -715,7 +715,7 @@ class CurriculumService:
 
     def outline_candidates(self, course_id: str) -> list[OutlineCandidateRecord]:
         """Concepts the headings of the course's materials suggest. Nothing is created."""
-        with self._database.session() as session:
+        with self._database.read() as session:
             get_course_or_404(session, course_id)
             titles = session.scalars(select(Concept.title).where(Concept.course_id == course_id))
             candidates = draft_outline(self._heading_sections(session, course_id), list(titles))

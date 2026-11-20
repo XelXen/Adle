@@ -138,7 +138,7 @@ class LearnerService:
     # -- preferences -------------------------------------------------------
 
     def get_preferences(self) -> LearnerPreferences:
-        with self._database.session() as session:
+        with self._database.read() as session:
             return self._preferences(session)
 
     @staticmethod
@@ -257,7 +257,7 @@ class LearnerService:
             return self._evidence(session, concept.id)
 
     def concept_evidence(self, concept_id: str) -> ConceptEvidenceRecord:
-        with self._database.session() as session:
+        with self._database.read() as session:
             concept = get_concept_or_404(session, concept_id)
             return self._evidence(session, concept.id)
 
