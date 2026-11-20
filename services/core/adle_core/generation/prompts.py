@@ -44,7 +44,9 @@ Writing rules:
 - No Markdown, no HTML, no links, no file names, no emoji.
 - Mathematics may appear only where a field says so, written between dollar signs in TeX,
   for example $z = w_1 x_1 + b$. Never use \\( \\) or \\[ \\].
-- Answer with one JSON object and nothing else: no introduction, no code fence."""
+- Answer with one JSON object and nothing else: no introduction, no code fence.
+- In a JSON string a backslash is written twice. Write "$\\\\frac{1}{2}$" and
+  "$\\\\theta$", never "$\\frac{1}{2}$"."""
 
 
 @dataclass(frozen=True, slots=True)

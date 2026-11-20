@@ -67,12 +67,115 @@ def extract_json_object(text: str) -> dict[str, Any]:
             raise DraftError(["The answer must be one JSON object and nothing else."])
         candidate = candidate[start : end + 1]
     try:
-        value = json.loads(candidate)
+        value = json.loads(mend_backslashes(candidate))
     except ValueError as error:
-        raise DraftError(["The answer is not valid JSON."]) from error
+        raise DraftError(
+            [
+                "The answer is not valid JSON. Check that every string is closed, that "
+                "there is no comma after the last item of a list or an object, and that "
+                "a quotation mark inside a string has a backslash before it."
+            ]
+        ) from error
     if not isinstance(value, dict):
         raise DraftError(["The answer must be one JSON object."])
     return value
+
+
+# -- backslashes -------------------------------------------------------------------
+
+#: The letters that make an escape JSON knows and that also begin commands of TeX:
+#: ``\beta``, ``\frac``, ``\nu``, ``\rho``, ``\theta``.
+_AMBIGUOUS_ESCAPES = frozenset("bfnrt")
+#: Commands of TeX that begin with one of those letters and are long enough not to be a
+#: line break or a tab followed by a word. Outside mathematics only these are taken for
+#: TeX; inside it, any command is.
+_TEX_COMMANDS = frozenset(
+    {
+        *("bar", "begin", "beta", "big", "bigg", "bigl", "bigr", "bigcap", "bigcup"),
+        *("binom", "bmod", "boldsymbol", "bot", "boxed", "bullet"),
+        *("frac", "forall"),
+        *("nabla", "neg", "neq", "newline", "nmid", "not", "notin", "nleq", "ngeq"),
+        *("nolimits", "nonumber"),
+        *("rangle", "rbrace", "rbrack", "rceil", "rfloor", "rho", "right", "rightarrow"),
+        *("rvert",),
+        *("tan", "tanh", "tau", "text", "textbf", "textit", "textrm", "texttt", "tfrac"),
+        *("theta", "therefore", "tilde", "times", "top", "triangle"),
+    }
+)
+_FOUR_HEX = re.compile(r"[0-9a-fA-F]{4}")
+_LETTERS = re.compile(r"[A-Za-z]+")
+
+
+def _mathematics_after(following: str, in_math: bool) -> bool:
+    r"""Whether ``\(`` or ``\[`` has opened mathematics, or ``\)`` or ``\]`` closed it."""
+    if following in ("(", "["):
+        return True
+    if following in (")", "]"):
+        return False
+    return in_math
+
+
+def mend_backslashes(text: str) -> str:
+    r"""Make the backslashes of TeX safe inside the strings of a JSON answer.
+
+    In JSON a backslash is written twice, and a model writing ``$\frac{1}{2}$`` often
+    writes it once. Some of the results are not JSON at all (``\sigma``). The others are
+    worse, because they are: ``\frac`` reads as a form feed followed by "rac" and
+    ``\theta`` as a tab followed by "heta", and the lesson would show nonsense where its
+    mathematics was, with nothing to say that anything had gone wrong.
+
+    So before an answer is parsed, a backslash inside a string is doubled when it cannot
+    be an escape of JSON, or when it begins a command of TeX: any command between dollar
+    signs or after ``\(``, and a well-known one anywhere. A backslash that is already
+    written twice is left alone, and so is a real ``\n`` between two sentences.
+    """
+    out: list[str] = []
+    in_string = in_math = False
+    index, end = 0, len(text)
+    while index < end:
+        char = text[index]
+        if not in_string:
+            in_string, in_math = char == '"', False
+            out.append(char)
+            index += 1
+            continue
+        if char != "\\":
+            if char == '"':
+                in_string = False
+            elif char == "$":
+                in_math = not in_math
+            out.append(char)
+            index += 1
+            continue
+
+        following = text[index + 1] if index + 1 < end else ""
+        if following == "\\":
+            # Written twice already. What follows the pair may open or close mathematics.
+            in_math = _mathematics_after(text[index + 2] if index + 2 < end else "", in_math)
+            out.append("\\\\")
+            index += 2
+            continue
+        if following in ('"', "/"):
+            out.append(char + following)
+            index += 2
+            continue
+        if following == "u" and _FOUR_HEX.match(text, index + 2):
+            out.append(text[index : index + 6])
+            index += 6
+            continue
+        if following in _AMBIGUOUS_ESCAPES:
+            word = _LETTERS.match(text, index + 1)
+            command = word.group() if word else ""
+            if len(command) < 2 or not (in_math or command in _TEX_COMMANDS):
+                # A line break, a tab: an escape that means what JSON says it means.
+                out.append(char + following)
+                index += 2
+                continue
+        # TeX, or nothing JSON knows: the backslash is meant as itself.
+        in_math = _mathematics_after(following, in_math)
+        out.append("\\\\")
+        index += 1
+    return "".join(out)
 
 
 def extract_python_file(text: str) -> str:

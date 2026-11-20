@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import copy
+import json
 from typing import Any
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from adle_core.generation.drafts import (
     MAX_PROPOSED_CONCEPTS,
@@ -69,6 +72,106 @@ def test_an_answer_without_one_json_object_is_refused_with_a_reason(text: str) -
     with pytest.raises(DraftError) as raised:
         extract_json_object(text)
     assert raised.value.problems
+
+
+# -- TeX inside JSON ----------------------------------------------------------------
+#
+# Raw strings throughout: what is between the quotes is, character for character, what a
+# model sent.
+
+
+def test_the_first_lesson_a_real_model_wrote_is_read_with_its_mathematics_whole() -> None:
+    r"""As it arrived from Kimi K3.1 Pro on 2026-11-20: every command with one backslash.
+
+    ``\operatorname``, ``\geq`` and ``\sigma`` are not JSON. ``\frac`` is: a form feed, then
+    "rac". Read either way, a good lesson was lost.
+    """
+    answer = (
+        r'{"problem": "A neuron computes $z=2(3)+(-1)(4)-2=0$. Find its output using three '
+        r"activations: step, where $\operatorname{step}(z)=0$ for $z<0$ and $1$ for "
+        r"$z\geq 0$; sigmoid, where $\sigma(z)=\frac{1}{1+e^{-z}}$; and ReLU, where "
+        r'$\operatorname{ReLU}(z)=\max(0,z)$."}'
+    )
+    problem = extract_json_object(answer)["problem"]
+    assert r"$\operatorname{step}(z)=0$" in problem
+    assert r"$z\geq 0$" in problem
+    assert r"$\sigma(z)=\frac{1}{1+e^{-z}}$" in problem
+    assert r"$\operatorname{ReLU}(z)=\max(0,z)$" in problem
+    # Nothing was turned into a control character on the way.
+    assert all(character.isprintable() for character in problem)
+
+
+@pytest.mark.parametrize(
+    ("sent", "meant"),
+    [
+        # Written the way JSON asks: left exactly as it is.
+        (r'{"a": "$\\frac{1}{2}$"}', r"$\frac{1}{2}$"),
+        (r'{"a": "$\\theta + \\beta$"}', r"$\theta + \beta$"),
+        # Written once. Each of these is valid JSON for something else entirely.
+        (r'{"a": "$\frac{1}{2}$"}', r"$\frac{1}{2}$"),
+        (r'{"a": "$\theta$ and $\tau$"}', r"$\theta$ and $\tau$"),
+        (r'{"a": "$\beta \times \rho$"}', r"$\beta \times \rho$"),
+        (r'{"a": "$\nabla f \neq 0$"}', r"$\nabla f \neq 0$"),
+        (r'{"a": "$\nu$ and $\ne$ and $\to$"}', r"$\nu$ and $\ne$ and $\to$"),
+        (r'{"a": "$\left(\frac{a}{b}\right)^2$"}', r"$\left(\frac{a}{b}\right)^2$"),
+        (r'{"a": "$\text{loss} = \tfrac{1}{2}e^2$"}', r"$\text{loss} = \tfrac{1}{2}e^2$"),
+        (r'{"a": "$\underline{x}$"}', r"$\underline{x}$"),
+        # Written once and not JSON at all.
+        (r'{"a": "$\sigma(z)$ and $\alpha \leq 1$"}', r"$\sigma(z)$ and $\alpha \leq 1$"),
+        (r'{"a": "$\{1, 2\}$, $a\,b$, 50\% of it"}', r"$\{1, 2\}$, $a\,b$, 50\% of it"),
+        # Both habits in one answer.
+        (r'{"a": "$\\theta$ then $\theta$"}', r"$\theta$ then $\theta$"),
+        # The other way of marking mathematics, and a well-known command with no marks.
+        (r'{"a": "\(x \neq 0\) and \[\frac{1}{x}\]"}', r"\(x \neq 0\) and \[\frac{1}{x}\]"),
+        (r'{"a": "\\(x \neq 0\\)"}', r"\(x \neq 0\)"),
+        (r'{"a": "the fraction \frac{1}{2}"}', r"the fraction \frac{1}{2}"),
+    ],
+)
+def test_tex_survives_being_written_with_one_backslash_or_two(sent: str, meant: str) -> None:
+    assert extract_json_object(sent) == {"a": meant}
+
+
+def test_escapes_that_mean_what_json_says_are_left_alone() -> None:
+    sent = (
+        r'{"a": "one\ntwo\tthree", "b": "she said \"yes\"", "c": "café", '
+        r'"d": "a\\b", "e": "either\/or", "f": "first.\nNext, the tangent.\nfractions follow"}'
+    )
+    assert extract_json_object(sent) == {
+        "a": "one\ntwo\tthree",
+        "b": 'she said "yes"',
+        "c": "café",
+        "d": "a\\b",
+        "e": "either/or",
+        # A line break before a word is a line break, whatever the word begins with.
+        "f": "first.\nNext, the tangent.\nfractions follow",
+    }
+
+
+def test_mathematics_left_open_in_one_string_does_not_leak_into_the_next() -> None:
+    sent = r'{"a": "it costs $5", "b": "one\ntwo"}'
+    assert extract_json_object(sent) == {"a": "it costs $5", "b": "one\ntwo"}
+
+
+def test_a_backslash_outside_any_string_is_still_not_json() -> None:
+    with pytest.raises(DraftError):
+        extract_json_object(r'{"a": 1, \frac: 2}')
+
+
+@given(
+    st.dictionaries(
+        st.text(alphabet="abc", min_size=1, max_size=3),
+        # Anything a careful writer could put in a string, backslashes and quotation
+        # marks included, but no control characters: those are what a single backslash
+        # before a letter would have meant.
+        st.text(alphabet='abfnrtu xyz012${}()[]\\"/,.%é', max_size=30),
+        max_size=4,
+    )
+)
+def test_an_answer_that_was_escaped_properly_is_read_exactly_as_before(
+    value: dict[str, str],
+) -> None:
+    assert extract_json_object(json.dumps(value)) == value
+    assert extract_json_object(json.dumps(value, ensure_ascii=False)) == value
 
 
 def test_a_python_file_is_taken_from_its_fence_or_as_it_stands() -> None:
