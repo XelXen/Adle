@@ -249,6 +249,10 @@ test.describe('learning', () => {
     // One right answer in the lesson and three in the check. The two wrong ones are not
     // mentioned: they showed nothing, and nothing is held against the learner.
     await expect(shown).toContainText('4 answers right.');
+    // What is still open is said as the concept's own row says it.
+    await expect(session.getByRole('list', { name: 'Needs more evidence' })).toContainText(
+      'Still needed: a possible misunderstanding to clear up.',
+    );
     await expect(session.getByText('Lighter evidence is')).toHaveCount(0);
     await expect(session.getByRole('list', { name: 'Planned review' })).toContainText(
       'Review tomorrow.',

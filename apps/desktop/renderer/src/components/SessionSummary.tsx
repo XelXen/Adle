@@ -70,7 +70,8 @@ export function SessionSummary({ session }: { session: Session }) {
           lines={session.still_needed.map((line) => ({
             key: line.concept_id,
             title: line.title,
-            detail: `${line.missing.join('; ')}.`,
+            // The same words, in the same form, as the concept's own row further down.
+            detail: `Still needed: ${line.missing.join('; ')}.`,
           }))}
         />
         <Group
