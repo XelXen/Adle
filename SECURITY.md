@@ -222,6 +222,7 @@ Details and reasoning: `docs/decisions/ADR-012-provider-quota-and-generation.md`
 | Model output cannot enter the database unchecked | Draft parsed leniently, compiled deterministically, then `parse_bundle` (ADR-010); scenes through the static policy | `test_drafts.py`, `test_generation_api.py` |
 | A model cannot invent an identifier or a citation | Identifiers are assigned by the core; a citation is a number the prompt offered, or it is dropped | `test_drafts.py` |
 | A model cannot make Adle loop | A fixed number of requests per job; one request in flight; local limits under the provider's | `test_model_gateway.py`, `test_generation_api.py` |
+| A notice the provider sends in the model's place is not taken for the model's answer, and its words cannot do anything | Recognised by the client (ADR-020) and raised as `provider_notice`; the words are made one line, cut at 300 characters, cleared of control and text-reordering characters, quoted, and shown as text with no link; never logged, never followed, never retried | `test_provider_notice.py`; `e2e/generation.spec.ts` (no link in the message; one request sent) |
 
 **Residual risks, accepted**
 

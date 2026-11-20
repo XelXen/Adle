@@ -202,6 +202,18 @@ describe('jobFailure', () => {
   });
 });
 
+describe("a notice from the provider in the model's place", () => {
+  it('is shown in its own words and leads to the settings, not to trying again', () => {
+    const message =
+      'The AI provider answered with a notice of its own instead of passing this to the ' +
+      'model. It said: "Top up to go on." This is about your account with the provider, not ' +
+      'about Adle. Nothing was changed.';
+    expect(
+      jobFailure(job({ status: 'failed', error_code: 'provider_notice', error_message: message })),
+    ).toEqual({ message, remedy: 'settings' });
+  });
+});
+
 describe('keptNeeds', () => {
   it('keeps only the needs that are themselves selected', () => {
     const proposal = readProposal(job({ result: PROPOSAL }))!;

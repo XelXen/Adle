@@ -37,9 +37,12 @@ export interface RecordedRequest {
  * What to answer with:
  *  - a string: the text of the model's answer;
  *  - `{ status }`: an HTTP error with that status;
+ *  - `{ notice }`: a successful answer that the provider wrote itself, in the model's place,
+ *    in the shape the real provider was seen to use on 2026-11-20;
  *  - `HANG`: accept the request and say nothing until the test releases it or the app gives up.
  */
-export type Answer = string | { status: number; retryAfter?: number } | { hang: true };
+export type Answer =
+  string | { status: number; retryAfter?: number } | { notice: string } | { hang: true };
 
 /** An answer that never comes by itself. */
 export const HANG: Answer = { hang: true };
@@ -93,6 +96,23 @@ function stream(response: ServerResponse, text: string): void {
   response.end('data: [DONE]\n\n');
 }
 
+/**
+ * A notice as the real provider sent one: a single chunk whose identifier begins
+ * "chatcmpl-fake", marked as finished, with no report of tokens used.
+ */
+function streamNotice(response: ServerResponse, notice: string): void {
+  response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  const chunk = {
+    choices: [{ delta: { content: notice, role: 'assistant' }, finish_reason: 'stop', index: 0 }],
+    created: 1795158495,
+    id: 'chatcmpl-fake-1795158495575810024',
+    model: 'coding-kimi-k3-free',
+    object: 'chat.completion.chunk',
+  };
+  response.write(`data: ${JSON.stringify(chunk)}\n\n`);
+  response.end('data: [DONE]\n\n');
+}
+
 export async function startFakeProvider(options: { delayMs?: number } = {}): Promise<FakeProvider> {
   const delayMs = options.delayMs ?? 250;
   const requests: RecordedRequest[] = [];
@@ -133,6 +153,10 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       if (typeof answer === 'string') {
         stream(response, answer);
+        return;
+      }
+      if ('notice' in answer) {
+        streamNotice(response, answer.notice);
         return;
       }
       const headers: Record<string, string> = { 'content-type': 'application/json' };

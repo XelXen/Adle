@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
@@ -180,6 +181,63 @@ class ProviderBadResponseError(ProviderError):
         )
 
 
+#: How the documented provider marks an answer it wrote itself, in the model's place.
+_NOTICE_ID_PREFIX = "chatcmpl-fake"
+#: How much of a provider's notice is shown. Enough for a sentence or two and an address.
+MAX_NOTICE_CHARACTERS = 300
+# Control characters, and the characters that reorder or hide text.
+_UNPRINTABLE = re.compile("[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")
+
+
+def clean_notice(text: str) -> str:
+    """A provider's own words made safe to show: one line, nothing hidden, not too long.
+
+    They are somebody else's text. They are shown, quoted, because they are the only
+    thing that says what the learner can do; they are never interpreted or followed.
+    """
+    one_line = " ".join(_UNPRINTABLE.sub(" ", text).split())
+    if len(one_line) > MAX_NOTICE_CHARACTERS:
+        one_line = one_line[: MAX_NOTICE_CHARACTERS - 1].rstrip() + "\u2026"
+    return one_line.replace('"', "'")
+
+
+class ProviderNoticeError(ProviderError):
+    """The provider answered in the model's place, with a notice of its own.
+
+    Seen with the documented provider on 2026-11-20: a request to an account that had not
+    been topped up came back as an ordinary, successful completion whose text was a
+    sentence about the account's allowance, with an identifier beginning
+    ``chatcmpl-fake`` and no tokens used. Taken for the model's answer, that sentence is
+    an unreadable draft, the job asks again, and the learner is told only that the
+    lesson could not be used, having spent two requests to learn nothing.
+    """
+
+    code = "provider_notice"
+
+    def __init__(self, notice: str) -> None:
+        self.notice = clean_notice(notice)
+        said = f' It said: "{self.notice}"' if self.notice else ""
+        super().__init__(
+            "The AI provider answered with a notice of its own instead of passing this to "
+            f"the model.{said} This is about your account with the provider, not about "
+            "Adle. Nothing was changed."
+        )
+
+
+def _looks_like_a_notice(response_id: object, text: str, usage: dict[str, Any] | None) -> bool:
+    """Whether a successful answer was written by the provider and not by the model."""
+    if isinstance(response_id, str) and response_id.startswith(_NOTICE_ID_PREFIX):
+        return True
+    # A model cannot write anything without reading and writing tokens. An answer that
+    # has text and reports that none were used did not come from one.
+    return (
+        bool(text.strip())
+        and usage is not None
+        and _count(usage, "prompt_tokens") == 0
+        and _count(usage, "completion_tokens") == 0
+    )
+
+
 class RequestCancelledError(Exception):
     """The caller asked to stop while the request was in flight."""
 
@@ -319,6 +377,7 @@ class ChatClient:
         size = 0
         usage: dict[str, Any] | None = None
         finish_reason: str | None = None
+        response_id: object = None
         saw_data = False
         for payload in _events(response):
             if cancelled():
@@ -337,6 +396,8 @@ class ChatClient:
                 logger.warning("provider.stream_error")
                 raise ProviderUnavailableError(provider_side=True)
             saw_data = True
+            if response_id is None:
+                response_id = chunk.get("id")
             if isinstance(chunk.get("usage"), dict):
                 usage = chunk["usage"]
             for choice in chunk.get("choices") or []:
@@ -353,7 +414,12 @@ class ChatClient:
                     finish_reason = choice["finish_reason"]
         if not saw_data:
             raise ProviderBadResponseError
-        return _result("".join(pieces), usage, finish_reason)
+        text = "".join(pieces)
+        if _looks_like_a_notice(response_id, text, usage):
+            # Its words are for the learner, not for the log.
+            logger.warning("provider.notice")
+            raise ProviderNoticeError(text)
+        return _result(text, usage, finish_reason)
 
 
 def _retry_after(value: str | None) -> float | None:
@@ -403,11 +469,12 @@ def _result_from_document(body: str) -> ChatResult:
         raise ProviderBadResponseError
     usage = document.get("usage") if isinstance(document, dict) else None
     reason = choice.get("finish_reason") if isinstance(choice, dict) else None
-    return _result(
-        text,
-        usage if isinstance(usage, dict) else None,
-        reason if isinstance(reason, str) else None,
-    )
+    usage = usage if isinstance(usage, dict) else None
+    response_id = document.get("id") if isinstance(document, dict) else None
+    if _looks_like_a_notice(response_id, text, usage):
+        logger.warning("provider.notice")
+        raise ProviderNoticeError(text)
+    return _result(text, usage, reason if isinstance(reason, str) else None)
 
 
 def _count(usage: dict[str, Any] | None, name: str) -> int | None:

@@ -130,7 +130,7 @@ exporting a single course to share (not planned; ADR-016), an installer, a signe
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-019, on 2026-11-20.
+`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-020, on 2026-11-20.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -140,21 +140,21 @@ Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 497 tests, 23 files |
+| Vitest | PASS | 498 tests, 23 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 88 source files |
-| pytest | PASS | 1035 tests |
-| Playwright + Electron (E2E) | PASS | 83 tests in 12 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
+| pytest | PASS | 1044 tests |
+| Playwright + Electron (E2E) | PASS | 84 tests in 11 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 411 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-20 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-20 (pip-audit 2.10.1) |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
-| Packaged build: every journey (`npm run e2e:packaged`) | PASS | 83 tests against the packaged app, none flaky |
+| Packaged build: every journey (`npm run e2e:packaged`) | PASS | 83 tests against the packaged app for ADR-019, none flaky; for ADR-020 the generation and security journeys were run again against a rebuilt package |
 | Packaged build: release start-up check (`npm run package:check`) | PASS | Fuses, will not run as Node, starts on an empty profile with a stripped environment, no orphaned core |
 | Packaged build on a computer that never had the project | NOT RUN | Needs another machine |
 | Installer, code signing | BLOCKED | Need the owner's certificates |
 | macOS / Linux | NOT RUN | Developed on Windows only |
-| Real AI provider | BLOCKED | The provider fails every request upstream (HTTP 500 `do_request_failed`); see "The real provider" |
+| Real AI provider | BLOCKED | First key: HTTP 500 from the provider's relay. Second key: the account must be topped up before anything reaches the model; see "The real provider" |
 
 ## Launch reliability (ADR-008)
 
@@ -283,14 +283,31 @@ or try the key in their own playground. In the app this state is handled: the jo
 "The AI provider reported a problem on its side. Nothing was changed; try again in a little
 while", nothing is saved, and no request is repeated.
 
+**A second key, the same day: no HTTP 500, and no model either.** The owner supplied another
+key. The request on the model's page came back with HTTP 200, and its text was the provider's
+own: "Sorry, to prevent abuse of free resources, accounts that have not been recharged can
+only try 10 times. You can increase the free quota after recharging;
+https://console.aihubmix.com/topup". Its identifier began `chatcmpl-fake` and it reported no
+tokens used; streamed, it was one chunk with no usage at all. Two requests were sent with
+this key, both answered this way. So with this account **the model is reachable in
+principle, and what stands in the way is topping the account up at AIHubMix**. That is the
+owner's to do; after it, run the smoke script above with `probe`, then `curriculum` and
+`lesson`.
+
+Adle did not recognise such an answer: it would have been taken for an unreadable draft,
+asked for again, and reported as "the lesson could not be used". It is now a failure of its
+own (`provider_notice`, ADR-020): one request, the provider's words shown to the learner,
+the settings offered. This is the first thing the real provider has taught the client.
+
 ## Next actions
 
 Everything that could be done on this machine without the owner is done. What remains, in
 the order it matters:
 
-1. **Retry the real provider** (see "The real provider") and, when it answers, read what the
-   model actually writes and adjust the prompts and the leniency of `generation/drafts.py`.
-   This is the one part of the product no test has exercised for real.
+1. **Top up the AIHubMix account of the second key, then retry the real provider** (see "The
+   real provider"). When it answers, read what the model actually writes and adjust the
+   prompts and the leniency of `generation/drafts.py`. This is the one part of the product
+   no test has exercised for real.
 2. **Push the branch** so that CI runs for the first time, on Windows and Linux. Expect
    surprises on Linux: nothing has run there.
 3. **Choose a licence, get signing certificates, and add an installer** (ADR-019 says what

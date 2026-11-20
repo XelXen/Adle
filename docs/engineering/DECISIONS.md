@@ -25,6 +25,7 @@ supersedes the old one and update this index.
 | [017](../decisions/ADR-017-session-summary.md) | A session is a sitting computed from the record (the latest run of activity with no pause over 45 minutes); it reports right answers as counts, names lighter evidence, never grants "demonstrated", and is shown on the Learn tab under the suggested next step. |
 | [018](../decisions/ADR-018-when-the-app-fails.md) | No crash reporting of any kind; a local log of the app's own failures that never holds learner content; a crashed or hung page, an uncaught error in the main process, and a core that dies each get a plain message and a way on, decided by pure functions. |
 | [019](../decisions/ADR-019-packaging.md) | Packed with `@electron/packager` into a folder; the core ships as a private Python (not a frozen executable) started cut off from the computer it is on; fuses set; one build for release and the same build with the debugger reachable for the end-to-end suite. No installer, signature, or updater yet. |
+| [020](../decisions/ADR-020-provider-notices.md) | A successful answer that the provider wrote itself in the model's place (an account notice) is recognised, ends the job after one request, and is shown to the learner in the provider's own words, quoted, cleaned, and as plain text. |
 
 ## Smaller standing choices (no ADR)
 

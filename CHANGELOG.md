@@ -65,6 +65,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - With a key, have a lesson written for any concept that has a learning objective. You see how
   far along it is and can cancel. If a picture cannot be made, the lesson is kept and that part
   is explained in words.
+- If the AI provider answers about your account instead of passing a request to the model
+  (an allowance used up, a balance needed), Adle shows you what the provider said, in its
+  own words, and does not spend a second request asking again.
 - Settings → AI provider shows how many requests Adle has sent today. Adle sends one request at
   a time, waits rather than exceed four a minute, and stops short of the provider's daily limit.
 - Lessons are read aloud with a voice installed on your computer. Nothing is sent anywhere to

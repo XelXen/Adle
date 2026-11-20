@@ -115,7 +115,7 @@ still missing: [`docs/engineering/RELEASE_CHECKLIST.md`](docs/engineering/RELEAS
 
 | Setting | Where |
 |---|---|
-| AI provider key | Settings → AI provider |
+| AI provider key | Settings → AI provider. Get one from [AIHubMix](https://aihubmix.com/token). On 2026-11-20 AIHubMix answered a new account that had never been topped up with a notice that it "can only try 10 times" on the free model, and that topping up raises the allowance. Adle shows such a notice as it stands. |
 | Theme | Settings → Appearance |
 | Provider address and model | Shown in Settings → AI provider (`https://aihubmix.com/v1`, `coding-kimi-k3-free`). For development, start with `ADLE_PROVIDER_BASE_URL` and `ADLE_PROVIDER_MODEL` set: `https` only, or `http` on this computer. Another address is always shown as "Custom endpoint". |
 | Narration voice and volume | Settings → Learning |

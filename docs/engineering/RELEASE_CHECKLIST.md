@@ -37,7 +37,7 @@ None of these is done. Each needs something only the owner has.
 | A licence for the project | The repository is marked `UNLICENSED` |
 | A build and a test run on macOS and on Linux | The script has the paths for both and has run on neither |
 | A run on a computer that has never had the project on it | Step 8 strips the environment, which is not the same thing |
-| A lesson written by the real model, read by a person | The provider has not answered a request yet |
+| A lesson written by the real model, read by a person | The model has not answered yet: one key gets HTTP 500 from the provider's relay; the other account must be topped up first |
 
 ## The acceptance list (PLAN.md section 17)
 
@@ -65,7 +65,10 @@ None of these is done. Each needs something only the owner has.
 ## Known limitations
 
 - **No lesson from the real model has been seen.** Every path is tested against a stand-in
-  that answers as the documentation says the provider does. The prompts are unchecked.
+  that answers as the documentation says the provider does. The prompts are unchecked. Two
+  keys were tried: the provider's relay answers the first with HTTP 500, and the second
+  belongs to an account that must be topped up before the provider passes anything to the
+  model (it says so in a notice, which Adle now shows; ADR-020).
 - **Narration and animation are synchronised per part of a lesson**, not per sentence.
 - **PDFs are read with `pypdf`.** Columns, tables, and equations come out as that library
   gives them. Scanned pages are flagged, not read.

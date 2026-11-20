@@ -136,6 +136,10 @@ function failure(code: string | null | undefined, message: string | null | undef
     case 'provider_key_missing':
     case 'provider_key_rejected':
       return { message: text, remedy: 'settings' };
+    case 'provider_notice':
+      // The provider answered about the learner's account. Asking again changes nothing;
+      // the settings are where the account and the key are looked after.
+      return { message: text, remedy: 'settings' };
     case 'quota_exhausted':
       // Trying again today cannot help; the allowance starts again tomorrow.
       return { message: text, remedy: 'wait' };

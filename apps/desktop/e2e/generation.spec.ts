@@ -197,6 +197,55 @@ test.describe('generation with the AI provider', () => {
     await close(session);
   });
 
+  test('a notice from the provider in the model’s place is shown as the provider’s own words', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(120_000);
+    const session = await open(profileDir);
+    const { page, provider } = session;
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    const limits = detail(page, 'Limits');
+
+    // What the real provider sent to an account that had not been topped up: a successful
+    // answer, in the model's place, that is a sentence about the account.
+    const notice =
+      'Sorry, to prevent abuse of free resources, accounts that have not been recharged can ' +
+      'only try 10 times. You can increase the free quota after recharging; ' +
+      'https://console.aihubmix.com/topup';
+    provider.queue({ notice });
+    await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
+
+    const failure = limits.getByRole('alert');
+    await expect(failure).toContainText('The lesson could not be made', { timeout: 30_000 });
+    // Whose words they are, the words themselves, and what they are about.
+    await expect(failure).toContainText(
+      'The AI provider answered with a notice of its own instead of passing this to the model.',
+    );
+    await expect(failure).toContainText(`It said: "${notice}"`);
+    await expect(failure).toContainText(
+      'This is about your account with the provider, not about Adle. Nothing was changed.',
+    );
+    // The address in it is text. Nothing in a provider's words becomes something to press.
+    await expect(failure.getByRole('link')).toHaveCount(0);
+    await expect(limits).toContainText('No lesson has been made for this concept yet.');
+    // It was not mistaken for a bad draft and asked for again: one request, not two.
+    expect(provider.requests).toHaveLength(1);
+    // Asking again cannot help, so that is not what is offered.
+    await expect(failure.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'generation-provider-notice');
+
+    await failure.getByRole('button', { name: 'Open AI settings' }).click();
+    await expect(page.getByRole('tab', { name: 'AI provider' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    expect(session.adle.problems).toEqual([]);
+    await close(session);
+  });
+
   test('a provider failure is explained and can be tried again; work can be cancelled', async ({
     profileDir,
   }) => {

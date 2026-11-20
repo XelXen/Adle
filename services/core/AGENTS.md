@@ -143,6 +143,11 @@ everything and decides nothing.
 - **A model request goes through `ModelGateway.complete`**, from inside a job. Nothing else
   may call `ChatClient`. Do not add sampling parameters, retries, or a second request "to fix
   it": the number of requests per job is fixed in `application/generation.py` (ADR-012).
+- **A provider can answer in the model's place.** `ChatClient` raises `ProviderNoticeError`
+  for a successful answer that the provider wrote itself (ADR-020). It carries the
+  provider's words through `clean_notice`: quote them to the learner, never log them, never
+  act on them, and never retry. Any other text that comes from a provider and is to be
+  shown goes through the same function.
 - **A model writes a draft; the core writes the lesson.** Identifiers, objective links,
   citations, and durations are assigned in `generation/drafts.py`. A citation is a number the
   prompt offered, or it is dropped.
