@@ -26,6 +26,7 @@ from adle_core.application.curriculum import (
 )
 from adle_core.application.evidence import (
     EVENT_DISMISSED,
+    EVENT_LESSON_COMPLETED,
     EVENT_UNHELPFUL,
     events_by_concept,
 )
@@ -38,10 +39,11 @@ from adle_core.infrastructure.orm import (
     Attempt,
     LearnerConceptState,
     LearnerEvent,
+    LearnerObservation,
     StoredLesson,
 )
 from adle_core.learner_model.bkt import Outcome
-from adle_core.learner_model.mastery import MasteryState
+from adle_core.learner_model.mastery import STATE_LABELS, MasteryState
 from adle_core.learner_model.misconceptions import (
     KIND_LABELS,
     Dismissal,
@@ -66,6 +68,7 @@ from adle_core.learner_model.practice import (
     fresh_items,
     next_fresh_at,
 )
+from adle_core.learner_model.sitting import Activity, ConceptNow, Sitting, latest_sitting
 from adle_core.learner_model.tracing import Observation, ObservationKind
 from adle_core.lessons.ir import SCHEMA_VERSION, AssessmentItem, Lesson
 from adle_core.lessons.player import PlayerQuestion, player_question
@@ -73,6 +76,9 @@ from adle_core.lessons.player import PlayerQuestion, player_question
 #: How many of a concept's latest answers the policy looks at for "how is it going".
 RECENT_ANSWERS = 8
 MAX_PRACTICE_QUESTIONS = 5
+#: How far back the latest sitting is looked for. Far more than one sitting holds; without
+#: a bound, every look at a course would read every answer ever given in it.
+SITTING_LOOKBACK = 600
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,12 +141,55 @@ class ProgressSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionShownRecord:
+    concept_id: str
+    title: str
+    #: Right answers in the sitting, and how many of them count in full.
+    right: int
+    right_unaided: int
+    demonstrated: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SessionNeededRecord:
+    concept_id: str
+    title: str
+    #: Where the concept stands, in the words used everywhere else.
+    label: str
+    missing: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class SessionReviewRecord:
+    concept_id: str
+    title: str
+    due_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class SessionRecord:
+    """The latest sitting on a course and what it showed. Counts and words; no score."""
+
+    started_at: datetime
+    ended_at: datetime
+    #: The learner may still be in it. Otherwise it is "last time".
+    current: bool
+    lessons_completed: int
+    answered: int
+    shown: list[SessionShownRecord]
+    still_needed: list[SessionNeededRecord]
+    reviews: list[SessionReviewRecord]
+
+
+@dataclass(frozen=True, slots=True)
 class LearningOverview:
     course_id: str
     plan: PlanRecord
     #: In an order that respects what each concept needs first.
     concepts: list[ConceptProgressRecord]
     summary: ProgressSummary
+    #: The latest sitting, or ``None`` if nothing has been done on the course yet.
+    session: SessionRecord | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,6 +251,41 @@ def _hypothesis_record(hypothesis: Hypothesis) -> HypothesisRecord:
         description=hypothesis.describe(),
         is_slip=hypothesis.is_slip,
         can_dismiss=hypothesis.is_open,
+    )
+
+
+def _session_record(sitting: Sitting | None) -> SessionRecord | None:
+    if sitting is None:
+        return None
+    return SessionRecord(
+        started_at=sitting.started_at,
+        ended_at=sitting.ended_at,
+        current=sitting.current,
+        lessons_completed=sitting.lessons_completed,
+        answered=sitting.answered,
+        shown=[
+            SessionShownRecord(
+                concept_id=line.concept_id,
+                title=line.title,
+                right=line.right,
+                right_unaided=line.right_unaided,
+                demonstrated=line.demonstrated,
+            )
+            for line in sitting.shown
+        ],
+        still_needed=[
+            SessionNeededRecord(
+                concept_id=line.concept_id,
+                title=line.title,
+                label=STATE_LABELS[line.state],
+                missing=list(line.missing),
+            )
+            for line in sitting.still_needed
+        ],
+        reviews=[
+            SessionReviewRecord(concept_id=line.concept_id, title=line.title, due_at=line.due_at)
+            for line in sitting.reviews
+        ],
     )
 
 
@@ -363,6 +447,57 @@ class LearningService:
         return pictures
 
     @staticmethod
+    def _activities(session: Session, course_id: str) -> list[Activity]:
+        """What the learner did on the course lately: answers, skips, lessons finished.
+
+        Read from the observations, which are what was counted as evidence: an answer
+        there is "hinted" if it was a repeat of a question answered moments before, and
+        "unsure" if the learner marked their own explanation. So an answer that counts
+        in full here is exactly one that counts in full for the state of a concept.
+        """
+        answers = session.execute(
+            select(
+                LearnerObservation.occurred_at,
+                LearnerObservation.concept_id,
+                LearnerObservation.outcome,
+                LearnerObservation.hinted,
+                LearnerObservation.unsure,
+            )
+            .where(
+                LearnerObservation.course_id == course_id,
+                LearnerObservation.kind == ObservationKind.ANSWER.value,
+            )
+            .order_by(LearnerObservation.id.desc())
+            .limit(SITTING_LOOKBACK)
+        ).all()
+        finished = session.execute(
+            select(LearnerEvent.occurred_at, LearnerEvent.concept_id)
+            .where(
+                LearnerEvent.course_id == course_id,
+                LearnerEvent.kind == EVENT_LESSON_COMPLETED,
+                LearnerEvent.concept_id.is_not(None),
+            )
+            .order_by(LearnerEvent.id.desc())
+            .limit(SITTING_LOOKBACK)
+        ).all()
+        activities = [
+            Activity(
+                at=occurred_at,
+                concept_id=concept_id,
+                answered=outcome != Outcome.SKIPPED.value,
+                right=outcome == Outcome.CORRECT.value,
+                right_unaided=outcome == Outcome.CORRECT.value and not hinted and not unsure,
+            )
+            for occurred_at, concept_id, outcome, hinted, unsure in answers
+        ]
+        activities.extend(
+            Activity(at=occurred_at, concept_id=concept_id, lesson_completed=True)
+            for occurred_at, concept_id in finished
+            if concept_id is not None
+        )
+        return activities
+
+    @staticmethod
     def _still_asking(
         report: LearnerEvent | None,
         newest_lesson_at: datetime | None,
@@ -399,7 +534,22 @@ class LearningService:
         with self._database.read() as session:
             get_course_or_404(session, course_id)
             pictures = self._pictures(session, course_id, moment)
+            activities = self._activities(session, course_id)
 
+        sitting = latest_sitting(
+            activities,
+            [
+                ConceptNow(
+                    id=picture.status.id,
+                    title=picture.status.title,
+                    state=picture.status.state,
+                    missing=picture.status.missing,
+                    review_due_at=picture.status.review_due_at,
+                )
+                for picture in pictures
+            ],
+            moment,
+        )
         decided = plan(
             [picture.status for picture in pictures],
             moment,
@@ -425,6 +575,7 @@ class LearningService:
                 reviews_due=sum(1 for concept in concepts if concept.review_due),
                 next_review_at=upcoming[0] if upcoming else None,
             ),
+            session=_session_record(sitting),
         )
 
     @staticmethod

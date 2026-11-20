@@ -239,8 +239,25 @@ test.describe('learning', () => {
       'More than one answer suggests that what causes what may be the other way round.',
     );
     await expect(row).toContainText('1 of 1 lesson finished.');
+
+    // ---- This session: what it showed, as counts of what happened and never as a score ----
+    const session = page.getByRole('region', { name: 'This session' });
+    await expect(session).toContainText('1 lesson finished, 6 questions answered.');
+    const shown = session.getByRole('list', { name: 'What you showed' });
+    await expect(shown.getByRole('listitem')).toHaveCount(1);
+    await expect(shown).toContainText(CONCEPT);
+    // One right answer in the lesson and three in the check. The two wrong ones are not
+    // mentioned: they showed nothing, and nothing is held against the learner.
+    await expect(shown).toContainText('4 answers right.');
+    await expect(session.getByText('Lighter evidence is')).toHaveCount(0);
+    await expect(session.getByRole('list', { name: 'Planned review' })).toContainText(
+      'Review tomorrow.',
+    );
+    await expect(session).not.toContainText('%');
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'learn-hypothesis');
+    await session.scrollIntoViewIfNeeded();
+    await screenshot(page, 'learn-session');
     await noticed.getByRole('button', { name: 'That was a slip' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Set aside' })).toBeVisible();
     await expect(noticed).toContainText('You said it was a slip, so it is set aside.');
@@ -271,6 +288,16 @@ test.describe('learning', () => {
     const laterRow = concepts(later).getByRole('listitem').filter({ hasText: CONCEPT }).first();
     await expect(laterRow).toContainText('A review is due');
     await expect(later.getByText('1 review is due.')).toBeVisible();
+    // Coming back, the same sitting is "last time": a reminder of where things were left.
+    const lastTime = later.getByRole('region', { name: 'Last time, 2 days ago' });
+    await expect(lastTime).toContainText('1 lesson finished, 6 questions answered.');
+    await expect(lastTime.getByRole('list', { name: 'What you showed' })).toContainText(
+      '4 answers right.',
+    );
+    await expect(lastTime.getByRole('list', { name: 'Planned review' })).toContainText(
+      'A review is due.',
+    );
+    await expect(later.getByRole('region', { name: 'This session' })).toHaveCount(0);
     await expectNoAccessibilityViolations(later);
     await screenshot(later, 'learn-review-due-dark');
 
@@ -287,6 +314,24 @@ test.describe('learning', () => {
     // ---- The review is done, and the next one is further away than the last ----
     await expect(laterRow).toContainText(/Next review in \d+ days/);
     await expect(laterRow.getByText('A review is due')).toHaveCount(0);
+    // A new sitting has taken the place of the old one.
+    const today = later.getByRole('region', { name: 'This session' });
+    await expect(today).toContainText('3 questions answered.');
+    // One of the three was an explanation the learner marked themselves: still a right
+    // answer, said to be lighter evidence, with what that means underneath.
+    await expect(today.getByRole('list', { name: 'What you showed' })).toContainText(
+      '3 answers right, 1 of them lighter evidence.',
+    );
+    await expect(today).toContainText(
+      'Lighter evidence is a right answer after a hint, one you were unsure of or marked yourself',
+    );
+    await expect(today.getByRole('list', { name: 'Planned review' })).toContainText(
+      /Review in \d+ days\./,
+    );
+    await expect(later.getByRole('region', { name: /^Last time/ })).toHaveCount(0);
+    await expectNoAccessibilityViolations(later);
+    await today.scrollIntoViewIfNeeded();
+    await screenshot(later, 'learn-session-dark');
     await expect(later.getByText('1 review is due.')).toHaveCount(0);
     await expect(suggestion(later, `Review "${CONCEPT}"`)).toHaveCount(0);
 

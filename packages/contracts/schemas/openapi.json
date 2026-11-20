@@ -684,9 +684,12 @@
           },
           "course_id": { "title": "Course Id", "type": "string" },
           "plan": { "$ref": "#/components/schemas/LearningPlan" },
+          "session": {
+            "anyOf": [{ "$ref": "#/components/schemas/SessionSummary" }, { "type": "null" }]
+          },
           "summary": { "$ref": "#/components/schemas/ProgressSummary" }
         },
-        "required": ["course_id", "plan", "concepts", "summary"],
+        "required": ["course_id", "plan", "concepts", "summary", "session"],
         "title": "LearningOverview",
         "type": "object"
       },
@@ -1539,6 +1542,76 @@
         },
         "required": ["level"],
         "title": "SelfRating",
+        "type": "object"
+      },
+      "SessionReview": {
+        "properties": {
+          "concept_id": { "title": "Concept Id", "type": "string" },
+          "due_at": { "format": "date-time", "title": "Due At", "type": "string" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": ["concept_id", "title", "due_at"],
+        "title": "SessionReview",
+        "type": "object"
+      },
+      "SessionShown": {
+        "properties": {
+          "concept_id": { "title": "Concept Id", "type": "string" },
+          "demonstrated": { "title": "Demonstrated", "type": "boolean" },
+          "right": { "title": "Right", "type": "integer" },
+          "right_unaided": { "title": "Right Unaided", "type": "integer" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": ["concept_id", "title", "right", "right_unaided", "demonstrated"],
+        "title": "SessionShown",
+        "type": "object"
+      },
+      "SessionStillNeeded": {
+        "properties": {
+          "concept_id": { "title": "Concept Id", "type": "string" },
+          "label": { "title": "Label", "type": "string" },
+          "missing": { "items": { "type": "string" }, "title": "Missing", "type": "array" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": ["concept_id", "title", "label", "missing"],
+        "title": "SessionStillNeeded",
+        "type": "object"
+      },
+      "SessionSummary": {
+        "description": "The latest sitting on a course and what it showed.\n\nA sitting is a run of activity with no long pause in it. Nobody starts or ends one;\nit is read off the record. Counts of answers and words for states: never a score.",
+        "properties": {
+          "answered": { "title": "Answered", "type": "integer" },
+          "current": { "title": "Current", "type": "boolean" },
+          "ended_at": { "format": "date-time", "title": "Ended At", "type": "string" },
+          "lessons_completed": { "title": "Lessons Completed", "type": "integer" },
+          "reviews": {
+            "items": { "$ref": "#/components/schemas/SessionReview" },
+            "title": "Reviews",
+            "type": "array"
+          },
+          "shown": {
+            "items": { "$ref": "#/components/schemas/SessionShown" },
+            "title": "Shown",
+            "type": "array"
+          },
+          "started_at": { "format": "date-time", "title": "Started At", "type": "string" },
+          "still_needed": {
+            "items": { "$ref": "#/components/schemas/SessionStillNeeded" },
+            "title": "Still Needed",
+            "type": "array"
+          }
+        },
+        "required": [
+          "started_at",
+          "ended_at",
+          "current",
+          "lessons_completed",
+          "answered",
+          "shown",
+          "still_needed",
+          "reviews"
+        ],
+        "title": "SessionSummary",
         "type": "object"
       },
       "Source": {

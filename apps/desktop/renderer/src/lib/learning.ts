@@ -5,10 +5,12 @@ import type {
   NextStep,
   PracticeSet,
   ProgressSummary,
+  SessionShown,
+  SessionSummary,
 } from '@adle/contracts';
 
 import type { Route } from '../app/router';
-import { pluralise } from './format';
+import { formatRelativeDay, pluralise } from './format';
 
 /**
  * What the interface does with what the core decided: where a suggested step
@@ -124,6 +126,68 @@ export function reviewSentence(summary: ProgressSummary, now: Date = new Date())
   return summary.next_review_at
     ? `The next review is ${formatWait(summary.next_review_at, now)}.`
     : null;
+}
+
+/**
+ * What a sitting is called. While the learner may still be in it, it is "This session";
+ * afterwards it is what they did last time, with the day, for someone coming back.
+ */
+export function sessionHeading(
+  session: Pick<SessionSummary, 'current' | 'ended_at'>,
+  now: Date = new Date(),
+): string {
+  if (session.current) return 'This session';
+  const day = formatRelativeDay(session.ended_at, now);
+  if (day === 'Today') return 'Earlier today';
+  if (day === 'Yesterday') return 'Last time, yesterday';
+  if (day.endsWith(' ago')) return `Last time, ${day}`;
+  return day ? `Last time, on ${day}` : 'Last time';
+}
+
+/** What was done in a sitting, as counts of things that happened. */
+export function sessionCounts(
+  session: Pick<SessionSummary, 'lessons_completed' | 'answered'>,
+): string {
+  const parts = [
+    session.lessons_completed > 0
+      ? `${pluralise(session.lessons_completed, 'lesson')} finished`
+      : null,
+    session.answered > 0 ? `${pluralise(session.answered, 'question')} answered` : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? `${parts.join(', ')}.` : 'No questions answered.';
+}
+
+/**
+ * What a concept's answers in a sitting showed. Counts of right answers; wrong answers are
+ * not in it. A right answer that did not count in full (see `LIGHTER_EVIDENCE`) is still a
+ * right answer, and is said to be lighter evidence, which is what the core calls it.
+ */
+export function shownSentence(
+  line: Pick<SessionShown, 'right' | 'right_unaided' | 'demonstrated'>,
+): string {
+  const lighter = Math.max(0, line.right - line.right_unaided);
+  let answers = `${pluralise(line.right, 'answer')} right`;
+  if (lighter > 0) {
+    answers += line.right === 1 ? ', as lighter evidence' : `, ${lighter} of them lighter evidence`;
+  }
+  return line.demonstrated ? `${answers}. Demonstrated for now.` : `${answers}.`;
+}
+
+/** Whether any line needs "lighter evidence" explained beneath it. */
+export function hasLighterEvidence(
+  lines: readonly Pick<SessionShown, 'right' | 'right_unaided'>[],
+): boolean {
+  return lines.some((line) => line.right > line.right_unaided);
+}
+
+export const LIGHTER_EVIDENCE =
+  'Lighter evidence is a right answer after a hint, one you were unsure of or marked ' +
+  'yourself, or one to a question you had just seen explained. It still counts, for a little less.';
+
+/** When a planned review comes round, as a sentence. */
+export function reviewWhen(dueAt: string, now: Date = new Date()): string {
+  const wait = formatWait(dueAt, now);
+  return wait === '' || wait === 'now' ? 'A review is due.' : `Review ${wait}.`;
 }
 
 export interface HypothesisLabel {

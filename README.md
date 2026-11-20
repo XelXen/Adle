@@ -43,6 +43,9 @@ understanding with short questions, and adapts the next step to what you have ac
   Never a score, and never from one answer.
 - **Practice and review:** a few questions chosen for what your answers have not shown yet.
   Reviews come due after a gap that grows as you remember.
+- **What your latest session showed:** right answers for each concept you worked on, what
+  still needs evidence, and what is planned for review. When you come back it is there as
+  "Last time".
 - **Mix-ups are possibilities, not verdicts:** when more than one answer points the same way,
   Adle says so, asks a question that would show it, and lets you set it aside.
 - **"This did not help":** skip ahead, ask for another kind of explanation, or do something
@@ -66,6 +69,8 @@ understanding with short questions, and adapts the next step to what you have ac
   for that request is sent to the AI provider you configured (AIHubMix by default). Nothing is
   sent before you add a key and ask.
 - No accounts, no analytics, no telemetry, no crash uploads.
+- In Settings → Privacy & data you can save a copy of everything as one file, restore from a
+  copy (what it replaces is kept, so a restore can be undone), and delete everything.
 
 Details: [SECURITY.md](SECURITY.md).
 

@@ -70,6 +70,9 @@ SELF_REPORT_PRIORS: dict[SelfReport, float] = {
 SELF_REPORT_PULL = 0.25
 
 #: The kinds of question Adle asks, with the phrase used for each in explanations.
+#: The form whose answers the learner marks themselves against a list of points.
+SELF_MARKED_FORM = "explanation"
+
 QUESTION_FORM_LABELS: dict[str, str] = {
     "multiple_choice": "a multiple-choice question",
     "true_false": "a true-or-false question",
@@ -286,6 +289,12 @@ def _what_happened(observation: Observation) -> str:
         if observation.hinted:
             return (
                 f"You answered {question} correctly after a hint, which counts as lighter evidence."
+            )
+        if observation.unsure and observation.question_form == SELF_MARKED_FORM:
+            # Nobody said they were unsure: the answer was the learner's own judgement.
+            return (
+                "You judged that your own explanation covered the points. An answer you "
+                "mark yourself counts as lighter evidence."
             )
         if observation.unsure:
             return (

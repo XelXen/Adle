@@ -260,6 +260,17 @@ def test_hinted_and_unsure_answers_do_not_count_towards_the_criteria() -> None:
     assert "said you were unsure" in explanations[1]
 
 
+def test_an_answer_the_learner_marked_themselves_is_described_as_that() -> None:
+    """Such an answer is recorded as unsure, but nobody said they were unsure."""
+    knowledge, _, explanations = run([answer(form="explanation", unsure=True, minutes=0)])
+    assert knowledge.unaided_correct == 0
+    assert explanations[0].startswith(
+        "You judged that your own explanation covered the points. "
+        "An answer you mark yourself counts as lighter evidence."
+    )
+    assert "unsure" not in explanations[0]
+
+
 def test_understanding_can_be_lost_again_and_the_reason_is_given() -> None:
     earned = [
         answer(form="multiple_choice", minutes=0),

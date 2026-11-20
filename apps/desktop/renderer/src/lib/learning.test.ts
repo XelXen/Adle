@@ -4,12 +4,18 @@ import type { ConceptProgress, Hypothesis, NextStep, ProgressSummary } from '@ad
 
 import {
   formatWait,
+  hasLighterEvidence,
   hypothesisLabel,
+  LIGHTER_EVIDENCE,
   outcomeWords,
   practiceSummary,
   practiceTitle,
   reviewNote,
   reviewSentence,
+  reviewWhen,
+  sessionCounts,
+  sessionHeading,
+  shownSentence,
   stepAction,
   summarySentence,
 } from './learning';
@@ -191,6 +197,73 @@ describe('reviews in words', () => {
     expect(reviewSentence({ ...summary, next_review_at: '2026-11-20T12:00:00Z' }, NOW)).toBe(
       'The next review is tomorrow.',
     );
+  });
+});
+
+describe('the session summary in words', () => {
+  const now = new Date(2026, 10, 19, 15, 0);
+  const at = (daysAgo: number, hour = 14): string =>
+    new Date(2026, 10, 19 - daysAgo, hour, 0).toISOString();
+
+  it('is "this session" while the learner may still be in it', () => {
+    expect(sessionHeading({ current: true, ended_at: at(0) }, now)).toBe('This session');
+  });
+
+  it('is named by its day once it is over', () => {
+    expect(sessionHeading({ current: false, ended_at: at(0, 9) }, now)).toBe('Earlier today');
+    expect(sessionHeading({ current: false, ended_at: at(1) }, now)).toBe('Last time, yesterday');
+    expect(sessionHeading({ current: false, ended_at: at(3) }, now)).toBe('Last time, 3 days ago');
+    expect(sessionHeading({ current: false, ended_at: at(40) }, now)).toMatch(/^Last time, on /);
+    expect(sessionHeading({ current: false, ended_at: 'not a date' }, now)).toBe('Last time');
+  });
+
+  it('counts what was done, and says so plainly when nothing was answered', () => {
+    expect(sessionCounts({ lessons_completed: 1, answered: 6 })).toBe(
+      '1 lesson finished, 6 questions answered.',
+    );
+    expect(sessionCounts({ lessons_completed: 2, answered: 0 })).toBe('2 lessons finished.');
+    expect(sessionCounts({ lessons_completed: 0, answered: 1 })).toBe('1 question answered.');
+    expect(sessionCounts({ lessons_completed: 0, answered: 0 })).toBe('No questions answered.');
+  });
+
+  it('says what was shown as a count of right answers, never as a share of all answers', () => {
+    expect(shownSentence({ right: 1, right_unaided: 1, demonstrated: false })).toBe(
+      '1 answer right.',
+    );
+    const demonstrated = shownSentence({ right: 4, right_unaided: 4, demonstrated: true });
+    expect(demonstrated).toBe('4 answers right. Demonstrated for now.');
+    expect(demonstrated).not.toMatch(/%|\//);
+  });
+
+  it('says which right answers were lighter evidence, without taking them away', () => {
+    expect(shownSentence({ right: 3, right_unaided: 2, demonstrated: true })).toBe(
+      '3 answers right, 1 of them lighter evidence. Demonstrated for now.',
+    );
+    expect(shownSentence({ right: 3, right_unaided: 0, demonstrated: false })).toBe(
+      '3 answers right, 3 of them lighter evidence.',
+    );
+    expect(shownSentence({ right: 1, right_unaided: 0, demonstrated: false })).toBe(
+      '1 answer right, as lighter evidence.',
+    );
+  });
+
+  it('explains lighter evidence only when some line mentions it', () => {
+    expect(hasLighterEvidence([{ right: 2, right_unaided: 2 }])).toBe(false);
+    expect(
+      hasLighterEvidence([
+        { right: 2, right_unaided: 2 },
+        { right: 1, right_unaided: 0 },
+      ]),
+    ).toBe(true);
+    expect(hasLighterEvidence([])).toBe(false);
+    expect(LIGHTER_EVIDENCE).toContain('It still counts');
+  });
+
+  it('says when a planned review comes round', () => {
+    expect(reviewWhen(new Date(2026, 10, 21, 15, 0).toISOString(), now)).toBe('Review in 2 days.');
+    expect(reviewWhen(new Date(2026, 10, 20, 15, 0).toISOString(), now)).toBe('Review tomorrow.');
+    expect(reviewWhen(new Date(2026, 10, 18, 15, 0).toISOString(), now)).toBe('A review is due.');
+    expect(reviewWhen('not a date', now)).toBe('A review is due.');
   });
 });
 

@@ -289,6 +289,7 @@ export interface LearningOverview {
   concepts: ConceptProgress[];
   course_id: string;
   plan: LearningPlan;
+  session: SessionSummary | null;
   summary: ProgressSummary;
 }
 export interface LearningPlan {
@@ -329,6 +330,41 @@ export interface NextStep {
   lesson_id: string | null;
   needs_key: boolean;
   reason: string;
+  title: string;
+}
+/**
+ * The latest sitting on a course and what it showed.
+ *
+ * A sitting is a run of activity with no long pause in it. Nobody starts or ends one;
+ * it is read off the record. Counts of answers and words for states: never a score.
+ *
+ */
+export interface SessionSummary {
+  answered: number;
+  current: boolean;
+  ended_at: string;
+  lessons_completed: number;
+  reviews: SessionReview[];
+  shown: SessionShown[];
+  started_at: string;
+  still_needed: SessionStillNeeded[];
+}
+export interface SessionReview {
+  concept_id: string;
+  due_at: string;
+  title: string;
+}
+export interface SessionShown {
+  concept_id: string;
+  demonstrated: boolean;
+  right: number;
+  right_unaided: number;
+  title: string;
+}
+export interface SessionStillNeeded {
+  concept_id: string;
+  label: string;
+  missing: string[];
   title: string;
 }
 /**

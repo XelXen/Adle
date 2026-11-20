@@ -126,6 +126,9 @@ most, a file's name.
   destination and puts counts and waits into words.
 - Show a plan with `NextSteps` wherever there is one. Do not build a second way of presenting a
   suggestion.
+- The session summary (`SessionSummary`, from `overview.session`) sits under the suggested
+  step on the Learn tab; that step is its "Continue". It shows right answers as counts and
+  never as a share of the answers given, and it does not list wrong ones.
 - Practice reuses `CheckpointPanel` and `lessons.answer`. A practice question is answered at the
   lesson it belongs to (`lesson_id` comes with it).
 - Opening a route again must be able to start afresh: `useRouter().visit` goes up with every

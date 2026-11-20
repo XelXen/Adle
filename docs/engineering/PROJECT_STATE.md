@@ -6,8 +6,8 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Last updated:** 2026-11-19
 - **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
 - **Last commit:** see `git log -1`
-- **Active milestone:** M7 — a session summary and the polish pass (the sample course, and
-  saving, restoring, and deleting the data, are done)
+- **Active milestone:** M7 — the polish pass (the sample course; saving, restoring, and
+  deleting the data; and the session summary are done)
 - **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
   `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
 
@@ -22,7 +22,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 | M4 — Wanim and Lesson IR | **Done** | Player frame, adapter, static scene policy, skill, threat model (ADR-004). Lesson IR 1.0 with a generated JSON Schema; one validating gateway; scenes re-checked on every read; answer keys kept in the core with deterministic scoring; the lesson player; the first lesson of the sample course (ADR-010). The packaged-build check is BLOCKED on M8 packaging. |
 | M5 — Generation, audio, timeline | **Done** (real provider BLOCKED) | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Every path is tested against a fake provider. **The real model has not produced a lesson yet:** the provider failed every request upstream on 2026-11-19, so the prompts are unchecked. |
 | M6 — Assessment and adaptation | **Done** | Hypotheses about mistakes computed from the record (tentative, supported, rejected, resolved), checked with questions that would show them, and dismissible by the learner; slips counted as partly right; repeats counted in full only after a gap; questions kept for practice in the Lesson IR; a next-step policy with a reason for every step; the Learn tab, practice and review, "what next" after a lesson, "This did not help"; teaching strategy chosen or rotated (ADR-014). Not built by decision: model grading of open answers and model-proposed hypotheses. |
-| M7 — Complete UX and sample course | **In progress** | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Also done: Settings → Privacy & data can save a copy of everything as one file, restore from one (checked and upgraded before anything is replaced; what is replaced is kept; undoable), and delete everything (ADR-016). Missing: a session summary; the polish pass. |
+| M7 — Complete UX and sample course | **In progress** | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Also done: Settings → Privacy & data can save a copy of everything as one file, restore from one (checked and upgraded before anything is replaced; what is replaced is kept; undoable), and delete everything (ADR-016). Also done: the session summary (ADR-017). Missing: the polish pass. |
 | M8 — Release hardening | Not started | — |
 
 ## What works in the running app
@@ -47,6 +47,12 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   last twelve hours is asked again; if nothing can be asked, the screen says when it can.
 - **Reviews:** scheduled by the core after answers; due ones are suggested first among routine
   steps and marked on the concept. Doing one moves the next further away.
+- **The session summary** (Learn tab, under the suggested step): "This session" while the
+  learner may still be in it, "Last time, yesterday" and the like afterwards. Lessons finished
+  and questions answered; for each concept worked on, how many answers were right (with any
+  that were lighter evidence named, and one sentence saying what that means), what is still
+  needed in the concept's own words, and when its review comes. No score, and wrong answers
+  are not listed.
 - **"This did not help"** in a lesson: skip to the next question, have the concept explained
   another way (a chosen way of teaching; needs a key), or go to the course. The suggestion on
   the Learn tab changes accordingly and says why.
@@ -110,12 +116,12 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   database (with a backup first), and exits with the app.
 
 Not present yet (do not assume): a lesson written by the real model (see "The real provider"),
-a session summary, exporting a single course to share (not planned; ADR-016), packaging.
+exporting a single course to share (not planned; ADR-016), packaging.
 
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-016.
+`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-017.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -125,10 +131,10 @@ Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 458 tests, 22 files |
+| Vitest | PASS | 465 tests, 22 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 87 source files |
-| pytest | PASS | 1006 tests |
+| mypy (strict) | PASS | 88 source files |
+| pytest | PASS | 1031 tests |
 | Playwright + Electron (E2E) | PASS | 81 tests in 11 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
 | `npm audit` (all dependencies) | NOT RUN | Last run before KaTeX was added; run again before release |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
@@ -245,13 +251,9 @@ and `lesson`, read what the model actually writes, and adjust the prompts and th
 
 ## Next actions (M7), in order
 
-1. **Session summary** (PLAN.md 3.1 step 10): what was shown, what needs more evidence, what
-   is planned for review. The plan: a pure module reads a "sitting" off the record (the latest
-   run of activity with no pause over 45 minutes), `LearningService.overview` gathers the
-   activity and exposes it, and the Learn tab and the end of a lesson show it.
-2. **Polish:** onboarding, empty and error states, keyboard and screen-reader pass, visual
+1. **Polish:** onboarding, empty and error states, keyboard and screen-reader pass, visual
    baselines; try Wanim's slides mode for finer narration and animation timing.
-3. **Retry the real provider** (see above) and adjust the prompts, including the request for
+2. **Retry the real provider** (see above) and adjust the prompts, including the request for
    practice questions and for a way of teaching.
 
 Then M8 (packaging, hardening, performance report, release checklist).

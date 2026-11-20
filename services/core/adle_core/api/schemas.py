@@ -494,12 +494,57 @@ class ProgressSummary(_Output):
     next_review_at: datetime | None
 
 
+class SessionShown(_Output):
+    concept_id: str
+    title: str
+    #: Right answers in the sitting. A count, not a rate: wrong answers are not in it.
+    right: int
+    #: Those of them that count in full: no hint, no "I am not sure", not marked by the
+    #: learner themselves, not a repeat of a question just answered.
+    right_unaided: int
+    #: The concept counts as demonstrated now, by the usual criteria.
+    demonstrated: bool
+
+
+class SessionStillNeeded(_Output):
+    concept_id: str
+    title: str
+    label: str
+    missing: list[str]
+
+
+class SessionReview(_Output):
+    concept_id: str
+    title: str
+    due_at: datetime
+
+
+class SessionSummary(_Output):
+    """The latest sitting on a course and what it showed.
+
+    A sitting is a run of activity with no long pause in it. Nobody starts or ends one;
+    it is read off the record. Counts of answers and words for states: never a score.
+    """
+
+    started_at: datetime
+    ended_at: datetime
+    #: The learner may still be in it; otherwise it was "last time".
+    current: bool
+    lessons_completed: int
+    answered: int
+    shown: list[SessionShown]
+    still_needed: list[SessionStillNeeded]
+    reviews: list[SessionReview]
+
+
 class LearningOverview(_Output):
     course_id: str
     plan: LearningPlan
     #: In an order that respects what each concept needs first.
     concepts: list[ConceptProgress]
     summary: ProgressSummary
+    #: Null until something has been done on the course.
+    session: SessionSummary | None
 
 
 class PracticeRequest(_Input):

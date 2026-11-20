@@ -178,12 +178,15 @@ flowchart LR
     M["learner_model.misconceptions<br/>answers + dismissals → hypotheses"]
     P["learner_model.practice<br/>which questions, and why"]
     N["learner_model.next_step<br/>one step, its reason, alternatives"]
+    T["learner_model.sitting<br/>the latest sitting and what it showed"]
   end
   A[("attempts<br/>with what each question could reveal")] --> L
   E[("learner_events<br/>set aside, did not help, finished")] --> L
   S[("states, lessons, progress")] --> L
   L["LearningService<br/>gathers; decides nothing"] --> M --> N
   L --> P
+  O[("observations<br/>what was counted, and when")] --> L --> T
+  T --> UI
   N --> UI["Renderer: Learn tab,<br/>end of a lesson, end of practice"]
   P --> PR["Renderer: practice screen<br/>(questions without answers)"]
   PR -- "lessons.answer" --> AS["AssessmentService<br/>score, fold, record"] --> A
@@ -195,6 +198,10 @@ flowchart LR
   with alternatives, and the learner may ignore it.
 - Practice and review answer through the same operation as a lesson's questions. There is one
   scoring path and one place where evidence is recorded. See ADR-014.
+- A session is not stored either. The latest sitting (a run of activity with no long pause)
+  is read off the observations and reported as counts of right answers, what is still
+  missing, and the reviews planned: "This session" while it may still be going, "Last time"
+  afterwards. See ADR-017.
 
 ## Asking the model
 

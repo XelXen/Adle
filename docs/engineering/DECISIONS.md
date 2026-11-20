@@ -22,6 +22,7 @@ supersedes the old one and update this index.
 | [014](../decisions/ADR-014-adaptation.md) | A pattern of wrong answers is a hypothesis computed from the record (tentative, supported, rejected, resolved) that the learner can set aside; a slip counts as partly right; a repeat counts in full only after a gap; lessons carry questions kept for review; the next step is chosen by readable rules, always with a reason, never the same lesson again after it did not help. No model grading and no model-proposed hypotheses. |
 | [015](../decisions/ADR-015-units-of-work.md) | A unit of work that may write takes SQLite's write lock when it begins and waits its turn; one that only reads runs on connections that cannot write and never waits. Fixes "database is locked" when a job committed between a request's first read and first write. |
 | [016](../decisions/ADR-016-copy-restore-and-delete.md) | A copy of the data is one self-contained file written through an internal operation; restoring happens while the core starts, on a working copy first, keeping what it replaces; deleting everything is done by the main process with the core held stopped; every path and confirmation comes from the operating system. |
+| [017](../decisions/ADR-017-session-summary.md) | A session is a sitting computed from the record (the latest run of activity with no pause over 45 minutes); it reports right answers as counts, names lighter evidence, never grants "demonstrated", and is shown on the Learn tab under the suggested next step. |
 
 ## Smaller standing choices (no ADR)
 

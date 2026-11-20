@@ -30,7 +30,8 @@ adle_core/
                   saving and restoring a copy of the data
   curriculum/     PURE rules: concept graph (loops, order, layers), outline from headings
   learner_model/  PURE rules: knowledge tracing, mastery states, review schedule, preferences,
-                  hypotheses about mistakes, which questions to practise, the next step
+                  hypotheses about mistakes, which questions to practise, the next step,
+                  the latest sitting
   lessons/        PURE: the Lesson IR, the validating gateway (bundle.py), the player view
   evaluation/     PURE: deterministic scoring of answers
   sample_course/  package data: course outline, lesson templates, scene files
@@ -118,6 +119,10 @@ everything and decides nothing.
   (`test_practice_and_next_step.py` checks every reason).
 - **Never suggest the same lesson again after it did not work**, and never suggest practice for
   something practice cannot supply. Both are tests; keep them passing rather than special-casing.
+- **A session is a sitting, computed by `learner_model/sitting.py`** (ADR-017). Do not store
+  one, and do not add a "session" row or a start or end event. It reports counts of right
+  answers and the words `mastery.py` already produced; it must never contain a rate, and a
+  sitting must never be what makes a concept "demonstrated".
 - **Time is an argument.** Anything that depends on "now" (`AssessmentService.answer`,
   `LearningService`) takes `now`; routes do not pass it. Tests move the clock that way.
 - **`learner_events` is append-only** and holds only events something reads. Adding a kind means

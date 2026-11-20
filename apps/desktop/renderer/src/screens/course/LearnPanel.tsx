@@ -7,6 +7,7 @@ import { Badge, Button, ErrorState, LoadingState, useToast } from '@adle/design-
 import { useRouter } from '../../app/router';
 import { GenerationStatus } from '../../components/GenerationStatus';
 import { NextSteps } from '../../components/NextSteps';
+import { SessionSummary } from '../../components/SessionSummary';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
 import { KIND_LESSON, lessonDisclosure, readLessonOutcome } from '../../lib/generation';
@@ -15,6 +16,7 @@ import {
   hypothesisLabel,
   reviewNote,
   reviewSentence,
+  sessionHeading,
   summarySentence,
 } from '../../lib/learning';
 import { useGeneration } from '../../lib/use-generation';
@@ -35,6 +37,7 @@ export function LearnPanel({ course }: { course: Course }) {
   const { navigate } = useRouter();
   const nextId = useId();
   const progressId = useId();
+  const sessionId = useId();
   const courseId = course.id;
   const overview = useResource(`learning:${courseId}`, () =>
     callCore('learning.overview', { path: { course_id: courseId } }),
@@ -157,6 +160,15 @@ export function LearnPanel({ course }: { course: Course }) {
         </h2>
         <NextSteps plan={data.plan} courseId={courseId} renderGeneration={lessonControl} />
       </section>
+
+      {data.session ? (
+        <section className={styles.section} aria-labelledby={sessionId}>
+          <h2 id={sessionId} className={styles.heading}>
+            {sessionHeading(data.session)}
+          </h2>
+          <SessionSummary session={data.session} />
+        </section>
+      ) : null}
 
       {data.concepts.length > 0 ? (
         <section className={styles.section} aria-labelledby={progressId}>

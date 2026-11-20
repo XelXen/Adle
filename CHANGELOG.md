@@ -88,6 +88,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
   first, a worked example, an everyday comparison, the mathematics step by step, a calculation by
   hand, or leading questions.
 - A lesson ends with what to do next, not only with what it covered.
+- A course shows what your latest session showed: how many answers were right for each concept
+  you worked on, what still needs evidence, and when each comes back for review. Coming back
+  another day, it is there as "Last time". It is never a score, and wrong answers are not
+  listed.
+- A right answer to a question you mark yourself is now described as that, instead of as an
+  answer you were unsure of.
 - Your data is kept safe between versions: a copy is made before its format is ever changed.
 - Interactive visuals run in an isolated frame; if one cannot run, a text explanation is shown
   instead and the rest of the lesson is unaffected.
