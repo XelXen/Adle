@@ -165,14 +165,6 @@ async def _serve(
 
 
 def main(argv: list[str] | None = None) -> int:
-    arguments = sys.argv[1:] if argv is None else argv
-    if arguments[:1] == ["--parse-worker"]:
-        # A packaged build has a single executable. Document parsing runs in a
-        # child of the same executable, started with this flag (see ingestion/extract.py).
-        from adle_core.ingestion import worker
-
-        return worker.main()
-
     logging.basicConfig(
         level=logging.INFO,
         stream=sys.stderr,

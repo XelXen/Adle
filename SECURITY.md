@@ -225,7 +225,8 @@ Details and reasoning: `docs/decisions/ADR-012-provider-quota-and-generation.md`
 
 **Residual risks, accepted**
 
-- What is sent (a concept, its objectives, a few passages) leaves the computer for the provider
+- What is sent (the course's name, a concept and its objectives, a few words about where the
+  learner stands on it, their pace, depth, and goal, and a few passages) leaves the computer for the provider
   once the learner asks. The provider's handling of it is outside Adle's control; the first-run
   screen and the settings say so.
 - A model can write a lesson that is valid and wrong. Validation checks form, not truth. The
@@ -260,19 +261,40 @@ request in any case. See ADR-013.
 ## Dependencies
 
 - Exact versions, committed lockfiles (`package-lock.json`, `uv.lock`).
-- `npm audit --audit-level=high` runs in CI. Status on 2026-11-19: 0 known vulnerabilities.
+- `npm audit --audit-level=high` and `pip-audit` over everything in `uv.lock` run in CI.
+  Status on 2026-11-20: 0 known vulnerabilities in either.
+- `npm run licenses:check` is part of every gate: it fails if a package states no licence or
+  is under one that would bind the whole of Adle, or if something that ships is missing from
+  `docs/engineering/THIRD_PARTY.md`.
 - npm install scripts are denied by default (`allowScripts` in `package.json`).
-- Licences in use: MIT, ISC, BSD, Apache-2.0, OFL-1.1. No GPL/AGPL.
+- Licences of what ships: MIT, ISC, BSD-3-Clause, Apache-2.0, OFL-1.1, PSF-2.0. No GPL,
+  AGPL, or LGPL anywhere, shipped or not.
+- FastAPI depends on the interface package of a telemetry library. Without that library's
+  other half it records and sends nothing; the package build fails if the other half is ever
+  present (`scripts/package.mjs`).
+
+## The packaged app
+
+Reasoning: `docs/decisions/ADR-019-packaging.md`.
+
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| The binary cannot be made to run as plain Node, take Node options from the environment, or load code from outside its archive | Electron fuses set by `scripts/package.mjs` | `npm run package:check` reads the fuses back and tries to run a script through it |
+| The release build cannot be debugged from outside | The inspect fuse is off in the release build; it is on only in the build made for tests, which is never distributed | `npm run package:check` (release) and `--test` (the other) |
+| Nothing on the learner's computer changes what the core runs | The private Python is started with `-I`: no `PYTHON*` variables, no user site-packages, nothing imported from the current folder. The parser worker inherits the same flags | `npm run package:check` (hostile `PYTHONHOME` and `PYTHONPATH`, bare `PATH`); `test_isolated_extraction.py`; `local-state.test.ts` |
+| The core is exactly what the lock file says | Dependencies installed from `uv.lock` with `--require-hashes` | The package build fails otherwise |
+| No package tree to audit at run time | Everything the app needs is bundled into `dist/`; the archive has no `node_modules` | `scripts/package.mjs` stages only `package.json`, `dist/`, and the icons |
+| Every boundary in this document holds in the packaged app | The whole end-to-end suite runs against it unchanged | `npm run e2e:packaged`: 83 journeys, including `security.spec.ts` and `scene-player.spec.ts` |
 
 ## Not yet done
 
 | Item | Milestone |
 |---|---|
-| Electron fuses, ASAR integrity, code signing | M8 (packaging) |
-| Player isolation re-verified in a packaged build | M8 |
-| Python dependency audit in CI (`pip-audit` or equivalent) | M8 |
-| OS-level sandbox for the parser worker (job object / seccomp / App Sandbox) | M8, with packaging |
-| Prompt-injection tests against the fake provider | M5 |
+| Code signing, and an installer | Needs the owner's certificates (ADR-019). Until then Windows warns about the program and macOS refuses it |
+| Checking the archive's integrity at start-up (the fuse for it) | With signing; without a signature it adds little |
+| OS-level sandbox for the parser worker (job object / seccomp / App Sandbox) | Not built. The worker is a separate, short-lived, isolated process that returns only checked JSON; see "Residual risks" under "Imported documents" |
+| A build and a test run on macOS and Linux | NOT RUN |
+| The CI workflow | Written, never run: the repository has no remote |
 
 ## Reporting a problem
 

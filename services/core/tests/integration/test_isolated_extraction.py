@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -12,7 +13,7 @@ from pathlib import Path
 import httpx2 as httpx
 import pytest
 
-from adle_core.ingestion.extract import extract_isolated, worker_command
+from adle_core.ingestion.extract import extract_isolated, interpreter_flags, worker_command
 from adle_core.ingestion.types import DEFAULT_LIMITS, DocumentKind, IngestionError
 
 DOCUMENTS = Path(__file__).resolve().parents[4] / "fixtures" / "sample-documents"
@@ -55,7 +56,48 @@ def test_type_detection_happens_before_any_process_is_started() -> None:
 
 
 def test_the_worker_command_runs_the_worker_module() -> None:
-    assert worker_command() == [sys.executable, "-m", "adle_core.ingestion.worker"]
+    assert worker_command() == [
+        sys.executable,
+        *interpreter_flags(),
+        "-m",
+        "adle_core.ingestion.worker",
+    ]
+    assert worker_command()[-2:] == ["-m", "adle_core.ingestion.worker"]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("started_with", "carried"),
+    [
+        ([], []),
+        (["-I"], ["-I"]),
+        (["-X", "utf8"], ["-X", "utf8"]),
+        (["-I", "-X", "utf8"], ["-I", "-X", "utf8"]),
+    ],
+)
+def test_a_worker_is_started_as_isolated_as_the_service_that_starts_it(
+    started_with: list[str], carried: list[str]
+) -> None:
+    """A packaged build runs its Python cut off from the computer's own. So must its child."""
+    asked = subprocess.run(  # noqa: S603 - fixed command
+        [
+            sys.executable,
+            *started_with,
+            "-c",
+            "import json; from adle_core.ingestion.extract import interpreter_flags; "
+            "print(json.dumps(interpreter_flags()))",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        # Without these two the result would depend on the machine running the test.
+        env={
+            key: value
+            for key, value in os.environ.items()
+            if key not in {"PYTHONUTF8", "PYTHONPATH"}
+        },
+    )
+    assert json.loads(asked.stdout) == carried
 
 
 @pytest.mark.slow

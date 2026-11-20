@@ -141,10 +141,32 @@ describe('UiStateStore', () => {
 describe('resolveLaunchSpec', () => {
   const base = { resourcesPath: '/opt/adle/resources', repoRoot: '/repo', exists: () => true };
 
-  it('uses the bundled executable in a packaged app', () => {
+  it('uses the private Python in a packaged app, cut off from the computer it is on', () => {
     const spec = resolveLaunchSpec({ ...base, isPackaged: true, platform: 'win32' });
     expect(spec.command).toBe(path.join('/opt/adle/resources', 'core', 'adle-core.exe'));
-    expect(spec.args).toEqual([]);
+    // Isolated first: nothing after it may be read from the environment or the folder.
+    expect(spec.args).toEqual(['-I', '-u', '-X', 'utf8', '-m', 'adle_core']);
+    expect(spec.cwd).toBe(path.join('/opt/adle/resources', 'core'));
+
+    const elsewhere = resolveLaunchSpec({ ...base, isPackaged: true, platform: 'darwin' });
+    expect(elsewhere.command).toBe(path.join('/opt/adle/resources', 'core', 'bin', 'python3.12'));
+    expect(elsewhere.args).toEqual(spec.args);
+  });
+
+  it('never looks at the repository or a development environment when packaged', () => {
+    const seen: string[] = [];
+    resolveLaunchSpec({
+      ...base,
+      isPackaged: true,
+      platform: 'win32',
+      exists: (file) => {
+        seen.push(file);
+        return true;
+      },
+    });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).not.toContain('.venv');
+    expect(seen[0]!.startsWith(path.join('/opt/adle/resources'))).toBe(true);
   });
 
   it('uses the uv environment in development', () => {

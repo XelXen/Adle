@@ -12,7 +12,8 @@ understanding with short questions, and adapts the next step to what you have ac
 > **Status: in development.** The whole learning loop works on the sample course: a curriculum,
 > lessons with live pictures and questions, evidence about what you know, a suggested next step
 > with its reason, practice, and reviews that come due. Your data can be copied to a file,
-> restored, and deleted. Still to come: an installer. See
+> restored, and deleted. It can be built into a folder that runs by itself; an installer and
+> a lesson written by the real AI provider are still to come. See
 > [`docs/engineering/PROJECT_STATE.md`](docs/engineering/PROJECT_STATE.md) for exactly what works.
 
 ## What works today
@@ -97,8 +98,18 @@ Other commands:
 | `npm run build` then `npm start` | Build once and run the built app |
 | `npm run check` | Format, lint, type-check, and run all unit tests (TypeScript and Python) |
 | `npm run e2e` | Build and run the end-to-end tests in the real app |
+| `npm run package` | Build Adle as a folder that runs by itself, in `apps/desktop/out/release/` |
+| `npm run package:check` | Start that build on an empty profile and check that it comes up whole |
 
-Installers are not available yet; packaging is part of the release milestone.
+## A build that runs by itself
+
+`npm run package` makes a folder with the app and a private Python for its local service.
+Nothing else needs to be installed on the computer, and a Python that is already there is
+never used. Zip the folder to move it; run `Adle` inside it to start.
+
+It is a folder, not an installer, and it is not signed: Windows will warn before running it
+and macOS will refuse. It has been built and tested on Windows only. Details and what is
+still missing: [`docs/engineering/RELEASE_CHECKLIST.md`](docs/engineering/RELEASE_CHECKLIST.md).
 
 ## Configuration
 

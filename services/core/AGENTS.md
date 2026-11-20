@@ -88,7 +88,14 @@ everything and decides nothing.
 - **Child processes:** never `multiprocessing`. Start children with `subprocess` and pass
   `stdin`, `stdout`, and `stderr` explicitly (`PIPE` or `DEVNULL`). The service keeps a thread
   blocked on its own stdin; on Windows a child that shares that handle hangs at start-up
-  (ADR-007). Exchange JSON with children, not pickle.
+  (ADR-007). Exchange JSON with children, not pickle. Start a Python child with
+  `interpreter_flags()` (`ingestion/extract.py`), so that it is as isolated as its parent.
+- **The service ships as a wheel inside a private Python** (ADR-019), started with `-I`.
+  So: anything read at run time is package data inside `adle_core/` and is found with
+  `importlib.resources`, never by a path relative to the repository; nothing may depend on
+  the current folder, on `PYTHONPATH`, or on a package that is not in `uv.lock`; and a new
+  run-time dependency is a new line in `docs/engineering/THIRD_PARTY.md`
+  (`npm run licenses`).
 - **Schema changes** need an Alembic revision in `adle_core/migrations/versions/` and the matching
   model change in `infrastructure/orm.py`; `test_database.py` fails if they disagree. Author one
   with `ADLE_DATA_DIR=./var/dev uv run alembic revision --autogenerate -m "..."`, then review it

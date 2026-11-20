@@ -28,6 +28,7 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
+      '**/out/**',
       '**/release/**',
       '**/coverage/**',
       '**/playwright-report/**',

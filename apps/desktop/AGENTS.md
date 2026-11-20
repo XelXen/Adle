@@ -94,7 +94,21 @@ most, a file's name.
 - `ADLE_USER_DATA_DIR=<dir>` runs against an isolated profile. Tests always set it.
 - `assets/brand/` holds the logo artwork and its vector form; `assets/icons/` is rendered from
   it by `npm run icons` and committed. The window reads its icon from `assets/icons/` at run
-  time (`paths.windowIcon`), so packaging must ship that folder (M8).
+  time (`paths.windowIcon`), so the package script ships that folder inside the archive.
+
+## The packaged app
+
+- `scripts/package.mjs` puts `package.json`, `dist/`, and the icons into `app.asar`, and a
+  private Python with the core into `resources/core` (ADR-019). Nothing else ships: if the app
+  comes to need a file at run time, it must be in `dist/` or added to the script, and the
+  packaged end-to-end run is what tells you that you forgot.
+- Anything the main process needs from npm must be bundled by esbuild. There is no
+  `node_modules` in the package, so an `external` other than `electron` breaks it.
+- `resolveLaunchSpec` decides how the core is started. Packaged, it is the private Python
+  with `-I` first. Do not pass it anything through `PYTHON*` variables: they are ignored.
+- The release build cannot be driven by a test tool, on purpose. Test the build from
+  `npm run package:test` with `npm run e2e:packaged`; check the release build from outside
+  with `npm run package:check`. A new fuse goes into both `package.mjs` and the check.
 
 ## Tests
 

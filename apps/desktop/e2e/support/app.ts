@@ -13,6 +13,13 @@ import {
 export const desktopDir = path.resolve(import.meta.dirname, '..', '..');
 export const repoRoot = path.resolve(desktopDir, '..', '..');
 
+/**
+ * Set to run the suite against a packaged build instead of the built files: the path of
+ * the app's executable, from `node scripts/package.mjs --for-tests`. Nothing else changes;
+ * the same journeys then prove the same things about what a learner would install.
+ */
+export const packagedExecutable = process.env.ADLE_E2E_EXECUTABLE || null;
+
 export interface LaunchedApp {
   app: ElectronApplication;
   page: Page;
@@ -111,7 +118,9 @@ export async function launchApp(
     );
   }
   const app = await electron.launch({
-    args: [desktopDir, ...ALWAYS_PAINT_SWITCHES],
+    ...(packagedExecutable
+      ? { executablePath: packagedExecutable, args: [...ALWAYS_PAINT_SWITCHES] }
+      : { args: [desktopDir, ...ALWAYS_PAINT_SWITCHES] }),
     env: { ...process.env, ...options.env, ADLE_USER_DATA_DIR: profileDir },
     // Playwright forces a light colour scheme by default, which would mask the
     // app's own theme handling. `null` leaves the media query to the app.

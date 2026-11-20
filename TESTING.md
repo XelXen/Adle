@@ -10,11 +10,13 @@ A result is never reported from reading code.
 
 | Command | Runs | Time |
 |---|---|---|
-| `npm run check` | Contract and allowlist drift, Prettier, ESLint, `tsc`, Vitest, ruff, mypy, pytest | ~1 min |
-| `node scripts/check.mjs --e2e` | All of the above, then builds and runs the Electron suite | ~5 min |
-| `npm test` | Vitest (TypeScript unit and component tests) | ~3 s |
-| `npm run core:test` | pytest (Python unit and integration tests) | ~30 s |
-| `npm run e2e` | Build, then Playwright against the real Electron app | ~4 min |
+| `npm run check` | Contract and allowlist drift, third-party licences, Prettier, ESLint, `tsc`, Vitest, ruff, mypy, pytest | ~2.5 min |
+| `node scripts/check.mjs --e2e` | All of the above, then builds and runs the Electron suite | ~14 min |
+| `npm test` | Vitest (TypeScript unit and component tests) | ~6 s |
+| `npm run core:test` | pytest (Python unit and integration tests) | ~95 s |
+| `npm run e2e` | Build, then Playwright against the real Electron app | ~11 min |
+| `npm run package:test` then `npm run e2e:packaged` | The same suite against the packaged app | ~2 min, then ~11 min |
+| `npm run package` then `npm run package:check` | The release build, started from outside on an empty profile | ~2 min, then ~15 s |
 
 Single targets:
 
@@ -142,7 +144,21 @@ to be visible, gives it keyboard focus, and checks that the page is producing fr
 that does not paint fails at once with a clear message (ADR-008). Tests never call `show()` on
 the window themselves.
 
-### 4. Fixtures
+### 4. The packaged app
+
+Two builds come out of `scripts/package.mjs` (ADR-019), and each is tested in the only way
+it can be.
+
+| What | How | Covers |
+|---|---|---|
+| The build for tests (`out/test`) | `npm run e2e:packaged`: the whole suite of section 3, unchanged, with `ADLE_E2E_EXECUTABLE` pointing at the packaged executable | Everything the suite covers, in the form a learner would run: the app loaded from its archive, the core running in its private Python. In particular scene isolation, the bridge surface, and the network block |
+| The release build (`out/release`) | `npm run package:check`, from outside, because its debugger switches are off | Fuses as intended; will not run as plain Node; starts on an empty profile with a bare `PATH` and a hostile `PYTHONHOME` and `PYTHONPATH`; the core comes up; nothing in the log of failures; the core does not stay behind when the app is ended |
+| The core as packaged | A step of `package.mjs` itself | The private Python imports the service and everything it needs, finds its migrations and the sample course as package data, and has no telemetry exporter in it |
+
+A first start straight after packaging is slow while the operating system looks at the new
+files, so `e2e:packaged` runs the start-up check first as a warm-up.
+
+### 5. Fixtures
 
 | Location | Contents |
 |---|---|
@@ -171,13 +187,13 @@ Recorded in `docs/engineering/PROJECT_STATE.md` with the date and commit they ap
 
 | Gap | Plan |
 |---|---|
-| **Packaged build** is not tested (no packager yet) | M8. Until then "works in the packaged build" is BLOCKED. |
+| **The release build** is checked from outside only; the journeys run against a twin of it with the debugger reachable | By design (ADR-019). The two differ in one fuse. |
+| **A computer that never had the project on it** | NOT RUN. The start-up check strips the environment, which is not the same thing. |
 | **CI** workflow exists but has never run (no remote) | Run on first push; treat as NOT RUN until then. |
-| **macOS and Linux** not exercised | CI matrix covers Linux; macOS in M8. |
-| **Visual regression** is manual (screenshots captured, not diffed) | Add baselines once screens stabilise (M7). |
-| **Screen reader** behaviour is inferred from roles and axe, not tested with a real reader | Manual pass in M7. |
-| **Performance** numbers are informal single-machine observations | Measured report in M8. |
+| **macOS and Linux** not exercised, in development or packaged | The CI matrix would cover Linux on first push; macOS has no runner set up. |
+| **Visual regression** is manual (screenshots captured, not diffed) | Left open. Baselines differ between machines and fonts; a person looks at `test-results/screens`. |
+| **Screen reader** behaviour is inferred from roles and axe, not tested with a real reader | NOT RUN. Needs a person. |
+| **Performance** is measured on one machine | `docs/engineering/PERFORMANCE.md`, by `scripts/measure.mjs`. Large courses, large documents, and memory are not measured. |
+| **The real AI provider** has never answered | BLOCKED at the provider. Every path is tested against a stand-in. |
 | Complex PDFs (multi-column, tables, equations) are not among the fixtures | Add them when extraction quality is worked on. |
 | Vector retrieval | Not built; search is FTS5 only (ADR-007). |
-| Answer evidence has no interface yet | The learner model is exercised with answers through the service in tests; only self-rating is reachable in the app until questions exist (M6). |
-| Lessons, audio, adaptation | Not built yet (M4–M6); their tests arrive with them. |

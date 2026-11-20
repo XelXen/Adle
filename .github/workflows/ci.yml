@@ -31,8 +31,12 @@ jobs:
         run: npm run core:sync
       - name: Contracts, format, lint, types, unit tests
         run: node scripts/check.mjs
-      - name: Dependency audit
+      - name: Dependency audit (npm)
         run: npm audit --audit-level=high
+      - name: Dependency audit (Python, everything in uv.lock)
+        run: |
+          uv export --directory services/core --frozen --no-emit-project --no-hashes --format requirements-txt --quiet --output-file requirements-audit.txt
+          uv tool run pip-audit -r services/core/requirements-audit.txt --disable-pip --no-deps
 
   e2e:
     name: End-to-end (${{ matrix.os }})

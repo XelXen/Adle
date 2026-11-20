@@ -272,6 +272,23 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 | `logs/core.log` | Main | The core's log output (no document text, answers, or secrets); rewritten at each start |
 | `logs/app.log` | Main | The app's own failures, one JSON line each: a page that crashed, an uncaught error, a core that would not start. No learner content; starts afresh at 512 KB (ADR-018) |
 
+## The packaged app
+
+```text
+Adle-<platform>-<arch>/
+  Adle(.exe)                 Electron, with its fuses set
+  resources/
+    app.asar                 package.json, dist/ (main, preload, renderer, player), icons
+    core/                    a private Python: the interpreter (adle-core.exe on Windows),
+                             its standard library, and site-packages with the core and
+                             exactly the dependencies in uv.lock
+```
+
+The main process finds the core with `resolveLaunchSpec`. Packaged, that is the private
+Python started with `-I -u -X utf8 -m adle_core`, so nothing on the computer (a Python the
+user has, a `PYTHONPATH`, a file in the current folder) can change what runs. In
+development it is the uv environment in `services/core`. See ADR-019.
+
 ## Code map
 
 | Path | Responsibility |
@@ -297,6 +314,7 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 | `services/core/adle_core/ingestion` | Type detection, parsers, chunking, and the parser worker process |
 | `services/core/adle_core/generation` | Provider credentials, scene policy (model client and quota manager arrive in M5) |
 | `skills/wanim-scene-authoring` | How to write a scene; tested examples |
+| `scripts` | Repository tooling: generated contracts and allowlists, the gate (`check.mjs`), packaging (`package.mjs`, `smoke-packaged.mjs`, `e2e-packaged.mjs`), the licence inventory, and timings |
 
 Layering rule for the core: `domain` depends on nothing; `application` and `generation` depend on
 `domain`; `api` depends on all of them and contains no domain logic; `infrastructure` implements

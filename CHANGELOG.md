@@ -99,6 +99,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Settings → About & diagnostics: "Show log files" opens the short log Adle keeps of its own
   failures. It stays on your computer and is never sent anywhere.
 - After "That was a slip", the keyboard stays on the line it belonged to.
+- Adle can be built into a folder that runs by itself, with its own private Python for the
+  local service. Nothing else has to be installed, and a Python already on the computer is
+  never used. There is no installer yet, and the build is not signed.
 - Your data is kept safe between versions: a copy is made before its format is ever changed.
 - Interactive visuals run in an isolated frame; if one cannot run, a text explanation is shown
   instead and the rest of the lesson is unaffected.

@@ -38,12 +38,25 @@ _TIMEOUT_MESSAGE = (
 _MAX_REPLY_BYTES = 64 * 1024 * 1024
 
 
+def interpreter_flags() -> list[str]:
+    """Flags this interpreter runs with that a child of it must run with too.
+
+    A packaged build starts its private Python isolated from the computer it is on:
+    no ``PYTHON*`` variables, no user site-packages, nothing from the current folder
+    (ADR-019). A worker started from it without the same flag would be open to all
+    three, and it is the worker that reads files from elsewhere.
+    """
+    flags: list[str] = []
+    if sys.flags.isolated:
+        flags.append("-I")
+    if sys.flags.utf8_mode:
+        flags.extend(["-X", "utf8"])
+    return flags
+
+
 def worker_command() -> list[str]:
-    """How to start the parser worker in this build."""
-    if getattr(sys, "frozen", False):
-        # A packaged build has one executable; it dispatches on this flag.
-        return [sys.executable, "--parse-worker"]
-    return [sys.executable, "-m", "adle_core.ingestion.worker"]
+    """How to start the parser worker: the same interpreter, the same isolation."""
+    return [sys.executable, *interpreter_flags(), "-m", "adle_core.ingestion.worker"]
 
 
 def extract_in_process(

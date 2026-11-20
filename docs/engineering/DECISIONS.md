@@ -24,6 +24,7 @@ supersedes the old one and update this index.
 | [016](../decisions/ADR-016-copy-restore-and-delete.md) | A copy of the data is one self-contained file written through an internal operation; restoring happens while the core starts, on a working copy first, keeping what it replaces; deleting everything is done by the main process with the core held stopped; every path and confirmation comes from the operating system. |
 | [017](../decisions/ADR-017-session-summary.md) | A session is a sitting computed from the record (the latest run of activity with no pause over 45 minutes); it reports right answers as counts, names lighter evidence, never grants "demonstrated", and is shown on the Learn tab under the suggested next step. |
 | [018](../decisions/ADR-018-when-the-app-fails.md) | No crash reporting of any kind; a local log of the app's own failures that never holds learner content; a crashed or hung page, an uncaught error in the main process, and a core that dies each get a plain message and a way on, decided by pure functions. |
+| [019](../decisions/ADR-019-packaging.md) | Packed with `@electron/packager` into a folder; the core ships as a private Python (not a frozen executable) started cut off from the computer it is on; fuses set; one build for release and the same build with the debugger reachable for the end-to-end suite. No installer, signature, or updater yet. |
 
 ## Smaller standing choices (no ADR)
 

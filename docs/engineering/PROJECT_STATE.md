@@ -3,11 +3,13 @@
 The single place to find out where Adle stands and what to do next. Update it at the end of every
 work session (see `AGENTS.md` → "Keeping the next agent oriented").
 
-- **Last updated:** 2026-11-19
+- **Last updated:** 2026-11-20
 - **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
 - **Last commit:** see `git log -1`
-- **Active milestone:** M8 — release hardening. Failure handling is done (ADR-018); packaging
-  is next. M7 is done except for the items listed under "Known gaps"
+- **Active milestone:** M8 — release hardening, done as far as this machine can take it:
+  failure handling (ADR-018), packaging (ADR-019), the licence inventory, the audits, the
+  performance report, and the release checklist. What is left needs the owner or the
+  provider; see "Next actions"
 - **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
   `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
 
@@ -23,7 +25,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 | M5 — Generation, audio, timeline | **Done** (real provider BLOCKED) | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Every path is tested against a fake provider. **The real model has not produced a lesson yet:** the provider failed every request upstream on 2026-11-19, so the prompts are unchecked. |
 | M6 — Assessment and adaptation | **Done** | Hypotheses about mistakes computed from the record (tentative, supported, rejected, resolved), checked with questions that would show them, and dismissible by the learner; slips counted as partly right; repeats counted in full only after a gap; questions kept for practice in the Lesson IR; a next-step policy with a reason for every step; the Learn tab, practice and review, "what next" after a lesson, "This did not help"; teaching strategy chosen or rotated (ADR-014). Not built by decision: model grading of open answers and model-proposed hypotheses. |
 | M7 — Complete UX and sample course | **Done** (two items left as known gaps) | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Also done: Settings → Privacy & data can save a copy of everything as one file, restore from one (checked and upgraded before anything is replaced; what is replaced is kept; undoable), and delete everything (ADR-016). Also done: the session summary (ADR-017). Polish done: every outcome of the new screens checked with axe, focus kept after "That was a slip". Left as known gaps, by decision: narration and animation are synchronised per segment (Wanim's slides mode was not tried), and screenshots are saved for review rather than compared against baselines. |
-| M8 — Release hardening | **In progress** | Done: a crashed or hung page, an uncaught error in the main process, and a core that dies are each handled, with a local log and no reporting (ADR-018). Missing: packaging, dependency and licence review, performance report, release checklist. |
+| M8 — Release hardening | **In progress** | Done: a crashed or hung page, an uncaught error in the main process, and a core that dies are each handled, with a local log and no reporting (ADR-018). Packaging (ADR-019): a folder that runs by itself, with a private Python for the core, fuses set; the whole end-to-end suite passes against the packaged app, and the release build passes a start-up check from outside. Licence inventory generated and checked in every gate; `npm audit` and `pip-audit` clean; `PERFORMANCE.md` and `RELEASE_CHECKLIST.md` written. **Not done, and not doable here:** an installer and code signing (the owner's certificates), macOS and Linux (no machine), a clean computer, a lesson from the real model (provider). |
 
 ## What works in the running app
 
@@ -118,14 +120,17 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   minutes. Each is noted in `logs/app.log` on this computer. Nothing is reported anywhere.
 - Python core starts as a supervised child, authenticates with a per-launch token, migrates its
   database (with a backup first), and exits with the app.
+- **As a packaged app** (`npm run package`): a folder with `Adle.exe`, the app in an archive,
+  and a private Python for the core that takes nothing from the computer it is on. Everything
+  above works in it; the end-to-end suite says so.
 
 Not present yet (do not assume): a lesson written by the real model (see "The real provider"),
-exporting a single course to share (not planned; ADR-016), packaging.
+exporting a single course to share (not planned; ADR-016), an installer, a signed build.
 
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-018.
+`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-019, on 2026-11-20.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -135,14 +140,19 @@ Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 496 tests, 23 files |
+| Vitest | PASS | 497 tests, 23 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 88 source files |
-| pytest | PASS | 1031 tests |
+| pytest | PASS | 1035 tests |
 | Playwright + Electron (E2E) | PASS | 83 tests in 12 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
-| `npm audit` (all dependencies) | NOT RUN | Last run before KaTeX was added; run again before release |
+| Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 411 npm and 41 Python packages, none refused, none unstated |
+| `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-20 |
+| `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-20 (pip-audit 2.10.1) |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
-| Packaged build | BLOCKED | No packager chosen yet (M8) |
+| Packaged build: every journey (`npm run e2e:packaged`) | PASS | 83 tests against the packaged app, none flaky |
+| Packaged build: release start-up check (`npm run package:check`) | PASS | Fuses, will not run as Node, starts on an empty profile with a stripped environment, no orphaned core |
+| Packaged build on a computer that never had the project | NOT RUN | Needs another machine |
+| Installer, code signing | BLOCKED | Need the owner's certificates |
 | macOS / Linux | NOT RUN | Developed on Windows only |
 | Real AI provider | BLOCKED | The provider fails every request upstream (HTTP 500 `do_request_failed`); see "The real provider" |
 
@@ -260,26 +270,41 @@ day's 80 budgeted requests were used on 2026-11-19.) When it answers: run it wit
 and `lesson`, read what the model actually writes, and adjust the prompts and the leniency of
 `generation/drafts.py` to it. Do not loosen the Lesson IR or the scene policy to fit the model.
 
-## Next actions (M8), in order
+**Retried on 2026-11-20: still BLOCKED, and it is not the request.** Two requests were sent.
+Adle's own client got the same HTTP 500. Then the request shown on the model's own page
+(`https://aihubmix.com/model/coding-kimi-k3-free`: one user message, `max_tokens` 1024, not
+streamed, to `/v1/chat/completions`) was sent as it stands, and got the same answer:
+`do_request_failed`, `Post "https://***/coding/v1/messages": Bad Request`. The provider's
+documentation names no required header, no restriction to particular clients, and no outage
+for this model. So the relay between AIHubMix and the model is refusing, for this key or for
+everyone; nothing in Adle can be changed to fix it, and Adle was not made to pretend to be
+another program to find out. For the owner: ask AIHubMix about that error with this model,
+or try the key in their own playground. In the app this state is handled: the job ends with
+"The AI provider reported a problem on its side. Nothing was changed; try again in a little
+while", nothing is saved, and no request is repeated.
 
-1. **Package the app** (M8): `scripts/package.mjs` is drafted in the working tree. It stages
-   the built app, copies the uv-managed Python with the core and its locked dependencies
-   installed into it (no PyInstaller), packs with `@electron/packager`, and sets the fuses.
-   Still to do: install the two tools, make the packaged launch use the private Python
-   (`launch-spec.ts`, and the parser worker's flags in `ingestion/extract.py`), run the
-   end-to-end suite against the packaged build, and a start-up check of the release build.
-2. **Dependency and licence review**, `npm audit`, a Python audit; **performance report**;
-   **release checklist** and known limitations.
-3. **Retry the real provider** (see above) and adjust the prompts, including the request for
-   practice questions and for a way of teaching.
+## Next actions
 
-Then the final hand-over: PLAN.md section 17, this file, and the release notes.
+Everything that could be done on this machine without the owner is done. What remains, in
+the order it matters:
+
+1. **Retry the real provider** (see "The real provider") and, when it answers, read what the
+   model actually writes and adjust the prompts and the leniency of `generation/drafts.py`.
+   This is the one part of the product no test has exercised for real.
+2. **Push the branch** so that CI runs for the first time, on Windows and Linux. Expect
+   surprises on Linux: nothing has run there.
+3. **Choose a licence, get signing certificates, and add an installer** (ADR-019 says what
+   and why). `docs/engineering/RELEASE_CHECKLIST.md` is the list.
+4. **Try the packaged folder on a computer that never had the project**, and on macOS.
+5. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
+   single course; a screen-reader pass by a person.
 
 ## Known gaps (tracked, not forgotten)
 
 | Gap | Planned |
 |---|---|
-| The parser worker has no OS-level sandbox | M8, with packaging (SECURITY.md) |
+| The parser worker has no OS-level sandbox | Not built. It is a separate, short-lived, isolated process that returns only checked JSON (SECURITY.md) |
+| No installer, no signature, no automatic update; Windows only | Needs the owner (ADR-019, `RELEASE_CHECKLIST.md`) |
 | A single course cannot be exported to share with someone else; a copy holds everything | By decision (ADR-016) |
 | A saved copy is not encrypted | By decision (ADR-016); the interface says so |
 | Narration and animation are synchronised per segment, not per sentence | M7, after testing Wanim's slides mode |

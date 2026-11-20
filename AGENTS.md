@@ -29,7 +29,8 @@ services/core/       Python FastAPI core               (AGENTS.md inside)
 skills/wanim-scene-authoring/   how to write a scene; examples run by the E2E suite
 docs/                architecture, ADRs (decisions/), engineering state
 fixtures/            sample documents for import tests (the sample course is package data in the core)
-scripts/             repo tooling (contracts, name allowlist, typecheck, check)
+scripts/             repo tooling (contracts, name allowlist, typecheck, check, package,
+                     licences, measurements)
 ```
 
 ## Commands
@@ -56,8 +57,14 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Rebuild document fixtures | see `fixtures/sample-documents/README.md` |
 | Add a sample lesson | files in `services/core/adle_core/sample_course/`, then `core:test` and `e2e -- lesson.spec.ts` |
 | Isolated profile / reset test data | set `ADLE_USER_DATA_DIR` to an empty directory |
+| Package the app (a folder that runs by itself) | `npm run package`, then `npm run package:check` |
+| Run every journey against the packaged app | `npm run package:test`, then `npm run e2e:packaged` |
+| Third-party licences: list / check | `npm run licenses` / `npm run licenses:check` (part of `check`) |
+| Measure what a learner waits for | `node scripts/measure.mjs` (`--packaged` for the packaged build) |
 
-Packaging is not implemented yet (M8).
+The packaged app is `apps/desktop/out/release/Adle-<platform>-<arch>/`. There is no installer
+and no code signing yet (ADR-019). The build in `out/test/` has its debugger reachable so the
+end-to-end suite can drive it: never hand that one to anyone.
 
 ## Architecture in five lines
 
@@ -153,4 +160,7 @@ Record facts, commands, and decisions. Not transcripts or reasoning traces.
 | Test layers, commands, gaps | `TESTING.md` |
 | Workflow and commit rules | `CONTRIBUTING.md` |
 | Writing Wanim scenes | `skills/wanim-scene-authoring/SKILL.md` |
+| Making a build, and where Adle stands against the acceptance list | `docs/engineering/RELEASE_CHECKLIST.md` |
+| What ships and under which licences | `docs/engineering/THIRD_PARTY.md` (generated) |
+| Timings and sizes, and how they were measured | `docs/engineering/PERFORMANCE.md` |
 | The lesson format | `services/core/adle_core/lessons/ir.py`, `packages/contracts/schemas/lesson-ir.schema.json`, ADR-010 |
