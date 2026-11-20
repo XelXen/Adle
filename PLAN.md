@@ -936,24 +936,37 @@ The coding agent must work sequentially through these milestones. It may paralle
 
 Adle is not ready to call production-quality until all applicable items below are true:
 
-- [ ] First launch is understandable without reading technical documentation.
-- [ ] App works without an AI provider configured using sample/local content.
-- [ ] Topic/syllabus import and source provenance work locally.
-- [ ] Curriculum graph is reviewable and editable.
-- [ ] Lesson IR is versioned and validated.
+Filled in on 2026-11-20. A ticked item ran and passed; the evidence for each, and the status
+of the two that are not ticked, is in `docs/engineering/RELEASE_CHECKLIST.md`. **Two items are
+open, so by this list Adle is not yet production-quality.** Neither can be closed from this
+machine: one waits for the AI provider to answer, the other for the repository to have a
+remote.
+
+- [x] First launch is understandable without reading technical documentation.
+- [x] App works without an AI provider configured using sample/local content.
+- [x] Topic/syllabus import and source provenance work locally.
+- [x] Curriculum graph is reviewable and editable.
+- [x] Lesson IR is versioned and validated.
 - [ ] Complete Wanim Python scene files are generated and executed only in the isolated player boundary.
-- [ ] Audio/transcript controls work, with honest alignment fallback.
-- [ ] Learner interactions produce persistent events.
-- [ ] Mastery is evidence-based and explainable.
-- [ ] Misconceptions are treated as hypotheses until supported.
-- [ ] Next-step adaptation is bounded, understandable, and user-controllable.
-- [ ] Retrieval practice exists and persists.
-- [ ] Quota exhaustion, network loss, TTS failure, Wanim failure, and malformed model output are recoverable.
-- [ ] Data export, deletion, backup, and restore are tested.
-- [ ] Light/dark themes, accessibility, and reduced motion are tested.
+      *Executed only in the isolated player: yes, in development and in the packaged app.
+      Generated: only by a stand-in for the provider. The real provider has answered every
+      request with an error of its own, including the request on its own documentation page.*
+- [x] Audio/transcript controls work, with honest alignment fallback.
+- [x] Learner interactions produce persistent events.
+- [x] Mastery is evidence-based and explainable.
+- [x] Misconceptions are treated as hypotheses until supported.
+- [x] Next-step adaptation is bounded, understandable, and user-controllable.
+- [x] Retrieval practice exists and persists.
+- [x] Quota exhaustion, network loss, TTS failure, Wanim failure, and malformed model output are recoverable.
+- [x] Data export, deletion, backup, and restore are tested. *("Export" is a copy of everything.)*
+- [x] Light/dark themes, accessibility, and reduced motion are tested. *(By tools. No person
+      has used it with a screen reader.)*
 - [ ] CI, unit, integration, E2E, security, and packaging checks pass.
-- [ ] `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and all developer docs are current.
-- [ ] Git history is coherent, atomic, and honest.
+      *Unit, integration, end-to-end, security, licence, and packaging checks pass on Windows,
+      against the built files and against the packaged app. CI has never run: there is no
+      remote. Nothing has run on macOS or Linux.*
+- [x] `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and all developer docs are current.
+- [x] Git history is coherent, atomic, and honest.
 
 ## 18. Current implementation status
 
