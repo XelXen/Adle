@@ -12,6 +12,7 @@ export const IPC = {
   appInfo: 'adle:app:info',
   uiStateUpdate: 'adle:app:ui-state-update',
   openExternal: 'adle:app:open-external',
+  showLogs: 'adle:app:show-logs',
   coreStatus: 'adle:core:status',
   coreStatusChanged: 'adle:core:status-changed',
   coreRestart: 'adle:core:restart',
@@ -111,6 +112,11 @@ export interface AdleBridge {
     info(): Promise<AppInfo>;
     updateUiState(patch: Partial<UiState>): Promise<UiState>;
     openExternal(link: ExternalLinkId): Promise<void>;
+    /**
+     * Open, in the file manager, the folder of Adle's own log files. They stay on this
+     * computer; this is how a learner looks at them or chooses to show them to someone.
+     */
+    showLogs(): Promise<CoreResult<null>>;
   };
   core: {
     status(): Promise<CoreStatus>;

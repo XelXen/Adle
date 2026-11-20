@@ -6,8 +6,8 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Last updated:** 2026-11-19
 - **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
 - **Last commit:** see `git log -1`
-- **Active milestone:** M7 — the polish pass (the sample course; saving, restoring, and
-  deleting the data; and the session summary are done)
+- **Active milestone:** M8 — release hardening. Failure handling is done (ADR-018); packaging
+  is next. M7 is done except for the items listed under "Known gaps"
 - **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
   `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
 
@@ -22,8 +22,8 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 | M4 — Wanim and Lesson IR | **Done** | Player frame, adapter, static scene policy, skill, threat model (ADR-004). Lesson IR 1.0 with a generated JSON Schema; one validating gateway; scenes re-checked on every read; answer keys kept in the core with deterministic scoring; the lesson player; the first lesson of the sample course (ADR-010). The packaged-build check is BLOCKED on M8 packaging. |
 | M5 — Generation, audio, timeline | **Done** (real provider BLOCKED) | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Every path is tested against a fake provider. **The real model has not produced a lesson yet:** the provider failed every request upstream on 2026-11-19, so the prompts are unchecked. |
 | M6 — Assessment and adaptation | **Done** | Hypotheses about mistakes computed from the record (tentative, supported, rejected, resolved), checked with questions that would show them, and dismissible by the learner; slips counted as partly right; repeats counted in full only after a gap; questions kept for practice in the Lesson IR; a next-step policy with a reason for every step; the Learn tab, practice and review, "what next" after a lesson, "This did not help"; teaching strategy chosen or rotated (ADR-014). Not built by decision: model grading of open answers and model-proposed hypotheses. |
-| M7 — Complete UX and sample course | **In progress** | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Also done: Settings → Privacy & data can save a copy of everything as one file, restore from one (checked and upgraded before anything is replaced; what is replaced is kept; undoable), and delete everything (ADR-016). Also done: the session summary (ADR-017). Missing: the polish pass. |
-| M8 — Release hardening | Not started | — |
+| M7 — Complete UX and sample course | **Done** (two items left as known gaps) | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Also done: Settings → Privacy & data can save a copy of everything as one file, restore from one (checked and upgraded before anything is replaced; what is replaced is kept; undoable), and delete everything (ADR-016). Also done: the session summary (ADR-017). Polish done: every outcome of the new screens checked with axe, focus kept after "That was a slip". Left as known gaps, by decision: narration and animation are synchronised per segment (Wanim's slides mode was not tried), and screenshots are saved for review rather than compared against baselines. |
+| M8 — Release hardening | **In progress** | Done: a crashed or hung page, an uncaught error in the main process, and a core that dies are each handled, with a local log and no reporting (ADR-018). Missing: packaging, dependency and licence review, performance report, release checklist. |
 
 ## What works in the running app
 
@@ -111,7 +111,11 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   safety copy; the key and the appearance settings stay. Each works when the local service
   has failed to start, except saving.
 - Settings → About & diagnostics: core status and restart; live scene runtime check with a mirrored,
-  keyboard-operable slider.
+  keyboard-operable slider; "Show log files" opens the folder of local logs.
+- **When the app itself fails** (ADR-018): a page that crashes or hangs, and an error nobody
+  caught in the main process, each bring a plain message from the operating system with a way
+  on (reload, wait, restart, quit); a core that dies is started again, at most twice in five
+  minutes. Each is noted in `logs/app.log` on this computer. Nothing is reported anywhere.
 - Python core starts as a supervised child, authenticates with a per-launch token, migrates its
   database (with a backup first), and exits with the app.
 
@@ -121,7 +125,7 @@ exporting a single course to share (not planned; ADR-016), packaging.
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-017.
+`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-018.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -131,11 +135,11 @@ Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 465 tests, 22 files |
+| Vitest | PASS | 496 tests, 23 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 88 source files |
 | pytest | PASS | 1031 tests |
-| Playwright + Electron (E2E) | PASS | 81 tests in 11 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
+| Playwright + Electron (E2E) | PASS | 83 tests in 12 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
 | `npm audit` (all dependencies) | NOT RUN | Last run before KaTeX was added; run again before release |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
 | Packaged build | BLOCKED | No packager chosen yet (M8) |
@@ -207,6 +211,13 @@ investigated, not ignored.
   `lesson_request` in the core.
 - A long shell heredoc that contains an apostrophe can fail to parse under Git Bash. Patch
   scripts are written to a file and run from there.
+- **Playwright's handle on a page does not survive that page's process crashing**, even after
+  the window has reloaded ("Target crashed"). `e2e/recovery.spec.ts` reads the reloaded
+  window through the main process with `webContents.executeJavaScript`, which works under
+  the app's Content Security Policy.
+- A self-marked answer is recorded as "unsure". The session summary first left such right
+  answers out of its count, which read as a miscount beside "3 of 3 answers right"; the
+  end-to-end journey showed it. They are counted, and named as lighter evidence (ADR-017).
 - Patch scripts written in Python on Windows turn LF into CRLF unless they write with
   `newline="\n"`. Git normalises on commit, but the working tree is left mixed. Node's
   `writeFileSync` does not do this.
@@ -249,20 +260,25 @@ day's 80 budgeted requests were used on 2026-11-19.) When it answers: run it wit
 and `lesson`, read what the model actually writes, and adjust the prompts and the leniency of
 `generation/drafts.py` to it. Do not loosen the Lesson IR or the scene policy to fit the model.
 
-## Next actions (M7), in order
+## Next actions (M8), in order
 
-1. **Polish:** onboarding, empty and error states, keyboard and screen-reader pass, visual
-   baselines; try Wanim's slides mode for finer narration and animation timing.
-2. **Retry the real provider** (see above) and adjust the prompts, including the request for
+1. **Package the app** (M8): `scripts/package.mjs` is drafted in the working tree. It stages
+   the built app, copies the uv-managed Python with the core and its locked dependencies
+   installed into it (no PyInstaller), packs with `@electron/packager`, and sets the fuses.
+   Still to do: install the two tools, make the packaged launch use the private Python
+   (`launch-spec.ts`, and the parser worker's flags in `ingestion/extract.py`), run the
+   end-to-end suite against the packaged build, and a start-up check of the release build.
+2. **Dependency and licence review**, `npm audit`, a Python audit; **performance report**;
+   **release checklist** and known limitations.
+3. **Retry the real provider** (see above) and adjust the prompts, including the request for
    practice questions and for a way of teaching.
 
-Then M8 (packaging, hardening, performance report, release checklist).
+Then the final hand-over: PLAN.md section 17, this file, and the release notes.
 
 ## Known gaps (tracked, not forgotten)
 
 | Gap | Planned |
 |---|---|
-| The main process does not handle a renderer crash (`render-process-gone`); the learner would see an empty window | M8 (start-up and shutdown failure matrix) |
 | The parser worker has no OS-level sandbox | M8, with packaging (SECURITY.md) |
 | A single course cannot be exported to share with someone else; a copy holds everything | By decision (ADR-016) |
 | A saved copy is not encrypted | By decision (ADR-016); the interface says so |

@@ -21,6 +21,7 @@ const bridge: AdleBridge = {
     info: () => ipcRenderer.invoke(IPC.appInfo),
     updateUiState: (patch: Partial<UiState>) => ipcRenderer.invoke(IPC.uiStateUpdate, patch),
     openExternal: (link: ExternalLinkId) => ipcRenderer.invoke(IPC.openExternal, link),
+    showLogs: () => ipcRenderer.invoke(IPC.showLogs),
   },
   core: {
     status: () => ipcRenderer.invoke(IPC.coreStatus),

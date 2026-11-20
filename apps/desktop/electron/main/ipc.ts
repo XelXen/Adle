@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+
 import {
   app,
   BrowserWindow,
@@ -5,6 +7,7 @@ import {
   ipcMain,
   type IpcMainInvokeEvent,
   nativeTheme,
+  shell,
   type WebContents,
 } from 'electron';
 
@@ -44,6 +47,8 @@ export interface IpcDependencies {
   uiState: UiStateStore;
   /** Everything the core persists. Deleted as a whole when the learner deletes everything. */
   dataDir: string;
+  /** Where the app's own log files are. */
+  logsDir: string;
 }
 
 function failure(code: string, message: string): CoreResult<never> {
@@ -172,6 +177,19 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       throw new Error('Unknown external link.');
     }
     await openExternalLink(link as ExternalLinkId);
+  });
+
+  handle(IPC.showLogs, async (): Promise<CoreResult<null>> => {
+    // A fixed folder of the app's own: the page chooses nothing here.
+    try {
+      mkdirSync(deps.logsDir, { recursive: true });
+    } catch {
+      return failure('not_opened', 'The folder could not be opened.');
+    }
+    const problem = await shell.openPath(deps.logsDir);
+    return problem
+      ? failure('not_opened', 'The folder could not be opened.')
+      : { ok: true, data: null };
   });
 
   handle(IPC.coreStatus, () => core.status);

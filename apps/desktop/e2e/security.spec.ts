@@ -31,7 +31,7 @@ test.describe('renderer boundary', () => {
       buffer: 'undefined',
       ipcRenderer: 'undefined',
       bridge: {
-        app: ['info', 'openExternal', 'updateUiState'],
+        app: ['info', 'openExternal', 'showLogs', 'updateUiState'],
         core: ['invoke', 'onStatus', 'restart', 'status'],
         data: ['eraseAll', 'restoreCopy', 'saveCopy', 'showSafetyCopies'],
         provider: ['clearApiKey', 'keyState', 'setApiKey'],

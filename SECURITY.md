@@ -243,6 +243,13 @@ request in any case. See ADR-013.
 - No telemetry, analytics, or crash upload. No external service other than the configured AI
   provider, and only when the learner starts a generation.
 - Logs contain event types and identifiers, never document text, answers, prompts, or secrets.
+  There are two, both under the profile's `logs/` folder and both local: the core's
+  (`core.log`, rewritten at each start) and the app's own failures (`app.log`, ADR-018).
+  Settings → About opens the folder. Nothing reads them but the learner.
+- No crash reporter is started and no failure is reported to anyone. When the page crashes
+  or hangs, or the main process throws, the learner is told in plain words, offered a way on,
+  and a line is written to `app.log` (`electron/main/recovery.ts`; `recovery.test.ts`,
+  `e2e/recovery.spec.ts`).
 - The first-run screen and Settings → Privacy & data state what is stored and what is sent.
   Each control that sends something lists what it sends beside it, from one function per kind
   of request (`lessonDisclosure` in `renderer/src/lib/generation.ts`), which must be kept in

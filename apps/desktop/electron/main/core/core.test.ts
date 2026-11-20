@@ -106,6 +106,26 @@ describe('CoreProcess', () => {
     expect(core.getConnection()).toBeNull();
   });
 
+  it('says so when it stopped without being asked, and only then', async () => {
+    const crashing = createCore('crash');
+    const stopped = new Promise<void>((resolve) => {
+      crashing.once('stopped-unexpectedly', () => resolve());
+    });
+    await crashing.start();
+    await stopped;
+    expect(crashing.status.state).toBe('failed');
+
+    const polite = createCore('ready');
+    let surprised = false;
+    polite.on('stopped-unexpectedly', () => {
+      surprised = true;
+    });
+    await polite.start();
+    await polite.stop();
+    await polite.whileStopped(() => undefined);
+    expect(surprised).toBe(false);
+  });
+
   it('stops gracefully by closing stdin, and kills a core that ignores it', async () => {
     const polite = createCore('ready');
     await polite.start();

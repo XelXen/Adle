@@ -269,13 +269,14 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 | `data/sources/<source id>.<ext>` | Core | A copy of each imported original, named by its generated id |
 | `data/assets/` | Core | Reserved for generated lesson assets (M5) |
 | `data/backups/` | Core | Safety copies: `adle-before-*` made before a migration and `adle-replaced-*` made before a restore (the newest five of each are kept). Each is one file and can itself be restored |
-| `logs/core.log` | Main | The core's log output (no document text, answers, or secrets) |
+| `logs/core.log` | Main | The core's log output (no document text, answers, or secrets); rewritten at each start |
+| `logs/app.log` | Main | The app's own failures, one JSON line each: a page that crashed, an uncaught error, a core that would not start. No learner content; starts afresh at 512 KB (ADR-018) |
 
 ## Code map
 
 | Path | Responsibility |
 |---|---|
-| `apps/desktop/electron/main` | App lifecycle, protocol, session hardening, core supervision, IPC handlers, key and UI-state storage; `data.ts` for copy, restore, and delete everything |
+| `apps/desktop/electron/main` | App lifecycle, protocol, session hardening, core supervision, IPC handlers, key and UI-state storage; `data.ts` for copy, restore, and delete everything; `recovery.ts` and `app-log.ts` for what happens when the app itself fails |
 | `apps/desktop/electron/preload` | The `window.adle` bridge: fixed channels only |
 | `apps/desktop/electron/shared` | The IPC contract (channel names and types) |
 | `apps/desktop/renderer` | React app: router, screens, core client, `ScenePlayer`, `MathText`; `src/lesson` holds lesson playback (controller, narrators, scene cues, answers) |

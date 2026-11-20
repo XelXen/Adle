@@ -1,10 +1,11 @@
-import { CircleCheck, RotateCw } from 'lucide-react';
+import { CircleCheck, FolderOpen, RotateCw } from 'lucide-react';
 import { useState } from 'react';
 
 import { Badge, Button, Card, Section, Stack } from '@adle/design-system';
 
 import type { PlayerStatus, SceneFailure } from '../../../../player/host/WanimPlayerAdapter';
 import { useApp } from '../../app/AppContext';
+import { getBridge } from '../../lib/bridge';
 import { ScenePlayer } from '../../components/ScenePlayer';
 import checkScene from './runtime-check.py?raw';
 import styles from './Settings.module.css';
@@ -24,6 +25,17 @@ export function AboutSettings() {
   const [sceneStatus, setSceneStatus] = useState<PlayerStatus>('idle');
   const [failure, setFailure] = useState<SceneFailure | null>(null);
   const [interacted, setInteracted] = useState(false);
+  const [logsProblem, setLogsProblem] = useState<string | null>(null);
+
+  const showLogs = async (): Promise<void> => {
+    setLogsProblem(null);
+    try {
+      const result = await getBridge().app.showLogs();
+      if (!result.ok) setLogsProblem(result.error.message);
+    } catch {
+      setLogsProblem('The folder could not be opened.');
+    }
+  };
 
   const restart = async (): Promise<void> => {
     setRestarting(true);
@@ -154,6 +166,31 @@ export function AboutSettings() {
               <dd>{info.platform}</dd>
             </div>
           </dl>
+        </Card>
+      </Section>
+
+      <Section
+        title="If something goes wrong"
+        description="Adle keeps a short log of its own failures on this computer. It is never sent anywhere."
+      >
+        <Card>
+          <div className={styles.statusRow}>
+            <div className={styles.statusText}>
+              <p className={styles.muted}>
+                The log says what happened to the app (a window that stopped, a service that would
+                not start), never what you typed, opened, or answered. If you ask someone for help,
+                these are the files to show them.
+              </p>
+              {logsProblem ? (
+                <p className={styles.muted} role="alert">
+                  {logsProblem}
+                </p>
+              ) : null}
+            </div>
+            <Button icon={<FolderOpen />} onClick={() => void showLogs()}>
+              Show log files
+            </Button>
+          </div>
         </Card>
       </Section>
     </Stack>

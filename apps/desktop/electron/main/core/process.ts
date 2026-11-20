@@ -95,7 +95,11 @@ function parseProtocolLine(line: string): ReadyEvent | { event: 'fatal'; message
  * - The child binds loopback on an OS-assigned port and reports it on stdout.
  * - Closing the child's stdin asks it to exit; it also exits if this process dies.
  */
-export class CoreProcess extends EventEmitter<{ status: [CoreStatus] }> {
+export class CoreProcess extends EventEmitter<{
+  status: [CoreStatus];
+  /** The core exited after starting, and nobody had asked it to. */
+  'stopped-unexpectedly': [];
+}> {
   private child: ChildProcessWithoutNullStreams | null = null;
   private connection: CoreConnection | null = null;
   private currentStatus: CoreStatus = { state: 'stopped' };
@@ -277,6 +281,8 @@ export class CoreProcess extends EventEmitter<{ status: [CoreStatus] }> {
             state: 'failed',
             message: 'The core service stopped unexpectedly. Your saved progress is safe.',
           });
+          // Nobody asked it to stop. Whoever supervises may want to start it again.
+          this.emit('stopped-unexpectedly');
         }
       });
 

@@ -140,6 +140,10 @@ export function LearnPanel({ course }: { course: Course }) {
         title: 'Set aside',
         description: 'It only comes back if later answers point the same way.',
       });
+      // The button that was pressed is gone with the update. Without this the keyboard
+      // would be left nowhere; the line it belonged to now says what became of it.
+      const line = hypothesisDomId(concept.concept_id, hypothesis.kind);
+      requestAnimationFrame(() => document.getElementById(line)?.focus());
     } catch (error) {
       toast.show({
         tone: 'danger',
@@ -202,6 +206,11 @@ export function LearnPanel({ course }: { course: Course }) {
   );
 }
 
+/** The element that says where one hypothesis stands, so focus can be sent to it. */
+function hypothesisDomId(conceptId: string, kind: string): string {
+  return `hypothesis-${conceptId}-${kind}`;
+}
+
 function lessonsNote(concept: ConceptProgress): string {
   if (concept.lessons_total === 0) return 'No lesson yet.';
   if (concept.lessons_completed === 0) {
@@ -256,7 +265,12 @@ function ConceptRow({
             {concept.hypotheses.map((hypothesis) => {
               const label = hypothesisLabel(hypothesis);
               return (
-                <li key={hypothesis.kind} className={styles.hypothesis}>
+                <li
+                  key={hypothesis.kind}
+                  id={hypothesisDomId(concept.concept_id, hypothesis.kind)}
+                  tabIndex={-1}
+                  className={styles.hypothesis}
+                >
                   <Badge tone={label.tone}>{label.status}</Badge>
                   <span className={styles.hypothesisText}>{hypothesis.description}</span>
                   {hypothesis.can_dismiss && !hypothesis.is_slip ? (

@@ -55,6 +55,19 @@ most, a file's name.
   dialogs. In end-to-end tests the dialogs are replaced with `app.evaluate` (see
   `e2e/data.spec.ts`), never driven.
 
+## When the app itself fails
+
+- What to do about a crashed or hung page, an uncaught error, or a core that died is decided
+  in `electron/main/recovery.ts`, in functions that do not import Electron and are unit
+  tested. `index.ts` connects them to events. Keep it that way round.
+- Every message says what happened in plain words, that the learner's work is safe, and what
+  they can do. No error names, codes, or stack traces in front of the learner.
+- `appLog.record(event, detail)` takes an event name and a few named facts. Never pass it
+  anything the learner typed, opened, or answered, or a path they chose. Nothing is ever sent
+  anywhere: do not add a crash reporter, and do not call `crashReporter.start` (ADR-018).
+- A real renderer crash kills Playwright's handle on the page. After one, read the window
+  through the main process (`reloadedPage` in `e2e/recovery.spec.ts`).
+
 ## URLs and origins
 
 - Never use `new URL(x).origin` for `adle://` URLs in main-process code: Node reports `"null"` for

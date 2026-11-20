@@ -262,6 +262,8 @@ test.describe('learning', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Set aside' })).toBeVisible();
     await expect(noticed).toContainText('You said it was a slip, so it is set aside.');
     await expect(noticed.getByRole('button', { name: 'That was a slip' })).toHaveCount(0);
+    // The button is gone; the keyboard is left on the line that says what became of it.
+    await expect(noticed.getByRole('listitem').first()).toBeFocused();
     // Nothing is due yet: it was all answered a moment ago.
     await expect(row).toContainText('Next review tomorrow');
     await expect(row.getByText('A review is due')).toHaveCount(0);
