@@ -21,9 +21,8 @@ what is never reached, so this is at most what ships.
 
 | Package | Version | Licence |
 |---|---|---|
-| `@fontsource-variable/inter` | 5.3.0 | OFL-1.1 |
-| `@fontsource-variable/jetbrains-mono` | 5.3.0 | OFL-1.1 |
-| `@fontsource-variable/newsreader` | 5.3.0 | OFL-1.1 |
+| `@fontsource-variable/geist` | 5.3.0 | OFL-1.1 |
+| `@fontsource-variable/geist-mono` | 5.3.0 | OFL-1.1 |
 | `@fontsource/inter` | 5.3.0 | OFL-1.1 |
 | `@wanimjs/wanim` | 0.1.3 | MIT |
 | `@xmldom/xmldom` | 0.9.12 | MIT |
@@ -43,6 +42,12 @@ what is never reached, so this is at most what ships.
 | `scheduler` | 0.28.0 | MIT |
 | `speech-rule-engine` | 4.1.5 | Apache-2.0 |
 | `wicked-good-xpath` | 1.3.0 | MIT |
+
+### In the app (files kept in this repository, each beside its licence)
+
+| File | Version | Licence | Where |
+|---|---|---|---|
+| Geist Serif (Regular) | as in geist 1.9.2 | OFL-1.1 | `packages/design-system/src/fonts/geist-serif` |
 
 ### In the core (Python packages, from `uv.lock`)
 
@@ -79,7 +84,7 @@ what is never reached, so this is at most what ships.
 
 None of this reaches a learner.
 
-### npm: 413 packages
+### npm: 412 packages
 
 | Licence | Packages |
 |---|---|
@@ -89,8 +94,8 @@ None of this reaches a learner.
 | BSD-2-Clause | 12 |
 | BlueOak-1.0.0 | 7 |
 | MPL-2.0 | 4 |
-| OFL-1.1 | 4 |
 | BSD-3-Clause | 3 |
+| OFL-1.1 | 3 |
 | CC-BY-4.0 | 1 |
 | CC0-1.0 | 1 |
 | PSF-2.0 | 1 |

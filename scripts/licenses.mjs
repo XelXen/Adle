@@ -19,7 +19,8 @@
  *   - What the project is built and tested with: everything npm and uv install for
  *     development. None of it reaches a learner, but its licences still bind the developers.
  *
- * Electron and Python carry their own licence files into the packaged folder.
+ * Electron and Python carry their own licence files into the packaged folder. A file kept
+ * in the repository itself (a font no package manager offers) is listed by hand, below.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -43,15 +44,29 @@ const acceptable = (licence) =>
  * list below is at most what ships. Everything else npm installs is a tool.
  */
 const SHIPPED_JS_ROOTS = [
-  '@fontsource-variable/inter',
-  '@fontsource-variable/jetbrains-mono',
-  '@fontsource-variable/newsreader',
+  '@fontsource-variable/geist',
+  '@fontsource-variable/geist-mono',
+  // The typeface scenes are drawn with, in the player frame. Not the interface's.
   '@fontsource/inter',
   '@wanimjs/wanim',
   'katex',
   'lucide-react',
   'react',
   'react-dom',
+];
+
+/**
+ * What ships that no package manager knows about: files kept in the repository, each
+ * beside the text of its licence. Kept by hand, and checked to be there.
+ */
+const VENDORED = [
+  {
+    name: 'Geist Serif (Regular)',
+    version: 'as in geist 1.9.2',
+    licence: 'OFL-1.1',
+    where: 'packages/design-system/src/fonts/geist-serif',
+    files: ['GeistSerif-Regular.woff2', 'LICENSE.txt'],
+  },
 ];
 
 // -- npm ------------------------------------------------------------------------------------
@@ -246,7 +261,16 @@ function build() {
       .filter((item) => item.licence !== null && !acceptable(item.licence))
       .map((item) => `${item.name} ${item.version}: ${item.licence} is not accepted`),
     ...missingShipped.map((name) => `${name}: listed as shipped but not installed`),
+    ...VENDORED.flatMap((item) =>
+      item.files
+        .filter((name) => !existsSync(path.join(repoRoot, item.where, name)))
+        .map((name) => `${item.name}: ${item.where}/${name} is missing`),
+    ),
   ];
+  const vendoredRows = VENDORED.map(
+    (item) =>
+      '| ' + [item.name, item.version, item.licence, '`' + item.where + '`'].join(' | ') + ' |',
+  );
 
   const text = `# Third-party software
 
@@ -271,6 +295,12 @@ what is never reached, so this is at most what ships.
 
 ${table(shippedJs)}
 
+### In the app (files kept in this repository, each beside its licence)
+
+| File | Version | Licence | Where |
+|---|---|---|---|
+${vendoredRows.join('\n')}
+
 ### In the core (Python packages, from \`uv.lock\`)
 
 ${table(shippedPython)}
@@ -289,7 +319,7 @@ ${countByLicence(npm)}
 
 ${table(python.filter((item) => !item.shipped))}
 `;
-  const shippedRows = [...shippedJs, ...shippedPython].map(row);
+  const shippedRows = [...[...shippedJs, ...shippedPython].map(row), ...vendoredRows];
   return { text, problems, shippedRows };
 }
 

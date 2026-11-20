@@ -92,22 +92,23 @@
   --ad-color-scene-muted: #5f6e65;
 
   /* ---- Typography ------------------------------------------------------- */
+  /* One family, three voices: Geist Sans, Geist Serif, and Geist Mono (ADR-025). */
   --ad-font-sans:
-    'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Geist Variable', Geist, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
   --ad-font-serif:
-    'Newsreader Variable', Newsreader, 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia,
-    'Times New Roman', serif;
+    'Geist Serif', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman',
+    serif;
   --ad-font-mono:
-    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'SF Mono', Menlo,
-    Consolas, monospace;
+    'Geist Mono Variable', 'Geist Mono', ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas,
+    monospace;
 
-  /* What is read. */
-  --ad-text-display: 500 2.75rem/3rem var(--ad-font-serif);
-  --ad-text-title: 500 1.875rem/2.25rem var(--ad-font-serif);
-  --ad-text-subtitle: 500 1.375rem/1.75rem var(--ad-font-serif);
-  --ad-text-reading: 400 1.125rem/1.75rem var(--ad-font-serif);
-  --ad-text-reading-large: 400 1.3125rem/1.875rem var(--ad-font-serif);
+  /* What is read. Geist Serif is drawn in one weight: a heavier one would be faked. */
+  --ad-text-display: 400 2.875rem/3.125rem var(--ad-font-serif);
+  --ad-text-title: 400 2rem/2.375rem var(--ad-font-serif);
+  --ad-text-subtitle: 400 1.4375rem/1.875rem var(--ad-font-serif);
+  --ad-text-reading: 400 1.1875rem/1.8125rem var(--ad-font-serif);
+  --ad-text-reading-large: 400 1.375rem/1.9375rem var(--ad-font-serif);
   /* What is operated. */
   --ad-text-heading: 600 1rem/1.5rem var(--ad-font-sans);
   --ad-text-body: 400 0.9375rem/1.5rem var(--ad-font-sans);
@@ -117,8 +118,8 @@
   --ad-text-caption: 500 0.75rem/1rem var(--ad-font-sans);
   --ad-text-eyebrow: 600 0.6875rem/1rem var(--ad-font-sans);
   --ad-text-mono: 400 0.8125rem/1.25rem var(--ad-font-mono);
-  --ad-tracking-tight: -0.011em;
-  --ad-tracking-display: -0.02em;
+  --ad-tracking-tight: -0.006em;
+  --ad-tracking-display: -0.012em;
   --ad-tracking-eyebrow: 0.07em;
 
   /* ---- Spacing: 8 px grid with a 4 px half step -------------------------- */

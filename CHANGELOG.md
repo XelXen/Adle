@@ -25,9 +25,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **A new look throughout.** Titles, lesson text, and questions are set in a serif made for
-  reading, and the interface around them in a quieter sans. Corners, borders, and shadows are
-  finer; the brand's teal is kept for the one thing to press.
+- **A new look throughout.** Titles, lesson text, and questions are set in a serif, and the
+  interface around them in a quieter sans: Geist Serif, Geist Sans, and Geist Mono, one
+  family. Corners, borders, and shadows are finer; the brand's teal is kept for the one
+  thing to press.
 - **A lesson has the whole window.** The side rail steps aside, your place in the lesson is a
   single strip across the top, and the controls float at the bottom edge.
 - The side rail lists your courses, so any of them is one click away.

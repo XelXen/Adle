@@ -14,6 +14,9 @@ Read the root `AGENTS.md` and `DESIGN_SYSTEM.md` first.
   (ADR-011).
 - **Two voices** (ADR-022): the serif (`text-display`, `-title`, `-subtitle`, `-reading*`) is
   for what is read; the sans is for what is operated. Never a serif button or a sans lesson.
+- **The faces are Geist** (ADR-025). Geist Serif has one weight and no italic: never give
+  serif text a `font-weight` above 400 or `font-style: italic`. Its file and licence live in
+  `src/fonts/geist-serif`; do not replace it with a package that needs a web framework.
 - **Three grounds:** `canvas` (the frame), `page` (the main panel), `surface` (a thing on the
   page). A new text colour needs a contrast pair on each ground it is used on.
 - **Teal is for the filled action and for selection.** Do not use it to decorate, and do not

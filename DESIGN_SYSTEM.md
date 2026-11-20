@@ -78,21 +78,25 @@ matters most, it is the only one with a filled button, and it may carry a wash o
 
 ### Typography
 
-Three families, all bundled (no network), each with one job:
+One family, Geist, in three voices, all bundled (no network), each with one job (ADR-025):
 
-| Family | Token | For |
+| Face | Token | For |
 |---|---|---|
-| Newsreader (variable, with optical sizes) | `--ad-font-serif` | What is read: titles, lesson text, questions |
-| Inter (variable) | `--ad-font-sans` | What is operated: labels, controls, data, descriptions |
-| JetBrains Mono (variable) | `--ad-font-mono` | What is typed or copied exactly: an address, a model's name, a key on the keyboard |
+| Geist Serif (Regular) | `--ad-font-serif` | What is read: titles, lesson text, questions |
+| Geist Sans (variable) | `--ad-font-sans` | What is operated: labels, controls, data, descriptions |
+| Geist Mono (variable) | `--ad-font-mono` | What is typed or copied exactly: an address, a model's name, a key on the keyboard |
+
+Geist Serif is drawn in **one weight and no italic**. Every serif text style is weight 400,
+and `font-synthesis: none` is set for the whole app, so the browser never fakes a bold or a
+slanted version of it. Emphasis inside serif text is said in words, or set in the sans.
 
 | Token | Family | Size / line | Weight | Use |
 |---|---|---|---|---|
-| `text-display` | serif | 44 / 48 | 500 | Welcome headline only |
-| `text-title` | serif | 30 / 36 | 500 | Page title (`h1`) |
-| `text-subtitle` | serif | 22 / 28 | 500 | A part of a lesson, a dialog's title, an empty state |
-| `text-reading-large` | serif | 21 / 30 | 400 | A question, a point written on the board |
-| `text-reading` | serif | 18 / 28 | 400 | A lesson's narration as text |
+| `text-display` | serif | 46 / 50 | 400 | Welcome headline only |
+| `text-title` | serif | 32 / 38 | 400 | Page title (`h1`) |
+| `text-subtitle` | serif | 23 / 30 | 400 | A part of a lesson, a dialog's title, an empty state |
+| `text-reading-large` | serif | 22 / 31 | 400 | A question, a point written on the board |
+| `text-reading` | serif | 19 / 29 | 400 | A lesson's narration as text |
 | `text-heading` | sans | 16 / 24 | 600 | Section titles |
 | `text-body` | sans | 15 / 24 | 400 | Default |
 | `text-body-strong` | sans | 15 / 24 | 550 | The name of a thing in a row |
@@ -110,7 +114,11 @@ text style.
 
 **Do** set a lesson's own words in the serif, wherever they appear.
 **Don't** set a button, a field, or a number in the serif, or a paragraph of interface copy in
-capitals. An eyebrow is two or three words.
+capitals. An eyebrow is two or three words. **Don't** put `font-weight` above 400 or
+`font-style: italic` on serif text: there is no such drawing of it, and nothing will change.
+
+Scenes are drawn with their own typeface (Inter, in the player frame), like their colours:
+see "Scenes".
 
 ### Space, shape, elevation, motion
 

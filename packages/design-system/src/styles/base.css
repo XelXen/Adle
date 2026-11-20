@@ -1,8 +1,18 @@
 /* Global element defaults. Component styling lives in each component's CSS module. */
-@import '@fontsource-variable/inter/wght.css';
-@import '@fontsource-variable/newsreader/opsz.css';
-@import '@fontsource-variable/jetbrains-mono/wght.css';
+@import '@fontsource-variable/geist/wght.css';
+@import '@fontsource-variable/geist/wght-italic.css';
+@import '@fontsource-variable/geist-mono/wght.css';
 @import './tokens.css';
+
+/* Geist Serif is not on npm as a font package without a web framework attached, so the
+   one file used is kept in this package with its licence (src/fonts/geist-serif). */
+@font-face {
+  font-family: 'Geist Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/geist-serif/GeistSerif-Regular.woff2') format('woff2');
+}
 
 *,
 *::before,
@@ -22,10 +32,8 @@ body {
   background: var(--ad-color-canvas);
   color: var(--ad-color-ink);
   font: var(--ad-text-body);
-  /* Inter as drawn (the two-storey "a"), with round quotation marks and commas, and an
-     "l" with a tail so that it is never read as a capital "I". */
-  font-feature-settings: 'ss03', 'cv05';
-  font-optical-sizing: auto;
+  /* One weight of the serif exists. Never let the browser draw a bold or an italic of it. */
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

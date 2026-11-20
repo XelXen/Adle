@@ -30,6 +30,7 @@ supersedes the old one and update this index.
 | [021](../decisions/ADR-021-a-choice-of-providers.md) | A second provider (NVIDIA NIM) chosen by the learner and by nothing else; a key kept and sent per provider and address; a provider's next model stands in when its first is away, and that is always said; each provider counted alone | Accepted |
 
 | [022](../decisions/ADR-022-sprout-second-edition.md) | Sprout, second edition: a serif for what is read and a sans for what is operated; three grounds (canvas, page, surface); finer radii and named shadows; the rail lists courses; a lesson has the whole window; the stage keeps its own colours | Accepted |
+| [025](../decisions/ADR-025-geist-typefaces.md) | Geist for all three voices: Geist Sans for what is operated, Geist Mono for what is exact, Geist Serif (one weight, kept as a file with its licence) for what is read; scenes keep Inter | Accepted |
 
 ## Smaller standing choices (no ADR)
 
@@ -37,6 +38,7 @@ supersedes the old one and update this index.
   is unnecessary for a handful of screens with no URLs.
 - **Data loading in the renderer:** `useResource(key, load)`; no client-side cache library.
 - **Icons:** `lucide-react` (ISC), imported per icon.
-- **Fonts:** Inter, Newsreader, and JetBrains Mono, all variable, all OFL-1.1, bundled from
-  `@fontsource-variable/*` (ADR-022).
+- **Fonts:** Geist Sans, Geist Mono, and Geist Serif, all OFL-1.1 and bundled: the first two
+  from `@fontsource-variable/*`, the serif as a file kept in the design system (ADR-025).
+  Scenes are drawn with Inter (`@fontsource/inter`), which is theirs alone.
 - **Licence field:** `UNLICENSED` (private) until the owner chooses a licence.
