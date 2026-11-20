@@ -394,6 +394,14 @@
   letter-spacing: var(--ad-tracking-display);
 }
 
+/* The passages of the learner's materials a lesson draws on, under its title. */
+.sources {
+  display: block;
+  margin-top: var(--ad-space-2);
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
 .finishedLine {
   display: flex;
   flex-wrap: wrap;

@@ -16,6 +16,7 @@ import {
 
 import { useApp } from '../../app/AppContext';
 import { useRouter } from '../../app/router';
+import { NextSteps } from '../../components/NextSteps';
 import { callCore, describeError } from '../../lib/core-client';
 import { courseRoute } from '../../lib/courses';
 import { formatRelativeDay, pluralise } from '../../lib/format';
@@ -55,6 +56,17 @@ export function HomeScreen() {
 
   const open = (course: Course): void => navigate(courseRoute(course));
 
+  // The course the learner was last in, and what Adle would suggest doing there next: the
+  // same suggestion its own page shows, one press away from the moment the app opens.
+  const recent =
+    courses.resource.status === 'ready'
+      ? courses.resource.data.courses.find((course) => course.last_opened_at)
+      : undefined;
+  const recentId = recent?.id ?? null;
+  const next = useResource(`home-next:${recentId ?? 'none'}`, async () =>
+    recentId ? callCore('learning.overview', { path: { course_id: recentId } }) : null,
+  );
+
   // The sample course is written by Adle and ships with the app: adding it needs no provider.
   const addSample = async (): Promise<void> => {
     setAddingSample(true);
@@ -86,6 +98,18 @@ export function HomeScreen() {
         </Button>
       }
     >
+      {/* Shown once it is known; the list of courses below never waits for it. */}
+      {recent && next.resource.status === 'ready' && next.resource.data ? (
+        <Section title="Pick up where you left off">
+          <NextSteps
+            plan={next.resource.data.plan}
+            courseId={recent.id}
+            eyebrow={recent.title}
+            withoutAlternatives
+          />
+        </Section>
+      ) : null}
+
       <Section title="Your courses">
         {list.status === 'loading' || (list.status === 'error' && starting) ? (
           <LoadingState title="Opening your library…" />

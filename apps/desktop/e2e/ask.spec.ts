@@ -43,11 +43,14 @@ interface Session {
 }
 
 /** The app with a provider on this computer, the sample course, and its first lesson open. */
-async function inTheLesson(profileDir: string, options: { key?: boolean } = {}): Promise<Session> {
+async function inTheLesson(
+  profileDir: string,
+  options: { key?: boolean; theme?: 'light' | 'dark' } = {},
+): Promise<Session> {
   const provider = await startFakeProvider();
   const adle = await launchApp(profileDir, {
     onboarded: true,
-    theme: 'light',
+    theme: options.theme ?? 'light',
     env: { ADLE_PROVIDER_BASE_URL: provider.baseUrl },
   });
   const { page } = adle;
@@ -216,7 +219,8 @@ test.describe('asking a question during a lesson', () => {
     profileDir,
   }) => {
     test.setTimeout(240_000);
-    const session = await inTheLesson(profileDir);
+    // In the dark theme, so that asking and its answer are checked for contrast there too.
+    const session = await inTheLesson(profileDir, { theme: 'dark' });
     const { adle, page, provider } = session;
     for (const part of [1, 2, 3]) {
       await expect(page.getByText(`Part ${part} of 10`)).toBeVisible();
@@ -251,6 +255,8 @@ test.describe('asking a question during a lesson', () => {
     // Neither what each choice gets right or wrong, nor the explanation shown afterwards.
     expect(prompt).not.toContain('Its weight is the smaller one');
     expect(prompt).not.toContain('Influence comes from the weight');
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'ask-answer-dark');
     await answerDialog(page).getByRole('button', { name: 'Back to the lesson' }).click();
 
     // ---- The answer the learner then gives is theirs, recorded as an aided one ----

@@ -35,6 +35,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
   when it is ready, with a notification if you are in another window. Notifications can be
   turned off in Settings → Appearance.
 - Check that a provider's key works, from Settings, before relying on it.
+- The library opens with "Pick up where you left off": the next step Adle suggests in the
+  course you were last in, with the reason for it.
+- A lesson written by an AI can be removed from its concept, to make room for another way
+  of teaching the same thing.
+- A lesson that draws on your own materials says which passages, under its title.
 
 ### Changed
 

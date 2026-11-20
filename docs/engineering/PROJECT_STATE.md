@@ -135,6 +135,10 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   in the background; can be turned off in Settings → Appearance). A break is also offered
   at the end of a lesson. Nothing about breaks is counted or kept.
 - "Cancel" and "Stop" take effect at once, however silent the provider is.
+- **Library:** opens with "Pick up where you left off": the suggested next step of the
+  course last opened, with its reason. A lesson a model wrote can be removed from its
+  concept (after a confirmation that says what goes and what stays); a lesson that draws on
+  the learner's materials names the passages under its title.
 - Settings → Learning: pace, explanation depth, narration, voice, volume (with a sample),
   captions, goal (stored by the core).
 - Settings → Privacy & data: what is stored and exactly what each kind of request sends.
@@ -411,8 +415,7 @@ What remains needs the owner. In the order it matters:
    The break makes the wait easier; this would shorten it from about twelve minutes to five.
 8. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
    single course; a screen-reader pass by a person; showing on a lesson, not only on its
-   job, which model wrote it; removing a lesson from the interface; a "continue" card on the
-   library.
+   job, which model wrote it.
 
 ## Known gaps (tracked, not forgotten)
 

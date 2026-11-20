@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
-import type { Concept, Course, Curriculum, Job } from '@adle/contracts';
+import type { Concept, Course, Curriculum, Job, LessonSummary } from '@adle/contracts';
 import {
   Badge,
   Button,
@@ -77,6 +77,7 @@ type OpenDialog =
   | { kind: 'edit'; concept: Concept }
   | { kind: 'prerequisites'; concept: Concept }
   | { kind: 'remove'; concept: Concept }
+  | { kind: 'remove-lesson'; lesson: LessonSummary }
   | { kind: 'outline' }
   | { kind: 'suggest' }
   | { kind: 'proposal'; job: Job }
@@ -267,6 +268,26 @@ export function CurriculumPanel({ course }: { course: Course }) {
       toast.show({
         tone: 'danger',
         title: 'The concept could not be removed',
+        description: describeError(error),
+      });
+    } finally {
+      setRemoving(false);
+      setDialog(null);
+    }
+  };
+
+  const removeLesson = async (lesson: LessonSummary): Promise<void> => {
+    setRemoving(true);
+    try {
+      await callCore('lessons.delete', { path: { lesson_id: lesson.id } });
+      // Which concepts have a lesson, and what is worth doing next, may both have changed.
+      lessons.reload();
+      curriculum.reload();
+      toast.show({ tone: 'success', title: 'Lesson removed', description: lesson.title });
+    } catch (error) {
+      toast.show({
+        tone: 'danger',
+        title: 'The lesson could not be removed',
         description: describeError(error),
       });
     } finally {
@@ -507,6 +528,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
                     onDismiss: () => putAway(selected.id, jobs.find(KIND_LESSON, selected.id)),
                   }}
                   onOpenLesson={(lessonId) => navigate({ name: 'lesson', courseId, lessonId })}
+                  onRemoveLesson={(lesson) => setDialog({ kind: 'remove-lesson', lesson })}
                   onEdit={() => setDialog({ kind: 'edit', concept: selected })}
                   onRemove={() => setDialog({ kind: 'remove', concept: selected })}
                   onEditPrerequisites={() =>
@@ -601,6 +623,31 @@ export function CurriculumPanel({ course }: { course: Course }) {
               }}
             >
               Send and suggest
+            </Button>
+          </>
+        }
+      />
+      <Dialog
+        open={dialog?.kind === 'remove-lesson'}
+        onClose={() => setDialog(null)}
+        title={
+          dialog?.kind === 'remove-lesson' ? `Remove “${dialog.lesson.title}”?` : 'Remove lesson?'
+        }
+        description="The lesson, its pictures, your place in it, and any questions you asked about it are removed. What you have shown you know about the concept stays; a suspected mix-up that rested on this lesson's questions goes with it. This cannot be undone."
+        dismissible={!removing}
+        actions={
+          <>
+            <Button onClick={() => setDialog(null)} disabled={removing}>
+              Keep it
+            </Button>
+            <Button
+              variant="destructive"
+              loading={removing}
+              onClick={() => {
+                if (dialog?.kind === 'remove-lesson') void removeLesson(dialog.lesson);
+              }}
+            >
+              Remove lesson
             </Button>
           </>
         }

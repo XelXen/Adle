@@ -11,6 +11,7 @@ import {
   courseCard,
   createCourse,
   expectNoAccessibilityViolations,
+  openCourseTab,
   providerKeyField,
   saveProviderKey,
   screenshot,
@@ -180,6 +181,42 @@ test.describe('generation with the AI provider', () => {
     await expect(page.getByText(/about 7,200 of 900,000/)).toBeVisible();
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'generation-usage');
+
+    // ---- The library offers the way back in: the same suggestion the course would make ----
+    await page
+      .getByRole('navigation')
+      .getByRole('button', { name: 'Library', exact: true })
+      .click();
+    await expect(page.getByRole('heading', { name: 'Pick up where you left off' })).toBeVisible();
+    const pickUp = page.getByRole('region', {
+      name: 'Continue "How a neuron weighs its inputs"',
+    });
+    await expect(pickUp).toContainText('Calculus refresher');
+    await expect(pickUp).toContainText('Why:');
+    await expect(pickUp.getByRole('button', { name: 'Continue lesson' })).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'library-pick-up');
+
+    // ---- A lesson a model wrote can be removed, after being asked ----
+    await courseCard(page, /Calculus refresher/).click();
+    await openCourseTab(page, 'Curriculum');
+    await pathList(page)
+      .getByRole('button', { name: /Limits/ })
+      .first()
+      .click();
+    await limits
+      .getByRole('button', { name: 'Remove lesson: How a neuron weighs its inputs' })
+      .click();
+    const removal = page.getByRole('dialog', { name: /^Remove “How a neuron weighs its inputs”/ });
+    await expect(removal).toContainText('What you have shown you know about the concept stays');
+    await removal.getByRole('button', { name: 'Keep it' }).click();
+    await expect(lessons.getByRole('listitem')).toHaveCount(1);
+    await limits
+      .getByRole('button', { name: 'Remove lesson: How a neuron weighs its inputs' })
+      .click();
+    await removal.getByRole('button', { name: 'Remove lesson' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson removed' })).toBeVisible();
+    await expect(limits).toContainText('No lesson has been made for this concept yet.');
 
     expect(session.adle.problems).toEqual([]);
     await close(session);

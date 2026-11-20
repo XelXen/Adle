@@ -42,13 +42,23 @@ export interface NextStepsProps {
    * it, such a step leads to the course page, where it can be started and followed.
    */
   renderGeneration?: (step: NextStep, conceptId: string, primary: boolean) => ReactNode;
+  /** What stands above the suggestion. On the library it names the course it is about. */
+  eyebrow?: string;
+  /** Leave out "Or instead": where the suggestion is a way in, not the place to choose. */
+  withoutAlternatives?: boolean;
 }
 
 /**
  * What Adle suggests doing next, with the reason for it, and what could be done
  * instead. A suggestion and never an instruction: every alternative is one press away.
  */
-export function NextSteps({ plan, courseId, renderGeneration }: NextStepsProps) {
+export function NextSteps({
+  plan,
+  courseId,
+  renderGeneration,
+  eyebrow = 'Suggested next step',
+  withoutAlternatives = false,
+}: NextStepsProps) {
   const titleId = useId();
   const othersId = useId();
   const step = plan.recommended;
@@ -56,7 +66,7 @@ export function NextSteps({ plan, courseId, renderGeneration }: NextStepsProps) 
   return (
     <div className={styles.steps}>
       <section className={styles.recommended} aria-labelledby={titleId}>
-        <p className={styles.eyebrow}>Suggested next step</p>
+        <p className={styles.eyebrow}>{eyebrow}</p>
         <h3 id={titleId} className={styles.title}>
           {step.title}
         </h3>
@@ -74,7 +84,7 @@ export function NextSteps({ plan, courseId, renderGeneration }: NextStepsProps) 
         />
       </section>
 
-      {plan.alternatives.length > 0 ? (
+      {plan.alternatives.length > 0 && !withoutAlternatives ? (
         <section className={styles.others} aria-labelledby={othersId}>
           <h3 id={othersId} className={styles.othersTitle}>
             Or instead

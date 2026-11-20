@@ -390,12 +390,23 @@ function LessonPlayer({
       title={lesson.title}
       eyebrow={eyebrow}
       description={
-        <span className={styles.finishedLine}>
-          <Badge tone={lesson.grounding === 'sample' ? 'accent' : 'neutral'}>
-            {GROUNDING_NOTE[lesson.grounding]}
-          </Badge>
-          <span>About {lesson.estimated_minutes} minutes</span>
-        </span>
+        <>
+          <span className={styles.finishedLine}>
+            <Badge tone={lesson.grounding === 'sample' ? 'accent' : 'neutral'}>
+              {GROUNDING_NOTE[lesson.grounding]}
+            </Badge>
+            <span>About {lesson.estimated_minutes} minutes</span>
+          </span>
+          {/* Where in the learner's own materials the lesson draws from: named, never invented. */}
+          {lesson.source_refs.length > 0 ? (
+            <span className={styles.sources}>
+              Draws on:{' '}
+              {lesson.source_refs
+                .map((source) => source.source_name + ', ' + source.locator)
+                .join('; ')}
+            </span>
+          ) : null}
+        </>
       }
     >
       {state.finished ? (

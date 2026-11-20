@@ -34,11 +34,14 @@ interface Session {
 }
 
 /** The app with a provider on this computer and the sample course open on its curriculum. */
-async function withTheSampleCourse(profileDir: string): Promise<Session> {
+async function withTheSampleCourse(
+  profileDir: string,
+  theme: 'light' | 'dark' = 'light',
+): Promise<Session> {
   const provider = await startFakeProvider();
   const adle = await launchApp(profileDir, {
     onboarded: true,
-    theme: 'light',
+    theme,
     env: { ADLE_PROVIDER_BASE_URL: provider.baseUrl },
   });
   const { page } = adle;
@@ -135,11 +138,14 @@ test.describe('waiting for something to be written', () => {
 
   test('a break ends by itself, says so once, and asks for nothing', async ({ profileDir }) => {
     test.setTimeout(240_000);
-    const { adle, page, provider } = await withTheSampleCourse(profileDir);
+    // In the dark theme, so that the break is checked for contrast there too.
+    const { adle, page, provider } = await withTheSampleCourse(profileDir, 'dark');
 
     provider.queue(HANG);
     await detail(page).getByRole('button', { name: 'Create another lesson with AI' }).click();
     await detail(page).getByRole('button', { name: 'Take a break' }).click();
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'break-dark');
     await expect(page.getByRole('heading', { name: 'Taking a break', level: 1 })).toBeVisible();
 
     // ---- The time passes (here, all at once) ----

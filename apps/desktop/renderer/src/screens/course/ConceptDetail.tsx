@@ -125,6 +125,7 @@ export function ConceptDetail({
   lessons,
   generation,
   onOpenLesson,
+  onRemoveLesson,
   onEdit,
   onRemove,
   onEditPrerequisites,
@@ -138,6 +139,8 @@ export function ConceptDetail({
   lessons: ConceptLessons;
   generation: LessonGeneration;
   onOpenLesson: (lessonId: string) => void;
+  /** Ask to remove a lesson. The caller confirms first. */
+  onRemoveLesson: (lesson: LessonSummary) => void;
   onEdit: () => void;
   onRemove: () => void;
   onEditPrerequisites: () => void;
@@ -300,6 +303,16 @@ export function ConceptDetail({
                   >
                     {action}
                   </Button>
+                  {/* A lesson a model wrote can be removed, to make room for another way of
+                      teaching the same thing. The sample course's own lessons stay. */}
+                  {lesson.origin === 'generated' ? (
+                    <IconButton
+                      label={`Remove lesson: ${lesson.title}`}
+                      icon={<Trash2 />}
+                      size="small"
+                      onClick={() => onRemoveLesson(lesson)}
+                    />
+                  ) : null}
                 </li>
               );
             })}
