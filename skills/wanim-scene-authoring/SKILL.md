@@ -104,6 +104,12 @@ use colour as the only carrier of meaning: pair it with position, a label, or a 
 - **Body text and labels** `font_size=24–32`; **formulas** `MathTex(..., font_size=40–48)`;
   **key numbers** `DecimalNumber(..., font_size=40–56)`.
 - At most about seven distinct visual elements. If it needs a legend, it is too dense.
+- **A `Dot` is created with keywords and then placed:**
+  `Dot(color=self.coral, radius=0.12).move_to(point)`. Given its position as an argument
+  (`Dot(point, color=...)`), a dot loses its colour in this runtime and is drawn white, which
+  cannot be seen on the light stage. The static policy rejects that form.
+- Words and numbers are drawn in `ink` or `muted`. The accent colours are for shapes: as text
+  they are too pale to read on the light stage.
 
 ### Text and maths
 

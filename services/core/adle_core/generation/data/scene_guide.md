@@ -85,6 +85,12 @@ use colour as the only carrier of meaning: pair it with position, a label, or a 
 - **Body text and labels** `font_size=24–32`; **formulas** `MathTex(..., font_size=40–48)`;
   **key numbers** `DecimalNumber(..., font_size=40–56)`.
 - At most about seven distinct visual elements. If it needs a legend, it is too dense.
+- **A `Dot` is created with keywords and then placed:**
+  `Dot(color=self.coral, radius=0.12).move_to(point)`. Given its position as an argument
+  (`Dot(point, color=...)`), a dot loses its colour in this runtime and is drawn white, which
+  cannot be seen on the light stage. The static policy rejects that form.
+- Words and numbers are drawn in `ink` or `muted`. The accent colours are for shapes: as text
+  they are too pale to read on the light stage.
 
 ### Text and maths
 
@@ -351,7 +357,9 @@ class ActivationCurve(InteractiveScene):
             axis_config={"color": self.muted, "include_tip": False},
         ).shift(UP * 0.5)
         sweep = always_redraw(
-            lambda: Dot(axes.c2p(tracker.get_value(), self.sigmoid(tracker.get_value())), color=self.green, radius=0.12)
+            lambda: Dot(color=self.green, radius=0.12).move_to(
+                axes.c2p(tracker.get_value(), self.sigmoid(tracker.get_value()))
+            )
         )
         note = Text("Large negative inputs give 0; large positive inputs give 1.", font_size=26, color=self.ink)
         note.to_edge(DOWN, buff=0.5)

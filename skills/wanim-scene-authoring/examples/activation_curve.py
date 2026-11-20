@@ -66,7 +66,9 @@ class ActivationCurve(InteractiveScene):
             axis_config={"color": self.muted, "include_tip": False},
         ).shift(UP * 0.5)
         sweep = always_redraw(
-            lambda: Dot(axes.c2p(tracker.get_value(), self.sigmoid(tracker.get_value())), color=self.green, radius=0.12)
+            lambda: Dot(color=self.green, radius=0.12).move_to(
+                axes.c2p(tracker.get_value(), self.sigmoid(tracker.get_value()))
+            )
         )
         note = Text("Large negative inputs give 0; large positive inputs give 1.", font_size=26, color=self.ink)
         note.to_edge(DOWN, buff=0.5)

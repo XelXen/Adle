@@ -1,0 +1,322 @@
+{
+  "lesson": {
+    "schema_version": "1.0",
+    "lesson_id": "@lesson",
+    "course_id": "@course",
+    "title": "Loss: measuring how wrong",
+    "concept_ids": [
+      "@concept:loss"
+    ],
+    "objectives": [
+      {
+        "objective_id": "@objective:loss.compute",
+        "statement": "Compute a mean squared error for a few predictions and targets."
+      },
+      {
+        "objective_id": "@objective:loss.meaning",
+        "statement": "Explain why errors are squared before they are averaged."
+      }
+    ],
+    "source_refs": [],
+    "grounding": "sample",
+    "strategy": "worked_example",
+    "estimated_minutes": 6,
+    "segments": [
+      {
+        "id": "seg_why",
+        "type": "explanation",
+        "title": "Better needs a number",
+        "estimated_seconds": 28,
+        "narration": [
+          {
+            "text": "A network makes a prediction. To improve it, we first have to say how wrong it was, and say it as a number."
+          },
+          {
+            "text": "That number is called the loss. A loss of zero means every prediction was exactly right. The larger the loss, the further off the network is.",
+            "show": "Loss: one number for how wrong the predictions are."
+          },
+          {
+            "text": "With a loss, better has a meaning: lower.",
+            "show": "Better means a lower loss."
+          }
+        ]
+      },
+      {
+        "id": "seg_errors",
+        "type": "visualization",
+        "title": "Errors, squared, averaged",
+        "estimated_seconds": 31,
+        "narration": [
+          {
+            "text": "Here are three targets, the answers we wanted, and the three predictions the network gave."
+          },
+          {
+            "text": "For each one, take the prediction minus the target. That difference is the error. Some errors are positive and some are negative.",
+            "show": "$\\text{error} = \\text{prediction} - \\text{target}$"
+          },
+          {
+            "text": "Square each error, so that it cannot be negative. Then take the average. The result is called the mean squared error.",
+            "show": "$\\text{MSE} = \\text{average of } (\\text{prediction} - \\text{target})^2$"
+          }
+        ],
+        "scene": {
+          "scene_id": "scn_loss_errors",
+          "fallback_text": "A chart with three pairs of marks. In each pair a dot marks the target and a small square marks the prediction, joined by a vertical line whose length is the error. The targets are $2$, $1$ and $3$ and the predictions are $3$, $1$ and $1$, so the errors are $+1$, $0$ and $-2$. Below the chart the formula appears: the mean squared error is the average of the squared errors, here $\\dfrac{1 + 0 + 4}{3}$."
+        }
+      },
+      {
+        "id": "seg_worked",
+        "type": "worked_example",
+        "title": "A mean squared error by hand",
+        "estimated_seconds": 37,
+        "narration": [
+          {
+            "text": "First prediction. Five minus four is an error of one. Squared, that is one.",
+            "show": "$(5 - 4)^2 = 1$"
+          },
+          {
+            "text": "Second prediction. Zero minus two is an error of minus two. Squared, that is four. The sign has gone.",
+            "show": "$(0 - 2)^2 = 4$"
+          },
+          {
+            "text": "Add the squares: five. There are two predictions, so divide by two. The mean squared error is two and a half.",
+            "show": "$\\text{MSE} = \\dfrac{1 + 4}{2} = 2.5$"
+          }
+        ],
+        "problem": "Targets: $4$ and $2$. Predictions: $5$ and $0$. Find the mean squared error."
+      },
+      {
+        "id": "seg_check_compute",
+        "type": "checkpoint",
+        "title": "Your turn to compute",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_mse",
+          "form": "numeric",
+          "concept_id": "@concept:loss",
+          "objective_id": "@objective:loss.compute",
+          "stem": "Targets: $2$ and $6$. Predictions: $5$ and $5$. What is the mean squared error?",
+          "explanation": "The errors are $3$ and $-1$. Their squares are $9$ and $1$, which add up to $10$. Dividing by the two predictions gives $5$.",
+          "difficulty": 2,
+          "hint": "Square each error before you add them up, then divide by how many there are.",
+          "expected": 5,
+          "tolerance": 0.001
+        }
+      },
+      {
+        "id": "seg_why_square",
+        "type": "explanation",
+        "title": "Why square?",
+        "estimated_seconds": 36,
+        "narration": [
+          {
+            "text": "Why not simply average the errors as they are? Try it with errors of plus three and minus three."
+          },
+          {
+            "text": "They average to zero, which would say the network is perfect, when it is wrong both times. Squaring removes the sign, so errors cannot cancel each other out.",
+            "show": "$+3$ and $-3$ average to $0$. Their squares do not."
+          },
+          {
+            "text": "Squaring does one more thing. An error of four counts as sixteen, while an error of one counts as just one. Big mistakes are punished much harder than small ones.",
+            "show": "Squaring makes large errors count for more."
+          }
+        ]
+      },
+      {
+        "id": "seg_check_meaning",
+        "type": "checkpoint",
+        "title": "A loss of zero?",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_cancelling",
+          "form": "multiple_choice",
+          "concept_id": "@concept:loss",
+          "objective_id": "@objective:loss.meaning",
+          "stem": "A network makes two predictions, with errors of $+2$ and $-2$. A colleague averages the errors as they are and reports a loss of $0$. What went wrong?",
+          "explanation": "Errors of opposite sign cancel when they are averaged as they are. Squaring each error first makes every term zero or positive, so the mean squared error here is $(4 + 4) / 2 = 4$, not $0$.",
+          "difficulty": 2,
+          "hint": "What happens to the sign of a number when you square it?",
+          "options": [
+            {
+              "id": "a",
+              "text": "The positive and negative errors cancelled, hiding that both predictions were off",
+              "feedback": "Yes. That is exactly why each error is squared before averaging."
+            },
+            {
+              "id": "b",
+              "text": "Nothing: a loss of $0$ is correct here",
+              "feedback": "Both predictions missed by $2$. A loss of $0$ should mean that every prediction was exactly right.",
+              "misconception": "definition_confusion"
+            },
+            {
+              "id": "c",
+              "text": "The errors should have been added, not averaged",
+              "feedback": "Adding them gives $0$ as well. The trouble is the signs, not the dividing.",
+              "misconception": "procedure_order"
+            },
+            {
+              "id": "d",
+              "text": "Two predictions are too few to compute a loss",
+              "feedback": "A loss can be computed for any number of predictions, even one."
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_check_compare",
+        "type": "checkpoint",
+        "title": "Which network is better?",
+        "estimated_seconds": 60,
+        "question": {
+          "id": "q_one_big_error",
+          "form": "multiple_choice",
+          "concept_id": "@concept:loss",
+          "objective_id": "@objective:loss.meaning",
+          "stem": "Network A is off by $1$ on each of four predictions. Network B is exactly right on three predictions and off by $3$ on the fourth. Which has the lower mean squared error?",
+          "explanation": "Squaring makes a single large error expensive. A: four errors of $1$ give $4 / 4 = 1$. B: one error of $3$ gives $9 / 4 = 2.25$.",
+          "difficulty": 3,
+          "hint": "Square the errors first. What does an error of $3$ become?",
+          "is_transfer": true,
+          "options": [
+            {
+              "id": "a",
+              "text": "Network A",
+              "feedback": "Yes. A scores $(1 + 1 + 1 + 1) / 4 = 1$, while B scores $9 / 4 = 2.25$. One large error outweighs several small ones."
+            },
+            {
+              "id": "b",
+              "text": "Network B",
+              "feedback": "B is right more often, but its one error of $3$ is squared to $9$, giving $9 / 4 = 2.25$ against $1$ for A.",
+              "misconception": "overgeneralization"
+            },
+            {
+              "id": "c",
+              "text": "They are the same",
+              "feedback": "Before squaring they look close: errors adding up to $4$ against $3$. Squaring changes the picture: $1$ for A against $2.25$ for B.",
+              "misconception": "procedure_order"
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_recap",
+        "type": "summary",
+        "title": "In short",
+        "estimated_seconds": 27,
+        "narration": [
+          {
+            "text": "The loss is one number that says how wrong the network's predictions are. Lower is better.",
+            "show": "Loss: lower is better."
+          },
+          {
+            "text": "For the mean squared error, take each error, square it, and average the squares.",
+            "show": "Mean squared error: square the errors, then average."
+          },
+          {
+            "text": "Squaring stops errors from cancelling and makes large mistakes count for more.",
+            "show": "No cancelling; large errors count for more."
+          },
+          {
+            "text": "Next: how to change the weights so that the loss goes down."
+          }
+        ]
+      }
+    ],
+    "practice": [
+      {
+        "id": "q_single_squared",
+        "form": "numeric",
+        "concept_id": "@concept:loss",
+        "objective_id": "@objective:loss.compute",
+        "stem": "A network makes a single prediction of $7$ when the target is $10$. What is the squared error?",
+        "explanation": "The error is $7 - 10 = -3$, and $(-3)^2 = 9$.",
+        "difficulty": 1,
+        "hint": "Find the error first, then square it.",
+        "expected": 9,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_never_negative",
+        "form": "true_false",
+        "concept_id": "@concept:loss",
+        "objective_id": "@objective:loss.meaning",
+        "stem": "True or false: a mean squared error can be negative.",
+        "explanation": "Each squared error is zero or positive, so their average is too. The smallest possible value is $0$, when every prediction is exactly right.",
+        "difficulty": 1,
+        "hint": "Can the square of a number be below zero?",
+        "correct": false
+      },
+      {
+        "id": "q_mse_with_negatives",
+        "form": "numeric",
+        "concept_id": "@concept:loss",
+        "objective_id": "@objective:loss.compute",
+        "stem": "Every target is $0$. The four predictions are $1$, $-1$, $2$ and $-2$. What is the mean squared error?",
+        "explanation": "The squared errors are $1$, $1$, $4$ and $4$, which add up to $10$. Dividing by four gives $2.5$. Averaged without squaring, the errors would have cancelled to $0$.",
+        "difficulty": 2,
+        "hint": "Square each error, add the four squares, and divide by four.",
+        "is_transfer": true,
+        "expected": 2.5,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_mse_steps",
+        "form": "ordering",
+        "concept_id": "@concept:loss",
+        "objective_id": "@objective:loss.compute",
+        "stem": "Put the steps for computing a mean squared error in order.",
+        "explanation": "Errors first, then their squares, then the average of the squares. Squaring has to come before adding, or opposite errors would cancel.",
+        "difficulty": 1,
+        "hint": "What has to happen before the errors are added together?",
+        "items": [
+          {
+            "id": "a",
+            "text": "Subtract each target from its prediction"
+          },
+          {
+            "id": "b",
+            "text": "Square each of the differences"
+          },
+          {
+            "id": "c",
+            "text": "Add the squares together"
+          },
+          {
+            "id": "d",
+            "text": "Divide by the number of predictions"
+          }
+        ]
+      },
+      {
+        "id": "q_why_square",
+        "form": "explanation",
+        "concept_id": "@concept:loss",
+        "objective_id": "@objective:loss.meaning",
+        "stem": "In your own words: why are the errors squared before they are averaged?",
+        "explanation": "Squaring removes the sign and weighs large errors more heavily.",
+        "difficulty": 2,
+        "rubric": [
+          {
+            "id": "cancel",
+            "text": "So that positive and negative errors cannot cancel each other out"
+          },
+          {
+            "id": "large",
+            "text": "So that large errors count for much more than small ones"
+          }
+        ],
+        "required_points": 1,
+        "sample_answer": "If errors were averaged as they are, a prediction that is too high and one that is too low would cancel, and a network that is wrong every time could look perfect. Squaring makes every error count as zero or more. It also makes one large error cost much more than several small ones."
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scn_loss_errors",
+      "purpose": "Show errors as the gaps between predictions and targets, then the mean squared error.",
+      "file": "loss_errors.py"
+    }
+  ]
+}

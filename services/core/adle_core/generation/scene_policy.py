@@ -310,6 +310,19 @@ class _Checker:
 
     def _check_call(self, node: ast.Call) -> None:
         function = node.func
+        if isinstance(function, ast.Name) and function.id == "Dot":
+            positioned = bool(node.args) or any(key.arg == "point" for key in node.keywords)
+            if positioned:
+                # Observed in the pinned runtime: a Dot given its position as an argument
+                # loses its colour and is drawn white, which cannot be seen on the light
+                # stage. Nothing fails, so it has to be caught here.
+                self.fail(
+                    "unreliable_call",
+                    "Create a Dot with keywords only and place it with move_to: "
+                    "Dot(color=..., radius=...).move_to(point).",
+                    node,
+                )
+            return
         if not (isinstance(function, ast.Attribute) and function.attr == "post_message"):
             return
         if not node.args:

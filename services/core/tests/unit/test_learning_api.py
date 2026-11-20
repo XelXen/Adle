@@ -524,8 +524,11 @@ def test_how_many_questions_can_be_chosen_within_limits(
 
 
 def test_a_concept_without_questions_says_so(client: TestClient, course: dict[str, Any]) -> None:
-    concepts = client.get(f"/v1/courses/{course['id']}/curriculum").json()["concepts"]
-    without_lesson = concepts[1]
+    added = client.post(
+        f"/v1/courses/{course['id']}/concepts",
+        json={"title": "Regularisation", "objectives": ["Say what weight decay does."]},
+    ).json()
+    without_lesson = next(item for item in added["concepts"] if item["title"] == "Regularisation")
     practice = client.post(f"/v1/concepts/{without_lesson['id']}/practice", json={}).json()
     assert practice["questions"] == []
     assert practice["reason"] == (
@@ -640,18 +643,33 @@ def test_saying_an_explanation_did_not_help_changes_what_is_suggested(
     )
     assert response.status_code == 204
 
-    view = overview(client, course)
-    step = view["plan"]["recommended"]
-    assert (step["kind"], step["concept_id"]) == ("another_explanation", concept_id)
-    assert step["reason"].startswith(f'You said an explanation of "{CONCEPT_TITLE}" did not help.')
-    # No key is set up in this test, and the suggestion says so instead of hiding.
-    assert step["needs_key"]
-    assert view["plan"]["note"] == PAUSE_NOTE
-    # The lesson is still there to continue, but it is not what is recommended.
-    assert view["plan"]["alternatives"][-1]["kind"] == "resume_lesson"
+    plan = overview(client, course)["plan"]
+    offered = [plan["recommended"], *plan["alternatives"]]
+    another = next(step for step in offered if step["kind"] == "another_explanation")
+    assert another["concept_id"] == concept_id
+    assert another["reason"].startswith(
+        f'You said an explanation of "{CONCEPT_TITLE}" did not help.'
+    )
+    # No key is set up in this test. The offer says so instead of hiding, and something
+    # that can be done without one is suggested first.
+    assert another["needs_key"]
+    assert not plan["recommended"]["needs_key"]
+    # The lesson that did not help is still there to continue, but only as a last resort.
+    assert plan["recommended"]["lesson_id"] != lesson["lesson_id"]
+    assert (plan["alternatives"][-1]["kind"], plan["alternatives"][-1]["lesson_id"]) == (
+        "resume_lesson",
+        lesson["lesson_id"],
+    )
 
+    # With a key, what the learner asked for comes first, and stopping is said to be fine.
     services.credentials.set_api_key("sk-test-not-a-real-key")
-    assert not overview(client, course)["plan"]["recommended"]["needs_key"]
+    with_key = overview(client, course)["plan"]
+    assert (with_key["recommended"]["kind"], with_key["recommended"]["concept_id"]) == (
+        "another_explanation",
+        concept_id,
+    )
+    assert not with_key["recommended"]["needs_key"]
+    assert with_key["note"] == PAUSE_NOTE
 
     # Once a question on it goes well without help, the request has been answered.
     answer(client, lesson, "q_influence", option_id="a")

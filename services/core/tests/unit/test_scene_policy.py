@@ -226,10 +226,32 @@ def test_names_require_the_star_import() -> None:
         ("self.adle_controls = [Slider()]", "invalid_controls"),
         ("while True:\n    pass", "unbounded_loop"),
         ("while 1:\n    x = 1", "unbounded_loop"),
+        # In the pinned runtime a dot given its position as an argument is drawn white.
+        ('self.add(Dot([1, 2, 0], color="#269B62"))', "unreliable_call"),
+        ('self.add(Dot(point=[1, 2, 0], color="#269B62"))', "unreliable_call"),
+        ("self.add(always_redraw(lambda: Dot(ORIGIN, radius=0.1)))", "unreliable_call"),
     ],
 )
 def test_convention_violations(body: str, code: str) -> None:
     assert code in codes(check_scene_source(scene(body)))
+
+
+def test_a_dot_made_with_keywords_and_then_placed_is_accepted() -> None:
+    report = check_scene_source(
+        scene('self.add(Dot(color="#269B62", radius=0.12).move_to([1, 2, 0]))')
+    )
+    assert report.violations == ()
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted((REPO_ROOT / "services/core/adle_core/sample_course/scenes").glob("*.py")),
+    ids=lambda p: p.name,
+)
+def test_every_scene_of_the_sample_course_passes(path: Path) -> None:
+    report = check_scene_source(path.read_text(encoding="utf-8"))
+    assert report.violations == ()
+    assert report.ok
 
 
 def test_init_override_and_special_methods_are_rejected() -> None:

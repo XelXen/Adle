@@ -1,0 +1,361 @@
+{
+  "lesson": {
+    "schema_version": "1.0",
+    "lesson_id": "@lesson",
+    "course_id": "@course",
+    "title": "The perceptron: a neuron that decides",
+    "concept_ids": [
+      "@concept:perceptron"
+    ],
+    "objectives": [
+      {
+        "objective_id": "@objective:perceptron.decide",
+        "statement": "Decide which answer a perceptron gives for a given input."
+      },
+      {
+        "objective_id": "@objective:perceptron.boundary",
+        "statement": "Describe the decision boundary of a perceptron with two inputs, and how the weights and bias move it."
+      },
+      {
+        "objective_id": "@objective:perceptron.limit",
+        "statement": "Give an example of a problem a single perceptron cannot solve, and say why."
+      }
+    ],
+    "source_refs": [],
+    "grounding": "sample",
+    "strategy": "visual",
+    "estimated_minutes": 6,
+    "segments": [
+      {
+        "id": "seg_idea",
+        "type": "explanation",
+        "title": "From a number to a decision",
+        "estimated_seconds": 33,
+        "narration": [
+          {
+            "text": "Some questions have only two answers. Is this email spam or not? Should the door open or stay shut?"
+          },
+          {
+            "text": "A perceptron is a neuron built for questions like that. It computes its weighted sum, and then applies the step function. If the sum is zero or more, it answers one, for yes. Otherwise it answers zero, for no.",
+            "show": "Answer $1$ if $w_1 x_1 + w_2 x_2 + b \\ge 0$, otherwise $0$"
+          },
+          {
+            "text": "So a perceptron is a weighted sum followed by a switch.",
+            "show": "Perceptron: weighted sum, then step."
+          }
+        ]
+      },
+      {
+        "id": "seg_worked",
+        "type": "worked_example",
+        "title": "Does it say yes?",
+        "estimated_seconds": 30,
+        "narration": [
+          {
+            "text": "First the weighted sum. One times two, plus one times two, is four.",
+            "show": "$1 \\times 2 + 1 \\times 2 = 4$"
+          },
+          {
+            "text": "Add the bias of minus three. That leaves one.",
+            "show": "$z = 4 - 3 = 1$"
+          },
+          {
+            "text": "One is not below zero, so the step function gives one. The perceptron answers yes.",
+            "show": "$z \\ge 0$, so the answer is $1$"
+          }
+        ],
+        "problem": "A perceptron has weights $w_1 = 1$ and $w_2 = 1$ and bias $b = -3$. What does it answer for the input $x_1 = 2$, $x_2 = 2$?"
+      },
+      {
+        "id": "seg_check_decide",
+        "type": "checkpoint",
+        "title": "Another input",
+        "estimated_seconds": 30,
+        "question": {
+          "id": "q_decide_low",
+          "form": "true_false",
+          "concept_id": "@concept:perceptron",
+          "objective_id": "@objective:perceptron.decide",
+          "stem": "The same perceptron ($w_1 = 1$, $w_2 = 1$, $b = -3$) is given $x_1 = 1$ and $x_2 = 1$. True or false: it answers $1$.",
+          "explanation": "$z = 1 + 1 - 3 = -1$, which is below zero, so the answer is $0$.",
+          "difficulty": 1,
+          "hint": "Compute $z$ first, then ask whether it is below zero.",
+          "correct": false
+        }
+      },
+      {
+        "id": "seg_boundary",
+        "type": "visualization",
+        "title": "The line between yes and no",
+        "estimated_seconds": 36,
+        "narration": [
+          {
+            "text": "Let us draw every possible input as a point: x one across, x two up. For some points the perceptron says yes, for others no."
+          },
+          {
+            "text": "The yes points and the no points are separated by a straight line. It is the set of points where the weighted sum is exactly zero. It is called the decision boundary.",
+            "show": "Boundary: $w_1 x_1 + w_2 x_2 + b = 0$"
+          },
+          {
+            "text": "Changing the bias slides the line without turning it. Changing the weights turns it.",
+            "show": "The bias slides the line; the weights turn it."
+          }
+        ],
+        "scene": {
+          "scene_id": "scn_perceptron_boundary",
+          "fallback_text": "A graph with $x_1$ across and $x_2$ up. A straight line runs from the point $(0, 3)$ to the point $(3, 0)$: the decision boundary $x_1 + x_2 - 3 = 0$. Two points beyond the line, $(2.5, 2.5)$ and $(2, 1.5)$, are marked as answering yes. Two points on the near side, $(1, 1)$ and $(0.5, 1.5)$, are marked as answering no. Then the bias is made more negative and the line slides outwards, parallel to itself, until it runs from $(0, 4)$ to $(4, 0)$. The point $(2, 1.5)$ is now on the no side."
+        }
+      },
+      {
+        "id": "seg_check_boundary",
+        "type": "checkpoint",
+        "title": "Moving the line",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_bias_slides",
+          "form": "multiple_choice",
+          "concept_id": "@concept:perceptron",
+          "objective_id": "@objective:perceptron.boundary",
+          "stem": "A perceptron with two inputs has its decision boundary drawn as a line. Its bias is then made much more negative, while the weights stay the same. What happens to the line?",
+          "explanation": "The boundary is the set of points where $w_1 x_1 + w_2 x_2 + b = 0$. The weights fix the direction of that line. Changing $b$ keeps the direction and moves the line: a more negative bias pushes it further out, so more is needed for a yes.",
+          "difficulty": 2,
+          "hint": "Which part of the equation sets the direction of the line, and which part is left over?",
+          "options": [
+            {
+              "id": "a",
+              "text": "It slides away, parallel to itself, so fewer points get a yes",
+              "feedback": "Yes. A more negative bias means the weighted inputs have to add up to more before the sum reaches zero."
+            },
+            {
+              "id": "b",
+              "text": "It turns around the origin",
+              "feedback": "Turning comes from changing the weights, which set the direction of the line. The bias only slides it.",
+              "misconception": "definition_confusion"
+            },
+            {
+              "id": "c",
+              "text": "Nothing: the bias does not affect the boundary",
+              "feedback": "The boundary is where $w_1 x_1 + w_2 x_2 + b = 0$, and $b$ is part of that equation.",
+              "misconception": "causal_confusion"
+            },
+            {
+              "id": "d",
+              "text": "It becomes a curve",
+              "feedback": "The boundary of a single perceptron is always a straight line, whatever its weights and bias.",
+              "misconception": "overgeneralization"
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_limit",
+        "type": "explanation",
+        "title": "What one line cannot do",
+        "estimated_seconds": 54,
+        "narration": [
+          {
+            "text": "A single perceptron can only separate yes from no with one straight line. Many problems fit that. Some do not."
+          },
+          {
+            "text": "Here is a famous one. Two switches control a light. The light should be on when exactly one switch is on, and off when both are on or both are off. This rule is called exclusive or, or XOR for short.",
+            "show": "XOR: on when exactly one input is on."
+          },
+          {
+            "text": "Draw the four cases as the corners of a square. The two yes corners sit on one diagonal and the two no corners on the other. No single straight line puts both yes corners on one side and both no corners on the other.",
+            "show": "No single line separates the two diagonals."
+          },
+          {
+            "text": "To solve it you need more than one neuron, working in layers. That is the next lesson."
+          }
+        ]
+      },
+      {
+        "id": "seg_check_limit",
+        "type": "checkpoint",
+        "title": "One line is not always enough",
+        "estimated_seconds": 60,
+        "question": {
+          "id": "q_cannot_learn",
+          "form": "multiple_choice",
+          "concept_id": "@concept:perceptron",
+          "objective_id": "@objective:perceptron.limit",
+          "stem": "A perceptron takes two inputs that are each $0$ or $1$. Which of these rules can a single perceptron not learn?",
+          "explanation": "A single perceptron separates yes from no with one straight line. For \"both\", \"at least one\", and \"always\", such a line exists. For \"different\", the yes points $(0, 1)$ and $(1, 0)$ and the no points $(0, 0)$ and $(1, 1)$ sit on opposite diagonals, and no straight line has one diagonal on each side.",
+          "difficulty": 3,
+          "hint": "Sketch the four possible inputs as the corners of a square, and mark which ones should give a yes.",
+          "is_transfer": true,
+          "options": [
+            {
+              "id": "a",
+              "text": "Answer yes when the two inputs are different",
+              "feedback": "Yes. That is XOR: the yes cases $(0, 1)$ and $(1, 0)$ lie on one diagonal and the no cases on the other, and one straight line cannot separate them."
+            },
+            {
+              "id": "b",
+              "text": "Answer yes when both inputs are $1$",
+              "feedback": "This one can be done: for example $w_1 = w_2 = 1$ and $b = -2$ says yes only for $(1, 1)$.",
+              "misconception": "overgeneralization"
+            },
+            {
+              "id": "c",
+              "text": "Answer yes when at least one input is $1$",
+              "feedback": "This one can be done: for example $w_1 = w_2 = 1$ and $b = -1$ says no only for $(0, 0)$.",
+              "misconception": "overgeneralization"
+            },
+            {
+              "id": "d",
+              "text": "Answer yes whatever the inputs are",
+              "feedback": "This one can be done with weights of $0$ and a bias of $0$ or more."
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_recap",
+        "type": "summary",
+        "title": "In short",
+        "estimated_seconds": 28,
+        "narration": [
+          {
+            "text": "A perceptron is a weighted sum followed by a step: yes if the sum is zero or more, no otherwise.",
+            "show": "Yes when $w_1 x_1 + w_2 x_2 + b \\ge 0$"
+          },
+          {
+            "text": "Its yes and no answers are separated by a straight line. The weights turn the line, and the bias slides it.",
+            "show": "Weights turn the boundary; the bias slides it."
+          },
+          {
+            "text": "One line is not always enough. XOR needs more than one neuron.",
+            "show": "One perceptron, one straight line."
+          },
+          {
+            "text": "Next: joining neurons into layers."
+          }
+        ]
+      }
+    ],
+    "practice": [
+      {
+        "id": "q_sum_then_answer",
+        "form": "numeric",
+        "concept_id": "@concept:perceptron",
+        "objective_id": "@objective:perceptron.decide",
+        "stem": "A perceptron has $w_1 = 2$, $w_2 = -1$ and $b = -1$. For the input $x_1 = 1$, $x_2 = 3$, what is its weighted sum $z$?",
+        "explanation": "$2 \\times 1 + (-1) \\times 3 - 1 = -2$. Since $z$ is below zero, the perceptron answers $0$.",
+        "difficulty": 2,
+        "hint": "Multiply each input by its weight, add the two products, then add the bias.",
+        "expected": -2,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_exactly_zero",
+        "form": "multiple_choice",
+        "concept_id": "@concept:perceptron",
+        "objective_id": "@objective:perceptron.decide",
+        "stem": "A perceptron's weighted sum for some input is exactly $0$. By the rule used in this lesson, what does it answer?",
+        "explanation": "The step function used here is $0$ below zero and $1$ at zero or above. A point exactly on the decision boundary gets a yes.",
+        "difficulty": 1,
+        "options": [
+          {
+            "id": "a",
+            "text": "$1$, because the sum is not below zero",
+            "feedback": "Yes. The step function gives $1$ for zero and for anything above it."
+          },
+          {
+            "id": "b",
+            "text": "$0$, because the sum is not above zero",
+            "feedback": "The rule here says yes when the sum is zero or more. Exactly zero counts as a yes.",
+            "misconception": "misread_question"
+          },
+          {
+            "id": "c",
+            "text": "$0.5$",
+            "feedback": "One half is what the sigmoid gives at zero. A perceptron uses the step function, which only ever gives $0$ or $1$.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "id": "d",
+            "text": "It cannot answer",
+            "feedback": "It always answers. The boundary itself is given to the yes side."
+          }
+        ],
+        "correct_option": "a"
+      },
+      {
+        "id": "q_bias_turns",
+        "form": "true_false",
+        "concept_id": "@concept:perceptron",
+        "objective_id": "@objective:perceptron.boundary",
+        "stem": "True or false: changing a perceptron's bias changes the direction of its decision boundary.",
+        "explanation": "The direction is set by the weights. The bias slides the line without turning it.",
+        "difficulty": 1,
+        "hint": "Think of the line sliding outwards in the picture. Did it turn?",
+        "correct": false
+      },
+      {
+        "id": "q_bias_for_or",
+        "form": "multiple_choice",
+        "concept_id": "@concept:perceptron",
+        "objective_id": "@objective:perceptron.boundary",
+        "stem": "A perceptron with $w_1 = 1$ and $w_2 = 1$ takes two inputs that are each $0$ or $1$. It should answer yes when at least one input is $1$, and no when both are $0$. Which bias works?",
+        "explanation": "Try the two cases that matter. $(0, 0)$ must give a negative sum, so $b$ must be below $0$. $(1, 0)$ must give a sum of zero or more, so $1 + b$ must be at least $0$. A bias of $-0.5$ does both.",
+        "difficulty": 3,
+        "hint": "Test each bias on the inputs $(0, 0)$ and $(1, 0)$.",
+        "is_transfer": true,
+        "options": [
+          {
+            "id": "a",
+            "text": "$b = -0.5$",
+            "feedback": "Yes. With both inputs at $0$ the sum is $-0.5$, a no. With one input at $1$ it is $0.5$, a yes."
+          },
+          {
+            "id": "b",
+            "text": "$b = -1.5$",
+            "feedback": "With $b = -1.5$ a single $1$ gives $z = -0.5$, which is a no. That bias makes the perceptron wait for both inputs."
+          },
+          {
+            "id": "c",
+            "text": "$b = 0.5$",
+            "feedback": "With $b = 0.5$ even the input $(0, 0)$ gives $z = 0.5$, a yes."
+          },
+          {
+            "id": "d",
+            "text": "$b = -2.5$",
+            "feedback": "With $b = -2.5$ even both inputs at $1$ give $z = -0.5$, a no."
+          }
+        ],
+        "correct_option": "a"
+      },
+      {
+        "id": "q_why_not_xor",
+        "form": "explanation",
+        "concept_id": "@concept:perceptron",
+        "objective_id": "@objective:perceptron.limit",
+        "stem": "In your own words: why can a single perceptron not compute XOR?",
+        "explanation": "One straight line cannot separate points that sit on opposite diagonals.",
+        "difficulty": 2,
+        "rubric": [
+          {
+            "id": "line",
+            "text": "A single perceptron separates yes from no with one straight line"
+          },
+          {
+            "id": "diagonal",
+            "text": "For XOR the yes cases and the no cases lie on opposite diagonals, so no single line separates them"
+          }
+        ],
+        "required_points": 1,
+        "sample_answer": "A perceptron answers yes on one side of a straight line and no on the other. For XOR the two yes inputs, $(0, 1)$ and $(1, 0)$, are opposite corners of a square, and the two no inputs are the other two corners. Any line that has both yes corners on one side also has a no corner there."
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scn_perceptron_boundary",
+      "purpose": "Show a perceptron's decision boundary and how the bias slides it.",
+      "file": "perceptron_boundary.py"
+    }
+  ]
+}

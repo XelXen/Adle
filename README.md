@@ -11,8 +11,8 @@ understanding with short questions, and adapts the next step to what you have ac
 
 > **Status: in development.** The whole learning loop works on the sample course: a curriculum,
 > lessons with live pictures and questions, evidence about what you know, a suggested next step
-> with its reason, practice, and reviews that come due. Still to come: lessons for the rest of
-> the sample course, export and restore, and an installer. See
+> with its reason, practice, and reviews that come due. Still to come: saving and restoring
+> your data, and an installer. See
 > [`docs/engineering/PROJECT_STATE.md`](docs/engineering/PROJECT_STATE.md) for exactly what works.
 
 ## What works today
@@ -29,7 +29,9 @@ understanding with short questions, and adapts the next step to what you have ac
   headings of your materials. Give each one learning objectives, say what it needs first, and
   see the result as a list or a map. Adle keeps the order learnable and explains when it cannot
   do what you asked.
-- **A sample course** you can add from the library with one click, without an AI key.
+- **A sample course** you can add from the library with one click, without an AI key:
+  "Introduction to neural networks", eight concepts from a single weighted sum to
+  backpropagation, each with a complete lesson.
 - **Lessons:** captions at your reading pace, a board that fills in as the lesson goes, live
   pictures you can pause, replay, try out, or read as a description, and questions that are
   explained whichever way you answer. A lesson remembers where you stopped, and tells you in

@@ -1,0 +1,308 @@
+{
+  "lesson": {
+    "schema_version": "1.0",
+    "lesson_id": "@lesson",
+    "course_id": "@course",
+    "title": "Derivatives and the chain rule",
+    "concept_ids": [
+      "@concept:chain_rule"
+    ],
+    "objectives": [
+      {
+        "objective_id": "@objective:chain_rule.slope",
+        "statement": "Interpret a derivative as a slope: the change in output for a small change in input."
+      },
+      {
+        "objective_id": "@objective:chain_rule.chain",
+        "statement": "Use the chain rule to differentiate a function of a function."
+      }
+    ],
+    "source_refs": [],
+    "grounding": "sample",
+    "strategy": "visual",
+    "estimated_minutes": 6,
+    "segments": [
+      {
+        "id": "seg_rate",
+        "type": "explanation",
+        "title": "How fast does it change?",
+        "estimated_seconds": 40,
+        "narration": [
+          {
+            "text": "Turn a tap a little and the water flows a little faster. Turn an oven's dial a little and the temperature rises by some amount. Often what matters is not a value itself, but how fast it changes when you nudge something."
+          },
+          {
+            "text": "That rate has a name: the derivative. It answers one question. If I change the input by a tiny amount, how many times as much does the output change?",
+            "show": "Derivative: change in output for each small change in input."
+          },
+          {
+            "text": "On a graph, the derivative at a point is the steepness of the curve there: its slope.",
+            "show": "On a graph, the derivative is the slope."
+          }
+        ]
+      },
+      {
+        "id": "seg_tangent",
+        "type": "visualization",
+        "title": "The slope of a curve",
+        "estimated_seconds": 36,
+        "narration": [
+          {
+            "text": "Here is the curve y equals x squared. At each point, a straight line that just touches the curve shows how steep it is there."
+          },
+          {
+            "text": "At x equals one the slope is two. A small step to the right lifts y by about twice as much."
+          },
+          {
+            "text": "Further along, at x equals two, the curve is steeper and the slope is four. For this curve, the slope is always two times x.",
+            "show": "For $y = x^2$, the slope is $2x$."
+          }
+        ],
+        "scene": {
+          "scene_id": "scn_slope",
+          "fallback_text": "A graph of the curve $y = x^2$. A point sits on the curve with a short straight line touching the curve at that point: the tangent, whose steepness is the derivative. At $x = 1$ the tangent has slope $2$. The point then slides along the curve to $x = 2$, where the tangent is steeper, with slope $4$. The slope is always $2x$."
+        }
+      },
+      {
+        "id": "seg_check_slope",
+        "type": "checkpoint",
+        "title": "A slope by hand",
+        "estimated_seconds": 30,
+        "question": {
+          "id": "q_slope_at_three",
+          "form": "numeric",
+          "concept_id": "@concept:chain_rule",
+          "objective_id": "@objective:chain_rule.slope",
+          "stem": "For the curve $y = x^2$ the slope at any point is $2x$. What is the slope at $x = 3$?",
+          "explanation": "The slope is $2x$, and $2 \\times 3 = 6$. Near $x = 3$, a small step in $x$ changes $y$ by about six times as much.",
+          "difficulty": 1,
+          "hint": "Put $3$ in place of $x$ in $2x$.",
+          "expected": 6,
+          "tolerance": 0.001
+        }
+      },
+      {
+        "id": "seg_reading",
+        "type": "explanation",
+        "title": "Reading a derivative",
+        "estimated_seconds": 27,
+        "narration": [
+          {
+            "text": "A derivative of six says: nudge the input up by a small amount, and the output goes up by about six times that amount."
+          },
+          {
+            "text": "A negative derivative says the output goes down when the input goes up. And a derivative of zero says that, right here, a small nudge changes nothing: the curve is flat.",
+            "show": "Positive: rises. Negative: falls. Zero: flat."
+          }
+        ]
+      },
+      {
+        "id": "seg_check_sign",
+        "type": "checkpoint",
+        "title": "A negative derivative",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_negative_rate",
+          "form": "multiple_choice",
+          "concept_id": "@concept:chain_rule",
+          "objective_id": "@objective:chain_rule.slope",
+          "stem": "At some point on a curve the derivative is $-3$. You increase the input by a small amount, $0.1$. About how much does the output change?",
+          "explanation": "For a small change, the change in output is about the derivative times the change in input: $-3 \\times 0.1 = -0.3$. The minus sign means the output falls.",
+          "difficulty": 2,
+          "hint": "Multiply the derivative by the size of the nudge, and keep the sign.",
+          "options": [
+            {
+              "id": "a",
+              "text": "It goes down by about $0.3$",
+              "feedback": "Yes. The change in output is about the derivative times the change in input: $-3 \\times 0.1 = -0.3$."
+            },
+            {
+              "id": "b",
+              "text": "It goes up by about $0.3$",
+              "feedback": "The size is right, but a negative derivative means the output falls as the input rises.",
+              "misconception": "notation_confusion"
+            },
+            {
+              "id": "c",
+              "text": "It goes down by about $3$",
+              "feedback": "The derivative is the change in output for each whole unit of input. For a change of only $0.1$ the output moves by a tenth of that.",
+              "misconception": "definition_confusion"
+            },
+            {
+              "id": "d",
+              "text": "It does not change",
+              "feedback": "Only a derivative of $0$ means no change. Here it is $-3$."
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_chain",
+        "type": "worked_example",
+        "title": "A chain of two steps",
+        "estimated_seconds": 57,
+        "narration": [
+          {
+            "text": "There are two steps here. x feeds u, and u feeds y. Take them one at a time.",
+            "show": "$x \\to u \\to y$"
+          },
+          {
+            "text": "First link. u is three times x, so when x changes by a little, u changes three times as much. That rate is three.",
+            "show": "$\\dfrac{du}{dx} = 3$"
+          },
+          {
+            "text": "Second link. y is u squared, so its rate is two times u. At x equals one, u is three, so the rate is six.",
+            "show": "$\\dfrac{dy}{du} = 2u = 6$"
+          },
+          {
+            "text": "A nudge to x is multiplied by three on the way to u, and by six on the way to y. Altogether it is multiplied by eighteen. That is the chain rule: multiply the rates along the chain.",
+            "show": "$\\dfrac{dy}{dx} = \\dfrac{dy}{du} \\times \\dfrac{du}{dx} = 6 \\times 3 = 18$"
+          }
+        ],
+        "problem": "Suppose $u = 3x$ and $y = u^2$. How fast does $y$ change when $x$ changes, at $x = 1$?"
+      },
+      {
+        "id": "seg_check_chain",
+        "type": "checkpoint",
+        "title": "A longer chain",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_three_links",
+          "form": "numeric",
+          "concept_id": "@concept:chain_rule",
+          "objective_id": "@objective:chain_rule.chain",
+          "stem": "A chain has three links: $u = 2x$, then $v = 3u$, then $y = 4v$. What is $\\dfrac{dy}{dx}$?",
+          "explanation": "Each link multiplies a small change by its own rate: $2$, then $3$, then $4$. Along the whole chain a change in $x$ is multiplied by $2 \\times 3 \\times 4 = 24$.",
+          "difficulty": 2,
+          "hint": "The chain rule multiplies the rates of the links. How many links are there?",
+          "is_transfer": true,
+          "expected": 24,
+          "tolerance": 0.001
+        }
+      },
+      {
+        "id": "seg_recap",
+        "type": "summary",
+        "title": "In short",
+        "estimated_seconds": 32,
+        "narration": [
+          {
+            "text": "A derivative says how fast an output changes when its input is nudged. On a graph it is the slope.",
+            "show": "Derivative: slope, or rate of change."
+          },
+          {
+            "text": "Its sign gives the direction, and zero means flat.",
+            "show": "The sign gives the direction; zero means flat."
+          },
+          {
+            "text": "When one quantity depends on another through a chain of steps, multiply the rates of the links. That is the chain rule.",
+            "show": "Chain rule: multiply the rates along the chain."
+          },
+          {
+            "text": "A neural network is exactly such a chain, which is why this rule will matter so much."
+          }
+        ]
+      }
+    ],
+    "practice": [
+      {
+        "id": "q_flat_point",
+        "form": "multiple_choice",
+        "concept_id": "@concept:chain_rule",
+        "objective_id": "@objective:chain_rule.slope",
+        "stem": "The derivative of a curve at some point is $0$. What does the curve look like there?",
+        "explanation": "The derivative is the slope. A slope of $0$ means that, at that point, the curve is neither rising nor falling.",
+        "difficulty": 1,
+        "options": [
+          {
+            "id": "a",
+            "text": "Flat: a small step left or right barely changes the height",
+            "feedback": "Yes. A slope of zero means the curve is level at that point."
+          },
+          {
+            "id": "b",
+            "text": "As steep as it can be",
+            "feedback": "A steep curve has a large derivative. Zero is the opposite: no steepness at all.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "id": "c",
+            "text": "It crosses the horizontal axis there",
+            "feedback": "That would be the value of the curve being $0$. The derivative being $0$ says something about its slope, not its height.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "id": "d",
+            "text": "It has a gap in it",
+            "feedback": "A derivative of $0$ belongs to a perfectly ordinary point where the curve is level."
+          }
+        ],
+        "correct_option": "a"
+      },
+      {
+        "id": "q_slope_negative_x",
+        "form": "numeric",
+        "concept_id": "@concept:chain_rule",
+        "objective_id": "@objective:chain_rule.slope",
+        "stem": "For the curve $y = x^2$ the slope is $2x$. What is the slope at $x = -2$?",
+        "explanation": "$2 \\times (-2) = -4$. On the left side of the curve the slope is negative: the curve is falling as $x$ increases.",
+        "difficulty": 1,
+        "hint": "Put $-2$ in place of $x$, and keep the sign.",
+        "expected": -4,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_chain_square",
+        "form": "numeric",
+        "concept_id": "@concept:chain_rule",
+        "objective_id": "@objective:chain_rule.chain",
+        "stem": "Suppose $u = 4x$ and $y = u^2$. Using the chain rule, what is $\\dfrac{dy}{dx}$ at $x = 1$?",
+        "explanation": "$\\dfrac{du}{dx} = 4$. At $x = 1$, $u = 4$, so $\\dfrac{dy}{du} = 2u = 8$. Multiplying the two rates gives $8 \\times 4 = 32$.",
+        "difficulty": 3,
+        "hint": "Find the rate of each link, then multiply them. For the second link you need the value of $u$.",
+        "expected": 32,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_add_or_multiply",
+        "form": "true_false",
+        "concept_id": "@concept:chain_rule",
+        "objective_id": "@objective:chain_rule.chain",
+        "stem": "True or false: to find the rate of change through a chain of steps, you add the rates of the individual steps.",
+        "explanation": "The rates are multiplied, not added. A change that is tripled and then doubled ends up six times as large, not five.",
+        "difficulty": 1,
+        "hint": "If one step triples a change and the next doubles it, how large is it at the end?",
+        "correct": false
+      },
+      {
+        "id": "q_explain_derivative",
+        "form": "explanation",
+        "concept_id": "@concept:chain_rule",
+        "objective_id": "@objective:chain_rule.slope",
+        "stem": "In your own words: what does it mean that the derivative of a function is $5$ at some point?",
+        "explanation": "A derivative is a rate of change, and the slope of the graph.",
+        "difficulty": 2,
+        "rubric": [
+          {
+            "id": "rate",
+            "text": "A small change in the input changes the output by about five times as much"
+          },
+          {
+            "id": "slope",
+            "text": "The graph of the function has a slope of five at that point"
+          }
+        ],
+        "required_points": 1,
+        "sample_answer": "At that point, nudging the input by a small amount changes the output by about five times that amount, in the same direction. On a graph, the curve rises five units for each unit to the right, measured along the tangent."
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scn_slope",
+      "purpose": "Show the tangent to a curve at two points, and that its slope is the derivative.",
+      "file": "tangent_slope.py"
+    }
+  ]
+}

@@ -1,0 +1,353 @@
+{
+  "lesson": {
+    "schema_version": "1.0",
+    "lesson_id": "@lesson",
+    "course_id": "@course",
+    "title": "Backpropagation: tracing the loss back to each weight",
+    "concept_ids": [
+      "@concept:backprop"
+    ],
+    "objectives": [
+      {
+        "objective_id": "@objective:backprop.trace",
+        "statement": "Compute the gradient of the loss with respect to a weight in a small network."
+      },
+      {
+        "objective_id": "@objective:backprop.reuse",
+        "statement": "Explain why working backwards from the loss saves repeated work."
+      }
+    ],
+    "source_refs": [],
+    "grounding": "sample",
+    "strategy": "worked_example",
+    "estimated_minutes": 7,
+    "segments": [
+      {
+        "id": "seg_blame",
+        "type": "explanation",
+        "title": "Which weight is responsible?",
+        "estimated_seconds": 43,
+        "narration": [
+          {
+            "text": "A network has made a prediction, and the loss says it was off. Gradient descent can fix that, but it needs to know, for every single weight, how the loss changes when that weight changes."
+          },
+          {
+            "text": "For a weight right next to the output, that is easy to see. But what about a weight buried in an early layer? It only affects the loss through everything that comes after it."
+          },
+          {
+            "text": "Backpropagation is the method for finding all of those derivatives. It is the chain rule, applied backwards through the network, from the loss to the first layer.",
+            "show": "Backpropagation: the chain rule, run backwards."
+          }
+        ]
+      },
+      {
+        "id": "seg_chain",
+        "type": "visualization",
+        "title": "A network is a chain",
+        "estimated_seconds": 41,
+        "narration": [
+          {
+            "text": "Here is the smallest possible network, drawn as a chain. The input is multiplied by the first weight to give h. Then h is multiplied by the second weight to give the prediction, y. Then y is compared with the target to give the loss."
+          },
+          {
+            "text": "The forward pass runs from left to right and fills in the values."
+          },
+          {
+            "text": "Backpropagation then runs from right to left. At each link it asks one question: how much does the loss change if this value changes?",
+            "show": "Forward: values. Backward: rates of change."
+          }
+        ],
+        "scene": {
+          "scene_id": "scn_backprop_chain",
+          "fallback_text": "A chain of four boxes from left to right: the input $x$, then $h = w_1 x$, then $y = w_2 h$, then the loss $L = (y - t)^2$. First the values fill in from left to right under the boxes: $x = 1$, $h = 2$, $y = 6$, $L = 1$. Then labels appear from right to left on a row below: $\\dfrac{dL}{dy} = 2$ under $y$, and then $\\dfrac{dL}{dh} = 6$ under $h$, showing the rates of change being passed backwards."
+        }
+      },
+      {
+        "id": "seg_worked",
+        "type": "worked_example",
+        "title": "Backwards, one link at a time",
+        "estimated_seconds": 63,
+        "narration": [
+          {
+            "text": "Start at the loss. It is y minus t, squared, so its derivative with respect to y is two times y minus t. That is two times one: two.",
+            "show": "$\\dfrac{dL}{dy} = 2(y - t) = 2$"
+          },
+          {
+            "text": "Now the second weight. y is w two times h, so nudging w two changes y at a rate of h, which is two. By the chain rule, two times two is four.",
+            "show": "$\\dfrac{dL}{dw_2} = \\dfrac{dL}{dy} \\times h = 2 \\times 2 = 4$"
+          },
+          {
+            "text": "Keep going backwards. Nudging h changes y at a rate of w two, which is three. So the loss changes with h at a rate of two times three: six.",
+            "show": "$\\dfrac{dL}{dh} = \\dfrac{dL}{dy} \\times w_2 = 2 \\times 3 = 6$"
+          },
+          {
+            "text": "Finally the first weight. h is w one times x, so nudging w one changes h at a rate of x, which is one. Six times one is six.",
+            "show": "$\\dfrac{dL}{dw_1} = \\dfrac{dL}{dh} \\times x = 6 \\times 1 = 6$"
+          }
+        ],
+        "problem": "$x = 1$, $w_1 = 2$, $w_2 = 3$, and the target is $t = 5$. The forward pass gives $h = w_1 x = 2$, $y = w_2 h = 6$ and $L = (y - t)^2 = 1$. Find $\\dfrac{dL}{dw_2}$ and $\\dfrac{dL}{dw_1}$."
+      },
+      {
+        "id": "seg_check_trace",
+        "type": "checkpoint",
+        "title": "One weight, one derivative",
+        "estimated_seconds": 60,
+        "question": {
+          "id": "q_single_weight",
+          "form": "numeric",
+          "concept_id": "@concept:backprop",
+          "objective_id": "@objective:backprop.trace",
+          "stem": "A network with one weight predicts $y = w x$ and has the loss $L = (y - t)^2$. With $x = 2$, $w = 3$ and $t = 4$, the prediction is $y = 6$. What is $\\dfrac{dL}{dw}$?",
+          "explanation": "$\\dfrac{dL}{dy} = 2(y - t) = 2 \\times 2 = 4$. Nudging $w$ changes $y$ at a rate of $x = 2$. By the chain rule, $\\dfrac{dL}{dw} = 4 \\times 2 = 8$.",
+          "difficulty": 3,
+          "hint": "Find how the loss changes with $y$ first. Then ask how $y$ changes with $w$.",
+          "expected": 8,
+          "tolerance": 0.001
+        }
+      },
+      {
+        "id": "seg_reuse",
+        "type": "explanation",
+        "title": "Why backwards?",
+        "estimated_seconds": 41,
+        "narration": [
+          {
+            "text": "Look again at what we just did. The rate for y, the number two, was worked out once and then used twice: for the second weight, and on the way to the first."
+          },
+          {
+            "text": "In a real network that sharing is enormous. Every weight in an early layer affects the loss through the same later layers. Working backwards computes the rate for each later value once, and every earlier weight reuses it.",
+            "show": "Each rate is computed once and reused by everything before it."
+          },
+          {
+            "text": "Starting from each weight and working forwards would repeat the same multiplications again and again, once for every weight.",
+            "show": "Backwards: one sweep. Forwards: one sweep for each weight."
+          }
+        ]
+      },
+      {
+        "id": "seg_check_reuse",
+        "type": "checkpoint",
+        "title": "What was shared?",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_shared_rate",
+          "form": "multiple_choice",
+          "concept_id": "@concept:backprop",
+          "objective_id": "@objective:backprop.reuse",
+          "stem": "In the worked example, which quantity was computed once and then used for both $\\dfrac{dL}{dw_2}$ and $\\dfrac{dL}{dw_1}$?",
+          "explanation": "Both weights influence the loss only by changing $y$. So $\\dfrac{dL}{dy}$ is needed for both, and backpropagation computes it once, at the start of the backward pass.",
+          "difficulty": 2,
+          "hint": "Which step of the worked example came first, and what used its result?",
+          "options": [
+            {
+              "id": "a",
+              "text": "$\\dfrac{dL}{dy}$, the rate at which the loss changes with the prediction",
+              "feedback": "Yes. Everything before $y$ affects the loss only through $y$, so this one number is shared."
+            },
+            {
+              "id": "b",
+              "text": "The learning rate",
+              "feedback": "The learning rate is used later, by gradient descent, to turn derivatives into steps. Backpropagation only finds the derivatives.",
+              "misconception": "definition_confusion"
+            },
+            {
+              "id": "c",
+              "text": "The input $x$",
+              "feedback": "$x$ appears in the last step for $w_1$, but it is not what the two derivatives have in common."
+            },
+            {
+              "id": "d",
+              "text": "Nothing: each derivative was worked out separately from scratch",
+              "feedback": "The first step, $\\dfrac{dL}{dy} = 2$, fed into both of them.",
+              "misconception": "procedure_order"
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_check_deep",
+        "type": "checkpoint",
+        "title": "In a deeper network",
+        "estimated_seconds": 60,
+        "question": {
+          "id": "q_ten_layers",
+          "form": "multiple_choice",
+          "concept_id": "@concept:backprop",
+          "objective_id": "@objective:backprop.reuse",
+          "stem": "A network has ten layers. A weight in the second layer and a weight in the third layer both need their derivatives. What do the two calculations share?",
+          "explanation": "Each weight affects the loss through every layer that comes after it. For weights in layers two and three, layers four to ten are common to both chains. Working backwards, the rates through those layers are computed once and reused.",
+          "difficulty": 3,
+          "hint": "Trace each weight's effect forward to the loss. Where do the two paths run together?",
+          "is_transfer": true,
+          "options": [
+            {
+              "id": "a",
+              "text": "The rates of change through every layer after the third, computed once and used by both",
+              "feedback": "Yes. Both weights act on the loss through layers four to ten, so that part of the chain is the same for both."
+            },
+            {
+              "id": "b",
+              "text": "Nothing: weights in different layers have unrelated derivatives",
+              "feedback": "They act on the loss through the same later layers, so the backward pass through those layers is shared.",
+              "misconception": "overgeneralization"
+            },
+            {
+              "id": "c",
+              "text": "Only the learning rate",
+              "feedback": "The learning rate belongs to gradient descent, not to finding derivatives.",
+              "misconception": "definition_confusion"
+            },
+            {
+              "id": "d",
+              "text": "The forward pass through layers one and two",
+              "feedback": "The forward values are needed too, but the saving in backpropagation comes from the shared backward part, after both weights."
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_recap",
+        "type": "summary",
+        "title": "In short",
+        "estimated_seconds": 35,
+        "narration": [
+          {
+            "text": "Backpropagation finds how the loss changes with every weight, by applying the chain rule from the loss backwards.",
+            "show": "The chain rule, from the loss back to the first layer."
+          },
+          {
+            "text": "Each step multiplies the rate arriving from the right by the local rate of one link.",
+            "show": "Rate arriving $\\times$ local rate."
+          },
+          {
+            "text": "Because later rates are computed once and reused, one backward sweep gives the derivative for every weight.",
+            "show": "One backward sweep, every derivative."
+          },
+          {
+            "text": "And with those derivatives, gradient descent can take its step. Forward pass, loss, backward pass, update: that loop is how a neural network learns.",
+            "show": "Forward, loss, backward, update. Repeat."
+          }
+        ]
+      }
+    ],
+    "practice": [
+      {
+        "id": "q_local_rate",
+        "form": "multiple_choice",
+        "concept_id": "@concept:backprop",
+        "objective_id": "@objective:backprop.trace",
+        "stem": "In a network, $y = w h$. How fast does $y$ change when the weight $w$ is nudged?",
+        "explanation": "When two quantities are multiplied, the rate of change with respect to one of them is the other one. For $y = w h$, nudging $w$ changes $y$ by $h$ times as much.",
+        "difficulty": 2,
+        "options": [
+          {
+            "id": "a",
+            "text": "At a rate of $h$",
+            "feedback": "Yes. $y$ is $w$ times $h$, so each small change in $w$ is multiplied by $h$."
+          },
+          {
+            "id": "b",
+            "text": "At a rate of $w$",
+            "feedback": "That is how fast $y$ changes when $h$ is nudged. For a nudge to $w$, the multiplier is the other factor, $h$.",
+            "misconception": "notation_confusion"
+          },
+          {
+            "id": "c",
+            "text": "At a rate of $w h$",
+            "feedback": "$w h$ is the value of $y$ itself, not how fast it changes.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "id": "d",
+            "text": "At a rate of $1$",
+            "feedback": "The rate would be $1$ only if $h$ were $1$."
+          }
+        ],
+        "correct_option": "a"
+      },
+      {
+        "id": "q_single_weight_again",
+        "form": "numeric",
+        "concept_id": "@concept:backprop",
+        "objective_id": "@objective:backprop.trace",
+        "stem": "$x = 3$, $w = 1$, and the target is $t = 1$. The prediction is $y = w x = 3$ and the loss is $L = (y - t)^2$. What is $\\dfrac{dL}{dw}$?",
+        "explanation": "$\\dfrac{dL}{dy} = 2(y - t) = 2 \\times 2 = 4$, and $y$ changes with $w$ at a rate of $x = 3$. So $\\dfrac{dL}{dw} = 4 \\times 3 = 12$.",
+        "difficulty": 2,
+        "hint": "Start from the loss: how does it change with $y$?",
+        "expected": 12,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_two_layers",
+        "form": "numeric",
+        "concept_id": "@concept:backprop",
+        "objective_id": "@objective:backprop.trace",
+        "stem": "$x = 2$, $w_1 = 1$, $w_2 = 2$, and the target is $t = 3$. The forward pass gives $h = w_1 x = 2$, $y = w_2 h = 4$ and $L = (y - t)^2 = 1$. What is $\\dfrac{dL}{dw_1}$?",
+        "explanation": "$\\dfrac{dL}{dy} = 2(y - t) = 2$. Passing it back through $y = w_2 h$ gives $\\dfrac{dL}{dh} = 2 \\times w_2 = 4$. Passing that back through $h = w_1 x$ gives $\\dfrac{dL}{dw_1} = 4 \\times x = 8$.",
+        "difficulty": 3,
+        "hint": "Go backwards one link at a time: first to $y$, then to $h$, then to $w_1$.",
+        "is_transfer": true,
+        "expected": 8,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_training_round",
+        "form": "ordering",
+        "concept_id": "@concept:backprop",
+        "objective_id": "@objective:backprop.trace",
+        "stem": "Put one round of training in order.",
+        "explanation": "The backward pass needs the values from the forward pass and starts from the loss. The update needs the derivatives the backward pass produces.",
+        "difficulty": 1,
+        "hint": "What does each step need to have before it can start?",
+        "items": [
+          {
+            "id": "a",
+            "text": "Forward pass: compute the prediction"
+          },
+          {
+            "id": "b",
+            "text": "Compute the loss"
+          },
+          {
+            "id": "c",
+            "text": "Backward pass: find the derivative of the loss for every weight"
+          },
+          {
+            "id": "d",
+            "text": "Update every weight with gradient descent"
+          }
+        ]
+      },
+      {
+        "id": "q_explain_backwards",
+        "form": "explanation",
+        "concept_id": "@concept:backprop",
+        "objective_id": "@objective:backprop.reuse",
+        "stem": "In your own words: why does backpropagation work backwards from the loss, instead of forwards from each weight?",
+        "explanation": "The later part of the chain is shared, so it is computed once.",
+        "difficulty": 2,
+        "rubric": [
+          {
+            "id": "shared",
+            "text": "Many weights affect the loss through the same later layers"
+          },
+          {
+            "id": "once",
+            "text": "Working backwards computes each of those later rates once, and reuses it"
+          }
+        ],
+        "required_points": 1,
+        "sample_answer": "Every weight affects the loss only through the layers that come after it, and those later layers are shared by many weights. Starting at the loss and moving backwards, the rate of change for each later value is computed once and handed to everything before it. Working forwards from each weight would recompute the same later part of the chain for every weight."
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scn_backprop_chain",
+      "purpose": "Show values moving forward through a chain and rates of change moving backward.",
+      "file": "backprop_chain.py"
+    }
+  ]
+}

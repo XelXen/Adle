@@ -61,7 +61,106 @@ function replaceSceneSource(profileDir: string, sceneId: string, source: string)
   }
 }
 
+interface SampleLesson {
+  /** The concept the lesson is listed under. */
+  concept: string;
+  title: string;
+  parts: number;
+  /** The part with something to try, and the name of its control. */
+  tryIt?: { part: number; control: string };
+}
+
+/** The other lessons of the sample course. */
+const OTHER_LESSONS: readonly SampleLesson[] = [
+  {
+    concept: 'Activation functions',
+    title: 'Activation functions: what a neuron does',
+    parts: 8,
+    tryIt: { part: 4, control: 'Z' },
+  },
+  { concept: 'The perceptron', title: 'The perceptron: a neuron that decides', parts: 8 },
+  { concept: 'Forward propagation', title: 'Forward propagation: from input to output', parts: 8 },
+  { concept: 'Loss', title: 'Loss: measuring how wrong', parts: 8 },
+  {
+    concept: 'Derivatives and the chain rule',
+    title: 'Derivatives and the chain rule',
+    parts: 8,
+  },
+  {
+    concept: 'Gradient descent',
+    title: 'Gradient descent: improving step by step',
+    parts: 7,
+    tryIt: { part: 5, control: 'Learning rate' },
+  },
+  { concept: 'Backpropagation', title: 'Backpropagation: tracing the loss back', parts: 8 },
+];
+
 test.describe('lesson', () => {
+  test('every other lesson of the sample course plays from start to finish', async ({ adle }) => {
+    test.setTimeout(300_000);
+    const { page } = adle;
+    await addSampleCourse(page);
+    const learningPath = page.getByRole('list', { name: 'Learning path' });
+
+    for (const lesson of OTHER_LESSONS) {
+      // ---- Open the concept's lesson from the curriculum ----
+      await learningPath
+        .getByRole('listitem')
+        .filter({
+          has: page.getByRole('button', { name: new RegExp(`^\\d*\\s*${lesson.concept}`) }),
+        })
+        .getByRole('button')
+        .first()
+        .click();
+      const concept = detail(page, lesson.concept);
+      await expect(concept).toBeVisible();
+      await concept.getByRole('button', { name: /^Start lesson: / }).click();
+      await expect(page.getByRole('heading', { level: 1 })).toContainText(lesson.title);
+      await expect(parts(page).getByRole('button')).toHaveCount(lesson.parts);
+
+      // ---- Go through every part: pictures load, questions can be skipped, nothing breaks ----
+      for (let part = 1; part <= lesson.parts; part += 1) {
+        await expect(page.getByText(`Part ${part} of ${lesson.parts}`)).toBeVisible();
+        const figure = page.getByRole('figure');
+        if ((await figure.count()) > 0) {
+          await sceneSettled(figure.first());
+          await expect(figure.getByText('The animation could not be shown')).toHaveCount(0);
+          // A picture always has its description in words one press away.
+          await expect(
+            page.getByRole('button', { name: 'Describe this picture in words' }),
+          ).toBeVisible();
+        }
+        if (lesson.tryIt?.part === part) {
+          // Something to try, with a control the keyboard can reach.
+          const control = figure.getByRole('slider', { name: lesson.tryIt.control });
+          await expect(control).toBeVisible({ timeout: 20_000 });
+          await control.focus();
+          await page.keyboard.press('ArrowRight');
+          await expect(page.getByText('You tried it.')).toBeVisible();
+          await screenshot(page, `lesson-try-${lesson.concept.toLowerCase().replace(/\W+/g, '-')}`);
+        }
+        const skip = page.getByRole('button', { name: 'Skip this question' });
+        if ((await skip.count()) > 0) {
+          await expect(continueButton(page)).toBeDisabled();
+          await skip.click();
+          await expect(page.getByText('Skipped', { exact: true })).toBeVisible();
+        }
+        if (part === 1) await expectNoAccessibilityViolations(page);
+        if (part < lesson.parts) await continueButton(page).click();
+      }
+      await screenshot(page, `lesson-end-${lesson.concept.toLowerCase().replace(/\W+/g, '-')}`);
+      await page.getByRole('button', { name: 'Finish lesson' }).click();
+      const finished = page.getByRole('region', { name: 'Lesson complete' });
+      await expect(finished).toBeVisible();
+      await expect(finished.getByText('Suggested next step')).toBeVisible();
+
+      await finished.getByRole('button', { name: 'Back to the course' }).click();
+      await openCourseTab(page, 'Curriculum');
+    }
+
+    expect(adle.problems).toEqual([]);
+  });
+
   test('take the sample lesson from start to finish', async ({ adle }) => {
     test.setTimeout(180_000);
     const { page } = adle;

@@ -209,5 +209,14 @@
       ]
     }
   ],
-  "lessons": ["weighted_sum"]
+  "lessons": [
+    "weighted_sum",
+    "activation",
+    "perceptron",
+    "forward",
+    "loss",
+    "chain_rule",
+    "gradient_descent",
+    "backprop"
+  ]
 }

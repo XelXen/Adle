@@ -33,7 +33,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
   change. Adle never shows a score.
 - Settings → Learning: pace, how detailed explanations are, narration, captions, and your goal.
 - A sample course, "Introduction to neural networks", that can be added from the library with
-  one click and needs no AI key.
+  one click and needs no AI key. All eight of its concepts have a full lesson: weights and bias,
+  activation functions, the perceptron, forward propagation, loss, derivatives and the chain
+  rule, gradient descent, and backpropagation. Each has animated pictures described in words,
+  questions, and further questions for practice and review, so the whole of Adle can be tried
+  without an AI provider.
 - Lessons: a lesson plays part by part with captions at your reading pace, a board that fills in
   as it goes, a transcript, and live pictures you can pause, replay, or have described in words.
   Nothing plays until you press Start. You can go back to any part you have reached.

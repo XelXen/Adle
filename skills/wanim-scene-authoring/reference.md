@@ -136,6 +136,7 @@ Rules that come with the interactive API (documented upstream):
 | Exception during `construct()` | The JavaScript error message | `runtime` |
 | `ImageMobject("x.png")` | "could not find x.png" | `runtime` |
 | `while True:` without `self.wait` | The frame stops answering; watchdog fires | `unresponsive` |
+| `Dot(point, color=...)` (position as an argument) | No error. The dot is drawn white: invisible on the light stage. Use `Dot(color=..., radius=...).move_to(point)`. The static policy rejects the first form. **Observed** in the sample scenes' screenshots. | none |
 
 Scenes and mobjects are JavaScript `Proxy` objects that throw an `AttributeError` for unknown
 **string** attributes, so reading a missing attribute from the host is an exception, not `undefined`.

@@ -1,0 +1,329 @@
+{
+  "lesson": {
+    "schema_version": "1.0",
+    "lesson_id": "@lesson",
+    "course_id": "@course",
+    "title": "Forward propagation: from input to output",
+    "concept_ids": [
+      "@concept:forward"
+    ],
+    "objectives": [
+      {
+        "objective_id": "@objective:forward.trace",
+        "statement": "Compute the output of a small two-layer network by hand."
+      },
+      {
+        "objective_id": "@objective:forward.layers",
+        "statement": "Explain what a hidden layer is and why its outputs are not seen directly."
+      }
+    ],
+    "source_refs": [],
+    "grounding": "sample",
+    "strategy": "worked_example",
+    "estimated_minutes": 5,
+    "segments": [
+      {
+        "id": "seg_layers",
+        "type": "explanation",
+        "title": "Neurons in layers",
+        "estimated_seconds": 38,
+        "narration": [
+          {
+            "text": "One neuron can draw one line. To do more, we connect neurons so that the outputs of some become the inputs of others."
+          },
+          {
+            "text": "They are arranged in layers. The input layer just holds the numbers we feed in. The output layer gives the network's answer. Any layer in between is called a hidden layer.",
+            "show": "Input layer, hidden layer, output layer."
+          },
+          {
+            "text": "It is called hidden because we never see its values directly. We choose the inputs and read the output. What happens in between is the network's own working.",
+            "show": "Hidden: neither an input nor the answer."
+          }
+        ]
+      },
+      {
+        "id": "seg_flow",
+        "type": "visualization",
+        "title": "One pass, left to right",
+        "estimated_seconds": 32,
+        "narration": [
+          {
+            "text": "Here is a small network. Two inputs on the left, two hidden neurons in the middle, one output on the right."
+          },
+          {
+            "text": "Every hidden neuron receives both inputs, computes its own weighted sum, and applies its activation function."
+          },
+          {
+            "text": "Their two outputs then become the inputs of the output neuron. Computing everything in this order, from left to right, is called forward propagation.",
+            "show": "Forward propagation: layer by layer, left to right."
+          }
+        ],
+        "scene": {
+          "scene_id": "scn_forward_pass",
+          "fallback_text": "A diagram of a network. On the left, two input circles labelled $x_1 = 1$ and $x_2 = 2$. In the middle, two hidden neurons, each joined by a line to both inputs. On the right, one output neuron joined to both hidden neurons. The values appear from left to right: the hidden neurons show $h_1 = 3$ and $h_2 = 0$, and then the output shows $y = 5$."
+        }
+      },
+      {
+        "id": "seg_worked",
+        "type": "worked_example",
+        "title": "The whole pass by hand",
+        "estimated_seconds": 47,
+        "narration": [
+          {
+            "text": "Start with the first hidden neuron. One plus two is three. ReLU leaves a positive number alone, so h one is three.",
+            "show": "$h_1 = \\mathrm{ReLU}(1 + 2) = 3$"
+          },
+          {
+            "text": "Now the second. One minus two is minus one. ReLU turns a negative number into zero, so h two is zero.",
+            "show": "$h_2 = \\mathrm{ReLU}(1 - 2) = 0$"
+          },
+          {
+            "text": "The hidden layer is done. Its outputs, three and zero, are the inputs of the output neuron.",
+            "show": "Hidden outputs: $3$ and $0$"
+          },
+          {
+            "text": "Two times three is six. Add h two, which is zero, and subtract one. The network's output is five.",
+            "show": "$y = 2 \\times 3 + 0 - 1 = 5$"
+          }
+        ],
+        "problem": "Inputs $x_1 = 1$ and $x_2 = 2$. The hidden neurons use ReLU: $h_1 = \\mathrm{ReLU}(x_1 + x_2)$, $h_2 = \\mathrm{ReLU}(x_1 - x_2)$ and $y = 2 h_1 + h_2 - 1$. Find $y$."
+      },
+      {
+        "id": "seg_check_trace",
+        "type": "checkpoint",
+        "title": "Your turn to trace",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_trace",
+          "form": "numeric",
+          "concept_id": "@concept:forward",
+          "objective_id": "@objective:forward.trace",
+          "stem": "The same network gets new inputs: $x_1 = 3$ and $x_2 = 1$. With $h_1 = \\mathrm{ReLU}(x_1 + x_2)$, $h_2 = \\mathrm{ReLU}(x_1 - x_2)$ and $y = 2 h_1 + h_2 - 1$, what is $y$?",
+          "explanation": "$h_1 = \\mathrm{ReLU}(4) = 4$ and $h_2 = \\mathrm{ReLU}(2) = 2$. Then $y = 2 \\times 4 + 2 - 1 = 9$.",
+          "difficulty": 2,
+          "hint": "Finish the hidden layer completely before you touch the output neuron.",
+          "expected": 9,
+          "tolerance": 0.001
+        }
+      },
+      {
+        "id": "seg_order",
+        "type": "explanation",
+        "title": "Why the order matters",
+        "estimated_seconds": 28,
+        "narration": [
+          {
+            "text": "Notice that the output neuron could not start until both hidden neurons had finished. Each layer needs the layer before it."
+          },
+          {
+            "text": "Within a layer, though, the neurons do not depend on each other. Each looks only at the layer before.",
+            "show": "A layer needs the one before it, and nothing else."
+          },
+          {
+            "text": "That is all forward propagation is: the weighted sum and activation you already know, repeated layer after layer.",
+            "show": "The same two steps, repeated."
+          }
+        ]
+      },
+      {
+        "id": "seg_check_order",
+        "type": "checkpoint",
+        "title": "In what order?",
+        "estimated_seconds": 30,
+        "question": {
+          "id": "q_pass_order",
+          "form": "ordering",
+          "concept_id": "@concept:forward",
+          "objective_id": "@objective:forward.trace",
+          "stem": "Put the steps of forward propagation, for a network with one hidden layer, in order.",
+          "explanation": "Values move from left to right. The hidden layer's sums come first, then its activations, and only then can the output neuron use them.",
+          "difficulty": 1,
+          "hint": "What does the output neuron need before it can start?",
+          "items": [
+            {
+              "id": "a",
+              "text": "Feed the input values into the input layer"
+            },
+            {
+              "id": "b",
+              "text": "Compute each hidden neuron's weighted sum"
+            },
+            {
+              "id": "c",
+              "text": "Apply the activation function to each hidden sum"
+            },
+            {
+              "id": "d",
+              "text": "Compute the output neuron's weighted sum from the hidden outputs"
+            }
+          ]
+        }
+      },
+      {
+        "id": "seg_check_hidden",
+        "type": "checkpoint",
+        "title": "What the output neuron sees",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_output_weights",
+          "form": "multiple_choice",
+          "concept_id": "@concept:forward",
+          "objective_id": "@objective:forward.layers",
+          "stem": "A network has 3 inputs, a hidden layer of 4 neurons, and 1 output neuron. Every neuron is connected to every neuron in the layer before it. How many weights does the output neuron have, not counting its bias?",
+          "explanation": "Each neuron has one weight for each value it receives. The output neuron receives the four outputs of the hidden layer, so it has four weights, and one bias.",
+          "difficulty": 2,
+          "hint": "Which values does the output neuron actually receive?",
+          "is_transfer": true,
+          "options": [
+            {
+              "id": "a",
+              "text": "4",
+              "feedback": "Yes. The output neuron's inputs are the four hidden outputs, with one weight for each."
+            },
+            {
+              "id": "b",
+              "text": "3",
+              "feedback": "Three is the number of network inputs, but the output neuron never sees those directly. Its inputs are the hidden neurons' outputs.",
+              "misconception": "definition_confusion"
+            },
+            {
+              "id": "c",
+              "text": "12",
+              "feedback": "Twelve is the number of weights in the hidden layer: four neurons with three inputs each. The question asks about the output neuron only.",
+              "misconception": "misread_question"
+            },
+            {
+              "id": "d",
+              "text": "7",
+              "feedback": "Adding the layer sizes counts neurons, not the connections into the output neuron."
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_recap",
+        "type": "summary",
+        "title": "In short",
+        "estimated_seconds": 26,
+        "narration": [
+          {
+            "text": "A network is neurons arranged in layers, each layer feeding the next.",
+            "show": "Layers feed forward."
+          },
+          {
+            "text": "A hidden layer sits between input and output. We never read its values directly.",
+            "show": "A hidden layer is the network's own working."
+          },
+          {
+            "text": "Forward propagation computes the output layer by layer: weighted sum, activation, and on to the next layer.",
+            "show": "Sum, activate, pass on."
+          },
+          {
+            "text": "Next: how to tell whether that output is any good."
+          }
+        ]
+      }
+    ],
+    "practice": [
+      {
+        "id": "q_trace_one_hidden",
+        "form": "numeric",
+        "concept_id": "@concept:forward",
+        "objective_id": "@objective:forward.trace",
+        "stem": "A network has one input $x = 2$, one hidden neuron $h = \\mathrm{ReLU}(3x - 10)$, and the output $y = 5h + 1$. What is $y$?",
+        "explanation": "$3 \\times 2 - 10 = -4$, and ReLU turns that into $h = 0$. Then $y = 5 \\times 0 + 1 = 1$.",
+        "difficulty": 2,
+        "hint": "Work out the hidden neuron first, including its ReLU.",
+        "is_transfer": true,
+        "expected": 1,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_why_hidden",
+        "form": "multiple_choice",
+        "concept_id": "@concept:forward",
+        "objective_id": "@objective:forward.layers",
+        "stem": "Why is a hidden layer called hidden?",
+        "explanation": "A hidden layer lies between the input layer and the output layer. We choose the inputs and read the output; the hidden values are computed along the way.",
+        "difficulty": 1,
+        "options": [
+          {
+            "id": "a",
+            "text": "Its values are neither the inputs we supply nor the output we read",
+            "feedback": "Yes. They are the network's intermediate working."
+          },
+          {
+            "id": "b",
+            "text": "Its weights are secret and cannot be changed",
+            "feedback": "Its weights are ordinary weights, and training changes them like any others.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "id": "c",
+            "text": "It does no computation",
+            "feedback": "It does the same computation as any layer: weighted sums, then an activation.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "id": "d",
+            "text": "It is switched off once training is over",
+            "feedback": "It is used every time the network makes a prediction."
+          }
+        ],
+        "correct_option": "a"
+      },
+      {
+        "id": "q_same_layer",
+        "form": "true_false",
+        "concept_id": "@concept:forward",
+        "objective_id": "@objective:forward.layers",
+        "stem": "True or false: in forward propagation, a hidden neuron needs the outputs of the other neurons in its own layer.",
+        "explanation": "A neuron's inputs come from the layer before it. Neurons in the same layer do not feed each other.",
+        "difficulty": 1,
+        "hint": "Where do the lines into a hidden neuron come from?",
+        "correct": false
+      },
+      {
+        "id": "q_hidden_weights",
+        "form": "numeric",
+        "concept_id": "@concept:forward",
+        "objective_id": "@objective:forward.layers",
+        "stem": "A network has 2 inputs and a hidden layer of 3 neurons, each connected to both inputs. How many weights does the hidden layer have in total, not counting biases?",
+        "explanation": "Each of the three hidden neurons has one weight for each of the two inputs: $3 \\times 2 = 6$.",
+        "difficulty": 2,
+        "hint": "How many lines run from the inputs to the hidden layer?",
+        "expected": 6,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_explain_forward",
+        "form": "explanation",
+        "concept_id": "@concept:forward",
+        "objective_id": "@objective:forward.trace",
+        "stem": "In your own words: what does forward propagation do?",
+        "explanation": "It is the ordinary neuron computation, repeated layer after layer.",
+        "difficulty": 2,
+        "rubric": [
+          {
+            "id": "order",
+            "text": "It computes the network's output one layer at a time, from the inputs towards the output"
+          },
+          {
+            "id": "reuse",
+            "text": "Each layer's outputs become the next layer's inputs"
+          }
+        ],
+        "required_points": 1,
+        "sample_answer": "Forward propagation feeds the inputs into the first layer, computes each neuron's weighted sum and activation, and passes those outputs on as the inputs of the next layer, until the output layer gives the network's answer."
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scn_forward_pass",
+      "purpose": "Show values moving through a small network, layer by layer.",
+      "file": "forward_pass.py"
+    }
+  ]
+}

@@ -3,7 +3,7 @@
  * Covers PLAN.md §10.2 (the required early spike) and the M4 acceptance items
  * that concern the player frame.
  */
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { desktopDir, expect, repoRoot, test } from './support/app';
@@ -213,50 +213,82 @@ test.describe('scene player frame', () => {
   });
 });
 
-test.describe('scene-authoring skill examples', () => {
-  const examplesDir = path.join(repoRoot, 'skills', 'wanim-scene-authoring', 'examples');
-  const examples = readdirSync(examplesDir).filter((file) => file.endsWith('.py'));
+/** The scene files that ship with the app as part of the sample course. */
+const sampleScenesDir = path.join(
+  repoRoot,
+  'services',
+  'core',
+  'adle_core',
+  'sample_course',
+  'scenes',
+);
 
-  test('there are examples to run', () => {
-    expect(examples.length).toBeGreaterThanOrEqual(3);
-  });
+const sceneSets = [
+  {
+    name: 'scene-authoring skill examples',
+    directory: path.join(repoRoot, 'skills', 'wanim-scene-authoring', 'examples'),
+    prefix: 'ex',
+    atLeast: 3,
+  },
+  // What a learner actually sees in the sample course. A lesson's animation is paced to
+  // its narration, so these run longer than the examples.
+  { name: 'sample course scenes', directory: sampleScenesDir, prefix: 'sc', atLeast: 11 },
+] as const;
 
-  for (const file of examples) {
-    for (const theme of ['light', 'dark'] as const) {
-      test(`${file} runs to completion in the ${theme} theme`, async ({ adle }) => {
-        const player = await mountRawPlayer(
-          adle.page,
-          `ex${theme}${file.replace(/[^a-z0-9]/g, '').slice(0, 12)}`,
-        );
-        await player.waitFor(`m.type === 'ready'`);
-        await player.load(exampleScene(file), { theme });
+for (const set of sceneSets) {
+  test.describe(set.name, () => {
+    const examples = readdirSync(set.directory).filter((file) => file.endsWith('.py'));
 
-        const settled = await player.waitFor(
-          `m.type === 'error' || m.type === 'finished' || (m.type === 'state' && m.state.interactive)`,
-        );
-        expect(settled?.type, JSON.stringify(settled)).not.toBe('error');
-        expect(settled).not.toBeNull();
+    test('there are scenes to run', () => {
+      expect(examples.length).toBeGreaterThanOrEqual(set.atLeast);
+    });
 
-        // An interactive scene with a second page continues into its animation.
-        if (settled?.type === 'state') {
-          const state = settled.state as { canNext: boolean };
-          if (state.canNext) {
-            await player.send({ type: 'next', runId: 'run' });
-            const finished = await player.waitFor(
-              `m.type === 'error' || m.type === 'finished'`,
-              20_000,
-            );
-            expect(finished?.type, JSON.stringify(finished)).toBe('finished');
+    for (const file of examples) {
+      for (const theme of ['light', 'dark'] as const) {
+        test(`${file} runs to completion in the ${theme} theme`, async ({ adle }) => {
+          test.setTimeout(90_000);
+          const player = await mountRawPlayer(
+            adle.page,
+            `${set.prefix}${theme}${file.replace(/[^a-z0-9]/g, '').slice(0, 12)}`,
+          );
+          await player.waitFor(`m.type === 'ready'`);
+          await player.load(readFileSync(path.join(set.directory, file), 'utf8'), { theme });
+
+          const settled = await player.waitFor(
+            `m.type === 'error' || m.type === 'finished' || (m.type === 'state' && m.state.interactive)`,
+            60_000,
+          );
+          expect(settled?.type, JSON.stringify(settled)).not.toBe('error');
+          expect(settled).not.toBeNull();
+
+          // An interactive scene with a second page continues into its animation.
+          if (settled?.type === 'state') {
+            const state = settled.state as { canNext: boolean };
+            if (state.canNext) {
+              await player.send({ type: 'next', runId: 'run' });
+              const finished = await player.waitFor(
+                `m.type === 'error' || m.type === 'finished'`,
+                20_000,
+              );
+              expect(finished?.type, JSON.stringify(finished)).toBe('finished');
+            }
           }
-        }
-        expect((await player.messages()).filter((message) => message.type === 'error')).toEqual([]);
-        await adle.page.screenshot({
-          path: path.join(desktopDir, 'test-results', 'screens', `scene-${theme}-${file}.png`),
+          expect((await player.messages()).filter((message) => message.type === 'error')).toEqual(
+            [],
+          );
+          await adle.page.screenshot({
+            path: path.join(
+              desktopDir,
+              'test-results',
+              'screens',
+              `scene-${set.prefix}-${theme}-${file}.png`,
+            ),
+          });
         });
-      });
+      }
     }
-  }
-});
+  });
+}
 
 test.describe('scene player in the app (Settings → About & diagnostics)', () => {
   test('the runtime check renders and its mirrored slider drives the scene by keyboard', async ({

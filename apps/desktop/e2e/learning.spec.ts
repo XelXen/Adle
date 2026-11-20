@@ -326,19 +326,24 @@ test.describe('learning', () => {
     // A question explains nothing, so there is nothing to report on it.
     await expect(page.getByRole('button', { name: 'This did not help' })).toHaveCount(0);
 
-    // ---- Back in the course, the suggestion has changed, and says why ----
+    // ---- Back in the course, the suggestion has changed ----
     await page.getByRole('button', { name: 'Back to the course' }).click();
-    const another = suggestion(page, `Try another explanation of "${CONCEPT}"`);
-    await expect(another).toContainText(
-      `Why: You said an explanation of "${CONCEPT}" did not help.`,
+    // Something that can be done without a key comes first, and it is not the lesson that
+    // did not help: a concept that needs nothing before it.
+    await expect(suggestion(page, 'Start "Derivatives and the chain rule"')).toContainText(
+      'It needs nothing first.',
     );
-    await expect(another).toContainText('It is also fine to stop here for today.');
+    // Another explanation is offered beside it, with the reason, and with what it needs.
+    const instead = page.getByRole('region', { name: 'Or instead' });
+    const another = instead
+      .getByRole('listitem')
+      .filter({ hasText: `Try another explanation of "${CONCEPT}"` });
+    await expect(another).toContainText(`You said an explanation of "${CONCEPT}" did not help.`);
     await expect(another).toContainText(
       'Writing a lesson needs the AI provider, and no key is set up yet.',
     );
-    // The lesson is still there to continue, but it is no longer what is suggested.
-    const instead = page.getByRole('region', { name: 'Or instead' });
-    await expect(instead).toContainText(`Continue "${LESSON}"`);
+    // The lesson is still there to continue, as the last thing offered.
+    await expect(instead.getByRole('listitem').last()).toContainText(`Continue "${LESSON}"`);
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'learn-another-explanation');
 

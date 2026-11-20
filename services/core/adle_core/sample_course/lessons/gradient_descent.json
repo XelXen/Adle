@@ -1,0 +1,298 @@
+{
+  "lesson": {
+    "schema_version": "1.0",
+    "lesson_id": "@lesson",
+    "course_id": "@course",
+    "title": "Gradient descent: improving step by step",
+    "concept_ids": [
+      "@concept:gradient_descent"
+    ],
+    "objectives": [
+      {
+        "objective_id": "@objective:gradient_descent.step",
+        "statement": "Carry out one gradient descent update for a weight."
+      },
+      {
+        "objective_id": "@objective:gradient_descent.rate",
+        "statement": "Predict what happens when the learning rate is too small or too large."
+      }
+    ],
+    "source_refs": [],
+    "grounding": "sample",
+    "strategy": "visual",
+    "estimated_minutes": 6,
+    "segments": [
+      {
+        "id": "seg_hill",
+        "type": "explanation",
+        "title": "Downhill in the fog",
+        "estimated_seconds": 35,
+        "narration": [
+          {
+            "text": "Imagine standing on a hillside in thick fog. You want to reach the bottom of the valley, but you can only feel the ground under your feet."
+          },
+          {
+            "text": "A sensible plan: feel which way the ground slopes, take a step downhill, and repeat."
+          },
+          {
+            "text": "Gradient descent trains a network the same way. The height is the loss. The position is a weight. The slope under your feet is the derivative of the loss with respect to that weight.",
+            "show": "Height: the loss. Position: a weight. Slope: the derivative."
+          }
+        ]
+      },
+      {
+        "id": "seg_descent",
+        "type": "visualization",
+        "title": "Steps down a curve",
+        "estimated_seconds": 38,
+        "narration": [
+          {
+            "text": "Here the loss is drawn against one weight. The lowest point of the curve is where we want the weight to be."
+          },
+          {
+            "text": "Start on the left. The curve slopes downward to the right here, so the derivative is negative. Stepping against the derivative moves the weight to the right, downhill."
+          },
+          {
+            "text": "Each step is the learning rate times the derivative. As the curve flattens near the bottom, the derivative shrinks, and so do the steps.",
+            "show": "$w \\leftarrow w - \\text{rate} \\times \\dfrac{dL}{dw}$"
+          }
+        ],
+        "scene": {
+          "scene_id": "scn_descent",
+          "fallback_text": "A U-shaped curve shows the loss $L = (w - 2)^2$ against the weight $w$, with its lowest point at $w = 2$. A dot starts high on the left at $w = -1$ and moves down the curve in a series of steps towards the bottom. The steps get shorter as the curve flattens: the dot goes to about $0.2$, then $0.9$, then $1.4$, then $1.6$, closing in on $2$."
+        }
+      },
+      {
+        "id": "seg_worked",
+        "type": "worked_example",
+        "title": "One update by hand",
+        "estimated_seconds": 52,
+        "narration": [
+          {
+            "text": "First, the derivative where we are standing. Minus one minus two is minus three, and two times that is minus six.",
+            "show": "$\\dfrac{dL}{dw} = 2 \\times (-1 - 2) = -6$"
+          },
+          {
+            "text": "It is negative, so the loss falls as the weight rises. We should move the weight up."
+          },
+          {
+            "text": "The step is the learning rate times the derivative. A quarter of minus six is minus one and a half.",
+            "show": "$0.25 \\times (-6) = -1.5$"
+          },
+          {
+            "text": "Subtract that step from the weight. Minus one, minus minus one and a half, is one half. The weight has moved towards two, and the loss has dropped from nine to two and a quarter.",
+            "show": "$w = -1 - (-1.5) = 0.5$"
+          }
+        ],
+        "problem": "The loss is $L = (w - 2)^2$, so its derivative is $\\dfrac{dL}{dw} = 2(w - 2)$. The weight is $w = -1$ and the learning rate is $0.25$. Find the new weight."
+      },
+      {
+        "id": "seg_check_step",
+        "type": "checkpoint",
+        "title": "Your turn to step",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_update",
+          "form": "numeric",
+          "concept_id": "@concept:gradient_descent",
+          "objective_id": "@objective:gradient_descent.step",
+          "stem": "With the same loss, $\\dfrac{dL}{dw} = 2(w - 2)$, the weight is now $w = 4$ and the learning rate is $0.25$. What is the weight after one update?",
+          "explanation": "The derivative is $2 \\times (4 - 2) = 4$. The step is $0.25 \\times 4 = 1$. Subtracting it gives $w = 4 - 1 = 3$: the weight moves left, towards $2$.",
+          "difficulty": 2,
+          "hint": "Work out the derivative at $w = 4$, multiply it by the learning rate, and subtract the result from $w$.",
+          "expected": 3,
+          "tolerance": 0.001
+        }
+      },
+      {
+        "id": "seg_rate",
+        "type": "interaction",
+        "title": "How big a step?",
+        "estimated_seconds": 67,
+        "narration": [
+          {
+            "text": "The learning rate decides how big each step is. Try it. The grey dot is where we start, and the coloured dot shows where one step lands."
+          },
+          {
+            "text": "A tiny rate barely moves. A rate that is too large jumps right over the bottom, and can land higher up the other side than where it started."
+          }
+        ],
+        "prompt": "Slide the learning rate from small to large. Find the rate that lands exactly at the bottom, then go past it. What happens to the landing point?",
+        "scene": {
+          "scene_id": "scn_learning_rate",
+          "fallback_text": "The same U-shaped loss curve, $L = (w - 2)^2$, with a fixed starting point at $w = -1$ and a second point showing where one gradient descent step lands. A slider sets the learning rate from $0$ to $1.2$, and a number shows the loss after the step. With a small rate the landing point stays close to the start. At a rate of $0.5$ it lands exactly at the bottom, $w = 2$, where the loss is $0$. Beyond that it overshoots to the other side, and at a rate above $1$ it lands higher than where it started, so the loss gets worse."
+        }
+      },
+      {
+        "id": "seg_check_rate",
+        "type": "checkpoint",
+        "title": "A loss that will not settle",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_bouncing_loss",
+          "form": "multiple_choice",
+          "concept_id": "@concept:gradient_descent",
+          "objective_id": "@objective:gradient_descent.rate",
+          "stem": "While a network is training, its loss jumps up and down wildly from step to step and keeps getting larger. Which change is most likely to help?",
+          "explanation": "A loss that bounces and grows means each step jumps past the bottom and lands higher on the other side. A smaller learning rate shortens the steps so that they stay on the downhill side.",
+          "difficulty": 2,
+          "hint": "Think about the dot that overshot the bottom of the curve. What made it overshoot?",
+          "is_transfer": true,
+          "options": [
+            {
+              "id": "a",
+              "text": "Make the learning rate smaller",
+              "feedback": "Yes. Steps that overshoot the bottom make the loss bounce and grow. Smaller steps stop the overshooting."
+            },
+            {
+              "id": "b",
+              "text": "Make the learning rate larger",
+              "feedback": "Larger steps overshoot even further. A growing, bouncing loss is the sign that the steps are already too big.",
+              "misconception": "causal_confusion"
+            },
+            {
+              "id": "c",
+              "text": "Step in the same direction as the derivative instead of against it",
+              "feedback": "That would walk uphill on purpose. The direction is right; the size of the step is the problem.",
+              "misconception": "definition_confusion"
+            },
+            {
+              "id": "d",
+              "text": "Nothing: this is how training normally looks",
+              "feedback": "A healthy run shows the loss falling overall. A loss that keeps growing means the steps are too large."
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_recap",
+        "type": "summary",
+        "title": "In short",
+        "estimated_seconds": 35,
+        "narration": [
+          {
+            "text": "Gradient descent lowers the loss a step at a time, moving each weight against its derivative.",
+            "show": "$w \\leftarrow w - \\text{rate} \\times \\dfrac{dL}{dw}$"
+          },
+          {
+            "text": "The learning rate sets the size of the steps. Too small, and training crawls. Too large, and it overshoots and can get worse.",
+            "show": "Too small: slow. Too large: overshoots."
+          },
+          {
+            "text": "As the bottom gets close, the slope flattens and the steps shrink on their own.",
+            "show": "Near the bottom, the steps shrink."
+          },
+          {
+            "text": "One question remains. How do we find the derivative for every weight in a deep network? That is the last lesson."
+          }
+        ]
+      }
+    ],
+    "practice": [
+      {
+        "id": "q_which_way",
+        "form": "multiple_choice",
+        "concept_id": "@concept:gradient_descent",
+        "objective_id": "@objective:gradient_descent.step",
+        "stem": "At the current weight, the derivative of the loss is positive. Which way does gradient descent move the weight?",
+        "explanation": "The update subtracts the learning rate times the derivative. With a positive derivative, something positive is subtracted, so the weight decreases.",
+        "difficulty": 1,
+        "options": [
+          {
+            "id": "a",
+            "text": "It decreases the weight",
+            "feedback": "Yes. A positive derivative means the loss rises as the weight rises, so the weight is moved down."
+          },
+          {
+            "id": "b",
+            "text": "It increases the weight",
+            "feedback": "A positive derivative means the loss rises with the weight. Gradient descent moves against the derivative, so the weight goes down.",
+            "misconception": "causal_confusion"
+          },
+          {
+            "id": "c",
+            "text": "It depends on the learning rate",
+            "feedback": "The learning rate sets how far the weight moves, never which way. The direction comes from the sign of the derivative.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "id": "d",
+            "text": "It leaves the weight where it is",
+            "feedback": "The weight stays put only where the derivative is $0$."
+          }
+        ],
+        "correct_option": "a"
+      },
+      {
+        "id": "q_update_negative_slope",
+        "form": "numeric",
+        "concept_id": "@concept:gradient_descent",
+        "objective_id": "@objective:gradient_descent.step",
+        "stem": "A weight is $w = 1$. The derivative of the loss there is $-4$, and the learning rate is $0.5$. What is the weight after one update?",
+        "explanation": "The step is $0.5 \\times (-4) = -2$. Subtracting it gives $w = 1 - (-2) = 3$. The derivative was negative, so the weight moved up.",
+        "difficulty": 2,
+        "hint": "Multiply the learning rate by the derivative, then subtract the result from the weight. Mind the signs.",
+        "expected": 3,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_small_rate",
+        "form": "true_false",
+        "concept_id": "@concept:gradient_descent",
+        "objective_id": "@objective:gradient_descent.rate",
+        "stem": "True or false: with a very small learning rate, gradient descent still moves towards a lower loss, only slowly.",
+        "explanation": "A small rate means short steps, still in the downhill direction. Training takes longer, but it does not go the wrong way.",
+        "difficulty": 1,
+        "hint": "Does the learning rate change the direction of a step, or its length?",
+        "correct": true
+      },
+      {
+        "id": "q_at_the_bottom",
+        "form": "numeric",
+        "concept_id": "@concept:gradient_descent",
+        "objective_id": "@objective:gradient_descent.step",
+        "stem": "The loss is $L = (w - 2)^2$, with derivative $\\dfrac{dL}{dw} = 2(w - 2)$. The weight is exactly $w = 2$ and the learning rate is $0.3$. What is the weight after one update?",
+        "explanation": "At $w = 2$ the derivative is $0$, so the step is $0.3 \\times 0 = 0$. The weight stays at $2$: at the bottom of the curve there is nowhere lower to go.",
+        "difficulty": 2,
+        "hint": "What is the derivative at $w = 2$?",
+        "is_transfer": true,
+        "expected": 2,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_explain_large_rate",
+        "form": "explanation",
+        "concept_id": "@concept:gradient_descent",
+        "objective_id": "@objective:gradient_descent.rate",
+        "stem": "In your own words: what goes wrong when the learning rate is too large?",
+        "explanation": "Steps that are too long overshoot the bottom.",
+        "difficulty": 2,
+        "rubric": [
+          {
+            "id": "overshoot",
+            "text": "The steps jump past the lowest point"
+          },
+          {
+            "id": "worse",
+            "text": "The loss can bounce around, or even grow, instead of falling"
+          }
+        ],
+        "required_points": 1,
+        "sample_answer": "Each step is so long that the weight jumps over the bottom of the loss curve and lands on the far side. If it lands higher than it started, the loss goes up, and the next step overshoots back again, so training bounces or gets steadily worse."
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scn_descent",
+      "purpose": "Show a weight moving down a loss curve in shrinking steps.",
+      "file": "descent_steps.py"
+    },
+    {
+      "id": "scn_learning_rate",
+      "purpose": "Let the learner set the learning rate and see where one step lands.",
+      "file": "learning_rate.py"
+    }
+  ]
+}

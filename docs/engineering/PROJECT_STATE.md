@@ -6,17 +6,10 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Last updated:** 2026-11-19
 - **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
 - **Last commit:** see `git log -1`
-- **Active milestone:** M7 — the rest of the sample course, export and restore, polish
+- **Active milestone:** M7 — saving and restoring data, a session summary, polish (the sample
+  course is complete)
 - **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
   `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
-
-## Work in progress outside the tracked files
-
-M7 has been started. `var/wip/sample-lessons/` (git-ignored, so it is on this computer only)
-holds a small generator and the full text of the seven remaining sample lessons
-(`content_a.py`, `content_b.py`, `content_c.py`). `build.py` there writes them into
-`services/core/adle_core/sample_course/lessons/` and updates the outline's list of lessons.
-Once the lessons and their scenes are in the repository and tested, that folder can go.
 
 ## Milestone status
 
@@ -29,7 +22,7 @@ Once the lessons and their scenes are in the repository and tested, that folder 
 | M4 — Wanim and Lesson IR | **Done** | Player frame, adapter, static scene policy, skill, threat model (ADR-004). Lesson IR 1.0 with a generated JSON Schema; one validating gateway; scenes re-checked on every read; answer keys kept in the core with deterministic scoring; the lesson player; the first lesson of the sample course (ADR-010). The packaged-build check is BLOCKED on M8 packaging. |
 | M5 — Generation, audio, timeline | **Done** (real provider BLOCKED) | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Every path is tested against a fake provider. **The real model has not produced a lesson yet:** the provider failed every request upstream on 2026-11-19, so the prompts are unchecked. |
 | M6 — Assessment and adaptation | **Done** | Hypotheses about mistakes computed from the record (tentative, supported, rejected, resolved), checked with questions that would show them, and dismissible by the learner; slips counted as partly right; repeats counted in full only after a gap; questions kept for practice in the Lesson IR; a next-step policy with a reason for every step; the Learn tab, practice and review, "what next" after a lesson, "This did not help"; teaching strategy chosen or rotated (ADR-014). Not built by decision: model grading of open answers and model-proposed hypotheses. |
-| M7 — Complete UX and sample course | Not started | — |
+| M7 — Complete UX and sample course | **In progress** | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Missing: saving a copy of the data, restoring, and deleting everything in the interface; a session summary; the polish pass. |
 | M8 — Release hardening | Not started | — |
 
 ## What works in the running app
@@ -64,7 +57,12 @@ Once the lessons and their scenes are in the repository and tested, that folder 
   to passages in the materials; say how well you already know a concept and read back the record
   of everything noted about it.
 - **Library → sample course:** "Try the sample course" adds "Introduction to neural networks"
-  (eight concepts with objectives and reasons for every prerequisite) without a key.
+  (eight concepts with objectives and reasons for every prerequisite) without a key. Every
+  concept has a lesson of seven or eight parts: nine animated scenes and two things to try (the
+  input of an activation function; the learning rate of gradient descent), questions in at
+  least two forms with a question that asks to apply the idea somewhere new, and four or five
+  further questions for practice and review. The whole loop can be walked without a key:
+  lesson, evidence, the next concept, a prerequisite to revisit, practice, reviews.
 - **Lessons:** a concept lists its lessons with how long they take and how far the learner has
   got. The lesson player shows parts one at a time with captions at the learner's reading pace,
   a board that fills in, a transcript, scenes that follow the narration (held until Start,
@@ -104,9 +102,7 @@ Once the lessons and their scenes are in the repository and tested, that folder 
   database (with a backup first), and exits with the app.
 
 Not present yet (do not assume): a lesson written by the real model (see "The real provider"),
-lessons for the other seven sample concepts (so on the sample course, after the first lesson,
-the suggestions are practice, reviews, and "create a lesson", which needs a key), a session
-summary, export and restore in the interface, packaging.
+a session summary, saving and restoring the data in the interface, packaging.
 
 Built and tested but not yet reachable from the interface: `restore_database`
 (`infrastructure/migrate.py`). The restore screen arrives with export in M7.
@@ -114,7 +110,7 @@ Built and tested but not yet reachable from the interface: `restore_database`
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the M6 commit.
+`node scripts/check.mjs --e2e` on the tree that became the sample-course commit.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -124,11 +120,11 @@ Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 374 tests, 18 files |
+| Vitest | PASS | 383 tests, 19 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 85 source files |
-| pytest | PASS | 952 tests |
-| Playwright + Electron (E2E) | PASS | 53 tests, none flaky. The run before the database fix of ADR-015 had one flaky test, which is how that bug was found |
+| pytest | PASS | 967 tests |
+| Playwright + Electron (E2E) | PASS | 77 tests in 11 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
 | `npm audit` (all dependencies) | NOT RUN | Last run before KaTeX was added; run again before release |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
 | Packaged build | BLOCKED | No packager chosen yet (M8) |
@@ -191,6 +187,17 @@ investigated, not ignored.
   Lessons now carry up to eight further questions (`Lesson.practice`) for practice and review.
 - On a question that is hard to guess, a slip of sign moves the estimate more than a right
   answer after a hint that gave the method away. That is intended (ADR-014) and tested.
+- **In Wanim 0.1.3 a `Dot` given its position as an argument (`Dot(point, color=...)`) loses
+  its colour and is drawn white**, which is invisible on the light stage. The shipped example
+  had this too. A dot is created with keywords and then placed
+  (`Dot(color=..., radius=...).move_to(point)`); the scene policy refuses the other form
+  (`unreliable_call`) so that a generated scene cannot have it either. Found by looking at the
+  screenshots the E2E suite takes of every scene.
+- Text inside a scene is drawn in `ink` or `muted` only. The accent colours are for shapes:
+  as text on the stage they do not have enough contrast in one theme or the other.
+- The sample lessons are written by hand as JSON. A mistyped formula would fail nowhere (the
+  player shows what it cannot typeset as written), so a unit test typesets every formula of
+  every sample lesson and checks that narration, which is read aloud, contains no notation.
 - An animation-only scene starts blank and is over in a few seconds, while its narration takes
   half a minute. Scenes follow the narration only at segment level today (start, pause, and a
   cue to leave a live page). Finer synchronisation needs Wanim's slides mode
@@ -217,17 +224,13 @@ and `lesson`, read what the model actually writes, and adjust the prompts and th
 
 ## Next actions (M7), in order
 
-1. **The rest of the sample course:** a lesson with scenes, questions tagged with the mistakes
-   their wrong options point at, and practice questions for each of the other seven concepts
-   (`services/core/adle_core/sample_course/`). With them the next-step policy has real
-   choices on the sample course: advance, revisit a prerequisite, review.
-2. **Export, restore, and delete:** a screen for backup and restore (`restore_database` is
-   built and tested), an export of the learner's data, and deleting everything.
-3. **Session summary** (PLAN.md 3.1 step 10): what was demonstrated, what needs more evidence,
+1. **Save a copy, restore, and delete everything** in Settings → Privacy & data
+   (`restore_database` is built and tested; the Electron side is started in the working tree).
+2. **Session summary** (PLAN.md 3.1 step 10): what was demonstrated, what needs more evidence,
    what is planned for review. `learner_events` and attempts hold what it needs.
-4. **Polish:** onboarding, empty and error states, keyboard and screen-reader pass, visual
+3. **Polish:** onboarding, empty and error states, keyboard and screen-reader pass, visual
    baselines; try Wanim's slides mode for finer narration and animation timing.
-5. **Retry the real provider** (see above) and adjust the prompts, including the request for
+4. **Retry the real provider** (see above) and adjust the prompts, including the request for
    practice questions and for a way of teaching.
 
 Then M8 (packaging, hardening, performance report, release checklist).
@@ -239,11 +242,9 @@ Then M8 (packaging, hardening, performance report, release checklist).
 | The main process does not handle a renderer crash (`render-process-gone`); the learner would see an empty window | M8 (start-up and shutdown failure matrix) |
 | The parser worker has no OS-level sandbox | M8, with packaging (SECURITY.md) |
 | Restore and export exist in code or are planned but have no screen | M7 |
-| Only one of the eight sample concepts has a lesson | M7 |
 | Narration and animation are synchronised per segment, not per sentence | M7, after testing Wanim's slides mode |
 | Working memory from the plan is not a stored thing: what a session needs is rebuilt from attempts, observations, and `learner_events` on every request | By decision (ADR-014) |
 | Open answers are self-assessed against a rubric, not graded by the model | By decision (ADR-014); revisit if the provider's allowance grows |
-| The next-step policy has few choices on the sample course until its other lessons exist | M7 |
 | Extraction quality on complex PDFs (columns, tables, equations) is whatever `pypdf` gives | When retrieval quality is evaluated |
 
 ## Open questions for the owner

@@ -23,6 +23,9 @@ from adle_core.infrastructure.orm import Course, StoredLesson, StoredScene
 from adle_core.lessons.bundle import LessonInvalidError, parse_bundle
 from adle_core.lessons.player import PlayerLesson
 
+#: One lesson for each concept of the sample course.
+SAMPLE_LESSONS = 8
+
 
 def install(client: TestClient) -> dict[str, Any]:
     response = client.post("/v1/courses/sample")
@@ -279,7 +282,9 @@ def test_a_lesson_must_belong_to_its_course_in_every_reference(
     assert services.lessons.store(parse_bundle(data), origin="generated").origin == "generated"
     with pytest.raises(Exception, match="already exists"):
         services.lessons.store(parse_bundle(data), origin="generated")
-    assert len(client.get(f"/v1/courses/{course['id']}/lessons").json()["lessons"]) == 2
+    lessons = client.get(f"/v1/courses/{course['id']}/lessons").json()["lessons"]
+    assert len(lessons) == SAMPLE_LESSONS + 1
+    assert [item["origin"] for item in lessons].count("generated") == 1
 
 
 def test_a_lesson_written_for_another_version_is_reported_not_half_played(
@@ -297,9 +302,12 @@ def test_a_lesson_written_for_another_version_is_reported_not_half_played(
     assert response.json()["error"]["code"] == "lesson_outdated"
     assert "different version" in response.json()["error"]["message"]
     # It can still be listed and removed.
-    assert len(client.get(f"/v1/courses/{course['id']}/lessons").json()["lessons"]) == 1
+    listed = client.get(f"/v1/courses/{course['id']}/lessons").json()["lessons"]
+    assert lesson_id in [item["id"] for item in listed]
     assert client.delete(f"/v1/lessons/{lesson_id}").status_code == 204
-    assert client.get(f"/v1/courses/{course['id']}/lessons").json() == {"lessons": []}
+    remaining = client.get(f"/v1/courses/{course['id']}/lessons").json()["lessons"]
+    assert lesson_id not in [item["id"] for item in remaining]
+    assert len(remaining) == SAMPLE_LESSONS - 1
 
 
 def _stored_scene(services: Services, lesson_id: str, scene_id: str) -> dict[str, Any]:
@@ -388,12 +396,25 @@ def test_deleting_a_course_or_a_concept_removes_its_lessons(
     loaded = first_lesson(client, course["id"])
     client.put(f"/v1/lessons/{loaded['lesson']['lesson_id']}/progress", json={"position": 1})
 
-    assert client.delete(f"/v1/concepts/{loaded['lesson']['concept_ids'][0]}").status_code == 200
-    with services.database.session() as session:
-        assert session.scalar(select(func.count(StoredLesson.id))) == 0
-        assert session.scalar(select(func.count(StoredScene.scene_id))) == 0
+    concept_id = loaded["lesson"]["concept_ids"][0]
+    lesson_id = loaded["lesson"]["lesson_id"]
+    assert client.delete(f"/v1/concepts/{concept_id}").status_code == 200
+    with services.database.read() as session:
+        # The concept's lesson and its scenes go with it; the other lessons stay.
+        assert session.get(StoredLesson, lesson_id) is None
+        assert (
+            session.scalar(
+                select(func.count(StoredScene.scene_id)).where(StoredScene.lesson_id == lesson_id)
+            )
+            == 0
+        )
+        assert session.scalar(select(func.count(StoredLesson.id))) == SAMPLE_LESSONS - 1
 
     assert client.delete(f"/v1/courses/{course['id']}").status_code == 204
+    with services.database.read() as session:
+        assert session.scalar(select(func.count(StoredLesson.id))) == 0
+        assert session.scalar(select(func.count(StoredScene.scene_id))) == 0
     again = install(client)
     assert again["id"] != course["id"]
-    assert len(client.get(f"/v1/courses/{again['id']}/lessons").json()["lessons"]) == 1
+    lessons = client.get(f"/v1/courses/{again['id']}/lessons").json()["lessons"]
+    assert len(lessons) == SAMPLE_LESSONS

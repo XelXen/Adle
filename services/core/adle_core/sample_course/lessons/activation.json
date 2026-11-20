@@ -1,0 +1,347 @@
+{
+  "lesson": {
+    "schema_version": "1.0",
+    "lesson_id": "@lesson",
+    "course_id": "@course",
+    "title": "Activation functions: what a neuron does with its sum",
+    "concept_ids": [
+      "@concept:activation"
+    ],
+    "objectives": [
+      {
+        "objective_id": "@objective:activation.apply",
+        "statement": "Apply a step, sigmoid, or ReLU function to a given value."
+      },
+      {
+        "objective_id": "@objective:activation.purpose",
+        "statement": "Explain why a network without activation functions can only draw straight lines."
+      },
+      {
+        "objective_id": "@objective:activation.compare",
+        "statement": "Describe how sigmoid and ReLU differ for large negative and large positive inputs."
+      }
+    ],
+    "source_refs": [],
+    "grounding": "sample",
+    "strategy": "visual",
+    "estimated_minutes": 6,
+    "segments": [
+      {
+        "id": "seg_why",
+        "type": "explanation",
+        "title": "A sum is not yet an answer",
+        "estimated_seconds": 29,
+        "narration": [
+          {
+            "text": "In the last lesson a neuron added up its weighted inputs and got a number, z. That number can be anything: large, tiny, or negative."
+          },
+          {
+            "text": "Before passing it on, the neuron puts z through one more step, called the activation function. It decides how strongly the neuron responds.",
+            "show": "Output $a = f(z)$"
+          },
+          {
+            "text": "Different functions respond in different ways. We will meet three of them.",
+            "show": "Step, sigmoid, ReLU"
+          }
+        ]
+      },
+      {
+        "id": "seg_step_relu",
+        "type": "visualization",
+        "title": "A switch and a ramp",
+        "estimated_seconds": 31,
+        "narration": [
+          {
+            "text": "The simplest is the step function. Below zero it gives zero. At zero or above it gives one. The neuron is either off or on.",
+            "show": "Step: $0$ if $z < 0$, otherwise $1$"
+          },
+          {
+            "text": "The second is called ReLU. Below zero it also gives zero. Above zero it simply passes z through unchanged.",
+            "show": "ReLU: $\\max(0, z)$"
+          },
+          {
+            "text": "So ReLU of minus three is zero, and ReLU of two is two."
+          }
+        ],
+        "scene": {
+          "scene_id": "scn_step_relu",
+          "fallback_text": "Two graphs side by side. On the left the step function: a flat line at $0$ for negative $z$ that jumps to a flat line at $1$ from $z = 0$ onwards. On the right ReLU: flat at $0$ for negative $z$, then a straight line rising with slope $1$, so that $\\mathrm{ReLU}(2) = 2$."
+        }
+      },
+      {
+        "id": "seg_check_apply",
+        "type": "checkpoint",
+        "title": "ReLU by hand",
+        "estimated_seconds": 30,
+        "question": {
+          "id": "q_relu_value",
+          "form": "numeric",
+          "concept_id": "@concept:activation",
+          "objective_id": "@objective:activation.apply",
+          "stem": "A neuron's weighted sum is $z = 2.5$, and it uses ReLU. What is its output?",
+          "explanation": "ReLU is $\\max(0, z)$. Since $2.5$ is positive, it passes through unchanged.",
+          "difficulty": 1,
+          "hint": "Is $z$ above or below zero? What does ReLU do in that case?",
+          "expected": 2.5,
+          "tolerance": 0.001
+        }
+      },
+      {
+        "id": "seg_sigmoid",
+        "type": "interaction",
+        "title": "A smooth version of the switch",
+        "estimated_seconds": 67,
+        "narration": [
+          {
+            "text": "The third function is the sigmoid. It is a smooth version of the step. Slide z and watch the output."
+          },
+          {
+            "text": "For large negative inputs the output is close to zero. For large positive inputs it is close to one. In between it rises smoothly, and at z equals zero it is exactly one half.",
+            "show": "$\\sigma(0) = 0.5$"
+          }
+        ],
+        "prompt": "Slide $z$ from far left to far right. Where does the output change fastest, and where does it hardly change at all?",
+        "scene": {
+          "scene_id": "scn_sigmoid",
+          "fallback_text": "A graph of the sigmoid function $\\sigma(z) = \\dfrac{1}{1 + e^{-z}}$ for $z$ from $-6$ to $6$: an S-shaped curve that is close to $0$ on the far left, passes through $0.5$ at $z = 0$, and is close to $1$ on the far right. A slider moves a point along the curve, and a number shows the output."
+        }
+      },
+      {
+        "id": "seg_check_compare",
+        "type": "checkpoint",
+        "title": "At the far left",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_far_left",
+          "form": "multiple_choice",
+          "concept_id": "@concept:activation",
+          "objective_id": "@objective:activation.compare",
+          "stem": "For a very large negative input, such as $z = -100$, what do sigmoid and ReLU give?",
+          "explanation": "Sigmoid squeezes every input into the range from $0$ to $1$ and approaches $0$ for large negative inputs. ReLU is $\\max(0, z)$, which is $0$ whenever $z$ is negative. The two differ for large positive inputs: sigmoid levels off at $1$, while ReLU keeps growing.",
+          "difficulty": 2,
+          "hint": "Look at the left end of each graph.",
+          "options": [
+            {
+              "id": "a",
+              "text": "Both give $0$, or very close to it",
+              "feedback": "Yes. Sigmoid flattens out towards $0$, and ReLU is exactly $0$ for every negative input."
+            },
+            {
+              "id": "b",
+              "text": "Sigmoid gives about $-1$ and ReLU gives $-100$",
+              "feedback": "Neither function ever gives a negative output. Sigmoid stays between $0$ and $1$, and ReLU replaces negatives with $0$.",
+              "misconception": "definition_confusion"
+            },
+            {
+              "id": "c",
+              "text": "Sigmoid gives about $0$ and ReLU gives $-100$",
+              "feedback": "ReLU passes positive inputs through unchanged, but it replaces every negative input with $0$.",
+              "misconception": "overgeneralization"
+            },
+            {
+              "id": "d",
+              "text": "Both give $1$",
+              "feedback": "That is what happens at the other end, for large positive inputs, and only for sigmoid.",
+              "misconception": "misread_question"
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_purpose",
+        "type": "explanation",
+        "title": "Why not just pass the sum along?",
+        "estimated_seconds": 38,
+        "narration": [
+          {
+            "text": "You might wonder why a neuron needs any of this. Why not pass the weighted sum straight on?"
+          },
+          {
+            "text": "Here is the trouble. A weighted sum of weighted sums is still just a weighted sum. Stack as many such layers as you like, and the whole network can do no more than a single layer could.",
+            "show": "Sums of sums are still sums."
+          },
+          {
+            "text": "A network like that can only draw straight lines through its data. An activation function that bends, like ReLU or sigmoid, is what lets a network fit curves.",
+            "show": "A bend in each neuron lets the network fit curves."
+          }
+        ]
+      },
+      {
+        "id": "seg_check_purpose",
+        "type": "checkpoint",
+        "title": "Ten layers, no bends",
+        "estimated_seconds": 45,
+        "question": {
+          "id": "q_no_activation",
+          "form": "multiple_choice",
+          "concept_id": "@concept:activation",
+          "objective_id": "@objective:activation.purpose",
+          "stem": "Someone builds a network with ten layers but forgets the activation functions, so every neuron passes its weighted sum straight on. What can this network learn?",
+          "explanation": "Each layer computes weighted sums of the layer before. Without an activation function, the output of the whole network is a weighted sum of its inputs, the same kind of thing one layer computes. Depth adds nothing until something that bends sits between the layers.",
+          "difficulty": 2,
+          "hint": "Think about what you get when you take a weighted sum of weighted sums.",
+          "is_transfer": true,
+          "options": [
+            {
+              "id": "a",
+              "text": "Only what a single layer could: straight-line relationships",
+              "feedback": "Yes. Without a bend anywhere, ten layers collapse into one weighted sum."
+            },
+            {
+              "id": "b",
+              "text": "Ten times more than a one-layer network",
+              "feedback": "More layers only help when each one bends its output. Without activation functions the layers collapse into one.",
+              "misconception": "overgeneralization"
+            },
+            {
+              "id": "c",
+              "text": "Curves, but only gentle ones",
+              "feedback": "A weighted sum of weighted sums has no bend at all, so not even a gentle curve.",
+              "misconception": "causal_confusion"
+            },
+            {
+              "id": "d",
+              "text": "Nothing at all: it cannot run",
+              "feedback": "It runs, and it can learn straight-line relationships. It just cannot learn anything more."
+            }
+          ],
+          "correct_option": "a"
+        }
+      },
+      {
+        "id": "seg_recap",
+        "type": "summary",
+        "title": "In short",
+        "estimated_seconds": 29,
+        "narration": [
+          {
+            "text": "An activation function turns a neuron's weighted sum into its output.",
+            "show": "$a = f(z)$"
+          },
+          {
+            "text": "Step switches between zero and one. Sigmoid does the same smoothly. ReLU gives zero for negative inputs and passes positive ones through.",
+            "show": "Step and sigmoid end at $1$; ReLU keeps growing."
+          },
+          {
+            "text": "Without a function that bends, a deep network is no more capable than a single layer.",
+            "show": "No bend, no curves."
+          },
+          {
+            "text": "Next, we use the step function to make a neuron that decides."
+          }
+        ]
+      }
+    ],
+    "practice": [
+      {
+        "id": "q_step_same",
+        "form": "true_false",
+        "concept_id": "@concept:activation",
+        "objective_id": "@objective:activation.apply",
+        "stem": "True or false: the step function gives the same output for $z = 0.1$ and for $z = 50$.",
+        "explanation": "The step function only asks whether $z$ is below zero. Both inputs are above it, so both give $1$.",
+        "difficulty": 1,
+        "hint": "What is the only thing the step function looks at?",
+        "correct": true
+      },
+      {
+        "id": "q_relu_of_sum",
+        "form": "numeric",
+        "concept_id": "@concept:activation",
+        "objective_id": "@objective:activation.apply",
+        "stem": "A neuron uses ReLU. Its weighted sum is $z = 3 \\times 2 + (-1) \\times 8 + 1$. What is its output?",
+        "explanation": "$z = 6 - 8 + 1 = -1$. ReLU replaces a negative input with $0$, so the output is $0$.",
+        "difficulty": 2,
+        "hint": "Work out $z$ first. Then ask whether it is negative.",
+        "is_transfer": true,
+        "expected": 0,
+        "tolerance": 0.001
+      },
+      {
+        "id": "q_which_exceeds_one",
+        "form": "short_answer",
+        "concept_id": "@concept:activation",
+        "objective_id": "@objective:activation.compare",
+        "stem": "Which of the three functions in this lesson can give an output larger than $1$? Answer with its name.",
+        "explanation": "Step and sigmoid never go above $1$. ReLU passes positive inputs through unchanged, so $\\mathrm{ReLU}(5) = 5$.",
+        "difficulty": 1,
+        "hint": "Which graph keeps rising as $z$ grows?",
+        "accepted": [
+          "ReLU",
+          "the ReLU function",
+          "ReLU function",
+          "rectified linear unit"
+        ]
+      },
+      {
+        "id": "q_sigmoid_true",
+        "form": "multiple_choice",
+        "concept_id": "@concept:activation",
+        "objective_id": "@objective:activation.compare",
+        "stem": "Which statement about the sigmoid function is true?",
+        "explanation": "Sigmoid is a smooth S-shaped curve that approaches $0$ on the left and $1$ on the right without ever reaching either.",
+        "difficulty": 1,
+        "options": [
+          {
+            "id": "a",
+            "text": "Its output is always between $0$ and $1$",
+            "feedback": "Yes. However large or small the input, sigmoid stays inside that range."
+          },
+          {
+            "id": "b",
+            "text": "Its output is exactly $0$ for every negative input",
+            "feedback": "That describes ReLU and the step function. Sigmoid is small but not zero for negative inputs: at $z = -1$ it is about $0.27$.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "id": "c",
+            "text": "Its output keeps growing as the input grows",
+            "feedback": "That describes ReLU. Sigmoid levels off as it approaches $1$.",
+            "misconception": "definition_confusion"
+          },
+          {
+            "id": "d",
+            "text": "Its output jumps straight from $0$ to $1$ at $z = 0$",
+            "feedback": "That describes the step function. Sigmoid rises smoothly and is $0.5$ at $z = 0$.",
+            "misconception": "definition_confusion"
+          }
+        ],
+        "correct_option": "a"
+      },
+      {
+        "id": "q_why_bend",
+        "form": "explanation",
+        "concept_id": "@concept:activation",
+        "objective_id": "@objective:activation.purpose",
+        "stem": "In your own words: why does a network need activation functions that are not straight lines?",
+        "explanation": "Depth only helps when something non-linear sits between the layers.",
+        "difficulty": 2,
+        "rubric": [
+          {
+            "id": "collapse",
+            "text": "Without them, many layers do no more than one layer could: sums of sums are still sums"
+          },
+          {
+            "id": "curves",
+            "text": "A function that bends lets the network fit relationships that are not straight lines"
+          }
+        ],
+        "required_points": 1,
+        "sample_answer": "Each layer computes weighted sums. A weighted sum of weighted sums is still a weighted sum, so without a bend the whole network behaves like one layer and can only fit straight-line relationships. An activation that bends, placed between the layers, is what lets depth add something."
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scn_step_relu",
+      "purpose": "Show the step function and ReLU side by side.",
+      "file": "step_and_relu.py"
+    },
+    {
+      "id": "scn_sigmoid",
+      "purpose": "Let the learner slide an input along the sigmoid curve and read the output.",
+      "file": "sigmoid_curve.py"
+    }
+  ]
+}
