@@ -13,6 +13,15 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Settings → AI provider: save, replace, or remove an AIHubMix key. The key is encrypted by the
   operating system and never displayed again.
 - Settings → Privacy & data: a plain statement of what is stored locally and what is sent.
+- **Save a copy of your data** as one file you can keep anywhere or take to another computer.
+  Your AI provider key is not in it.
+- **Restore from a copy.** The copy is checked first, and what it replaces is kept as a safety
+  copy, so a restore can be undone. A copy from an older version of Adle is brought up to date;
+  if anything goes wrong, your data is left exactly as it was.
+- **Delete everything** Adle has stored on this computer, after a confirmation. Your key and
+  copies you saved elsewhere are not touched.
+- Every "what is sent" note now lists all of it, including your goal, your pace and depth
+  preferences, and a few words about where you stand on the concept.
 - Settings → About & diagnostics: status of the local service with a restart button, and a live
   check that interactive visuals work on this computer.
 - Courses: create a course from a topic or from your own materials. The library lists your

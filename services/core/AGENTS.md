@@ -26,7 +26,8 @@ Add a dependency with `uv add <name>` (or `uv add --dev <name>`) inside `service
 adle_core/
   errors.py       AdleError and friends (no framework imports; usable everywhere)
   api/            FastAPI app factory, auth, error contract, schemas, routes (no domain logic)
-  application/    service container; courses, sources, jobs, curriculum, learner, retrieval
+  application/    service container; courses, sources, jobs, curriculum, learner, retrieval,
+                  saving and restoring a copy of the data
   curriculum/     PURE rules: concept graph (loops, order, layers), outline from headings
   learner_model/  PURE rules: knowledge tracing, mastery states, review schedule, preferences,
                   hypotheses about mistakes, which questions to practise, the next step
@@ -61,7 +62,19 @@ everything and decides nothing.
   include it in a model's `repr`, or log it. Loggers carry `SecretRedactionFilter` as a backstop.
 - **Logging:** log event types and identifiers, not document text, answers, or prompts.
 - **Paths:** store only under `Settings.data_dir`, under generated names. Never use a
-  user-supplied path as a destination.
+  user-supplied path as a destination. The one exception is `data.save_copy` (ADR-016): an
+  internal route that writes a copy of the data where the learner chose in a save dialog.
+  Do not add a second.
+- **A copy of the data is one self-contained file.** Make one with `backup_database` and
+  nothing else: it includes the write-ahead log and leaves the copy in SQLite's single-file
+  mode, so that looking at it creates nothing beside it.
+- **The database is replaced only while the service starts**, by `data_copy.restore_copy`,
+  before `build_services`. Never add a route that swaps or deletes it: every service holds
+  connections. A restore is all or nothing; keep it so (`test_data_copy.py`).
+- **Nothing may depend on a stored original being present.** A copy does not carry the files
+  that were imported, and after a restore the ones nothing refers to are removed.
+- **A database file may come from anywhere.** Connections are opened with
+  `trusted_schema = OFF`; do not turn it back on to make a trigger or a view work.
 - **SQL:** parameterised only.
 - **Two kinds of unit of work** (ADR-015). `database.read()` for anything that only reads: it
   cannot write, takes no lock, and never waits. `database.session()` for anything that may

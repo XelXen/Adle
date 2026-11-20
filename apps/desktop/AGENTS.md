@@ -27,16 +27,33 @@ Prefer a core operation (`callCore`) over a new IPC channel whenever the work be
 
 ## File paths
 
-Renderer script must never be able to name a file. A path may enter the app in two ways only,
-both in `electron/main/ipc.ts` (`registerImportHandlers`):
+Renderer script must never be able to name a file. A path may enter the app in two ways only:
 
-- the operating system's file dialog, opened by the main process;
+- a dialog of the operating system, opened by the main process: to choose files to import
+  (`registerImportHandlers` in `electron/main/ipc.ts`), where to save a copy of the data, or
+  which copy to restore (`electron/main/data.ts`);
 - files the learner dropped, turned into paths by the preload with `webUtils.getPathForFile`
   (a `File` constructed by script has no path and is rejected).
 
-Paths are validated by `parseImportPaths` (`electron/main/imports.ts`) and handed to an
-**internal** core operation. Do not add an IPC channel or a public core operation that takes a
-path, a URL, or a directory from the renderer.
+Paths are validated (`parseImportPaths` in `imports.ts`; `parseSavePath` and
+`parseRestorePath` in `data-copy.ts`) and handed to an **internal** core operation or to the
+core's start-up. Do not add an IPC channel or a public core operation that takes a path, a URL,
+or a directory from the renderer, and do not return a path to it: say what happened and, at
+most, a file's name.
+
+## The data as a whole
+
+- `window.adle.data.*` (save a copy, restore, delete everything, show safety copies) take
+  **no arguments**. The question each one needs answered is asked by the main process in a
+  window of the operating system. Keep it that way: an argument is a way for the page to answer.
+- Anything that deletes or replaces the core's files runs inside `core.whileStopped(...)`,
+  which also keeps anything else from starting the core meanwhile. Start it again afterwards
+  and call `afterStart` (the new core needs the provider key).
+- A restore is `core.restart({ restoreFrom })`; read `core.lastRestore` afterwards. `null`
+  means the core said nothing about it, which is never reported as success.
+- Rules about paths are pure functions in `data-copy.ts` with unit tests; `data.ts` has the
+  dialogs. In end-to-end tests the dialogs are replaced with `app.evaluate` (see
+  `e2e/data.spec.ts`), never driven.
 
 ## URLs and origins
 

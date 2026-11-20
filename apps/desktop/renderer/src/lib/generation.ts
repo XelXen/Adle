@@ -8,6 +8,28 @@ import type { Job } from '@adle/contracts';
 export const KIND_PROPOSAL = 'curriculum_proposal';
 export const KIND_LESSON = 'lesson_generation';
 
+/**
+ * Everything a request for a lesson contains, as a list to put after "Sends to <provider>:".
+ *
+ * This is a promise to the learner, made before anything is sent. Keep it in step with
+ * `lesson_request` in the core (`generation/prompts.py`): if the request gains something,
+ * it is named here first.
+ *
+ * `materials` is whether the course has imported materials, where the caller knows.
+ */
+export function lessonDisclosure(materials: 'some' | 'none' | 'unknown'): string {
+  const always =
+    "this course's name, this concept and its objectives, where you stand on it in a few " +
+    'words, your preferences for pace and depth';
+  if (materials === 'some') {
+    return `${always}, your goal, and a few related passages from your materials`;
+  }
+  if (materials === 'unknown') {
+    return `${always}, your goal, and any related passages from your materials`;
+  }
+  return `${always}, and your goal`;
+}
+
 export interface ProposedNeed {
   /** Position of the needed concept in the same proposal. */
   index: number;

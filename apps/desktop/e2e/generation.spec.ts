@@ -123,7 +123,9 @@ test.describe('generation with the AI provider', () => {
     const limits = detail(page, 'Limits');
     await expect(limits).toContainText('No lesson has been made for this concept yet.');
     await expect(limits).toContainText(
-      'Sends this concept and its objectives to Custom endpoint (127.0.0.1).',
+      "Sends to Custom endpoint (127.0.0.1): this course's name, this concept and its " +
+        'objectives, where you stand on it in a few words, your preferences for pace and ' +
+        'depth, and your goal.',
     );
     await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
     await expect(limits.getByRole('progressbar')).toBeVisible();

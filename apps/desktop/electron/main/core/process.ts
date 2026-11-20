@@ -18,18 +18,42 @@ export interface CoreProcessOptions {
   dataDir: string;
   logsDir: string;
   readyTimeoutMs?: number;
+  /** How long a start may take when it has a copy to restore first. */
+  restoreTimeoutMs?: number;
   stopTimeoutMs?: number;
 }
 
 const DEFAULT_READY_TIMEOUT_MS = 30_000;
+/** A start that first restores a copy checks, copies, and upgrades a whole database. */
+const DEFAULT_RESTORE_TIMEOUT_MS = 180_000;
 const DEFAULT_STOP_TIMEOUT_MS = 6_000;
 /** Stop buffering protocol output from a misbehaving child. */
 const MAX_STDOUT_BUFFER = 64 * 1024;
+
+/** What the core says about a restore it was asked to do while starting. */
+export type RestoreReport = { ok: true } | { ok: false; message: string };
+
+/** Something to do once, while starting, before any data is opened. */
+export interface LaunchInstruction {
+  /** Replace the data with this copy first. An absolute path chosen by the learner. */
+  restoreFrom?: string;
+}
 
 interface ReadyEvent {
   event: 'ready';
   port: number;
   version: string;
+  restore: RestoreReport | null;
+}
+
+function parseRestoreReport(value: unknown): RestoreReport | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (record.ok === true) return { ok: true };
+  if (record.ok === false && typeof record.message === 'string') {
+    return { ok: false, message: record.message.slice(0, 500) };
+  }
+  return null;
 }
 
 function parseProtocolLine(line: string): ReadyEvent | { event: 'fatal'; message: string } | null {
@@ -49,7 +73,12 @@ function parseProtocolLine(line: string): ReadyEvent | { event: 'fatal'; message
     record.port < 65536 &&
     typeof record.version === 'string'
   ) {
-    return { event: 'ready', port: record.port, version: record.version };
+    return {
+      event: 'ready',
+      port: record.port,
+      version: record.version,
+      restore: parseRestoreReport(record.restore),
+    };
   }
   if (record.event === 'fatal' && typeof record.message === 'string') {
     return { event: 'fatal', message: record.message.slice(0, 500) };
@@ -73,6 +102,9 @@ export class CoreProcess extends EventEmitter<{ status: [CoreStatus] }> {
   private logStream: WriteStream | null = null;
   private starting: Promise<CoreStatus> | null = null;
   private stopping = false;
+  /** True while something that needs the core stopped is running; see `whileStopped`. */
+  private held = false;
+  private restoreReport: RestoreReport | null = null;
 
   constructor(private readonly options: CoreProcessOptions) {
     super();
@@ -87,17 +119,42 @@ export class CoreProcess extends EventEmitter<{ status: [CoreStatus] }> {
     return this.connection;
   }
 
-  start(): Promise<CoreStatus> {
+  /**
+   * What the core reported about the restore asked for at its latest start, or null if none
+   * was asked for (or the core did not get far enough to try).
+   */
+  get lastRestore(): RestoreReport | null {
+    return this.restoreReport;
+  }
+
+  start(instruction: LaunchInstruction = {}): Promise<CoreStatus> {
     if (this.currentStatus.state === 'ready') return Promise.resolve(this.currentStatus);
-    this.starting ??= this.launch().finally(() => {
+    if (this.held) return Promise.resolve(this.currentStatus);
+    this.starting ??= this.launch(instruction).finally(() => {
       this.starting = null;
     });
     return this.starting;
   }
 
-  async restart(): Promise<CoreStatus> {
+  async restart(instruction: LaunchInstruction = {}): Promise<CoreStatus> {
     await this.stop();
-    return this.start();
+    return this.start(instruction);
+  }
+
+  /**
+   * Stop the core and run `work` while it stays stopped. Until `work` has finished,
+   * nothing can start the core again (a start asked for meanwhile is not carried out),
+   * so `work` may delete or replace the core's files. Start it again afterwards.
+   */
+  async whileStopped<T>(work: () => Promise<T> | T): Promise<T> {
+    this.held = true;
+    try {
+      // A start already under way has a child by now; stopping ends that too.
+      await this.stop();
+      return await work();
+    } finally {
+      this.held = false;
+    }
   }
 
   async stop(): Promise<void> {
@@ -128,7 +185,8 @@ export class CoreProcess extends EventEmitter<{ status: [CoreStatus] }> {
     return createWriteStream(path.join(this.options.logsDir, 'core.log'), { flags: 'w' });
   }
 
-  private launch(): Promise<CoreStatus> {
+  private launch(instruction: LaunchInstruction): Promise<CoreStatus> {
+    this.restoreReport = null;
     this.setStatus({ state: 'starting' });
 
     let spec: LaunchSpec;
@@ -169,10 +227,13 @@ export class CoreProcess extends EventEmitter<{ status: [CoreStatus] }> {
         resolve(status);
       };
 
+      const patience = instruction.restoreFrom
+        ? (this.options.restoreTimeoutMs ?? DEFAULT_RESTORE_TIMEOUT_MS)
+        : (this.options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS);
       const readyTimer = setTimeout(() => {
         settle({ state: 'failed', message: 'The core service took too long to start.' });
         child.kill();
-      }, this.options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS);
+      }, patience);
 
       child.stdout.setEncoding('utf8');
       child.stdout.on('data', (chunk: string) => {
@@ -185,6 +246,7 @@ export class CoreProcess extends EventEmitter<{ status: [CoreStatus] }> {
           buffer = buffer.slice(newline + 1);
           const event = parseProtocolLine(line);
           if (event?.event === 'ready') {
+            this.restoreReport = event.restore;
             this.connection = { baseUrl: `http://127.0.0.1:${event.port}`, token };
             settle({ state: 'ready', version: event.version });
           } else if (event?.event === 'fatal') {
@@ -222,7 +284,12 @@ export class CoreProcess extends EventEmitter<{ status: [CoreStatus] }> {
       child.stdin.on('error', () => {
         /* The exit handler reports the failure; a broken pipe here is not actionable. */
       });
-      child.stdin.write(`${JSON.stringify({ token })}\n`);
+      // A one-time instruction travels the same way: it names a file, and argv is visible
+      // to other processes.
+      const handshake = instruction.restoreFrom
+        ? { token, restore_from: instruction.restoreFrom }
+        : { token };
+      child.stdin.write(`${JSON.stringify(handshake)}\n`);
     });
   }
 }

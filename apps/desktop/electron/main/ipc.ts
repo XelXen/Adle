@@ -24,6 +24,7 @@ import {
 } from '../shared/ipc';
 import { callCore } from './core/client';
 import type { CoreProcess } from './core/process';
+import { registerDataHandlers } from './data';
 import {
   MAX_IMPORT_FILES,
   parseCourseId,
@@ -41,6 +42,8 @@ export interface IpcDependencies {
   core: CoreProcess;
   keyStore: ProviderKeyStore;
   uiState: UiStateStore;
+  /** Everything the core persists. Deleted as a whole when the learner deletes everything. */
+  dataDir: string;
 }
 
 function failure(code: string, message: string): CoreResult<never> {
@@ -212,6 +215,10 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   );
 
   registerImportHandlers(core, handle);
+  registerDataHandlers(
+    { core, dataDir: deps.dataDir, afterStart: () => syncProviderKey(deps) },
+    handle,
+  );
 
   handle(IPC.providerClearApiKey, async (): Promise<CoreResult<ProviderKeyState>> => {
     keyStore.clear();

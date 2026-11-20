@@ -11,6 +11,7 @@ from adle_core.api.errors import ErrorResponse, install_error_handlers
 from adle_core.api.routes import (
     courses,
     curriculum,
+    data,
     generation,
     learning,
     lessons,
@@ -47,6 +48,6 @@ def create_app(services: Services) -> FastAPI:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_ALLOWED_HOSTS)
     install_error_handlers(app)
 
-    for module in (system, provider, courses, curriculum, lessons, generation, learning):
+    for module in (system, provider, courses, curriculum, lessons, generation, learning, data):
         app.include_router(module.router, prefix=API_PREFIX)
     return app

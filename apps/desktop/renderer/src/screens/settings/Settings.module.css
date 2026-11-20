@@ -5,7 +5,37 @@
 }
 
 .rowTitle {
+  margin: 0;
   font: var(--ad-text-body-strong);
+}
+
+/* An action on the data as a whole: what it does on one side, its button on the other. */
+.dataRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ad-space-4) var(--ad-space-6);
+}
+
+.dataText {
+  display: flex;
+  flex: 1 1 24rem;
+  flex-direction: column;
+  gap: var(--ad-space-1);
+  min-width: 0;
+  max-width: 44rem;
+}
+
+.dataText p {
+  margin: 0;
+}
+
+.dataActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-3);
 }
 
 .keyForm {

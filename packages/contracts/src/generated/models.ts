@@ -142,6 +142,9 @@ export interface ConceptUpdate {
   tags?: ('conceptual' | 'calculation' | 'visual' | 'procedural')[] | null;
   title?: string | null;
 }
+export interface CopyDestination {
+  path: string;
+}
 export interface Course {
   concept_count: number;
   created_at: string;

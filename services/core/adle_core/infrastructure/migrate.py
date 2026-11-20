@@ -12,8 +12,10 @@ Rules (PLAN.md §5.5, PROMPT.md §13):
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import resources
@@ -33,6 +35,9 @@ logger = logging.getLogger(__name__)
 
 #: Automatic backups kept per database. Older ones are removed after a successful migration.
 MAX_AUTOMATIC_BACKUPS = 5
+#: Copies of data that a restore replaced. Enough to undo a mistake several times over;
+#: without a limit, each restore would leave another whole database behind for ever.
+MAX_REPLACED_BACKUPS = 5
 
 
 class MigrationError(RuntimeError):
@@ -53,6 +58,10 @@ class UnrecognisedDatabaseError(MigrationError):
 
 class InvalidBackupError(MigrationError):
     """The file offered for restoring is not a usable Adle database."""
+
+
+class CopyOutOfDateError(MigrationError):
+    """The copy offered for restoring could not be brought to this version's schema."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,36 +96,64 @@ def _read_only_uri(path: Path) -> str:
 
 
 def backup_database(source: Path, destination: Path) -> None:
-    """Write a consistent copy of a live SQLite database, including WAL contents."""
+    """Write a consistent copy of a live SQLite database as one self-contained file.
+
+    The copy includes what is still in the write-ahead log. It is then switched to
+    SQLite's single-file mode. Left as it was, merely opening it to look at it, even
+    read-only, would create two more files beside it and leave them there, and it
+    could not be read from a disk that cannot be written to. A copy is something a
+    learner keeps in a folder of their own, so it is one file and stays one file.
+    """
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with (
-        sqlite3.connect(_read_only_uri(source), uri=True) as original,
-        sqlite3.connect(destination) as copy,
-    ):
-        original.backup(copy)
-    # `with` on a sqlite3 connection only ends the transaction; close explicitly.
-    original.close()
-    copy.close()
+    # `with` on a sqlite3 connection only ends a transaction, so close explicitly:
+    # on Windows a file that is still open cannot be moved or deleted.
+    original = sqlite3.connect(_read_only_uri(source), uri=True)
+    try:
+        copy = sqlite3.connect(destination)
+        try:
+            original.backup(copy)
+            copy.execute("PRAGMA journal_mode = DELETE")
+        finally:
+            copy.close()
+    finally:
+        original.close()
 
 
-def _prune_backups(directory: Path) -> None:
-    backups = sorted(directory.glob("adle-before-*.db"), key=lambda path: path.stat().st_mtime)
-    for stale in backups[:-MAX_AUTOMATIC_BACKUPS]:
+def _prune_backups(
+    directory: Path, pattern: str = "adle-before-*.db", keep: int = MAX_AUTOMATIC_BACKUPS
+) -> None:
+    """Keep the newest ``keep`` safety copies of one kind. Files named otherwise are not ours."""
+    backups = sorted(directory.glob(pattern), key=lambda path: path.stat().st_mtime)
+    for stale in backups[:-keep]:
         stale.unlink(missing_ok=True)
 
 
+#: Tables created by the first revision and present in every one since.
+_TABLES_OF_EVERY_REVISION = frozenset({"courses", "sources", "app_settings"})
+
+
 def _check_backup(backup: Path) -> None:
-    """Raise unless ``backup`` is an intact Adle database this build can open."""
+    """Raise unless ``backup`` is an intact Adle database this build can open.
+
+    The file may come from anywhere, so it is only read here, with nothing in its
+    schema trusted, and nothing of it is used until all of this has passed.
+    """
     not_usable = InvalidBackupError(
-        "That file is not an Adle backup, or it is damaged. Your current data was not changed."
+        "That file is not a copy of Adle's data, or it is damaged. "
+        "Your current data was not changed."
     )
     try:
         connection = sqlite3.connect(_read_only_uri(backup), uri=True)
     except sqlite3.Error as error:
         raise not_usable from error
     try:
+        connection.execute("PRAGMA trusted_schema = OFF")
         integrity = connection.execute("PRAGMA integrity_check").fetchall()
         revisions = connection.execute("SELECT version_num FROM alembic_version").fetchall()
+        tables = {
+            str(row[0])
+            for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
     except sqlite3.Error as error:
         raise not_usable from error
     finally:
@@ -127,9 +164,20 @@ def _check_backup(backup: Path) -> None:
         ScriptDirectory.from_config(_alembic_config()).get_revision(str(revisions[0][0]))
     except CommandError as error:
         raise DatabaseTooNewError(
-            "That backup was saved by a newer version of Adle. Update Adle to restore it; "
+            "That copy was saved by a newer version of Adle. Update Adle to restore it; "
             "your current data was not changed."
         ) from error
+    # Another program's database can carry a version table too. Every revision of
+    # Adle's schema has had these tables, so their absence means it is not ours.
+    if not _TABLES_OF_EVERY_REVISION.issubset(tables):
+        raise not_usable
+
+
+def _remove_database_files(path: Path) -> None:
+    """Delete a database file that is not open anywhere, with anything SQLite left beside it."""
+    for suffix in ("", "-wal", "-shm", "-journal"):
+        with contextlib.suppress(OSError):
+            path.with_name(path.name + suffix).unlink(missing_ok=True)
 
 
 def _fold_in_write_ahead_log(path: Path) -> None:
@@ -148,7 +196,13 @@ def _fold_in_write_ahead_log(path: Path) -> None:
         raise sqlite3.OperationalError("database is in use")
 
 
-def restore_database(backup: Path, target: Path, backups_dir: Path) -> Path | None:
+def restore_database(
+    backup: Path,
+    target: Path,
+    backups_dir: Path,
+    *,
+    prepare: Callable[[Path], None] | None = None,
+) -> Path | None:
     """Replace the database at ``target`` with ``backup``.
 
     Nothing is discarded. The backup is checked before the current data is touched,
@@ -156,35 +210,67 @@ def restore_database(backup: Path, target: Path, backups_dir: Path) -> Path | No
     path is returned (``None`` if there was nothing to replace), so a restore can
     itself be undone.
 
-    ``target`` must not be open anywhere. The restored data may be at an older schema
-    revision: run :func:`migrate` on it afterwards, as at any start-up.
+    ``prepare`` is given a private working copy of the backup before anything is
+    replaced, to do whatever must succeed first (bringing it to the current schema).
+    If it raises, the current data has not been touched.
+
+    ``target`` must not be open anywhere. Without ``prepare`` the restored data may be
+    at an older schema revision: run :func:`migrate` on it afterwards, as at any start-up.
     """
     _check_backup(backup)
+    try:
+        is_the_data_itself = target.exists() and backup.samefile(target)
+    except OSError:
+        is_the_data_itself = False
+    if is_the_data_itself:
+        raise InvalidBackupError(
+            "That file is the data Adle is using now, not a copy of it. "
+            "Your current data was not changed."
+        )
     staged = target.with_name(target.name + ".restoring")
     replaced: Path | None = None
     try:
-        staged.unlink(missing_ok=True)
+        _remove_database_files(staged)
         target.parent.mkdir(parents=True, exist_ok=True)
         backup_database(backup, staged)
+        if prepare is not None:
+            prepare(staged)
+            # Whatever prepared it has closed it; make sure it stands alone before it moves.
+            _fold_in_write_ahead_log(staged)
         if target.exists():
             stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
             replaced = backups_dir / f"adle-replaced-{stamp}.db"
             backup_database(target, replaced)
             _fold_in_write_ahead_log(target)
+        # The one step that changes the learner's data, and it is all or nothing.
         staged.replace(target)
     except (OSError, sqlite3.Error) as error:
-        staged.unlink(missing_ok=True)
+        _remove_database_files(staged)
+        if replaced is not None:
+            # Nothing was replaced, so a file that says otherwise would only mislead.
+            _remove_database_files(replaced)
         raise MigrationError(
-            "Adle could not restore that backup, so your current data was left as it was. "
-            "Close any other copy of Adle and try again.",
-            backup_path=replaced,
+            "Adle could not restore from that copy, so your current data was left as it was. "
+            "Close any other window of Adle and try again."
         ) from error
-    logger.info("Restored the database from a backup")
+    except BaseException:
+        # Whatever else went wrong (what prepared the copy refused it), leave no trace.
+        _remove_database_files(staged)
+        raise
+    if replaced is not None:
+        with contextlib.suppress(OSError):
+            _prune_backups(backups_dir, "adle-replaced-*.db", MAX_REPLACED_BACKUPS)
+    logger.info("Restored the database from a copy")
     return replaced
 
 
-def migrate(database: Database, backups_dir: Path) -> MigrationOutcome:
-    """Upgrade ``database`` to the newest revision, backing it up first if it holds data."""
+def migrate(database: Database, backups_dir: Path, *, keep_backup: bool = True) -> MigrationOutcome:
+    """Upgrade ``database`` to the newest revision, backing it up first if it holds data.
+
+    ``keep_backup=False`` is for a working copy that is itself a copy of something kept
+    (a restore being prepared): there is nothing to protect, and a backup of it would
+    push a real one out of the few that are kept.
+    """
     config = _alembic_config()
     scripts = ScriptDirectory.from_config(config)
     head = head_revision()
@@ -212,16 +298,17 @@ def migrate(database: Database, backups_dir: Path) -> MigrationOutcome:
                 "Update Adle to open it; nothing has been changed."
             ) from error
 
-        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        backup_path = backups_dir / f"adle-before-{head}-from-{current}-{stamp}.db"
-        try:
-            backup_database(database.path, backup_path)
-        except (OSError, sqlite3.Error) as error:
-            raise MigrationError(
-                "Adle could not make a safety copy of your data before updating it, "
-                "so nothing was changed. Check that the disk is not full."
-            ) from error
-        logger.info("Backed up the database before migrating from %s to %s", current, head)
+        if keep_backup:
+            stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            backup_path = backups_dir / f"adle-before-{head}-from-{current}-{stamp}.db"
+            try:
+                backup_database(database.path, backup_path)
+            except (OSError, sqlite3.Error) as error:
+                raise MigrationError(
+                    "Adle could not make a safety copy of your data before updating it, "
+                    "so nothing was changed. Check that the disk is not full."
+                ) from error
+            logger.info("Backed up the database before migrating from %s to %s", current, head)
 
     try:
         with database.engine.begin() as connection:

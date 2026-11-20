@@ -8,7 +8,8 @@ one, change the other in the same commit.
 
 | Asset | Where it lives | Main risk |
 |---|---|---|
-| Course materials, answers, learning history | The core's data directory on disk | Leaving the device |
+| Course materials, answers, learning history | The core's data directory on disk | Leaving the device; being replaced or destroyed |
+| A copy of the data the learner saved | Wherever the learner put it: an ordinary, unencrypted file | Outside Adle's control once written; the interface says so |
 | The AI provider key | OS secure storage; core memory while running | Disclosure to the UI, logs, disk, or a scene |
 | The learner's machine | — | Code execution, file access, or network access by untrusted content |
 
@@ -38,6 +39,8 @@ Full diagram: `docs/architecture/overview.md`.
 
 - IPC handlers accept calls only from the top-level `adle://app` frame (`isTrustedSender`), and
   treat every argument as untrusted (`parseInvokeRequest`, `validateApiKey`, `parseUiStatePatch`).
+- Handlers that act on the data as a whole take no arguments at all (see "The learner's data
+  as a whole").
 - Core operations are looked up in a table generated from the core itself. Unknown and
   `internal` operations are refused; parameters are shape- and size-checked.
   (`security-boundaries.test.ts`, `e2e/security.spec.ts`)
@@ -51,6 +54,7 @@ Full diagram: `docs/architecture/overview.md`.
 | Loopback only, OS-assigned port | `__main__.py` binds `127.0.0.1:0` | `tests/integration/test_process_lifecycle.py` |
 | Every route needs the per-launch token | App-wide dependency `require_launch_token`, constant-time comparison | `tests/unit/test_api_boundary.py` |
 | Token never in argv, environment, or logs | Delivered over stdin | `core.test.ts` (fake core checks argv and env); `test_process_lifecycle.py` (stderr) |
+| A file to restore from is named the same way, and never logged | `restore_from` in the handshake line; `_restore` logs the outcome only | `core.test.ts` (fake core checks argv and env); `test_process_lifecycle.py` (the folder's name is not in stderr) |
 | No orphaned backend | Core exits on stdin EOF | `test_process_lifecycle.py`; `core.test.ts` |
 | DNS rebinding closed | `TrustedHostMiddleware` | `test_api_boundary.py` |
 | No CORS, no interactive docs | Not configured; `docs_url=None` | `test_api_boundary.py` |
@@ -59,7 +63,9 @@ Full diagram: `docs/architecture/overview.md`.
 Loopback traffic is unencrypted HTTP. See "Out of scope".
 
 Reads and writes of the database are separate kinds of connection (ADR-015): code that only
-reads runs where SQLite refuses any write.
+reads runs where SQLite refuses any write. Nothing in a database file's schema is trusted
+(`trusted_schema = OFF`, `cell_size_check = ON` on every connection), because the file may
+have been restored from a copy the learner was given (ADR-016).
 
 ## The provider key
 
@@ -148,6 +154,37 @@ Document content is data. Nothing in a file is executed, followed, or treated as
   arguments, or its environment).
 - A file within the limits can still be slow to parse; the time limit (120 s) bounds it.
 
+## The learner's data as a whole
+
+Saving a copy of everything, restoring from one, and deleting everything
+(Settings → Privacy & data). Reasoning: `docs/decisions/ADR-016-copy-restore-and-delete.md`.
+
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| Page script cannot say where a copy goes, which file is restored, or that the learner is sure | `window.adle.data.*` take no arguments. The save dialog, the open dialog, and the confirmation are opened by the main process (`electron/main/data.ts`) | `e2e/security.spec.ts` (arguments are ignored; each question is still asked; backing out does nothing); `data.test.ts` |
+| The page never learns a path | A saved copy is reported by file name only | `data.test.ts` |
+| Writing a copy to a named file is for the main process alone | `data.save_copy` is an internal operation | `e2e/security.spec.ts` (refused from the page); `test_data_copy.py` (every operation that takes a path is internal) |
+| A copy is never written inside the data folder, over a folder, or with another ending | `parseSavePath` in main; `_destination` in the core, again | `data-copy.test.ts`; `test_data_copy.py` |
+| A failed save damages nothing | Written as `<name>.part`, renamed when complete | `test_data_copy.py` (an older copy is byte-for-byte as it was) |
+| The provider key is not in a copy | The key is never in the database | `test_data_copy.py`; `e2e/data.spec.ts` |
+| A file is checked before any of it is used | `_check_backup`: opened read-only with nothing in its schema trusted; integrity, a known revision, Adle's own tables | `test_database.py`; `test_data_copy.py` (another program's database with a version table is refused) |
+| A restore is all or nothing | The copy is brought to the current schema in a working file first; the current data is kept as a safety copy; one atomic rename | `test_data_copy.py` (a copy that cannot be upgraded replaces nothing); `test_database.py`; `test_process_lifecycle.py` |
+| A refused restore leaves a working app | Reported in the `ready` line; the core starts on the data as it was | `test_process_lifecycle.py`; `e2e/data.spec.ts` |
+| Nothing can start the core while its folder is being deleted | `CoreProcess.whileStopped` | `core.test.ts`; `data.test.ts` (order of events) |
+| Only Adle's own folder can be deleted | `canErase`: absolute, not a root, not directly under one; the folder comes from `paths.coreDataDir()` | `data-copy.test.ts`; `data.test.ts` |
+| Deleting everything leaves no learner text on disk in Adle's folders, and leaves the key | The data directory is removed; the core log is rewritten at the next start; `credentials.bin` is outside it | `e2e/data.spec.ts` (searches the folders for a phrase from an imported file) |
+| After a restore, no imported original stays that the learner cannot see | `SourceService.forget_unreferenced_files` at start-up | `test_data_copy.py` |
+| "Show safety copies" can open one folder only | The folder is fixed in the main process | `data.test.ts`; `e2e/data.spec.ts` |
+
+**Residual risks, accepted**
+
+- A copy is not encrypted. Anyone who can read the file can read the text of the learner's
+  materials and their learning history. The interface says so where the copy is made.
+- "Delete everything" unlinks files; it does not overwrite the disk blocks they occupied.
+- A copy the learner was given is someone else's content. Restoring it gives that content the
+  standing of the learner's own and no more: text is shown as text, scenes are checked again
+  on every read and run only in the player frame.
+
 ## Lessons and answers
 
 Details and reasoning: `docs/decisions/ADR-010-lesson-ir-and-playback.md`.
@@ -207,6 +244,11 @@ request in any case. See ADR-013.
   provider, and only when the learner starts a generation.
 - Logs contain event types and identifiers, never document text, answers, prompts, or secrets.
 - The first-run screen and Settings → Privacy & data state what is stored and what is sent.
+  Each control that sends something lists what it sends beside it, from one function per kind
+  of request (`lessonDisclosure` in `renderer/src/lib/generation.ts`), which must be kept in
+  step with the prompt builder in the core.
+- The learner can take a copy of everything, put one back, and delete everything
+  (see "The learner's data as a whole").
 
 ## Dependencies
 

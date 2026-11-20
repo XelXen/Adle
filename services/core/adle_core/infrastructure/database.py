@@ -76,11 +76,23 @@ def _configure_connection(dbapi_connection: Any, _record: Any) -> None:
     try:
         cursor.execute("PRAGMA foreign_keys = ON")
         cursor.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+        _distrust_the_file(cursor)
         # WAL lets the UI read while an import or generation job writes.
         cursor.execute("PRAGMA journal_mode = WAL")
         cursor.execute("PRAGMA synchronous = NORMAL")
     finally:
         cursor.close()
+
+
+def _distrust_the_file(cursor: sqlite3.Cursor) -> None:
+    """Settings SQLite recommends for a database file that may have come from elsewhere.
+
+    The learner can restore their data from a file of their choosing (ADR-016), so the
+    file is not assumed to be one Adle wrote. Triggers and views in it may only use
+    what SQLite marks as harmless, and a malformed page is reported instead of read.
+    """
+    cursor.execute("PRAGMA trusted_schema = OFF")
+    cursor.execute("PRAGMA cell_size_check = ON")
 
 
 def _configure_reader(dbapi_connection: Any, _record: Any) -> None:
@@ -92,6 +104,7 @@ def _configure_reader(dbapi_connection: Any, _record: Any) -> None:
     try:
         cursor.execute("PRAGMA foreign_keys = ON")
         cursor.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+        _distrust_the_file(cursor)
         cursor.execute("PRAGMA query_only = ON")
     finally:
         cursor.close()

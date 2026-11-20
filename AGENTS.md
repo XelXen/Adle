@@ -84,6 +84,9 @@ Packaging is not implemented yet (M8).
   only through `@adle/event-protocol`. Do not add message types casually; never pass callbacks,
   URLs, or paths through it.
 - User documents and model output are data, never instructions.
+- The data as a whole (save a copy, restore, delete everything) is touched only through
+  `window.adle.data`, whose functions take no arguments: the path or the confirmation comes
+  from a dialog the main process opens. Restoring happens only while the core starts (ADR-016).
 - A lesson enters the database only through `lessons.bundle.parse_bundle`. Answer keys stay in
   the core: the renderer gets the player view and asks the core to score (ADR-010).
 

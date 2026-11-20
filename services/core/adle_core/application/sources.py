@@ -242,6 +242,21 @@ class SourceService:
             session.delete(source)
         self._files.delete(stored_name)
 
+    def forget_unreferenced_files(self) -> int:
+        """Delete stored originals that no source refers to. Returns how many.
+
+        After the data has been replaced by a copy, the folder of originals still holds
+        the files of whatever was there before. Nothing lists them and nothing would
+        ever delete them, so a file the learner can no longer see would stay on disk.
+        The reverse case needs nothing: a source whose original is missing works, since
+        an original is not read again after import, and nothing may come to rely on it.
+
+        Call only while nothing is being imported (at start-up, before serving).
+        """
+        with self._database.read() as session:
+            names = {name for name in session.scalars(select(Source.stored_name)) if name}
+        return self._files.keep_only(names)
+
     # -- importing ---------------------------------------------------------
 
     def start_import(self, course_id: str, paths: list[Path]) -> JobSnapshot:

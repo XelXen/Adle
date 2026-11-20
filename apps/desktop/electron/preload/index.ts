@@ -50,6 +50,13 @@ const bridge: AdleBridge = {
       return ipcRenderer.invoke(IPC.sourcesImportPaths, courseId, paths);
     },
   },
+  data: {
+    // No arguments: the main process asks the learner where, which, and whether.
+    saveCopy: () => ipcRenderer.invoke(IPC.dataSaveCopy),
+    restoreCopy: () => ipcRenderer.invoke(IPC.dataRestoreCopy),
+    eraseAll: () => ipcRenderer.invoke(IPC.dataEraseAll),
+    showSafetyCopies: () => ipcRenderer.invoke(IPC.dataShowSafetyCopies),
+  },
 };
 
 contextBridge.exposeInMainWorld('adle', bridge);

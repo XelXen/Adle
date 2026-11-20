@@ -11,8 +11,8 @@ understanding with short questions, and adapts the next step to what you have ac
 
 > **Status: in development.** The whole learning loop works on the sample course: a curriculum,
 > lessons with live pictures and questions, evidence about what you know, a suggested next step
-> with its reason, practice, and reviews that come due. Still to come: saving and restoring
-> your data, and an installer. See
+> with its reason, practice, and reviews that come due. Your data can be copied to a file,
+> restored, and deleted. Still to come: an installer. See
 > [`docs/engineering/PROJECT_STATE.md`](docs/engineering/PROJECT_STATE.md) for exactly what works.
 
 ## What works today

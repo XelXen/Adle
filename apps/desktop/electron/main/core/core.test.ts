@@ -16,7 +16,7 @@ const running: CoreProcess[] = [];
 
 function createCore(
   mode: string,
-  overrides: { readyTimeoutMs?: number; stopTimeoutMs?: number } = {},
+  overrides: { readyTimeoutMs?: number; restoreTimeoutMs?: number; stopTimeoutMs?: number } = {},
 ) {
   const core = new CoreProcess({
     resolveSpec: () => ({ command: process.execPath, args: [FAKE_CORE, mode], cwd: directory }),
@@ -126,6 +126,102 @@ describe('CoreProcess', () => {
     expect(await core.restart()).toEqual({ state: 'ready', version: 'fake' });
     // Every launch gets its own token.
     expect(core.getConnection()?.token).not.toBe(firstToken);
+  });
+
+  describe('a start that first restores a copy', () => {
+    const copy = (name: string): string => path.join(directory, 'copies', name);
+
+    it('passes the file over stdin and reports what the core said about it', async () => {
+      const core = createCore('ready');
+      await core.start();
+      // Nothing was asked for, so there is nothing to report.
+      expect(core.lastRestore).toBeNull();
+
+      expect(await core.restart({ restoreFrom: copy('mine.adle') })).toEqual({
+        state: 'ready',
+        version: 'fake',
+      });
+      // The fake answers "leaked" if the path reached it through argv or the environment.
+      expect(core.lastRestore).toEqual({ ok: true });
+    });
+
+    it('reports a refusal with its reason while the core runs on', async () => {
+      const core = createCore('ready');
+      expect((await core.start({ restoreFrom: copy('refused.adle') })).state).toBe('ready');
+      expect(core.lastRestore).toEqual({
+        ok: false,
+        message: 'That file is not a copy of your data.',
+      });
+      expect(core.getConnection()).not.toBeNull();
+    });
+
+    it('does not mistake a report it cannot read for a success', async () => {
+      const core = createCore('ready');
+      expect((await core.start({ restoreFrom: copy('garbled.adle') })).state).toBe('ready');
+      expect(core.lastRestore).toBeNull();
+    });
+
+    it('forgets the report at the next ordinary start', async () => {
+      const core = createCore('ready');
+      await core.start({ restoreFrom: copy('mine.adle') });
+      expect(core.lastRestore).toEqual({ ok: true });
+      await core.restart();
+      expect(core.lastRestore).toBeNull();
+    });
+
+    it('is given longer than an ordinary start, but not for ever', async () => {
+      const patient = createCore('ready', { readyTimeoutMs: 100, restoreTimeoutMs: 5000 });
+      expect((await patient.start({ restoreFrom: copy('slow.adle') })).state).toBe('ready');
+      expect(patient.lastRestore).toEqual({ ok: true });
+
+      const impatient = createCore('ready', { readyTimeoutMs: 5000, restoreTimeoutMs: 100 });
+      expect(await impatient.start({ restoreFrom: copy('slow.adle') })).toEqual({
+        state: 'failed',
+        message: 'The core service took too long to start.',
+      });
+      expect(impatient.lastRestore).toBeNull();
+    });
+  });
+
+  describe('work that needs the core stopped', () => {
+    it('runs with the core stopped, and nothing can start it meanwhile', async () => {
+      const core = createCore('ready');
+      await core.start();
+      const seen: CoreStatus[] = [];
+
+      const result = await core.whileStopped(async () => {
+        seen.push(core.status);
+        // Someone presses "Restart" in another part of the app while the files are going.
+        seen.push(await core.start());
+        seen.push(await core.restart());
+        return 'done';
+      });
+
+      expect(result).toBe('done');
+      expect(seen).toEqual([{ state: 'stopped' }, { state: 'stopped' }, { state: 'stopped' }]);
+      expect(core.getConnection()).toBeNull();
+      // Afterwards it starts as usual.
+      expect(await core.start()).toEqual({ state: 'ready', version: 'fake' });
+    });
+
+    it('lets the core start again even if the work fails', async () => {
+      const core = createCore('ready');
+      await core.start();
+      await expect(
+        core.whileStopped(() => {
+          throw new Error('the disk said no');
+        }),
+      ).rejects.toThrow('the disk said no');
+      expect(await core.start()).toEqual({ state: 'ready', version: 'fake' });
+    });
+
+    it('ends a start that was already under way', async () => {
+      const core = createCore('silent', { readyTimeoutMs: 10_000 });
+      const starting = core.start();
+      await core.whileStopped(() => undefined);
+      expect((await starting).state).toBe('failed');
+      expect(core.status).toEqual({ state: 'stopped' });
+    });
   });
 });
 

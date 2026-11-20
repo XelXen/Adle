@@ -249,6 +249,21 @@
         "title": "ConceptUpdate",
         "type": "object"
       },
+      "CopyDestination": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "pattern": "^[^\\x00]+$",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": ["path"],
+        "title": "CopyDestination",
+        "type": "object"
+      },
       "Course": {
         "properties": {
           "concept_count": { "title": "Concept Count", "type": "integer" },
@@ -2971,6 +2986,35 @@
         },
         "summary": "Import Sources",
         "tags": ["courses"],
+        "x-adle-internal": true
+      }
+    },
+    "/v1/data/copy": {
+      "post": {
+        "operationId": "data.save_copy",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CopyDestination" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": { "description": "Successful Response" },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Save A Copy",
+        "tags": ["data"],
         "x-adle-internal": true
       }
     },

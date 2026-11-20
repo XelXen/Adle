@@ -34,7 +34,7 @@ import {
 import { GenerationStatus } from '../../components/GenerationStatus';
 import { callCore, describeError } from '../../lib/core-client';
 import { formatRelativeDay } from '../../lib/format';
-import type { JobFailure } from '../../lib/generation';
+import { type JobFailure, lessonDisclosure } from '../../lib/generation';
 import { isJobActive } from '../../lib/use-job';
 import styles from './Curriculum.module.css';
 import {
@@ -347,11 +347,9 @@ export function ConceptDetail({
             <p className={styles.aiNote}>
               {concept.objectives.length === 0
                 ? 'Add a learning objective first, so the lesson has something to aim at.'
-                : `Sends ${
-                    hasMaterials
-                      ? 'this concept, its objectives, and a few related passages from your materials'
-                      : 'this concept and its objectives'
-                  } to ${generation.providerName}. It usually takes three of today's requests.`}
+                : `Sends to ${generation.providerName}: ${lessonDisclosure(
+                    hasMaterials ? 'some' : 'none',
+                  )}. It usually takes three of today's requests.`}
             </p>
           </div>
         )}

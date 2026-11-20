@@ -437,6 +437,118 @@ def test_a_database_that_is_open_elsewhere_is_not_replaced(
     assert not isinstance(raised.value, InvalidBackupError)
     assert "left as it was" in str(raised.value)
     assert course_titles(database.path) == ["In use", "Written while it reads"]
+    # Nothing was replaced, so nothing says otherwise: no safety copy, no working file.
+    assert not list(backups.glob("adle-replaced-*"))
+    assert not list(database.path.parent.glob("*.restoring*"))
+
+
+def test_a_backup_is_a_single_file_and_looking_at_it_creates_nothing_beside_it(
+    database: Database, backups: Path, tmp_path: Path
+) -> None:
+    migrate(database, backups)
+    add_course(database, "In the backup")
+    folder = tmp_path / "somewhere of the learner's"
+    saved = folder / "saved.db"
+    backup_database(database.path, saved)
+    assert [entry.name for entry in folder.iterdir()] == ["saved.db"]
+
+    # Restoring from a file only reads it. A copy left in the live database's
+    # write-ahead mode would gain two files beside it here, and keep them.
+    fresh = tmp_path / "new-profile" / "adle.db"
+    restore_database(saved, fresh, tmp_path / "new-profile" / "backups")
+
+    assert [entry.name for entry in folder.iterdir()] == ["saved.db"]
+    assert course_titles(fresh) == ["In the backup"]
+
+
+def test_what_prepares_a_restore_runs_on_a_working_copy_and_can_stop_it(
+    database: Database, backups: Path, tmp_path: Path
+) -> None:
+    migrate(database, backups)
+    add_course(database, "As it was")
+    saved = tmp_path / "saved.db"
+    backup_database(database.path, saved)
+    with database.session() as session:
+        course = session.get(Course, "crs_00000000000000000001")
+        assert course is not None
+        course.title = "Current"
+    database.dispose()
+    seen: list[Path] = []
+
+    def refuse(working_copy: Path) -> None:
+        seen.append(working_copy)
+        assert course_titles(working_copy) == ["As it was"]
+        raise MigrationError("This copy will not do.")
+
+    with pytest.raises(MigrationError, match="will not do"):
+        restore_database(saved, database.path, backups, prepare=refuse)
+
+    assert len(seen) == 1
+    assert seen[0] not in {saved, database.path}
+    assert course_titles(database.path) == ["Current"]
+    assert not list(backups.glob("adle-replaced-*"))
+    assert not list(database.path.parent.glob("*.restoring*"))
+
+    def rename(working_copy: Path) -> None:
+        connection = sqlite3.connect(working_copy)
+        try:
+            connection.execute("UPDATE courses SET title = 'Prepared'")
+            connection.commit()
+        finally:
+            connection.close()
+
+    restore_database(saved, database.path, backups, prepare=rename)
+
+    # What was prepared is what is restored; the file it came from is untouched.
+    assert course_titles(database.path) == ["Prepared"]
+    assert course_titles(saved) == ["As it was"]
+
+
+def test_a_restore_that_fails_for_any_reason_leaves_no_working_file(
+    database: Database, backups: Path, tmp_path: Path
+) -> None:
+    migrate(database, backups)
+    add_course(database, "Current")
+    saved = tmp_path / "saved.db"
+    backup_database(database.path, saved)
+    database.dispose()
+
+    def break_unexpectedly(_working_copy: Path) -> None:
+        raise RuntimeError("not a failure anyone planned for")
+
+    with pytest.raises(RuntimeError, match="not a failure anyone planned for"):
+        restore_database(saved, database.path, backups, prepare=break_unexpectedly)
+
+    assert course_titles(database.path) == ["Current"]
+    assert not list(database.path.parent.glob("*.restoring*"))
+    assert not list(backups.glob("adle-replaced-*"))
+
+
+def test_only_the_newest_copies_of_replaced_data_are_kept(
+    database: Database, backups: Path, tmp_path: Path
+) -> None:
+    migrate(database, backups)
+    add_course(database, "Restored again and again")
+    saved = tmp_path / "saved.db"
+    backup_database(database.path, saved)
+    database.dispose()
+    backups.mkdir(parents=True, exist_ok=True)
+    # Other files in the folder are not ours to tidy: an automatic backup, something of the learner's.
+    (backups / "adle-before-0002-from-0001-20260101T000000Z.db").write_bytes(b"kept")
+    (backups / "my-own-copy.db").write_bytes(b"kept")
+
+    replaced = [
+        restore_database(saved, database.path, backups)
+        for _ in range(migrate_module.MAX_REPLACED_BACKUPS + 2)
+    ]
+
+    kept = sorted(path.name for path in backups.glob("adle-replaced-*.db"))
+    assert len(kept) == migrate_module.MAX_REPLACED_BACKUPS
+    # The newest ones, so the latest restore can always be undone.
+    newest = [path.name for path in replaced[-migrate_module.MAX_REPLACED_BACKUPS :] if path]
+    assert kept == sorted(newest)
+    assert (backups / "adle-before-0002-from-0001-20260101T000000Z.db").exists()
+    assert (backups / "my-own-copy.db").exists()
 
 
 # -- model behaviour -------------------------------------------------------

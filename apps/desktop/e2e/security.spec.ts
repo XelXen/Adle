@@ -2,7 +2,10 @@
  * The process and origin boundaries described in SECURITY.md, checked from
  * inside the running app rather than assumed from configuration.
  */
-import { expect, test } from './support/app';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+
+import { expect, test, waitForCore } from './support/app';
 import { fixtureScene, mountRawPlayer } from './support/player';
 
 test.describe('renderer boundary', () => {
@@ -30,6 +33,7 @@ test.describe('renderer boundary', () => {
       bridge: {
         app: ['info', 'openExternal', 'updateUiState'],
         core: ['invoke', 'onStatus', 'restart', 'status'],
+        data: ['eraseAll', 'restoreCopy', 'saveCopy', 'showSafetyCopies'],
         provider: ['clearApiKey', 'keyState', 'setApiKey'],
         sources: ['importDropped', 'importWithPicker'],
       },
@@ -95,6 +99,10 @@ test.describe('renderer boundary', () => {
         () => 'opened',
         () => 'refused',
       ),
+      // Writing a copy of the data to a named file is for the main process alone.
+      saveCopy: await window.adle!.core.invoke('data.save_copy', {
+        body: { path: 'C:/Users/Public/everything.adle' },
+      }),
     }));
     expect(results.internal).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     expect(results.unknown).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
@@ -104,6 +112,60 @@ test.describe('renderer boundary', () => {
     expect(results.badCourse).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     expect(results.prototype).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     expect(results.external).toBe('refused');
+    expect(results.saveCopy).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
+  });
+
+  test('the page cannot say where a copy goes, which file is restored, or that it is sure', async ({
+    adle,
+    profileDir,
+  }) => {
+    const { app, page } = adle;
+    await waitForCore(page);
+    const target = path.join(profileDir, 'chosen-by-the-page.adle');
+    // The learner backs out of every question the operating system asks.
+    await app.evaluate(({ dialog }) => {
+      const asked: string[] = [];
+      (globalThis as Record<string, unknown>).adleAskedKinds = asked;
+      dialog.showSaveDialog = () => {
+        asked.push('save');
+        return Promise.resolve({ canceled: true, filePath: '' });
+      };
+      dialog.showOpenDialog = () => {
+        asked.push('open');
+        return Promise.resolve({ canceled: true, filePath: '', filePaths: [] });
+      };
+      dialog.showMessageBox = () => {
+        asked.push('confirm');
+        return Promise.resolve({ response: 0, checkboxChecked: false });
+      };
+    });
+
+    // Page script passes everything it can think of. None of it is looked at.
+    const results = await page.evaluate(async (target) => {
+      type Loose = Record<string, (...args: unknown[]) => Promise<unknown>>;
+      const data = window.adle!.data as unknown as Loose;
+      return {
+        save: await data.saveCopy!(target, { path: target, filePath: target }),
+        restore: await data.restoreCopy!(target, { restoreFrom: target }),
+        erase: await data.eraseAll!(true, { confirmed: true, response: 1 }),
+      };
+    }, target);
+
+    // Each was asked of the learner, who said no; so nothing happened.
+    expect(results).toEqual({
+      save: { ok: true, data: null },
+      restore: { ok: true, data: null },
+      erase: { ok: true, data: null },
+    });
+    const asked = await app.evaluate(
+      () => (globalThis as Record<string, unknown>).adleAskedKinds as string[],
+    );
+    expect(asked).toEqual(['save', 'open', 'confirm']);
+    expect(existsSync(target)).toBe(false);
+    // The core was never stopped: nothing was restored and nothing was deleted.
+    expect(await page.evaluate(() => window.adle!.core.status())).toMatchObject({
+      state: 'ready',
+    });
   });
 });
 

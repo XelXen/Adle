@@ -6,7 +6,7 @@ import { Button, Callout, Dialog, Select, useToast } from '@adle/design-system';
 
 import { useRouter } from '../../app/router';
 import { callCore } from '../../lib/core-client';
-import { type JobFailure, refusalOf } from '../../lib/generation';
+import { type JobFailure, lessonDisclosure, refusalOf } from '../../lib/generation';
 import { useResource } from '../../lib/use-resource';
 import { STRATEGY_CHOICES, type TeachingStrategy } from '../course/ConceptDetail';
 import styles from './Lesson.module.css';
@@ -126,7 +126,7 @@ export function UnhelpfulDialog({
                 </Button>
               </div>
               <p className={styles.note}>
-                Sends this concept and its objectives to {status.display_name}. It usually takes
+                Sends to {status.display_name}: {lessonDisclosure('unknown')}. It usually takes
                 three of today&rsquo;s requests.
               </p>
             </>

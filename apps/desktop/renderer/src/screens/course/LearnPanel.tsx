@@ -9,7 +9,7 @@ import { GenerationStatus } from '../../components/GenerationStatus';
 import { NextSteps } from '../../components/NextSteps';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
-import { KIND_LESSON, readLessonOutcome } from '../../lib/generation';
+import { KIND_LESSON, lessonDisclosure, readLessonOutcome } from '../../lib/generation';
 import {
   formatWait,
   hypothesisLabel,
@@ -115,11 +115,8 @@ export function LearnPanel({ course }: { course: Course }) {
               </Button>
             </div>
             <p className={styles.aiNote}>
-              Sends{' '}
-              {course.source_count > 0
-                ? 'this concept, its objectives, and a few related passages from your materials'
-                : 'this concept and its objectives'}{' '}
-              to {providerName}. It usually takes three of today&rsquo;s requests.
+              Sends to {providerName}: {lessonDisclosure(course.source_count > 0 ? 'some' : 'none')}
+              . It usually takes three of today&rsquo;s requests.
             </p>
           </>
         ) : null}

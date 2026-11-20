@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+from collections.abc import Collection
 from pathlib import Path
 
 _CHUNK = 1024 * 1024
@@ -57,3 +58,21 @@ class AssetStore:
     def delete(self, stored_name: str | None) -> None:
         if stored_name:
             self.path_for(stored_name).unlink(missing_ok=True)
+
+    def keep_only(self, stored_names: Collection[str]) -> int:
+        """Delete every stored file whose name is not in ``stored_names``.
+
+        Returns how many were deleted. A file that cannot be deleted now is left for
+        the next time; folders are never touched.
+        """
+        wanted = set(stored_names)
+        removed = 0
+        for entry in self.root.iterdir():
+            if entry.name in wanted or not entry.is_file():
+                continue
+            try:
+                entry.unlink()
+            except OSError:
+                continue
+            removed += 1
+        return removed

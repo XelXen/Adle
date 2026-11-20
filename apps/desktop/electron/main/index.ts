@@ -79,7 +79,7 @@ async function start(): Promise<void> {
   const uiState = new UiStateStore(paths.uiStateFile());
   // Apply the saved theme before the window exists so there is no flash of the wrong one.
   nativeTheme.themeSource = uiState.get().theme;
-  const deps = { core, keyStore, uiState };
+  const deps = { core, keyStore, uiState, dataDir: paths.coreDataDir() };
 
   registerIpcHandlers(deps);
   forwardCoreStatus(core, () => mainWindow?.webContents ?? null);

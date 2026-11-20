@@ -8,6 +8,7 @@ import type {
   ConceptEvidence,
   ConceptOrder,
   ConceptUpdate,
+  CopyDestination,
   Course,
   CourseCreate,
   CourseList,
@@ -112,6 +113,7 @@ export const OPERATIONS = {
     path: '/v1/concepts/{concept_id}',
     internal: false,
   },
+  'data.save_copy': { method: 'POST', path: '/v1/data/copy', internal: true },
   'generation.accept_proposal': {
     method: 'POST',
     path: '/v1/jobs/{job_id}/accept',
@@ -316,6 +318,12 @@ export interface OperationTypes {
     query: undefined;
     body: ConceptUpdate;
     result: Curriculum;
+  };
+  'data.save_copy': {
+    path: undefined;
+    query: undefined;
+    body: CopyDestination;
+    result: null;
   };
   'generation.accept_proposal': {
     path: { job_id: string };

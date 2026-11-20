@@ -21,6 +21,10 @@ export const IPC = {
   providerClearApiKey: 'adle:provider:clear-api-key',
   sourcesImportWithPicker: 'adle:sources:import-with-picker',
   sourcesImportPaths: 'adle:sources:import-paths',
+  dataSaveCopy: 'adle:data:save-copy',
+  dataRestoreCopy: 'adle:data:restore-copy',
+  dataEraseAll: 'adle:data:erase-all',
+  dataShowSafetyCopies: 'adle:data:show-safety-copies',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -86,6 +90,12 @@ export interface ProviderKeyState {
 /** A background import as reported by the core (see `Job` in the generated contract). */
 export type ImportJob = Job;
 
+/** A copy of the learner's data was written where they chose. */
+export interface SavedCopy {
+  /** The name of the file, for saying what was saved. Never a path the page could act on. */
+  fileName: string;
+}
+
 /** External destinations the UI may open in the system browser. Nothing else can be opened. */
 export const EXTERNAL_LINKS = {
   aihubmixKeys: 'https://aihubmix.com/token',
@@ -121,5 +131,23 @@ export interface AdleBridge {
     importWithPicker(courseId: string): Promise<CoreResult<ImportJob | null>>;
     /** Import files the learner dropped onto the window. */
     importDropped(courseId: string, files: File[]): Promise<CoreResult<ImportJob>>;
+  };
+  /**
+   * The learner's own data as a whole. Each of these asks the learner in a window of the
+   * operating system, which page script cannot answer for them: where to save, which file
+   * to restore, whether to delete. Each resolves with `null` if they backed out.
+   */
+  data: {
+    /** Save a copy of everything Adle holds to a file the learner chooses. */
+    saveCopy(): Promise<CoreResult<SavedCopy | null>>;
+    /** Replace everything with a copy saved earlier. What is replaced is kept as a safety copy. */
+    restoreCopy(): Promise<CoreResult<{ restored: true } | null>>;
+    /** Delete every course, lesson, answer, and safety copy. The provider key is not touched. */
+    eraseAll(): Promise<CoreResult<{ erased: true } | null>>;
+    /**
+     * Open, in the file manager, the folder where Adle keeps the copies it makes before
+     * it replaces or updates the data. The folder is fixed; the page chooses nothing.
+     */
+    showSafetyCopies(): Promise<CoreResult<null>>;
   };
 }

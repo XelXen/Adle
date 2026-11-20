@@ -233,6 +233,23 @@ SQLite's write lock when it begins, so writers queue instead of colliding. One t
 never waits. The interface's polling and first loads are reads, so a job that is writing never
 holds the screen up. See ADR-015.
 
+## The data as a whole: copy, restore, delete
+
+Three actions in Settings → Privacy & data act on everything at once (ADR-016). The page asks
+for one with `window.adle.data.*`, which takes no arguments; the main process asks the learner
+the question that goes with it in a window of the operating system.
+
+- **Save a copy.** Main opens a save dialog and passes the chosen path to the internal
+  operation `data.save_copy`. The core writes one self-contained SQLite file (`.adle`) with
+  the online backup, under a temporary name, and renames it when complete.
+- **Restore from a copy.** Main opens an open dialog, stops the core, and starts it again with
+  `restore_from` in the handshake line. Before opening anything the core checks the file,
+  upgrades a working copy of it, keeps the current data in `data/backups/`, and swaps the
+  working copy in. The `ready` line says how it went; if the copy was refused, the core is
+  running on the data as it was.
+- **Delete everything.** Main asks for confirmation, stops the core and holds it stopped,
+  removes `data/`, and starts the core on an empty folder. The key and `ui-state.json` stay.
+
 ## Data on disk
 
 Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS default):
@@ -244,14 +261,14 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 | `data/adle.db` (+ `-wal`, `-shm`) | Core | Courses, sources, sections, chunks, jobs, settings, curriculum, learner preferences, observations, derived states, lessons with their scenes, lesson progress, and answers |
 | `data/sources/<source id>.<ext>` | Core | A copy of each imported original, named by its generated id |
 | `data/assets/` | Core | Reserved for generated lesson assets (M5) |
-| `data/backups/` | Core | Automatic database copies made before a migration (five kept) |
+| `data/backups/` | Core | Safety copies: `adle-before-*` made before a migration and `adle-replaced-*` made before a restore (the newest five of each are kept). Each is one file and can itself be restored |
 | `logs/core.log` | Main | The core's log output (no document text, answers, or secrets) |
 
 ## Code map
 
 | Path | Responsibility |
 |---|---|
-| `apps/desktop/electron/main` | App lifecycle, protocol, session hardening, core supervision, IPC handlers, key and UI-state storage |
+| `apps/desktop/electron/main` | App lifecycle, protocol, session hardening, core supervision, IPC handlers, key and UI-state storage; `data.ts` for copy, restore, and delete everything |
 | `apps/desktop/electron/preload` | The `window.adle` bridge: fixed channels only |
 | `apps/desktop/electron/shared` | The IPC contract (channel names and types) |
 | `apps/desktop/renderer` | React app: router, screens, core client, `ScenePlayer`, `MathText`; `src/lesson` holds lesson playback (controller, narrators, scene cues, answers) |
@@ -262,7 +279,7 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 | `packages/event-protocol` | Host ↔ player message types, validators, and origin helpers |
 | `packages/contracts` | Generated API types and operation table; the Lesson IR as JSON Schema |
 | `services/core/adle_core/api` | FastAPI app, auth, error contract, routes |
-| `services/core/adle_core/application` | The service container; courses, sources (import and search), background jobs, curriculum, learner, retrieval, lessons, assessment, the sample-course installer |
+| `services/core/adle_core/application` | The service container; courses, sources (import and search), background jobs, curriculum, learner, retrieval, lessons, assessment, the sample-course installer, saving and restoring a copy of the data (`data_copy.py`) |
 | `services/core/adle_core/lessons` | The Lesson IR, the validating gateway for lesson bundles, and the answer-free view for the player |
 | `services/core/adle_core/evaluation` | Deterministic scoring of answers |
 | `services/core/adle_core/sample_course` | The sample course: outline, lesson templates, scene files (package data) |

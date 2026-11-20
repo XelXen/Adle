@@ -6,8 +6,8 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Last updated:** 2026-11-19
 - **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
 - **Last commit:** see `git log -1`
-- **Active milestone:** M7 — saving and restoring data, a session summary, polish (the sample
-  course is complete)
+- **Active milestone:** M7 — a session summary and the polish pass (the sample course, and
+  saving, restoring, and deleting the data, are done)
 - **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
   `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
 
@@ -22,7 +22,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 | M4 — Wanim and Lesson IR | **Done** | Player frame, adapter, static scene policy, skill, threat model (ADR-004). Lesson IR 1.0 with a generated JSON Schema; one validating gateway; scenes re-checked on every read; answer keys kept in the core with deterministic scoring; the lesson player; the first lesson of the sample course (ADR-010). The packaged-build check is BLOCKED on M8 packaging. |
 | M5 — Generation, audio, timeline | **Done** (real provider BLOCKED) | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Every path is tested against a fake provider. **The real model has not produced a lesson yet:** the provider failed every request upstream on 2026-11-19, so the prompts are unchecked. |
 | M6 — Assessment and adaptation | **Done** | Hypotheses about mistakes computed from the record (tentative, supported, rejected, resolved), checked with questions that would show them, and dismissible by the learner; slips counted as partly right; repeats counted in full only after a gap; questions kept for practice in the Lesson IR; a next-step policy with a reason for every step; the Learn tab, practice and review, "what next" after a lesson, "This did not help"; teaching strategy chosen or rotated (ADR-014). Not built by decision: model grading of open answers and model-proposed hypotheses. |
-| M7 — Complete UX and sample course | **In progress** | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Missing: saving a copy of the data, restoring, and deleting everything in the interface; a session summary; the polish pass. |
+| M7 — Complete UX and sample course | **In progress** | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Also done: Settings → Privacy & data can save a copy of everything as one file, restore from one (checked and upgraded before anything is replaced; what is replaced is kept; undoable), and delete everything (ADR-016). Missing: a session summary; the polish pass. |
 | M8 — Release hardening | Not started | — |
 
 ## What works in the running app
@@ -95,22 +95,27 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   core; how much of today's request and token allowance is used and when it resets.
 - Settings → Learning: pace, explanation depth, narration, voice, volume (with a sample),
   captions, goal (stored by the core).
-- Settings → Privacy & data: what is stored, what is sent.
+- Settings → Privacy & data: what is stored and exactly what each kind of request sends.
+  **Save a copy** writes everything to one `.adle` file wherever the learner chooses.
+  **Restore from a copy** checks the file, brings it up to date, keeps what it replaces as a
+  safety copy, and restarts the local service on it; a file that is not a copy, or cannot be
+  used, changes nothing and says why. **Show safety copies** opens their folder; one of them
+  can be restored the same way, which is how a restore is undone. **Delete everything** asks
+  in the operating system's own window, then removes every course, material, answer, and
+  safety copy; the key and the appearance settings stay. Each works when the local service
+  has failed to start, except saving.
 - Settings → About & diagnostics: core status and restart; live scene runtime check with a mirrored,
   keyboard-operable slider.
 - Python core starts as a supervised child, authenticates with a per-launch token, migrates its
   database (with a backup first), and exits with the app.
 
 Not present yet (do not assume): a lesson written by the real model (see "The real provider"),
-a session summary, saving and restoring the data in the interface, packaging.
-
-Built and tested but not yet reachable from the interface: `restore_database`
-(`infrastructure/migrate.py`). The restore screen arrives with export in M7.
+a session summary, exporting a single course to share (not planned; ADR-016), packaging.
 
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the sample-course commit.
+`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-016.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -120,11 +125,11 @@ Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 383 tests, 19 files |
+| Vitest | PASS | 458 tests, 22 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 85 source files |
-| pytest | PASS | 967 tests |
-| Playwright + Electron (E2E) | PASS | 77 tests in 11 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
+| mypy (strict) | PASS | 87 source files |
+| pytest | PASS | 1006 tests |
+| Playwright + Electron (E2E) | PASS | 81 tests in 11 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
 | `npm audit` (all dependencies) | NOT RUN | Last run before KaTeX was added; run again before release |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
 | Packaged build | BLOCKED | No packager chosen yet (M8) |
@@ -180,6 +185,22 @@ investigated, not ignored.
 - React's lint rules (`react-hooks/immutability`, `refs`) reject writing to a ref received as
   a prop and reading refs in a `useState` initialiser. Long-lived non-React state goes in a
   small class created once (`openSession`, `SceneCues`).
+- **A copy of a SQLite database made with the backup API is still in write-ahead mode.**
+  Merely opening it, even read-only, creates a `-shm` and a `-wal` file beside it and leaves
+  them there. Every copy is therefore switched to single-file mode before it is closed
+  (`backup_database`); a test looks at the folder afterwards.
+- `PRAGMA trusted_schema = OFF` does not break the triggers that keep the search index in
+  step: FTS5 is marked harmless by SQLite. Checked with a probe before it was switched on,
+  and by the whole suite since.
+- The first version of a test for a guarantee can pass without testing it. The seven
+  guarantees of ADR-016 were each removed from the code in turn and a test was seen to fail
+  (a throwaway script outside the repository does this in a minute).
+- Several notices of what a lesson request sends had left out the learner's goal, pace, depth
+  of explanation, and the few words about where they stand on the concept. All of them now
+  come from one function (`lessonDisclosure`), which is to be kept in step with
+  `lesson_request` in the core.
+- A long shell heredoc that contains an apostrophe can fail to parse under Git Bash. Patch
+  scripts are written to a file and run from there.
 - Patch scripts written in Python on Windows turn LF into CRLF unless they write with
   `newline="\n"`. Git normalises on commit, but the working tree is left mixed. Node's
   `writeFileSync` does not do this.
@@ -224,13 +245,13 @@ and `lesson`, read what the model actually writes, and adjust the prompts and th
 
 ## Next actions (M7), in order
 
-1. **Save a copy, restore, and delete everything** in Settings → Privacy & data
-   (`restore_database` is built and tested; the Electron side is started in the working tree).
-2. **Session summary** (PLAN.md 3.1 step 10): what was demonstrated, what needs more evidence,
-   what is planned for review. `learner_events` and attempts hold what it needs.
-3. **Polish:** onboarding, empty and error states, keyboard and screen-reader pass, visual
+1. **Session summary** (PLAN.md 3.1 step 10): what was shown, what needs more evidence, what
+   is planned for review. The plan: a pure module reads a "sitting" off the record (the latest
+   run of activity with no pause over 45 minutes), `LearningService.overview` gathers the
+   activity and exposes it, and the Learn tab and the end of a lesson show it.
+2. **Polish:** onboarding, empty and error states, keyboard and screen-reader pass, visual
    baselines; try Wanim's slides mode for finer narration and animation timing.
-4. **Retry the real provider** (see above) and adjust the prompts, including the request for
+3. **Retry the real provider** (see above) and adjust the prompts, including the request for
    practice questions and for a way of teaching.
 
 Then M8 (packaging, hardening, performance report, release checklist).
@@ -241,7 +262,8 @@ Then M8 (packaging, hardening, performance report, release checklist).
 |---|---|
 | The main process does not handle a renderer crash (`render-process-gone`); the learner would see an empty window | M8 (start-up and shutdown failure matrix) |
 | The parser worker has no OS-level sandbox | M8, with packaging (SECURITY.md) |
-| Restore and export exist in code or are planned but have no screen | M7 |
+| A single course cannot be exported to share with someone else; a copy holds everything | By decision (ADR-016) |
+| A saved copy is not encrypted | By decision (ADR-016); the interface says so |
 | Narration and animation are synchronised per segment, not per sentence | M7, after testing Wanim's slides mode |
 | Working memory from the plan is not a stored thing: what a session needs is rebuilt from attempts, observations, and `learner_events` on every request | By decision (ADR-014) |
 | Open answers are self-assessed against a rubric, not graded by the model | By decision (ADR-014); revisit if the provider's allowance grows |

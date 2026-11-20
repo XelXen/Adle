@@ -383,7 +383,9 @@ test.describe('learning', () => {
       await expect(how.getByRole('option', { name: 'Pictures first' })).toHaveCount(0);
       await how.selectOption({ label: 'An everyday comparison' });
       await expect(dialog).toContainText(
-        'Sends this concept and its objectives to Custom endpoint (127.0.0.1).',
+        "Sends to Custom endpoint (127.0.0.1): this course's name, this concept and its " +
+          'objectives, where you stand on it in a few words, your preferences for pace and ' +
+          'depth, your goal, and any related passages from your materials.',
       );
       expect(provider.requests).toHaveLength(0);
       await dialog.getByRole('button', { name: 'Create that lesson' }).click();

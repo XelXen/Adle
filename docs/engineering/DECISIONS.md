@@ -21,6 +21,7 @@ supersedes the old one and update this index.
 | [013](../decisions/ADR-013-narration-aloud.md) | Narration is read by voices installed on the computer (local voices only), behind the narrator interface; words are highlighted only when the engine reports them; silent captions are always available. No bundled engine and no cloud voice in the first release. |
 | [014](../decisions/ADR-014-adaptation.md) | A pattern of wrong answers is a hypothesis computed from the record (tentative, supported, rejected, resolved) that the learner can set aside; a slip counts as partly right; a repeat counts in full only after a gap; lessons carry questions kept for review; the next step is chosen by readable rules, always with a reason, never the same lesson again after it did not help. No model grading and no model-proposed hypotheses. |
 | [015](../decisions/ADR-015-units-of-work.md) | A unit of work that may write takes SQLite's write lock when it begins and waits its turn; one that only reads runs on connections that cannot write and never waits. Fixes "database is locked" when a job committed between a request's first read and first write. |
+| [016](../decisions/ADR-016-copy-restore-and-delete.md) | A copy of the data is one self-contained file written through an internal operation; restoring happens while the core starts, on a working copy first, keeping what it replaces; deleting everything is done by the main process with the core held stopped; every path and confirmation comes from the operating system. |
 
 ## Smaller standing choices (no ADR)
 

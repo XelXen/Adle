@@ -8,6 +8,7 @@ import {
   keptNeeds,
   KIND_LESSON,
   KIND_PROPOSAL,
+  lessonDisclosure,
   readLessonOutcome,
   readProposal,
 } from './generation';
@@ -50,6 +51,23 @@ const PROPOSAL = {
   grounded_in_materials: true,
   accepted: false,
 };
+
+describe('lessonDisclosure', () => {
+  it('names what is said about the learner, not only what is said about the concept', () => {
+    for (const materials of ['some', 'none', 'unknown'] as const) {
+      const said = lessonDisclosure(materials);
+      for (const item of ['where you stand', 'pace and depth', 'your goal', "course's name"]) {
+        expect(said).toContain(item);
+      }
+    }
+  });
+
+  it('mentions passages from the materials only when there may be some', () => {
+    expect(lessonDisclosure('none')).not.toContain('materials');
+    expect(lessonDisclosure('some')).toContain('a few related passages from your materials');
+    expect(lessonDisclosure('unknown')).toContain('any related passages from your materials');
+  });
+});
 
 describe('readProposal', () => {
   it('reads the concepts, what each needs, and where the proposal came from', () => {
