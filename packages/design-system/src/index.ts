@@ -18,6 +18,9 @@ export { ActionCard, type ActionCardProps, Card, type CardProps } from './compon
 export {
   Checkbox,
   type CheckboxProps,
+  type ChoiceButton,
+  ChoiceButtons,
+  type ChoiceButtonsProps,
   RadioGroup,
   type RadioGroupProps,
   type RadioOption,

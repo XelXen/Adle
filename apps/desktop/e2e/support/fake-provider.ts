@@ -22,7 +22,7 @@ import { exampleScene } from './player';
 const answers = path.join(repoRoot, 'fixtures', 'model-answers');
 const read = (name: string): string => readFileSync(path.join(answers, name), 'utf8');
 
-export type RequestKind = 'curriculum' | 'lesson' | 'scene';
+export type RequestKind = 'curriculum' | 'lesson' | 'scene' | 'ask' | 'check';
 
 export interface RecordedRequest {
   kind: RequestKind;
@@ -61,12 +61,17 @@ export interface FakeProvider {
 function kindOf(system: string): RequestKind {
   if (system.includes('design the curriculum')) return 'curriculum';
   if (system.includes('Wanim scene file')) return 'scene';
+  // A question the learner asked in the middle of a lesson, and the check of a key.
+  if (system.includes('partway through a lesson')) return 'ask';
+  if (system.includes('checking that a connection works')) return 'check';
   return 'lesson';
 }
 
 function defaultAnswer(kind: RequestKind, user: string): string {
   if (kind === 'curriculum') return read('curriculum.json');
   if (kind === 'lesson') return read('lesson.json');
+  if (kind === 'ask') return read('answer.json');
+  if (kind === 'check') return 'ready';
   return exampleScene(user.includes('Kind: interactive') ? 'neuron_weight.py' : 'weighted_sum.py');
 }
 

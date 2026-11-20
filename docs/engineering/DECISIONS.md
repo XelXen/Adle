@@ -30,7 +30,10 @@ supersedes the old one and update this index.
 | [021](../decisions/ADR-021-a-choice-of-providers.md) | A second provider (NVIDIA NIM) chosen by the learner and by nothing else; a key kept and sent per provider and address; a provider's next model stands in when its first is away, and that is always said; each provider counted alone | Accepted |
 
 | [022](../decisions/ADR-022-sprout-second-edition.md) | Sprout, second edition: a serif for what is read and a sans for what is operated; three grounds (canvas, page, surface); finer radii and named shadows; the rail lists courses; a lesson has the whole window; the stage keeps its own colours | Accepted |
+| [023](../decisions/ADR-023-every-provider-with-a-key.md) | "Automatic": the learner may let Adle use every provider they have given a key to, each for what it is good at (the quick one for what is waited for, the roomy one for long work once the quick one is half used); a second provider is asked when the first cannot answer; where a request may go is said before, during, and after; with one provider chosen nothing changes | Accepted |
+| [024](../decisions/ADR-024-asking-during-a-lesson.md) | A question asked during a lesson is a note beside one part, not a chat: one request, kept with the part; a question the lesson is asking is never answered for the learner, and asking about it counts as help; short work has a lane of its own so it never waits behind a lesson | Accepted |
 | [025](../decisions/ADR-025-geist-typefaces.md) | Geist for all three voices: Geist Sans for what is operated, Geist Mono for what is exact, Geist Serif (one weight, kept as a file with its licence) for what is read; scenes keep Inter | Accepted |
+| [026](../decisions/ADR-026-breaks-and-being-told.md) | The wait for a lesson is said honestly and a break is offered beside it; a break is never counted; what is being written is visible from anywhere; a notification says it is ready in words fixed by its kind in the main process | Accepted |
 
 ## Smaller standing choices (no ADR)
 

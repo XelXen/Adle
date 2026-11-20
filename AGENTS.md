@@ -30,7 +30,7 @@ skills/wanim-scene-authoring/   how to write a scene; examples run by the E2E su
 docs/                architecture, ADRs (decisions/), engineering state
 fixtures/            sample documents for import tests (the sample course is package data in the core)
 scripts/             repo tooling (contracts, name allowlist, typecheck, check, package,
-                     licences, measurements)
+                     licences, the secret scan, measurements; dev/ for trying real providers)
 ```
 
 ## Commands
@@ -61,6 +61,8 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Package the app (a folder that runs by itself) | `npm run package`, then `npm run package:check` |
 | Run every journey against the packaged app | `npm run package:test`, then `npm run e2e:packaged` |
 | Third-party licences: list / check | `npm run licenses` / `npm run licenses:check` (part of `check`) |
+| Nothing secret is about to be committed | `npm run secrets:check` (part of `check`) |
+| Try the real providers by hand (spends allowance; never in a test) | `uv run --directory services/core python ../../scripts/dev/real_provider_check.py --help` |
 | Measure what a learner waits for | `node scripts/measure.mjs` (`--packaged` for the packaged build) |
 
 The packaged app is `apps/desktop/out/release/Adle-<platform>-<arch>/`. There is no installer
@@ -88,10 +90,17 @@ end-to-end suite can drive it: never hand that one to anyone.
   `operation_id` and `npm run contracts`. Main-only routes are marked `x-adle-internal`.
 - A provider key lives in OS secure storage and core memory. It must never appear in the
   renderer, argv, the environment, a log, the database, or a fixture.
-- There are two providers and the learner chooses one (ADR-021). Nothing else may change it:
-  no failure, missing key, or used-up quota moves a request to another provider. A key is
-  sent only to the provider, and the address, it was given for. A provider's next model
-  (same address, same key) may stand in for its first, and that is always said.
+- There are two providers. The learner chooses one, or "automatic": every provider they have
+  given a key to, each for what it is good at (ADR-021, ADR-023). Nothing else changes that
+  choice. With one provider chosen, no failure, missing key, or used-up quota moves a request
+  to another. With automatic, a request may go on to the next provider in the plan, and only
+  ever to one with a key of its own; where it may go is said before it is sent, and who
+  wrote the answer afterwards. A key is sent only to the provider, and the address, it was
+  given for. A provider's next model (same address, same key) may stand in for its first,
+  and that is always said.
+- A notification of the operating system is asked for by its kind and nothing else
+  (`window.adle.app.notify`). Its words are fixed in the main process (ADR-026): never add
+  an argument that carries text.
 - Scene code is untrusted. It runs only in the player frame, passes `scene_policy`, and talks
   only through `@adle/event-protocol`. Do not add message types casually; never pass callbacks,
   URLs, or paths through it.
@@ -113,6 +122,9 @@ end-to-end suite can drive it: never hand that one to anyone.
 - No blank screens: every async view has loading, empty, error, and ready states.
 - Never shame, never trap the learner in repetition, never show mastery as a precise percentage,
   never mark mastery from one answer. Always say why the next step was chosen.
+- A break is offered and never counted: no streak, total, or reminder (ADR-026).
+- A question asked during a lesson is a note beside one part, not a chat (ADR-024). It never
+  gets the answer to a question the lesson is asking.
 - Every animation has a text equivalent; every scene control has a keyboard-operable mirror.
 - No placeholder buttons, fake data paths, or "coming soon" in anything marked done.
 
@@ -125,8 +137,10 @@ end-to-end suite can drive it: never hand that one to anyone.
 account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day of its own)
 
 - Tests never call a real provider; use the fake server.
-- One request in flight, at most 4/minute, budget 80 requests and 800k tokens per day.
+- One request in flight at each provider, at most 4/minute there, budget 80 requests and 800k
+  tokens per day.
 - One scene = one request = one complete file. No repair loops; at most one deliberate retry.
+  A question asked during a lesson is one request, two at most; a check of a key is one.
   Asking a provider's next model because the one before is away is not a retry of the answer,
   and is bounded by the number of models.
 - Send a model only the fields its own reference lists (`ModelSpec` in `provider.py`), and

@@ -7,6 +7,7 @@ import { Button, Callout, Dialog, Select, useToast } from '@adle/design-system';
 import { useRouter } from '../../app/router';
 import { callCore } from '../../lib/core-client';
 import { type JobFailure, lessonDisclosure, refusalOf } from '../../lib/generation';
+import { destination, usualWait } from '../../lib/provider';
 import { useResource } from '../../lib/use-resource';
 import { STRATEGY_CHOICES, type TeachingStrategy } from '../course/ConceptDetail';
 import styles from './Lesson.module.css';
@@ -126,8 +127,9 @@ export function UnhelpfulDialog({
                 </Button>
               </div>
               <p className={styles.note}>
-                Sends to {status.display_name}: {lessonDisclosure('unknown')}. It usually takes
-                three of today&rsquo;s requests.
+                Sends to {destination(status, 'lesson')}: {lessonDisclosure('unknown')}. It usually
+                takes three of today&rsquo;s requests
+                {usualWait(status, 'lesson') ? `, and ${usualWait(status, 'lesson')}` : ''}.
               </p>
             </>
           ) : provider.resource.status === 'loading' ? (

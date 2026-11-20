@@ -22,6 +22,19 @@ and versions follow [Semantic Versioning](https://semver.org/).
   writing. Suggested concepts say which model suggested them.
 - "Use today" counts each provider separately, and says when the limits shown are Adle's own
   rather than the provider's.
+- **Use both providers together.** With a key for each, "Automatic" (Settings → AI provider)
+  sends what you are waiting for to the quicker one and long work to the one with more room,
+  and asks the other if one cannot answer. Before anything is sent Adle says where it may go,
+  and afterwards who wrote it. You can still choose one provider only.
+- **Ask a question in the middle of a lesson.** "Ask a question" pauses the lesson and lets
+  you ask about the part in front of you, in your own words or with a ready-made question
+  ("Say this more simply", "Give me an example"). The answer is kept beside that part. If
+  the part is a question for you, Adle helps you think and does not give the answer away.
+- **Take a break while a lesson is written.** Adle says about how long the wait is, offers a
+  break of that length, shows what it is writing from anywhere in the app, and tells you
+  when it is ready, with a notification if you are in another window. Notifications can be
+  turned off in Settings → Appearance.
+- Check that a provider's key works, from Settings, before relying on it.
 
 ### Changed
 
@@ -36,6 +49,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- "Cancel" and "Stop" now take effect at once. They used to wait until the provider next
+  sent something, which with a model that thinks before it writes could be minutes.
+- The time a lesson takes is no longer described as "a minute or two".
 - A lesson whose formulas the model wrote with single backslashes is now read as it was
   meant. Before, it was refused as unreadable and written again, or, worse, could have been
   accepted with its mathematics damaged.

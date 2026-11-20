@@ -182,6 +182,111 @@ export function RadioGroup<Value extends string>({
   );
 }
 
+/**
+ * A space between two pieces of text that are laid out apart from each other. It takes no
+ * room (a flex container drops it), but it keeps the pieces from being read, by a
+ * checker or a search, as one word run together.
+ */
+const SPACE = ' ';
+
+export interface ChoiceButton<Value extends string> {
+  value: Value;
+  label: ReactNode;
+  description?: ReactNode;
+  /** A short label at the end of the title's line, such as "Recommended". */
+  badge?: ReactNode;
+}
+
+export interface ChoiceButtonsProps<Value extends string> {
+  /** Accessible name of the group. */
+  label: string;
+  /** The option in force, or null while none is. */
+  value: Value | null;
+  options: readonly ChoiceButton<Value>[];
+  onValueChange: (value: Value) => void;
+  /** The option being put into force at the moment, when that takes a while. */
+  pending?: Value | null;
+  disabled?: boolean;
+  className?: string;
+}
+
+/**
+ * One choice from a short list that takes effect, and is recorded, the moment it is
+ * pressed. Each option is a button that says whether it is the one in force
+ * (`aria-pressed`), so the arrow keys never change anything on their way past. For a
+ * choice that is confirmed with a button afterwards, use `RadioGroup`.
+ *
+ * A button is named by everything it shows, in the order it shows it: its title, its
+ * badge, then what it means. Naming it by the title alone would leave words on screen
+ * that speech control cannot press; leaving the naming to the content would run the
+ * pieces together into one word.
+ */
+export function ChoiceButtons<Value extends string>({
+  label,
+  value,
+  options,
+  onValueChange,
+  pending = null,
+  disabled = false,
+  className,
+}: ChoiceButtonsProps<Value>) {
+  const name = useId();
+  return (
+    <div role="group" aria-label={label} className={cx(styles.radioGroup, className)}>
+      {options.map((option) => {
+        const id = `${name}-${option.value}`;
+        const selected = option.value === value;
+        const busy = option.value === pending;
+        const namedBy = [
+          `${id}-label`,
+          option.badge ? `${id}-badge` : null,
+          option.description ? `${id}-description` : null,
+        ]
+          .filter((part) => part !== null)
+          .join(' ');
+        return (
+          <button
+            key={option.value}
+            type="button"
+            className={cx(
+              styles.radioRow,
+              styles.choiceButton,
+              selected && styles.radioRowSelected,
+            )}
+            aria-pressed={selected}
+            aria-busy={busy || undefined}
+            aria-labelledby={namedBy}
+            // Kept focusable while something is pending, so the keyboard does not lose its place.
+            aria-disabled={disabled || pending !== null || undefined}
+            onClick={() => {
+              if (!disabled && pending === null && !selected) onValueChange(option.value);
+            }}
+          >
+            <span className={cx(styles.choiceMark, selected && styles.choiceMarkOn)} aria-hidden />
+            <span className={styles.checkboxText}>
+              <span className={styles.choiceTitle}>
+                <span id={`${id}-label`}>{option.label}</span>
+                {option.badge ? (
+                  <>
+                    {SPACE}
+                    <span id={`${id}-badge`}>{option.badge}</span>
+                  </>
+                ) : null}
+              </span>
+              {option.description ? SPACE : null}
+              {option.description ? (
+                <span id={`${id}-description`} className={styles.checkboxDescription}>
+                  {option.description}
+                </span>
+              ) : null}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export interface SegmentedOption<Value extends string> {
   value: Value;
   label: string;

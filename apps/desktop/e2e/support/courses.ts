@@ -78,6 +78,32 @@ export async function importAndWait(
 export const courseCard = (page: Page, name: string | RegExp) =>
   page.getByRole('main').getByRole('button', { name });
 
+/** The card of one provider in Settings → AI provider, by the name it is shown under. */
+export const providerCard = (page: Page, name: string | RegExp) =>
+  page
+    .getByRole('list', { name: 'AI providers' })
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('heading', { name, exact: typeof name === 'string' }) });
+
+/** The field a provider's key is typed into: empty whether or not one is saved already. */
+export const providerKeyField = (page: Page, name: string | RegExp) =>
+  providerCard(page, name).getByRole('textbox', { name: /API key$|^Replace the .* key$/ });
+
+/**
+ * Save a key for one provider, on Settings → AI provider, and wait until it says so.
+ * `name` is the provider as it is shown ("AIHubMix"); the key's last four characters
+ * are what the card shows afterwards.
+ */
+export async function saveProviderKey(
+  page: Page,
+  name: string | RegExp,
+  key: string,
+): Promise<void> {
+  await providerKeyField(page, name).fill(key);
+  await providerCard(page, name).getByRole('button', { name: 'Save key' }).click();
+  await expect(providerCard(page, name)).toContainText(`Key saved · ends in ${key.slice(-4)}`);
+}
+
 /** Open one of a course's tabs. A course with concepts opens on "Learn". */
 export async function openCourseTab(
   page: Page,

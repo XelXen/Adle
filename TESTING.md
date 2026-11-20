@@ -126,6 +126,8 @@ dialog, run axe, save a screenshot.
 |---|---|
 | `first-run.spec.ts` | First launch without a key; disclosure shown; library; persisted across restart; keyboard-only completion |
 | `providers.spec.ts` | **Two providers, as two servers on this computer.** Both are shown with their addresses and models in order; choosing NVIDIA and giving it its own key; a request with the first model away: only NVIDIA's server is asked, only with NVIDIA's key, each model with only its documented fields; the stand-in is said while it happens and in the review; the provider cannot be changed while it is writing; the choice, both keys and the count survive a restart. A key is not handed over when the provider has moved, and is there again when it is back. The page cannot name an address or an unknown provider |
+| `ask.spec.ts` | **A question asked during a lesson.** What will be sent is said first and nothing is sent before "Ask"; the answer is typeset and says who wrote it; it is kept beside its part, can be removed, belongs to that part, and is there after a restart; a ready-made question; a question the lesson is asking: the dialog says asking counts as help, the request has the choices and nothing that settles it, and the answer that follows is recorded as aided (read from the database); a slow answer: carry on with the lesson, be told by the app and (recorded, never shown) by the computer; stopping one; a provider that fails; no key |
+| `break.spec.ts` | **Waiting for something to be written.** The wait is said in minutes with a break offered; the break's clock, made longer and shorter, left running in the rail; the lesson arrives while the learner is in Settings and in another window: a toast, and a notification with fixed words; the break has it waiting and opening it ends the break; a break ends by itself (the page's clock moved forward), says so once, and more rest is as welcome as going back; notifications turned off; the page cannot ask for words of its own |
 | `provider-key.spec.ts` | Save key → not in DOM, bridge responses, or any profile file (including the core log after exit); survives restart; remove with confirmation; invalid key; dialog focus trap and Escape |
 | `scene-player.spec.ts` | Plain scene; interactive scene driven by host and by pointer; events; pause/resume frame-identical; hold on first frame; theme; four broken scenes fail safely; stuck scene isolated; **a curve shown by its stroke is a line and one shown with `set_opacity` is filled in** (the window's own pixels, read by the main process); every skill example and **every scene of the sample course** run to completion in both themes, with a screenshot of each; the in-app runtime check operated by keyboard |
 | `security.spec.ts` | Renderer globals and exact bridge surface; no network/popups/navigation; inline script refused; internal operations refused; **the page cannot say where a copy goes, which file is restored, or that the learner is sure**; hostile scene contained; player has no bridge |
@@ -142,6 +144,15 @@ dialog, run axe, save a screenshot.
 
 Screenshots of every screen and scene are written to `apps/desktop/test-results/screens/` for
 review. They are not compared against baselines (see Gaps).
+
+No notification of the operating system is ever shown by a test run. The launch helper
+replaces the last step (`Notification.prototype.show`) with a recorder, so the app's own
+decision runs as it does for a learner: read what it would have shown with `adle.notices()`.
+One is only asked for while the window does not have the focus, which on a developer's
+screen is a matter of luck, so a journey sets it: `adle.setFocused(false)`.
+
+A journey that needs minutes to pass moves the page's clock (`page.clock.install()`,
+`fastForward`, then `resume`); it never waits them out.
 
 Test launches add Chromium switches that keep the window painting when it is covered by another
 window; they affect scheduling only. Before a test starts, the launch helper waits for the window

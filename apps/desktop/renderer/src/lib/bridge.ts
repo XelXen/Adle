@@ -23,6 +23,7 @@ export type {
   CoreResult,
   CoreStatus,
   ExternalLinkId,
+  NoticeKind,
   ProviderKeyState,
   ProviderKeyStates,
   ThemePreference,

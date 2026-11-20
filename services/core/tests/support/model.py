@@ -1,7 +1,7 @@
 """A stand-in for the model provider that never leaves the process.
 
 ``FakeProvider`` is an httpx transport handler. By default it answers each kind
-of request (curriculum, lesson, scene) with a good canned answer; a test can
+of request (curriculum, lesson, scene, ask, check) with a good canned answer; a test can
 queue specific answers, failures, or malformed output ahead of the defaults.
 Everything that was asked is recorded so tests can assert on what was sent.
 """
@@ -28,6 +28,8 @@ FORBIDDEN_SCENE = "import os\nfrom manim import *\n\n\nclass Bad(Scene):\n    de
 ANSWERS = REPO_ROOT / "fixtures" / "model-answers"
 CURRICULUM: dict[str, Any] = json.loads((ANSWERS / "curriculum.json").read_text("utf-8"))
 LESSON: dict[str, Any] = json.loads((ANSWERS / "lesson.json").read_text("utf-8"))
+#: An answer to something the learner asked in the middle of a lesson.
+ANSWER: dict[str, Any] = json.loads((ANSWERS / "answer.json").read_text("utf-8"))
 
 
 def sse(text: str, *, usage: dict[str, int] | None = None) -> httpx.Response:
@@ -69,6 +71,10 @@ class FakeProvider:
             return "curriculum"
         if "Wanim scene file" in system:
             return "scene"
+        if "partway through a lesson" in system:
+            return "ask"
+        if "checking that a connection works" in system:
+            return "check"
         return "lesson"
 
     def kinds(self) -> list[str]:
@@ -85,6 +91,10 @@ class FakeProvider:
             return CURRICULUM
         if kind == "lesson":
             return LESSON
+        if kind == "ask":
+            return ANSWER
+        if kind == "check":
+            return "ready"
         user = body["messages"][1]["content"]
         return INTERACTIVE_SCENE if "Kind: interactive" in user else ANIMATION_SCENE
 

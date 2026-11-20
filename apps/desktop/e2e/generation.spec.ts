@@ -11,6 +11,8 @@ import {
   courseCard,
   createCourse,
   expectNoAccessibilityViolations,
+  providerKeyField,
+  saveProviderKey,
   screenshot,
   showNarrationAsText,
 } from './support/courses';
@@ -43,9 +45,7 @@ async function open(
   await showNarrationAsText(page);
   if (options.key !== false) {
     await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByLabel('API key', { exact: true }).fill(KEY);
-    await page.getByRole('button', { name: 'Save key' }).click();
-    await expect(page.getByText('Saved · ends in 4Wd1')).toBeVisible();
+    await saveProviderKey(page, /Custom endpoint/, KEY);
     await page.getByRole('button', { name: 'Library', exact: true }).click();
   }
   return { adle, page, provider };
@@ -75,9 +75,11 @@ test.describe('generation with the AI provider', () => {
 
     // The learner is told where requests go: this is not the default provider.
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('heading', { name: 'Custom endpoint (127.0.0.1)' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Custom endpoint (127.0.0.1)', exact: true }),
+    ).toBeVisible();
     // It is the only provider there is, so there is nothing to choose between.
-    await expect(page.getByRole('button', { name: /^Us(e|ing) / })).toHaveCount(0);
+    await expect(page.getByRole('group', { name: 'Which provider to use' })).toHaveCount(0);
     await expect(page.getByText('0 of 90', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Library', exact: true }).click();
 
@@ -198,7 +200,7 @@ test.describe('generation with the AI provider', () => {
     expect(provider.requests).toHaveLength(0);
 
     await refusal.getByRole('button', { name: 'Open AI settings' }).click();
-    await expect(page.getByLabel('API key', { exact: true })).toBeVisible();
+    await expect(providerKeyField(page, /Custom endpoint/)).toBeVisible();
     await close(session);
   });
 

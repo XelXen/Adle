@@ -7,6 +7,7 @@ import {
   Button,
   Callout,
   Checkbox,
+  ChoiceButtons,
   Dialog,
   EmptyState,
   ErrorState,
@@ -231,6 +232,63 @@ describe('RadioGroup', () => {
     expect(screen.getByRole('radio', { name: 'The first input' })).toHaveAccessibleDescription(
       'The right answer',
     );
+  });
+});
+
+describe('ChoiceButtons', () => {
+  const options = [
+    { value: 'auto', label: 'Automatic', description: 'Use each for what it is best at.' },
+    { value: 'one', label: 'One only', description: 'Everything goes to one.' },
+  ] as const;
+
+  it('says which option is in force and changes nothing on the way past', async () => {
+    const onValueChange = vi.fn();
+    render(
+      <ChoiceButtons
+        label="Which provider"
+        value="auto"
+        options={options}
+        onValueChange={onValueChange}
+      />,
+    );
+    const group = screen.getByRole('group', { name: 'Which provider' });
+    expect(group).toBeInTheDocument();
+    const automatic = screen.getByRole('button', { name: /^Automatic/ });
+    const one = screen.getByRole('button', { name: /^One only/ });
+    expect(automatic).toHaveAttribute('aria-pressed', 'true');
+    expect(one).toHaveAttribute('aria-pressed', 'false');
+    // Named by everything it shows, title first: no words on screen that cannot be said.
+    expect(one).toHaveAccessibleName('One only Everything goes to one.');
+
+    // Arrow keys move nothing: only pressing an option chooses it.
+    automatic.focus();
+    await userEvent.keyboard('{ArrowDown}{ArrowUp}');
+    expect(onValueChange).not.toHaveBeenCalled();
+    // Pressing the one already in force is not a change.
+    await userEvent.click(automatic);
+    expect(onValueChange).not.toHaveBeenCalled();
+    await userEvent.click(one);
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith('one');
+  });
+
+  it('takes no second choice while the first is being put into force', async () => {
+    const onValueChange = vi.fn();
+    render(
+      <ChoiceButtons
+        label="Which provider"
+        value="auto"
+        pending="one"
+        options={options}
+        onValueChange={onValueChange}
+      />,
+    );
+    const one = screen.getByRole('button', { name: /^One only/ });
+    expect(one).toHaveAttribute('aria-busy', 'true');
+    // Still focusable, so the keyboard does not lose its place.
+    expect(one).not.toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: /^Automatic/ }));
+    await userEvent.click(one);
+    expect(onValueChange).not.toHaveBeenCalled();
   });
 });
 

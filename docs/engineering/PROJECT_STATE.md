@@ -10,7 +10,10 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   failure handling (ADR-018), packaging (ADR-019), the licence inventory, the audits, the
   performance report, and the release checklist. Since then: a second AI provider, NVIDIA
   NIM, beside AIHubMix (ADR-021), through which **a real model has written lessons for the
-  first time**. What is left needs the owner; see "Next actions"
+  first time**; and, at the owner's request on 2026-11-20: a new look (ADR-022) in Geist
+  (ADR-025), both providers used together (ADR-023), questions asked during a lesson
+  (ADR-024), and a break while a lesson is written (ADR-026). What is left needs the owner;
+  see "Next actions"
 - **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
   `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
 
@@ -107,13 +110,31 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Narration aloud:** the lesson is read by a voice installed on the computer (never an online
   one), with "Read aloud" and "Transcript" switches in the lesson. Without a voice, or if the
   voice fails, the narration is shown as text at the learner's reading pace.
-- Settings → AI provider: **choose between AIHubMix and NVIDIA NIM.** Each card shows the
-  provider's address, its models in the order they are asked, and what that order means.
-  The provider is changed only by that button, and not while something is being written.
-  Below it: save / replace / remove the key of the provider in use (OS-encrypted; a key is
-  kept for one provider at one address and never sent anywhere else), and how much of today's
-  request and token allowance is used **at that provider** and when it resets, with a
-  sentence saying whether the limits are the provider's or Adle's own.
+- Settings → AI provider: **"Which provider to use": Automatic, AIHubMix only, or NVIDIA
+  NIM only.** Automatic uses every provider that has a key, each for what it is best at:
+  what is waited for (a question, a list of concepts) goes to the quick one, long work (a
+  lesson) to the roomy one once the quick one is half used for the day, and the other is
+  asked when one cannot answer. "Where requests go now" shows the plan for each kind of
+  request and the reason. The choice is changed only there, and not while something is
+  being written. Below it, a card for each provider: its address, its models in the order
+  they are asked, its key (save, replace, remove; OS-encrypted; kept for one provider at one
+  address and never sent anywhere else), **"Check that it works"** (one word from that
+  provider, nothing of the learner's sent), and how much of today's allowance is used
+  there, with a sentence saying whether the limits are the provider's or Adle's own.
+- **Asking a question during a lesson:** "Ask a question" in the lesson's bar pauses the
+  lesson and opens a dialog: the learner's own words or a ready-made question, what will
+  be sent and where, and "Ask". The answer is kept beside that part under "Your questions
+  about this part", says who wrote it, and can be removed. The learner can carry on with
+  the lesson while it is written. On a question the lesson is asking, Adle helps without
+  giving the answer, and the answer that follows counts as an aided one.
+- **Waiting:** where something is being written, the app says about how long it usually
+  takes, that the learner need not watch, and offers **a break**: one clock sized to the
+  wait, a small idea of what to do away from the screen, and what is being written
+  meanwhile. The rail shows "Now": what is being written and a running break. When it is
+  ready the app says so, and so does the operating system (fixed words, only while Adle is
+  in the background; can be turned off in Settings → Appearance). A break is also offered
+  at the end of a lesson. Nothing about breaks is counted or kept.
+- "Cancel" and "Stop" take effect at once, however silent the provider is.
 - Settings → Learning: pace, explanation depth, narration, voice, volume (with a sample),
   captions, goal (stored by the core).
 - Settings → Privacy & data: what is stored and exactly what each kind of request sends.
@@ -343,35 +364,64 @@ With that account the model is reachable in principle, and what stands in the wa
 the account up, which is the owner's to do. Adle recognises such an answer (`provider_notice`,
 ADR-020): one request, the provider's words shown, the settings offered.
 
-AIHubMix stays the provider in use until the learner chooses otherwise, because it was the
-only one when people first installed Adle. That is one line (`ProviderCatalogue.providers`)
-if the owner would rather new installations start on NVIDIA.
+Tried again on 2026-11-20 through the new "automatic" choice, with keys for both providers
+(`scripts/dev/real_provider_check.py`, see "Trying the real providers again"): AIHubMix
+answered a check of its key and a question with the same notice; NVIDIA's Kimi K3.1 Pro
+answered the check in 14 seconds and then **the question, in AIHubMix's place, in 64
+seconds**, and the answer's record says "AIHubMix could not answer, so NVIDIA NIM wrote
+this." That run is also why an account that refuses is now left alone for six hours, not
+ten minutes: each try at it can be one of the ten the account allows.
+
+New installations start on "automatic", which with one key is simply that provider. The
+owner's description of AIHubMix as the quick one is written into its definition (`quick`)
+and has not been observed: its model has never answered Adle.
+
+### Trying the real providers again
+
+    uv run --directory services/core python ../../scripts/dev/real_provider_check.py \
+        --out <a folder outside the repository> \
+        --aihubmix <file holding that key> --nvidia <file holding that key> \
+        --selection auto check ask curriculum lesson
+
+Keys are read from files and never printed. Every prompt and answer is saved under
+`--out`, with which provider and model each request went to and how long it took, and the
+data it leaves can be opened in the app (`ADLE_USER_DATA_DIR=<out>/profile`). No test runs
+this, and it spends real allowance.
 
 ## Next actions
 
 What remains needs the owner. In the order it matters:
 
 1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
-   They are in a transcript; treat them as used. Then type the new NVIDIA key into
-   Settings → AI provider yourself, choose NVIDIA, and **sit a generated lesson from start
-   to finish**. That is the one thing about generation nobody has done yet. Expect about ten
-   minutes for a lesson to be written.
-2. **Push the branch** so that CI runs for the first time, on Windows and Linux. Expect
-   surprises on Linux: nothing has run there.
-3. **Choose a licence, get signing certificates, and add an installer** (ADR-019 says what
+   They are in a transcript; treat them as used. Then type the new keys into Settings → AI
+   provider yourself, press "Check that it works" on each, leave the choice on Automatic,
+   and **sit a generated lesson from start to finish**, asking it a question on the way.
+   Expect about twelve minutes for a lesson to be written by NVIDIA; the app will offer a
+   break and tell you when it is ready.
+2. **Top up the AIHubMix account** (its notice says ten tries without one), or remove its
+   key: until then Automatic finds out once that it refuses and uses NVIDIA.
+3. **Push the branch** so that CI runs for the first time, on Windows and Linux (it now runs
+   for `dev` too). Expect surprises on Linux: nothing has run there.
+4. **Choose a licence, get signing certificates, and add an installer** (ADR-019 says what
    and why). `docs/engineering/RELEASE_CHECKLIST.md` is the list.
-4. **Try the packaged folder on a computer that never had the project**, and on macOS.
-5. Decide whether new installations should start on NVIDIA rather than AIHubMix (see "The
-   real providers"), and whether GLM 5.3 Flash should stay third while it does not answer.
-6. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
+5. **Try the packaged folder on a computer that never had the project**, and on macOS.
+6. Decide whether GLM 5.3 Flash should stay NVIDIA's third model while it does not answer.
+7. The largest thing still not built from the plan: **opening a lesson as soon as its words
+   are ready**, with the pictures arriving while the learner studies (PROMPT.md 3, PLAN 12.1).
+   The break makes the wait easier; this would shorten it from about twelve minutes to five.
+8. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
    single course; a screen-reader pass by a person; showing on a lesson, not only on its
-   job, which model wrote it.
+   job, which model wrote it; removing a lesson from the interface; a "continue" card on the
+   library.
 
 ## Known gaps (tracked, not forgotten)
 
 | Gap | Planned |
 |---|---|
-| "Stop" on a generation waits for the provider's next line: usually under a second, up to three minutes if the provider is silent | By decision (ADR-021): closing a connection from another thread is not dependable across platforms |
+| A request the learner stopped is given up at once, but its connection is only let go when the provider next says something (or its time runs out), so for a moment two may be open at one provider | By decision (ADR-023): closing a connection from another thread is not dependable across platforms |
+| A lesson appears only when all of it is written, pictures included | Not built (ADR-026, "Next actions" 7) |
+| A question asked during a lesson does not remember earlier questions | By decision (ADR-024): it is a note, not a chat |
+| AIHubMix being "the quick one" is the owner's report, not a measurement | Its model has never answered Adle; one word in its definition if it turns out otherwise |
 | Which model wrote a lesson is kept with the job that made it, not with the lesson | When someone wants to see it later than the notice |
 | GLM 5.3 Flash, NVIDIA's third model, has never answered | The owner's choice of order (ADR-021) |
 | The parser worker has no OS-level sandbox | Not built. It is a separate, short-lived, isolated process that returns only checked JSON (SECURITY.md) |

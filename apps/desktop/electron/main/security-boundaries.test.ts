@@ -72,7 +72,7 @@ describe('main window', () => {
     const options = createdWindows.at(-1) as { show: boolean; backgroundColor: string };
     // Not hidden until `ready-to-show`: see the note in window.ts.
     expect(options.show).toBe(true);
-    expect(options.backgroundColor).toBe('#F6F8F4');
+    expect(options.backgroundColor).toBe('#F3F4F1');
   });
 
   it('carries the app icon, which exists in the repository', () => {

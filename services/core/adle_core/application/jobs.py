@@ -1,10 +1,14 @@
 """Background jobs the interface can watch and cancel.
 
-Long work (importing documents, and later generating lessons) must not block
-a request or the interface. A job is a row in the database plus a function
-run on a single worker thread:
+Long work (importing documents, generating lessons) must not block a request
+or the interface. A job is a row in the database plus a function run on a
+worker thread:
 
-* one job runs at a time, so heavy work is naturally bounded;
+* there are two lanes, each with one worker. Long work (an import, a lesson, a
+  list of concepts) runs in the main lane one job at a time, so heavy work is
+  naturally bounded. Short things the learner is sitting and waiting for (a
+  question asked in the middle of a lesson, a check that a key works) run in
+  the quick lane, so that they never wait behind a lesson that takes minutes;
 * progress and outcome are persisted, so the interface can poll for them;
 * cancellation is cooperative: the work checks ``context.cancelled``;
 * a job that was still pending when the app closed is marked as interrupted
@@ -18,6 +22,7 @@ import queue
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -30,6 +35,12 @@ from adle_core.infrastructure.orm import Job
 logger = logging.getLogger(__name__)
 
 ACTIVE_STATUSES = ("queued", "running")
+
+#: Long work, one job at a time.
+LANE_MAIN = "main"
+#: Short work the learner is waiting for. It does not wait behind long work.
+LANE_QUICK = "quick"
+LANES = (LANE_MAIN, LANE_QUICK)
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +56,8 @@ class JobSnapshot:
     result: Any | None
     error_code: str | None
     error_message: str | None
+    #: When it was asked for, so that the interface can say how long it has been.
+    created_at: datetime | None = None
 
     @property
     def finished(self) -> bool:
@@ -66,6 +79,7 @@ def _snapshot(job: Job) -> JobSnapshot:
         result=job.result,
         error_code=error.get("code"),
         error_message=error.get("message"),
+        created_at=job.created_at,
     )
 
 
@@ -107,14 +121,16 @@ Work = Callable[[JobContext], Any]
 
 
 class JobRunner:
-    """Runs submitted work one job at a time on a background thread."""
+    """Runs submitted work on background threads: one job at a time in each lane."""
 
     def __init__(self, database: Database) -> None:
         self._database = database
-        self._queue: queue.Queue[tuple[str, Work] | None] = queue.Queue()
+        self._queues: dict[str, queue.Queue[tuple[str, Work] | None]] = {
+            lane: queue.Queue() for lane in LANES
+        }
         self._cancel_events: dict[str, threading.Event] = {}
         self._lock = threading.Lock()
-        self._thread: threading.Thread | None = None
+        self._threads: list[threading.Thread] = []
 
     def start(self) -> None:
         """Mark work abandoned by a previous run as interrupted, then start the worker."""
@@ -125,17 +141,22 @@ class JobRunner:
                     "code": "interrupted",
                     "message": "Adle was closed before this finished. You can start it again.",
                 }
-        self._thread = threading.Thread(target=self._work_loop, name="adle-jobs", daemon=True)
-        self._thread.start()
+        for lane in LANES:
+            thread = threading.Thread(
+                target=self._work_loop, args=(lane,), name=f"adle-jobs-{lane}", daemon=True
+            )
+            thread.start()
+            self._threads.append(thread)
 
     def stop(self, timeout: float = 5.0) -> None:
-        """Ask running work to stop and wait briefly for the worker to finish."""
+        """Ask running work to stop and wait briefly for the workers to finish."""
         with self._lock:
             for cancel_event in self._cancel_events.values():
                 cancel_event.set()
-        self._queue.put(None)
-        if self._thread is not None:
-            self._thread.join(timeout)
+        for waiting in self._queues.values():
+            waiting.put(None)
+        for thread in self._threads:
+            thread.join(timeout)
 
     def submit(
         self,
@@ -144,6 +165,7 @@ class JobRunner:
         *,
         course_id: str | None = None,
         subject_id: str | None = None,
+        lane: str = LANE_MAIN,
     ) -> JobSnapshot:
         job_id = new_id("job")
         with self._database.session() as session:
@@ -160,7 +182,7 @@ class JobRunner:
             snapshot = _snapshot(job)
         with self._lock:
             self._cancel_events[job_id] = threading.Event()
-        self._queue.put((job_id, work))
+        self._queues[lane].put((job_id, work))
         return snapshot
 
     def find_active(self, kind: str, subject_id: str) -> JobSnapshot | None:
@@ -194,6 +216,16 @@ class JobRunner:
                 select(Job.id).where(Job.kind.in_(kinds), Job.status.in_(ACTIVE_STATUSES)).limit(1)
             ).first()
             return found is not None
+
+    def list_all_active(self, kinds: Sequence[str]) -> list[JobSnapshot]:
+        """Jobs of these kinds that are waiting or running, in any course, oldest first."""
+        with self._database.read() as session:
+            jobs = session.scalars(
+                select(Job)
+                .where(Job.kind.in_(kinds), Job.status.in_(ACTIVE_STATUSES))
+                .order_by(Job.created_at, Job.id)
+            )
+            return [_snapshot(job) for job in jobs]
 
     def list_active(self, course_id: str) -> list[JobSnapshot]:
         """Jobs of a course that are waiting or running, oldest first."""
@@ -256,9 +288,10 @@ class JobRunner:
             for name, value in fields.items():
                 setattr(job, name, value)
 
-    def _work_loop(self) -> None:
+    def _work_loop(self, lane: str) -> None:
+        waiting = self._queues[lane]
         while True:
-            item = self._queue.get()
+            item = waiting.get()
             if item is None:
                 return
             job_id, work = item

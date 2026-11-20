@@ -67,6 +67,81 @@
         "title": "AnswerResult",
         "type": "object"
       },
+      "Ask": {
+        "description": "A question the learner asked about a part of a lesson, and the answer.",
+        "properties": {
+          "citations": {
+            "items": { "$ref": "#/components/schemas/AskCitation" },
+            "title": "Citations",
+            "type": "array"
+          },
+          "created_at": { "format": "date-time", "title": "Created At", "type": "string" },
+          "id": { "title": "Id", "type": "string" },
+          "lesson_id": { "title": "Lesson Id", "type": "string" },
+          "paragraphs": { "items": { "type": "string" }, "title": "Paragraphs", "type": "array" },
+          "question": { "title": "Question", "type": "string" },
+          "segment_id": { "title": "Segment Id", "type": "string" },
+          "written_by": { "$ref": "#/components/schemas/WrittenBy" }
+        },
+        "required": [
+          "id",
+          "lesson_id",
+          "segment_id",
+          "question",
+          "paragraphs",
+          "citations",
+          "written_by",
+          "created_at"
+        ],
+        "title": "Ask",
+        "type": "object"
+      },
+      "AskCitation": {
+        "properties": {
+          "locator": { "title": "Locator", "type": "string" },
+          "source_name": { "title": "Source Name", "type": "string" }
+        },
+        "required": ["source_name", "locator"],
+        "title": "AskCitation",
+        "type": "object"
+      },
+      "AskList": {
+        "properties": {
+          "asks": {
+            "items": { "$ref": "#/components/schemas/Ask" },
+            "title": "Asks",
+            "type": "array"
+          },
+          "limit": { "title": "Limit", "type": "integer" }
+        },
+        "required": ["asks", "limit"],
+        "title": "AskList",
+        "type": "object"
+      },
+      "AskRequest": {
+        "additionalProperties": false,
+        "description": "Something the learner wants to ask about one part of a lesson.",
+        "properties": {
+          "question": { "maxLength": 500, "minLength": 3, "title": "Question", "type": "string" },
+          "segment_id": {
+            "pattern": "^seg_[a-z0-9_]{1,40}$",
+            "title": "Segment Id",
+            "type": "string"
+          }
+        },
+        "required": ["segment_id", "question"],
+        "title": "AskRequest",
+        "type": "object"
+      },
+      "Author": {
+        "properties": {
+          "model": { "title": "Model", "type": "string" },
+          "provider": { "title": "Provider", "type": "string" }
+        },
+        "required": ["provider", "model"],
+        "title": "Author",
+        "type": "object"
+      },
       "Beat": {
         "additionalProperties": false,
         "description": "One breath of narration, and what appears on screen as it starts.",
@@ -523,6 +598,10 @@
           "course_id": {
             "anyOf": [{ "type": "string" }, { "type": "null" }],
             "title": "Course Id"
+          },
+          "created_at": {
+            "anyOf": [{ "format": "date-time", "type": "string" }, { "type": "null" }],
+            "title": "Created At"
           },
           "error_code": {
             "anyOf": [{ "type": "string" }, { "type": "null" }],
@@ -1353,11 +1432,25 @@
         "title": "ProposalAcceptance",
         "type": "object"
       },
+      "ProviderCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "provider_id": {
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$",
+            "title": "Provider Id",
+            "type": "string"
+          }
+        },
+        "required": ["provider_id"],
+        "title": "ProviderCheck",
+        "type": "object"
+      },
       "ProviderChoice": {
-        "description": "One provider the learner can choose.",
+        "description": "One provider there is.",
         "properties": {
           "base_url": { "title": "Base Url", "type": "string" },
           "display_name": { "title": "Display Name", "type": "string" },
+          "in_use": { "title": "In Use", "type": "boolean" },
           "key_configured": { "title": "Key Configured", "type": "boolean" },
           "limits_published": { "title": "Limits Published", "type": "boolean" },
           "models": {
@@ -1366,7 +1459,9 @@
             "type": "array"
           },
           "provider_id": { "title": "Provider Id", "type": "string" },
-          "selected": { "title": "Selected", "type": "boolean" }
+          "quick": { "title": "Quick", "type": "boolean" },
+          "selected": { "title": "Selected", "type": "boolean" },
+          "usage": { "$ref": "#/components/schemas/ProviderUsage" }
         },
         "required": [
           "provider_id",
@@ -1375,7 +1470,10 @@
           "models",
           "key_configured",
           "selected",
-          "limits_published"
+          "in_use",
+          "quick",
+          "limits_published",
+          "usage"
         ],
         "title": "ProviderChoice",
         "type": "object"
@@ -1411,21 +1509,57 @@
         "title": "ProviderModel",
         "type": "object"
       },
+      "ProviderRoute": {
+        "description": "Where one kind of request would go at this moment, and how long it may take.",
+        "properties": {
+          "names": { "items": { "type": "string" }, "title": "Names", "type": "array" },
+          "provider_ids": {
+            "items": { "type": "string" },
+            "title": "Provider Ids",
+            "type": "array"
+          },
+          "reason": { "title": "Reason", "type": "string" },
+          "sentence": { "title": "Sentence", "type": "string" },
+          "wait_measured": { "title": "Wait Measured", "type": "boolean" },
+          "wait_seconds": { "title": "Wait Seconds", "type": "integer" }
+        },
+        "required": [
+          "provider_ids",
+          "names",
+          "sentence",
+          "reason",
+          "wait_seconds",
+          "wait_measured"
+        ],
+        "title": "ProviderRoute",
+        "type": "object"
+      },
+      "ProviderRoutes": {
+        "description": "Where each kind of request would go. Read just before saying where one will go.",
+        "properties": {
+          "ask": { "$ref": "#/components/schemas/ProviderRoute" },
+          "curriculum": { "$ref": "#/components/schemas/ProviderRoute" },
+          "lesson": { "$ref": "#/components/schemas/ProviderRoute" }
+        },
+        "required": ["ask", "curriculum", "lesson"],
+        "title": "ProviderRoutes",
+        "type": "object"
+      },
       "ProviderSelection": {
         "additionalProperties": false,
         "properties": {
-          "provider_id": {
+          "selection": {
             "pattern": "^[a-z][a-z0-9_-]{0,31}$",
-            "title": "Provider Id",
+            "title": "Selection",
             "type": "string"
           }
         },
-        "required": ["provider_id"],
+        "required": ["selection"],
         "title": "ProviderSelection",
         "type": "object"
       },
       "ProviderStatus": {
-        "description": "The provider in use, and every provider there is to choose from.",
+        "description": "The learner's choice, every provider there is, and where requests would go.",
         "properties": {
           "base_url": { "title": "Base Url", "type": "string" },
           "display_name": { "title": "Display Name", "type": "string" },
@@ -1437,7 +1571,9 @@
             "items": { "$ref": "#/components/schemas/ProviderChoice" },
             "title": "Providers",
             "type": "array"
-          }
+          },
+          "routes": { "$ref": "#/components/schemas/ProviderRoutes" },
+          "selection": { "title": "Selection", "type": "string" }
         },
         "required": [
           "provider_id",
@@ -1446,13 +1582,15 @@
           "model",
           "model_name",
           "key_configured",
-          "providers"
+          "selection",
+          "providers",
+          "routes"
         ],
         "title": "ProviderStatus",
         "type": "object"
       },
       "ProviderUsage": {
-        "description": "Adle's own count of today's requests to the provider in use.\n\nAn estimate: the provider keeps the real one.",
+        "description": "Adle's own count of today's requests to one provider.\n\nAn estimate: the provider keeps the real one.",
         "properties": {
           "limits_published": { "title": "Limits Published", "type": "boolean" },
           "provider_id": { "title": "Provider Id", "type": "string" },
@@ -1935,6 +2073,21 @@
         },
         "required": ["id", "title", "estimated_seconds", "narration", "type", "problem"],
         "title": "WorkedExampleSegment",
+        "type": "object"
+      },
+      "WrittenBy": {
+        "description": "Who wrote something a model wrote.",
+        "properties": {
+          "authors": {
+            "items": { "$ref": "#/components/schemas/Author" },
+            "title": "Authors",
+            "type": "array"
+          },
+          "models": { "items": { "type": "string" }, "title": "Models", "type": "array" },
+          "note": { "default": "", "title": "Note", "type": "string" },
+          "provider": { "default": "", "title": "Provider", "type": "string" }
+        },
+        "title": "WrittenBy",
         "type": "object"
       }
     }
@@ -3194,6 +3347,34 @@
         "tags": ["system"]
       }
     },
+    "/v1/jobs": {
+      "get": {
+        "description": "Lessons and lists of concepts being written, in any course.\n\nSo that the app can say, wherever the learner is, that something is on its way.",
+        "operationId": "jobs.list_writing",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/JobList" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List Writing",
+        "tags": ["generation"]
+      }
+    },
     "/v1/jobs/{job_id}": {
       "get": {
         "operationId": "jobs.get",
@@ -3461,6 +3642,116 @@
         "tags": ["lessons"]
       }
     },
+    "/v1/lessons/{lesson_id}/asks": {
+      "get": {
+        "description": "Everything the learner has asked about this lesson, oldest first.",
+        "operationId": "lessons.list_asks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AskList" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List Asks",
+        "tags": ["lessons"]
+      },
+      "post": {
+        "description": "Ask Adle something about one part of a lesson. The answer is written by a model.\n\nStarts a job and returns at once. When it has finished, the answer is among\n``lessons.list_asks``.",
+        "operationId": "lessons.ask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AskRequest" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Ask About Lesson",
+        "tags": ["lessons"]
+      }
+    },
+    "/v1/lessons/{lesson_id}/asks/{ask_id}": {
+      "delete": {
+        "operationId": "lessons.delete_ask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "ask_id",
+            "required": true,
+            "schema": { "title": "Ask Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Successful Response" },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Delete Ask",
+        "tags": ["lessons"]
+      }
+    },
     "/v1/lessons/{lesson_id}/progress": {
       "put": {
         "operationId": "lessons.save_progress",
@@ -3616,6 +3907,38 @@
         "tags": ["provider"]
       }
     },
+    "/v1/provider/check": {
+      "post": {
+        "description": "Ask one provider for one word, to find out whether its key works.\n\nIt counts as one request there. Nothing of the learner's is sent.",
+        "operationId": "provider.check",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ProviderCheck" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Check Provider",
+        "tags": ["provider"]
+      }
+    },
     "/v1/provider/credential": {
       "delete": {
         "operationId": "provider.clear_credential",
@@ -3682,7 +4005,7 @@
     },
     "/v1/provider/selection": {
       "put": {
-        "description": "Use another provider from now on. Its key stays where it is; so do the others'.",
+        "description": "Record the learner's choice: one provider, or every one they have a key for.\n\nNo key is touched. Refused while something is being written.",
         "operationId": "provider.select",
         "requestBody": {
           "content": {
@@ -3712,7 +4035,22 @@
     },
     "/v1/provider/usage": {
       "get": {
+        "description": "Today's count at one provider: the one named, or the one a lesson would go to.",
         "operationId": "provider.usage",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "provider_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                { "pattern": "^[a-z][a-z0-9_-]{0,31}$", "type": "string" },
+                { "type": "null" }
+              ],
+              "title": "Provider Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {

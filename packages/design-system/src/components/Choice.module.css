@@ -258,6 +258,74 @@
   transform: scale(1);
 }
 
+/* ---- Choice buttons: a choice that takes effect when pressed ------------ */
+.choiceButton {
+  width: 100%;
+  color: inherit;
+  text-align: start;
+}
+
+.choiceButton:focus-visible {
+  outline: 2px solid var(--ad-color-focus);
+  outline-offset: 2px;
+}
+
+.choiceButton[aria-disabled='true']:not(.radioRowSelected) {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.choiceButton[aria-disabled='true']:not(.radioRowSelected):hover {
+  border-color: var(--ad-color-border-control);
+}
+
+.choiceButton[aria-busy='true'] {
+  opacity: 1;
+  cursor: progress;
+}
+
+.choiceTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2);
+  font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
+}
+
+/* The same mark as a radio button's, drawn: the button itself carries the state. */
+.choiceMark {
+  display: grid;
+  place-content: center;
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0.1875rem 0 0;
+  border: var(--ad-border-width) solid var(--ad-color-border-strong);
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-surface);
+  transition: border-color var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.choiceMark::after {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-on-action);
+  transform: scale(0);
+  transition: transform var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.choiceMarkOn {
+  border-color: var(--ad-color-action);
+  background: var(--ad-color-action);
+}
+
+.choiceMarkOn::after {
+  transform: scale(1);
+}
+
 /* ---- Segmented control -------------------------------------------------- */
 .segmented {
   display: inline-flex;

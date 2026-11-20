@@ -19,6 +19,7 @@ import {
   doc,
   expectNoAccessibilityViolations,
   importAndWait,
+  saveProviderKey,
   screenshot,
 } from './support/courses';
 
@@ -275,9 +276,7 @@ test.describe('your data as a whole', () => {
     const dataDir = path.join(profileDir, 'data');
 
     await page.getByRole('navigation').getByRole('button', { name: 'Settings' }).click();
-    await page.getByLabel('API key', { exact: true }).fill(KEY);
-    await button(page, 'Save key').click();
-    await expect(page.getByText('Saved · ends in 1Kp7')).toBeVisible();
+    await saveProviderKey(page, 'AIHubMix', KEY);
 
     await openLibrary(page);
     await createCourse(page, 'To be deleted');

@@ -12,6 +12,7 @@ import httpx2 as httpx
 from fastapi import Request
 
 from adle_core.api.auth import LaunchToken
+from adle_core.application.asks import AskService
 from adle_core.application.assessment import AssessmentService
 from adle_core.application.courses import CourseService
 from adle_core.application.curriculum import CurriculumService
@@ -48,6 +49,7 @@ class Services:
     curriculum: CurriculumService
     learner: LearnerService
     lessons: LessonService
+    asks: AskService
     assessment: AssessmentService
     learning: LearningService
     sample_course: SampleCourseService
@@ -91,9 +93,12 @@ def build_services(
     courses = CourseService(database, source_files)
     curriculum = CurriculumService(database, retriever)
     lessons = LessonService(database)
+    asks = AskService(database)
     learner = LearnerService(database)
     # One vault, and one client for each provider. A client asks the vault for its own
-    # provider's key and for no other, and only ever talks to its own address.
+    # provider's key and for no other, and only ever talks to its own address. The
+    # learner's choice starts as "automatic": whichever providers they give a key to.
+    # The desktop shell hands over a choice they made earlier, if there is one.
     credentials = CredentialVault(settings.providers.default.provider_id)
     provider_clients = tuple(
         ChatClient(config, credentials, transport=provider_transport)
@@ -114,13 +119,14 @@ def build_services(
         curriculum=curriculum,
         learner=learner,
         lessons=lessons,
+        asks=asks,
         assessment=AssessmentService(database, lessons, learner),
         learning=LearningService(database, curriculum, learner, credentials),
         sample_course=SampleCourseService(database, courses, curriculum, lessons),
         provider_clients=provider_clients,
         gateway=gateway,
         generation=GenerationService(
-            database, jobs, gateway, curriculum, lessons, learner, retriever
+            database, jobs, gateway, curriculum, lessons, learner, retriever, asks
         ),
     )
 

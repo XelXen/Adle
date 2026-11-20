@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from fastapi import Response as HttpResponse
 
 from adle_core.api import schemas
+from adle_core.application.asks import MAX_ASKS_PER_LESSON
 from adle_core.application.services import Services, get_services
 from adle_core.evaluation.scoring import Response
 from adle_core.lessons.player import player_view
@@ -91,6 +92,46 @@ def answer_question(
         lesson_id, question_id, response, hinted=body.hinted, unsure=body.unsure
     )
     return schemas.AnswerResult.model_validate(result)
+
+
+@router.post(
+    "/lessons/{lesson_id}/asks",
+    operation_id="lessons.ask",
+    response_model=schemas.Job,
+    status_code=202,
+)
+def ask_about_lesson(
+    lesson_id: str, body: schemas.AskRequest, services: ServicesDep
+) -> schemas.Job:
+    """Ask Adle something about one part of a lesson. The answer is written by a model.
+
+    Starts a job and returns at once. When it has finished, the answer is among
+    ``lessons.list_asks``.
+    """
+    return schemas.Job.model_validate(
+        services.generation.ask(lesson_id, body.segment_id, body.question)
+    )
+
+
+@router.get(
+    "/lessons/{lesson_id}/asks",
+    operation_id="lessons.list_asks",
+    response_model=schemas.AskList,
+)
+def list_asks(lesson_id: str, services: ServicesDep) -> schemas.AskList:
+    """Everything the learner has asked about this lesson, oldest first."""
+    return schemas.AskList(
+        asks=[schemas.Ask.model_validate(ask) for ask in services.asks.list_for_lesson(lesson_id)],
+        limit=MAX_ASKS_PER_LESSON,
+    )
+
+
+@router.delete(
+    "/lessons/{lesson_id}/asks/{ask_id}", operation_id="lessons.delete_ask", status_code=204
+)
+def delete_ask(lesson_id: str, ask_id: str, services: ServicesDep) -> HttpResponse:
+    services.asks.delete(lesson_id, ask_id)
+    return HttpResponse(status_code=204)
 
 
 @router.delete("/lessons/{lesson_id}", operation_id="lessons.delete", status_code=204)

@@ -1,7 +1,13 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { PROVIDER_IDS, type ProviderId, type ProviderKeyState } from '../shared/ipc';
+import {
+  PROVIDER_AUTOMATIC,
+  PROVIDER_IDS,
+  type ProviderId,
+  type ProviderKeyState,
+  type ProviderSelection,
+} from '../shared/ipc';
 
 /** The subset of Electron's `safeStorage` this module needs; injectable for tests. */
 export interface Encryptor {
@@ -66,6 +72,11 @@ export function parseProviderId(value: unknown): ProviderId | null {
     : null;
 }
 
+/** What the learner may choose: one provider Adle keeps keys for, or "automatic". */
+export function parseSelection(value: unknown): ProviderSelection | null {
+  return value === PROVIDER_AUTOMATIC ? PROVIDER_AUTOMATIC : parseProviderId(value);
+}
+
 /** Where the one key that earlier versions kept was sent. */
 export const LEGACY_PROVIDER: { id: ProviderId; address: string } = {
   id: 'aihubmix',
@@ -84,8 +95,8 @@ interface StoredKey {
 }
 
 interface Stored {
-  /** The provider the learner chose, or null while they have not chosen. */
-  selected: ProviderId | null;
+  /** What the learner chose (a provider, or "automatic"), or null while they have not. */
+  selected: ProviderSelection | null;
   keys: StoredKey[];
 }
 
@@ -121,13 +132,13 @@ function parseStored(plain: string): Stored | null {
       // A key that could not be sent anyway is not kept.
     }
   }
-  return { selected: parseProviderId(selected), keys: kept };
+  return { selected: parseSelection(selected), keys: kept };
 }
 
 /**
- * Keeps the model providers' keys, and which provider the learner chose, encrypted with
- * the operating system's credential facility (DPAPI, Keychain, or libsecret via Electron
- * safeStorage).
+ * Keeps the model providers' keys, and what the learner chose (one provider, or every
+ * provider they have a key for), encrypted with the operating system's credential
+ * facility (DPAPI, Keychain, or libsecret via Electron safeStorage).
  *
  * A key is kept with two things: the provider it is for, and the address it was given
  * for. It is only ever handed back for that provider at that address, so a key typed
@@ -228,18 +239,18 @@ export class ProviderKeyStore {
     return { stored: key !== null, hint: key ? key.slice(-4) : null };
   }
 
-  /** The provider the learner chose, or null while they have not chosen one. */
-  selected(): ProviderId | null {
+  /** What the learner chose, or null while they have not chosen anything. */
+  selected(): ProviderSelection | null {
     return this.read().selected;
   }
 
   /**
-   * Remember the learner's choice of provider for the next launch. Returns false where it
-   * could not be kept (no secure storage): the choice then lasts until the app closes.
+   * Remember the learner's choice for the next launch. Returns false where it could not
+   * be kept (no secure storage): the choice then lasts until the app closes.
    */
-  select(provider: ProviderId): boolean {
+  select(selection: ProviderSelection): boolean {
     try {
-      this.write({ ...this.read(), selected: provider });
+      this.write({ ...this.read(), selected: selection });
       return true;
     } catch {
       return false;

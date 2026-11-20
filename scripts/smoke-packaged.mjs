@@ -159,6 +159,22 @@ function isWindows() {
   return process.platform === 'win32';
 }
 
+/** Whose work the app is built from, and their licences, travel with it. */
+function checkNotices(executable) {
+  const resources =
+    process.platform === 'darwin'
+      ? path.resolve(path.dirname(executable), '..', 'Resources')
+      : path.join(path.dirname(executable), 'resources');
+  const folder = path.join(resources, 'licenses');
+  const inventory = path.join(folder, 'THIRD-PARTY.md');
+  if (!existsSync(inventory)) throw new Error('The package has no licenses/THIRD-PARTY.md.');
+  const texts = existsSync(path.join(folder, 'texts'))
+    ? readdirSync(path.join(folder, 'texts'))
+    : [];
+  // The fonts and the scene runtime, at the very least, each bring a licence text.
+  if (texts.length < 5) throw new Error('The package has too few licence texts to be believed.');
+}
+
 async function main() {
   const executable = findExecutable();
   if (!executable) {
@@ -169,6 +185,8 @@ async function main() {
   console.log(`Checking ${executable}`);
   await checkFuses(executable);
   console.log('  PASS  fuses are set as intended');
+  checkNotices(executable);
+  console.log('  PASS  the third-party notices are in the package');
   if (!forTests) {
     checkWillNotRunAsNode(executable);
     console.log('  PASS  will not run as plain Node');

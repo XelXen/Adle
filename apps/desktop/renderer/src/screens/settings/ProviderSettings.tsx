@@ -1,12 +1,13 @@
-import { ExternalLink, Eye, EyeOff, KeyRound } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { CircleCheck, ExternalLink, Eye, EyeOff, Route } from 'lucide-react';
+import { type FormEvent, useId, useState } from 'react';
 
-import type { ProviderChoice, ProviderUsage } from '@adle/contracts';
+import type { Job, ProviderChoice, ProviderStatus } from '@adle/contracts';
 import {
   Badge,
   Button,
   Callout,
   Card,
+  ChoiceButtons,
   Dialog,
   ErrorState,
   IconButton,
@@ -22,11 +23,28 @@ import { useApp } from '../../app/AppContext';
 import { getBridge, type ProviderKeyState, type ProviderKeyStates } from '../../lib/bridge';
 import { callCore, describeError, unwrap } from '../../lib/core-client';
 import { formatClockTime } from '../../lib/format';
+import { jobFailure } from '../../lib/generation';
+import { AUTOMATIC, readCheck } from '../../lib/provider';
+import { isJobActive, useJob } from '../../lib/use-job';
 import { useResource } from '../../lib/use-resource';
-import { keyBadge, keyPage, limitsNote, modelOrder } from './provider-model';
+import {
+  couldUseBoth,
+  keyBadge,
+  keyPage,
+  limitsNote,
+  modelOrder,
+  providerCharacter,
+  routeLines,
+  selectionOptions,
+} from './provider-model';
 import styles from './Settings.module.css';
 
-/** Choose the model provider, look after its key, and see what has been used today. */
+/**
+ * Which providers Adle may use, their keys, and what has been used today.
+ *
+ * The learner chooses: one provider, or "automatic" (every provider they have a key for,
+ * each for what it is good at). Nothing else changes that choice (ADR-023).
+ */
 export function ProviderSettings() {
   const { coreStatus } = useApp();
   const toast = useToast();
@@ -36,36 +54,11 @@ export function ProviderSettings() {
   const provider = useResource(`provider-status:${coreStatus.state}`, () =>
     callCore('provider.status'),
   );
-  const usage = useResource(`provider-usage:${coreStatus.state}`, () => callCore('provider.usage'));
-  const [switching, setSwitching] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState<string | null>(null);
 
   const keys: ProviderKeyStates =
     keyState.resource.status === 'ready' ? keyState.resource.data : {};
   const keysKnown = keyState.resource.status === 'ready';
-
-  const choose = async (choice: ProviderChoice): Promise<void> => {
-    setSwitching(choice.provider_id);
-    try {
-      unwrap(await getBridge().provider.select(choice.provider_id));
-      provider.reload();
-      usage.reload();
-      toast.show({
-        tone: 'success',
-        title: `Now using ${choice.display_name}`,
-        description: keys[choice.provider_id]?.stored
-          ? 'Its key is already saved.'
-          : 'Add its key below to create courses and lessons with it.',
-      });
-    } catch (error) {
-      toast.show({
-        tone: 'danger',
-        title: 'The provider was not changed',
-        description: describeError(error),
-      });
-    } finally {
-      setSwitching(null);
-    }
-  };
 
   if (provider.resource.status === 'loading') {
     return <LoadingState title="Reading provider settings…" />;
@@ -80,27 +73,95 @@ export function ProviderSettings() {
     );
   }
 
-  const { providers } = provider.resource.data;
-  const inUse = providers.find((choice) => choice.selected);
+  const status = provider.resource.data;
+  const { providers } = status;
+  const options = selectionOptions(providers);
+
+  const choose = async (selection: string): Promise<void> => {
+    const chosen = options.find((option) => option.value === selection);
+    setChoosing(selection);
+    try {
+      unwrap(await getBridge().provider.select(selection));
+      provider.reload();
+      toast.show({
+        tone: 'success',
+        title:
+          selection === AUTOMATIC
+            ? 'Adle now uses every provider with a key'
+            : `Now using ${chosen?.label ?? 'that provider'}`,
+        description:
+          selection === AUTOMATIC || keys[selection]?.stored
+            ? undefined
+            : 'Add its key below to create courses and lessons with it.',
+      });
+    } catch (error) {
+      toast.show({
+        tone: 'danger',
+        title: 'The choice was not changed',
+        description: describeError(error),
+      });
+    } finally {
+      setChoosing(null);
+    }
+  };
 
   return (
     <Stack gap={6}>
       <Callout tone="info" title="What is sent, and when">
         <p>
-          When you ask Adle to build a course or a lesson, it sends the text needed for that request
-          (for example a few passages from your notes and the concept being taught) to the provider
-          in use below, and to no other. Your files, answers, and progress are never uploaded in
-          bulk, and nothing is sent until you start a generation.
+          When you ask Adle to build a course, write a lesson, or answer a question, it sends the
+          text needed for that request (for example the concept being taught and a few passages from
+          your notes) to a provider you have given a key to below, and to no other. Before each
+          request Adle says where it will go, and afterwards who wrote the answer. Your files,
+          answers, and progress are never uploaded in bulk, and nothing is sent until you ask.
         </p>
       </Callout>
 
+      {providers.length > 1 ? (
+        <Section
+          title="Which provider to use"
+          description="This is your choice, and nothing else changes it."
+        >
+          <Stack gap={4}>
+            {couldUseBoth(status) ? (
+              <Callout
+                tone="info"
+                title="You have keys for more than one provider"
+                actions={
+                  <Button
+                    size="small"
+                    loading={choosing === AUTOMATIC}
+                    disabled={choosing !== null && choosing !== AUTOMATIC}
+                    onClick={() => void choose(AUTOMATIC)}
+                  >
+                    Use both, automatically
+                  </Button>
+                }
+              >
+                Adle can use each for what it is best at: the quicker one for what you are waiting
+                for, the one with more room for long work.
+              </Callout>
+            ) : null}
+            <ChoiceButtons
+              label="Which provider to use"
+              value={status.selection}
+              pending={choosing}
+              options={options.map((option) => ({
+                value: option.value,
+                label: option.label,
+                description: option.description,
+                badge: option.recommended ? <Badge tone="accent">Recommended</Badge> : undefined,
+              }))}
+              onValueChange={(selection) => void choose(selection)}
+            />
+            <RoutesCard status={status} />
+          </Stack>
+        </Section>
+      ) : null}
+
       <Section
-        title="Provider"
-        description={
-          providers.length > 1
-            ? 'Adle sends requests to one provider: the one you choose here. It never changes provider by itself.'
-            : undefined
-        }
+        title={providers.length > 1 ? 'Providers and keys' : 'Provider and key'}
+        description="Adle works without a key: you can explore sample content and your saved courses."
       >
         <ul className={styles.choices} aria-label="AI providers">
           {providers.map((choice) => (
@@ -110,138 +171,164 @@ export function ProviderSettings() {
                 alone={providers.length === 1}
                 keyState={keys[choice.provider_id]}
                 keysKnown={keysKnown}
-                switching={switching}
-                onChoose={() => void choose(choice)}
+                onKeysChange={(next) => {
+                  keyState.setData(next);
+                  // Whether a provider "has a key", and where requests go, is the core's to say.
+                  provider.reload();
+                }}
+                onChecked={provider.reload}
               />
             </li>
           ))}
         </ul>
       </Section>
-
-      {inUse ? (
-        <Section
-          title="API key"
-          description="Adle works without a key: you can explore sample content and your saved courses."
-        >
-          <KeyCard
-            // A key typed for one provider must never be saved for another: start afresh.
-            key={inUse.provider_id}
-            provider={inUse}
-            state={keys[inUse.provider_id]}
-            known={keysKnown}
-            onChange={(next) => {
-              keyState.setData(next);
-              // Whether the provider "has a key" is the core's to say, too.
-              provider.reload();
-            }}
-          />
-        </Section>
-      ) : null}
-
-      <Section
-        title="Use today"
-        description={`Adle's own count of what it has sent ${
-          inUse ? `to ${inUse.display_name} ` : ''
-        }today. The provider keeps the real total, and anything else that uses the same key counts against it too.`}
-      >
-        {usage.resource.status === 'loading' ? (
-          <LoadingState title="Counting today's requests…" />
-        ) : usage.resource.status === 'error' ? (
-          <ErrorState
-            title="Today's use could not be read"
-            description={describeError(usage.resource.error)}
-            actions={<Button onClick={usage.reload}>Try again</Button>}
-          />
-        ) : (
-          <UsageCard usage={usage.resource.data} provider={inUse} />
-        )}
-      </Section>
     </Stack>
   );
 }
 
-/** One provider: where it is, which models it asks, and the control that chooses it. */
+/** Where each kind of request would go at this moment, as the core says. */
+function RoutesCard({ status }: { status: ProviderStatus }) {
+  const heading = useId();
+  return (
+    <Card padding="compact" tone="subtle">
+      <section aria-labelledby={heading}>
+        <Stack gap={3}>
+          <Stack direction="row" gap={2} align="center">
+            <Route className={styles.leadIcon} aria-hidden="true" />
+            <h3 id={heading} className={styles.rowTitle}>
+              Where requests go now
+            </h3>
+          </Stack>
+          {status.key_configured ? (
+            <dl className={styles.routes}>
+              {routeLines(status).map((line) => (
+                <div key={line.work}>
+                  <dt>{line.label}</dt>
+                  <dd>
+                    {line.destination}
+                    {line.reason ? <span className={styles.routeReason}>{line.reason}</span> : null}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className={styles.muted}>
+              Nowhere yet: there is no key for
+              {status.selection === AUTOMATIC ? ' any provider' : ' the provider you chose'}. Add
+              one below.
+            </p>
+          )}
+        </Stack>
+      </section>
+    </Card>
+  );
+}
+
+/** One provider: what it is, its key, a way to check the key, and what was sent today. */
 function ProviderCard({
   choice,
   alone,
   keyState,
   keysKnown,
-  switching,
-  onChoose,
+  onKeysChange,
+  onChecked,
 }: {
   choice: ProviderChoice;
-  /** It is the only provider there is, so there is nothing to choose. */
+  /** It is the only provider there is. */
   alone: boolean;
   keyState: ProviderKeyState | undefined;
   keysKnown: boolean;
-  /** The provider being switched to at the moment, if any. */
-  switching: string | null;
-  onChoose: () => void;
+  onKeysChange: (next: ProviderKeyStates) => void;
+  /** A check of the key has finished: today's count has changed. */
+  onChecked: () => void;
 }) {
+  const heading = useId();
   const badge = keyBadge(keyState);
+  const { usage } = choice;
   return (
     <Card>
-      <Stack gap={4}>
-        <Stack direction="row" gap={3} align="center" wrap>
-          <h3 className={styles.rowTitle}>{choice.display_name}</h3>
-          {alone ? null : (
-            <>
-              {choice.selected ? <Badge tone="accent">In use</Badge> : null}
-              {keysKnown ? <Badge tone={badge.tone}>{badge.text}</Badge> : null}
-            </>
-          )}
+      <section aria-labelledby={heading}>
+        <Stack gap={5}>
+          <Stack gap={2}>
+            <Stack direction="row" gap={3} align="center" wrap>
+              <h3 id={heading} className={styles.providerName}>
+                {choice.display_name}
+              </h3>
+              {keysKnown ? <Badge tone={badge.tone}>{badge.text}</Badge> : <Badge>Checking…</Badge>}
+              {!alone && choice.in_use ? <Badge tone="accent">In use</Badge> : null}
+            </Stack>
+            <p className={styles.muted}>{providerCharacter(choice)}</p>
+          </Stack>
+
+          <dl className={styles.facts}>
+            <div>
+              <dt>Address</dt>
+              <dd className={styles.mono}>{choice.base_url}</dd>
+            </div>
+            <div>
+              <dt>{choice.models.length > 1 ? 'Models, in order' : 'Model'}</dt>
+              <dd>
+                <ol className={styles.models}>
+                  {choice.models.map((model) => (
+                    <li key={model.id}>
+                      {model.name} <span className={styles.modelId}>{model.id}</span>
+                    </li>
+                  ))}
+                </ol>
+              </dd>
+            </div>
+          </dl>
+          <p className={styles.muted}>{modelOrder(choice.models)}</p>
+
+          <KeyControls
+            // A key typed for one provider must never be saved for another.
+            key={choice.provider_id}
+            provider={choice}
+            state={keyState}
+            known={keysKnown}
+            onChange={onKeysChange}
+            onChecked={onChecked}
+          />
+
+          <div className={styles.usage}>
+            <h4 className={styles.usageTitle}>Sent to {choice.display_name} today</h4>
+            <ProgressBar
+              label="Requests"
+              showLabel
+              value={usage.requests_today / usage.requests_per_day}
+              valueText={`${usage.requests_today.toLocaleString()} of ${usage.requests_per_day.toLocaleString()}`}
+            />
+            <ProgressBar
+              label="Tokens (words and parts of words)"
+              showLabel
+              value={usage.tokens_today / usage.tokens_per_day}
+              valueText={`about ${usage.tokens_today.toLocaleString()} of ${usage.tokens_per_day.toLocaleString()}`}
+            />
+            <p className={styles.usageNote}>
+              {limitsNote(choice, usage, formatClockTime(usage.resets_at))} The provider keeps the
+              real total, and anything else that uses the same key counts against it too.
+            </p>
+          </div>
         </Stack>
-        <dl className={styles.facts}>
-          <div>
-            <dt>Address</dt>
-            <dd className={styles.mono}>{choice.base_url}</dd>
-          </div>
-          <div>
-            <dt>{choice.models.length > 1 ? 'Models, in order' : 'Model'}</dt>
-            <dd>
-              <ol className={styles.models}>
-                {choice.models.map((model) => (
-                  <li key={model.id}>
-                    {model.name} <span className={styles.modelId}>{model.id}</span>
-                  </li>
-                ))}
-              </ol>
-            </dd>
-          </div>
-        </dl>
-        <p className={styles.muted}>{modelOrder(choice.models)}</p>
-        {alone ? null : (
-          <div>
-            <Button
-              size="small"
-              aria-pressed={choice.selected}
-              loading={switching === choice.provider_id}
-              disabled={switching !== null && switching !== choice.provider_id}
-              onClick={() => {
-                if (!choice.selected) onChoose();
-              }}
-            >
-              {choice.selected ? `Using ${choice.display_name}` : `Use ${choice.display_name}`}
-            </Button>
-          </div>
-        )}
-      </Stack>
+      </section>
     </Card>
   );
 }
 
-/** Add, replace, or remove the key of the provider in use. */
-function KeyCard({
+/** Add, check, replace, or remove one provider's key. */
+function KeyControls({
   provider,
   state,
   known,
   onChange,
+  onChecked,
 }: {
   provider: ProviderChoice;
   state: ProviderKeyState | undefined;
   /** Whether what is stored has been read yet. */
   known: boolean;
   onChange: (next: ProviderKeyStates) => void;
+  onChecked: () => void;
 }) {
   const { info } = useApp();
   const toast = useToast();
@@ -251,9 +338,14 @@ function KeyCard({
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [checkStarted, setCheckStarted] = useState<Job | null>(null);
+  const [checkRefusal, setCheckRefusal] = useState<string | null>(null);
+  const [startingCheck, setStartingCheck] = useState(false);
+  const check = useJob(checkStarted, onChecked);
 
   const stored = state?.stored === true;
   const page = keyPage(provider.provider_id);
+  const name = provider.display_name;
 
   const save = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
@@ -268,6 +360,9 @@ function KeyCard({
       // Drop the plaintext from renderer state as soon as it has been handed over.
       setDraft('');
       setRevealed(false);
+      // What an earlier check said was about the key before this one.
+      setCheckStarted(null);
+      setCheckRefusal(null);
       toast.show({
         tone: 'success',
         title: 'Key saved',
@@ -284,6 +379,8 @@ function KeyCard({
     setRemoving(true);
     try {
       onChange(unwrap(await getBridge().provider.clearApiKey(provider.provider_id)));
+      setCheckStarted(null);
+      setCheckRefusal(null);
       toast.show({ tone: 'success', title: 'Key removed' });
       setConfirmingRemoval(false);
     } catch (error) {
@@ -297,80 +394,136 @@ function KeyCard({
     }
   };
 
+  const startCheck = async (): Promise<void> => {
+    setStartingCheck(true);
+    setCheckRefusal(null);
+    try {
+      setCheckStarted(
+        await callCore('provider.check', { body: { provider_id: provider.provider_id } }),
+      );
+    } catch (error) {
+      setCheckStarted(null);
+      setCheckRefusal(describeError(error));
+    } finally {
+      setStartingCheck(false);
+    }
+  };
+
+  if (!info.secureStorageAvailable) {
+    return (
+      <Callout tone="warning" title="Secure storage is unavailable">
+        This computer does not offer encrypted credential storage, so Adle will not save a key.
+        Everything that does not need AI still works.
+      </Callout>
+    );
+  }
+
+  const checking = startingCheck || isJobActive(check);
+  const outcome = readCheck(check);
+  const failed = checkRefusal ?? jobFailure(check)?.message ?? null;
+
   return (
     <>
-      <Card>
-        <Stack gap={4}>
-          <Stack direction="row" gap={3} align="center" wrap>
-            <KeyRound className={styles.leadIcon} aria-hidden="true" />
-            <span className={styles.rowTitle}>{provider.display_name} key</span>
-            {!known ? (
-              <Badge>Checking…</Badge>
-            ) : stored ? (
-              <Badge tone="success">Saved · ends in {state.hint}</Badge>
-            ) : (
-              <Badge>Not set</Badge>
-            )}
-          </Stack>
-
-          {!info.secureStorageAvailable ? (
-            <Callout tone="warning" title="Secure storage is unavailable">
-              This computer does not offer encrypted credential storage, so Adle will not save a
-              key. Everything that does not need AI still works.
-            </Callout>
-          ) : (
-            <form className={styles.keyForm} onSubmit={(event) => void save(event)} noValidate>
-              <TextField
-                label={stored ? 'Replace key' : 'API key'}
-                type={revealed ? 'text' : 'password'}
-                value={draft}
-                onChange={(event) => {
-                  setDraft(event.target.value);
-                  setFormError(null);
-                }}
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="Paste your key"
-                error={formError}
-                description={`Stored encrypted by your operating system. It is never shown again, and it is only ever sent to ${provider.display_name}, at the address above.`}
-                trailing={
-                  <IconButton
-                    label={revealed ? 'Hide key' : 'Show key'}
-                    icon={revealed ? <EyeOff /> : <Eye />}
-                    size="small"
-                    onClick={() => setRevealed((value) => !value)}
-                  />
-                }
-              />
-              <Stack direction="row" gap={3} wrap>
-                <Button type="submit" variant="primary" loading={saving}>
-                  {stored ? 'Replace key' : 'Save key'}
-                </Button>
-                {stored ? (
-                  <Button variant="tertiary" onClick={() => setConfirmingRemoval(true)}>
-                    Remove key
-                  </Button>
-                ) : null}
-                {page ? (
-                  <Button
-                    variant="tertiary"
-                    icon={<ExternalLink />}
-                    onClick={() => void getBridge().app.openExternal(page.link)}
-                  >
-                    {page.label}
-                  </Button>
-                ) : null}
-              </Stack>
-            </form>
-          )}
+      <form className={styles.keyForm} onSubmit={(event) => void save(event)} noValidate>
+        <TextField
+          label={stored ? `Replace the ${name} key` : `${name} API key`}
+          type={revealed ? 'text' : 'password'}
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setFormError(null);
+          }}
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="Paste your key"
+          error={formError}
+          description={`Stored encrypted by your operating system. It is never shown again, and it is only ever sent to ${name}, at the address above.`}
+          trailing={
+            <IconButton
+              label={revealed ? `Hide the ${name} key` : `Show the ${name} key`}
+              icon={revealed ? <EyeOff /> : <Eye />}
+              size="small"
+              onClick={() => setRevealed((value) => !value)}
+            />
+          }
+        />
+        <Stack direction="row" gap={3} wrap>
+          <Button type="submit" variant={stored ? 'secondary' : 'primary'} loading={saving}>
+            {stored ? 'Replace key' : 'Save key'}
+          </Button>
+          {stored && known ? (
+            <Button
+              loading={checking}
+              onClick={() => void startCheck()}
+              aria-describedby={`${provider.provider_id}-check-note`}
+            >
+              Check that it works
+            </Button>
+          ) : null}
+          {stored ? (
+            <Button variant="tertiary" onClick={() => setConfirmingRemoval(true)}>
+              Remove key
+            </Button>
+          ) : null}
+          {page ? (
+            <Button
+              variant="tertiary"
+              icon={<ExternalLink />}
+              onClick={() => void getBridge().app.openExternal(page.link)}
+            >
+              {page.label}
+            </Button>
+          ) : null}
         </Stack>
-      </Card>
+        {stored && known ? (
+          <p id={`${provider.provider_id}-check-note`} className={styles.muted}>
+            A check asks {name} for one word. It counts as one of today&apos;s requests, and nothing
+            of yours is sent.
+          </p>
+        ) : null}
+      </form>
+
+      {/* Announced when it arrives: the learner pressed a button and is waiting for this. */}
+      <div role="status" aria-live="polite">
+        {checking ? (
+          <p className={styles.muted}>
+            {check?.progress_message || 'Asking for one word'}…{' '}
+            {check ? (
+              <Button
+                size="small"
+                variant="tertiary"
+                onClick={() =>
+                  void callCore('jobs.cancel', { path: { job_id: check.id } }).catch(() => {
+                    // The check ends by itself in a moment either way.
+                  })
+                }
+              >
+                Stop
+              </Button>
+            ) : null}
+          </p>
+        ) : outcome ? (
+          <p className={styles.checkOk}>
+            <CircleCheck aria-hidden="true" />
+            <span>
+              {outcome.provider} answered {outcome.took}
+              {outcome.model ? ` (${outcome.model})` : ''}. The key works.
+              {outcome.note ? ` ${outcome.note}` : ''}
+            </span>
+          </p>
+        ) : null}
+      </div>
+      {!checking && failed ? (
+        <Callout tone="danger" title={`${name} did not answer the check`} urgent>
+          {failed}
+        </Callout>
+      ) : null}
 
       <Dialog
         open={confirmingRemoval}
         onClose={() => setConfirmingRemoval(false)}
-        title={`Remove the saved ${provider.display_name} key?`}
-        description={`Adle will stop being able to create new courses and lessons with ${provider.display_name} until you add a key again. Your existing courses and progress are not affected.`}
+        title={`Remove the saved ${name} key?`}
+        description={`Adle will stop being able to send anything to ${name} until you add a key again. Your existing courses and progress are not affected.`}
         dismissible={!removing}
         actions={
           <>
@@ -384,40 +537,5 @@ function KeyCard({
         }
       />
     </>
-  );
-}
-
-/** Adle's own count of today's requests to the provider in use. */
-function UsageCard({
-  usage,
-  provider,
-}: {
-  usage: ProviderUsage;
-  provider: ProviderChoice | undefined;
-}) {
-  return (
-    <Card>
-      <Stack gap={4}>
-        <ProgressBar
-          label="Requests"
-          showLabel
-          value={usage.requests_today / usage.requests_per_day}
-          valueText={`${usage.requests_today.toLocaleString()} of ${usage.requests_per_day.toLocaleString()}`}
-        />
-        <ProgressBar
-          label="Tokens (words and parts of words)"
-          showLabel
-          value={usage.tokens_today / usage.tokens_per_day}
-          valueText={`about ${usage.tokens_today.toLocaleString()} of ${usage.tokens_per_day.toLocaleString()}`}
-        />
-        <p className={styles.usageNote}>
-          {limitsNote(
-            { display_name: provider?.display_name ?? 'The provider' },
-            usage,
-            formatClockTime(usage.resets_at),
-          )}
-        </p>
-      </Stack>
-    </Card>
   );
 }

@@ -105,8 +105,12 @@ export interface LessonGeneration {
   starting: boolean;
   /** Starting was refused before a job existed. */
   refusal: JobFailure | null;
-  /** The provider the request goes to, as the learner knows it. */
-  providerName: string;
+  /** Where the request would go, as the core plans it: to put after "Sends to". */
+  destination: string;
+  /** How long a lesson usually takes there, in words, where that is known. */
+  usualWait: string | null;
+  /** The same in seconds, for sizing a break taken meanwhile. */
+  usualSeconds: number | null;
   /** Ask for a lesson, in a chosen way of teaching or (with null) in whichever suits. */
   onCreate: (strategy: TeachingStrategy | null) => void;
   onCancel: () => void;
@@ -307,6 +311,7 @@ export function ConceptDetail({
           refusal={generation.refusal}
           subject="the lesson"
           waitingText="Waiting for its turn"
+          usualSeconds={generation.usualSeconds}
           onCancel={generation.onCancel}
           onRetry={() => generation.onCreate(strategy || null)}
           onDismiss={generation.onDismiss}
@@ -347,9 +352,11 @@ export function ConceptDetail({
             <p className={styles.aiNote}>
               {concept.objectives.length === 0
                 ? 'Add a learning objective first, so the lesson has something to aim at.'
-                : `Sends to ${generation.providerName}: ${lessonDisclosure(
+                : `Sends to ${generation.destination}: ${lessonDisclosure(
                     hasMaterials ? 'some' : 'none',
-                  )}. It usually takes three of today's requests.`}
+                  )}. It usually takes three of today's requests${
+                    generation.usualWait ? `, and ${generation.usualWait}` : ''
+                  }.`}
             </p>
           </div>
         )}

@@ -307,7 +307,19 @@ async function main() {
     process.platform === 'darwin'
       ? path.join(appFolder, `${app.productName}.app`, 'Contents', 'Resources')
       : path.join(appFolder, 'resources');
-  for (const needed of ['app.asar', 'core']) {
+  // What a learner is owed with the app: whose work it is built from, and their licences.
+  const notices = spawnSync(
+    process.execPath,
+    [
+      path.join(repoRoot, 'scripts', 'licenses.mjs'),
+      `--collect=${path.join(resources, 'licenses')}`,
+    ],
+    { cwd: repoRoot, encoding: 'utf8' },
+  );
+  if (notices.status !== 0) {
+    throw new Error(`The third-party notices could not be collected: ${notices.stderr}`);
+  }
+  for (const needed of ['app.asar', 'core', path.join('licenses', 'THIRD-PARTY.md')]) {
     if (!existsSync(path.join(resources, needed))) {
       throw new Error(`The packaged app has no resources/${needed}.`);
     }

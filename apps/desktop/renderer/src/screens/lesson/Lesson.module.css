@@ -416,6 +416,103 @@
   list-style: none;
 }
 
+/* ---- Asking about a part (ADR-024) -------------------------------------------------- */
+.askBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+}
+
+/* Inside the dialog a note lines up with the field above it. */
+.askBody .note {
+  padding: 0;
+}
+
+.askLead {
+  margin: 0;
+  font: var(--ad-text-body);
+}
+
+.askHint {
+  margin: 0 0 var(--ad-space-2);
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.askSuggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A question and its answer: a note in the margin of the lesson. The learner's words are
+   set as theirs (the sans, behind a rule); the answer is something to read (the serif). */
+.askNote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  min-width: 0;
+}
+
+.askQuestion {
+  margin: 0;
+  padding-left: var(--ad-space-3);
+  border-left: 2px solid var(--ad-color-border-strong);
+  font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
+  overflow-wrap: anywhere;
+}
+
+.askAnswer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  font: var(--ad-text-reading);
+  color: var(--ad-color-ink);
+}
+
+.askAnswer p,
+.askMeta {
+  margin: 0;
+}
+
+.askMeta {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+/* The questions kept beside a part of the lesson, folded away until asked for. */
+.asked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+}
+
+.askedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.askedItem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ad-space-4);
+  padding: var(--ad-space-5);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-1);
+  animation: written var(--ad-duration-slow) var(--ad-ease-out);
+}
+
 .way {
   display: flex;
   flex-direction: column;

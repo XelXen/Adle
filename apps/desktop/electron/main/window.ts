@@ -4,8 +4,8 @@ import { paths } from './paths';
 import { APP_ENTRY_URL } from './protocol';
 
 /** Canvas colours from the Sprout tokens, used to avoid a white flash before first paint. */
-const CANVAS_LIGHT = '#F6F8F4';
-const CANVAS_DARK = '#101713';
+const CANVAS_LIGHT = '#F3F4F1';
+const CANVAS_DARK = '#0C100E';
 
 export function createMainWindow(options: { showDevTools: boolean }): BrowserWindow {
   const window = new BrowserWindow({

@@ -13,6 +13,7 @@ export const IPC = {
   uiStateUpdate: 'adle:app:ui-state-update',
   openExternal: 'adle:app:open-external',
   showLogs: 'adle:app:show-logs',
+  appNotify: 'adle:app:notify',
   coreStatus: 'adle:core:status',
   coreStatusChanged: 'adle:core:status-changed',
   coreRestart: 'adle:core:restart',
@@ -46,7 +47,27 @@ export interface UiState {
   theme: ThemePreference;
   /** True once the learner has finished the first-run welcome. */
   onboardingCompleted: boolean;
+  /**
+   * Whether the operating system may say that something is ready while Adle is in the
+   * background. On unless the learner turns it off.
+   */
+  notifications: boolean;
 }
+
+/**
+ * Everything a notification of the operating system can be about. The page names one of
+ * these and nothing else: the words shown are fixed in the main process
+ * (`electron/main/notices.ts`), so no text from a lesson, a document, or a model can
+ * reach the notification centre (ADR-026).
+ */
+export const NOTICE_KINDS = [
+  'lesson_ready',
+  'concepts_ready',
+  'answer_ready',
+  'writing_stopped',
+  'break_over',
+] as const;
+export type NoticeKind = (typeof NOTICE_KINDS)[number];
 
 export interface AppInfo {
   name: string;
@@ -88,6 +109,13 @@ export interface CoreInvokeParams {
  */
 export const PROVIDER_IDS = ['aihubmix', 'nvidia', 'custom'] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
+
+/**
+ * The choice that lets Adle use every provider the learner has given a key for, each for
+ * what it is good at (ADR-023). The other choices are one provider's name.
+ */
+export const PROVIDER_AUTOMATIC = 'auto';
+export type ProviderSelection = ProviderId | typeof PROVIDER_AUTOMATIC;
 
 /** Whether a provider key is stored. The key itself never crosses to the renderer. */
 export interface ProviderKeyState {
@@ -132,6 +160,12 @@ export interface AdleBridge {
      * computer; this is how a learner looks at them or chooses to show them to someone.
      */
     showLogs(): Promise<CoreResult<null>>;
+    /**
+     * Ask the operating system to say that something is ready, in words fixed by its
+     * kind. Nothing is shown while Adle's window has the focus, or when the learner has
+     * turned notifications off. Resolves with whether one was shown.
+     */
+    notify(kind: NoticeKind): Promise<boolean>;
   };
   core: {
     status(): Promise<CoreStatus>;
@@ -146,10 +180,11 @@ export interface AdleBridge {
     setApiKey(providerId: string, apiKey: string): Promise<CoreResult<ProviderKeyStates>>;
     clearApiKey(providerId: string): Promise<CoreResult<ProviderKeyStates>>;
     /**
-     * Use another provider from now on. Only ever called because the learner chose it:
-     * nothing in Adle changes provider by itself.
+     * Record which provider to use from now on: one provider's name, or "auto" for every
+     * provider the learner has given a key for. Only ever called because the learner
+     * chose it: nothing in Adle changes this by itself.
      */
-    select(providerId: string): Promise<CoreResult<null>>;
+    select(selection: string): Promise<CoreResult<null>>;
   };
   sources: {
     /**

@@ -1,4 +1,7 @@
-"""More than one provider: which is in use, whose key goes where, and which model answers.
+"""More than one provider: one chosen, whose key goes where, and which model answers.
+
+Everything here is about a learner who chose one provider. What happens when they let
+Adle use every provider they have a key for is in ``test_provider_routing.py``.
 
 No request in this file leaves the process (ADR-021).
 """
@@ -8,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -123,7 +127,7 @@ def both_providers(
     *,
     limits: QuotaLimits | None = QuotaLimits(requests_per_minute=600),
 ) -> tuple[ModelGateway, FakeTime, CredentialVault]:
-    """A gateway over both providers, a key for each, NVIDIA in use."""
+    """A gateway over both providers, a key for each, and NVIDIA chosen by the learner."""
     vault = CredentialVault()
     transport = httpx.MockTransport(endpoint)
     clients = [
@@ -322,23 +326,31 @@ def test_another_providers_key_never_stands_in_for_a_missing_one(
     assert endpoint.urls == []
 
 
-def test_the_vault_keeps_a_key_for_each_provider_and_knows_which_is_in_use() -> None:
+def test_the_vault_keeps_a_key_for_each_provider_and_knows_what_was_chosen() -> None:
     vault = CredentialVault()
-    assert vault.active_provider_id == "aihubmix"
+    # Until the learner says otherwise: every provider they give a key to.
+    assert vault.selection == "auto"
+    assert vault.default_provider_id == "aihubmix"
+    assert vault.has_api_key is False
+
+    vault.select("aihubmix")
     vault.set_api_key(NVIDIA_KEY, "nvidia")
-    # A key for a provider that is not in use does not make "there is a key" true.
+    # A key for a provider that was not chosen does not make "there is a key" true.
     assert vault.has_api_key is False
     assert vault.has_key_for("nvidia") is True
 
     vault.select("nvidia")
     assert vault.has_api_key is True
-    assert vault.api_key() == NVIDIA_KEY
+    assert vault.api_key("nvidia") == NVIDIA_KEY
     assert vault.api_key("aihubmix") is None
+    # Without a name, a key is the first provider's: never "whichever is in use".
+    assert vault.api_key() is None
 
     vault.set_api_key(AIHUBMIX_KEY, "aihubmix")
     vault.clear_api_key("nvidia")
     assert vault.has_api_key is False
     assert vault.api_key("aihubmix") == AIHUBMIX_KEY
+    assert vault.api_key() == AIHUBMIX_KEY
 
 
 def test_no_key_of_any_provider_appears_in_the_vaults_description_or_in_a_log(
@@ -466,12 +478,52 @@ def test_a_request_can_be_stopped_before_the_model_has_begun_to_answer() -> None
         checks += 1
         return checks >= 2
 
+    # The reading itself, without the waiting beside it (see the next test).
+    client = client_for(NVIDIA, lambda request: waiting_response())
     with pytest.raises(RequestCancelledError):
-        client_for(NVIDIA, lambda request: waiting_response()).complete(
-            REQUEST, cancelled=cancelled
-        )
+        client._send(REQUEST, NVIDIA.models[0], cancelled, None)
     # Stopped at the second line that arrived: a line that only kept the connection open.
     assert checks == 2
+
+
+def test_a_request_is_given_up_at_once_however_silent_the_provider_is() -> None:
+    """A model can take a minute before its first word. "Stop" must not take a minute too."""
+    reached, release = threading.Event(), threading.Event()
+    stop = threading.Event()
+    stages: list[str] = []
+
+    def silent(request: httpx.Request) -> httpx.Response:
+        reached.set()
+        # Nothing at all comes back until the test lets it: no status line, no keep-alive.
+        release.wait(30)
+        return stream("too late", thinking="still thinking")
+
+    client = client_for(NVIDIA, silent)
+    failure: list[BaseException] = []
+
+    def ask() -> None:
+        try:
+            client.complete(REQUEST, cancelled=stop.is_set, on_stage=stages.append)
+        except BaseException as error:
+            failure.append(error)
+
+    asking = threading.Thread(target=ask)
+    asking.start()
+    try:
+        assert reached.wait(20)
+        began = time.monotonic()
+        stop.set()
+        asking.join(10)
+        # Whoever asked is told straight away, while the provider is still saying nothing.
+        assert not asking.is_alive()
+        assert time.monotonic() - began < 5
+        assert [type(error) for error in failure] == [RequestCancelledError]
+    finally:
+        release.set()
+    # What arrives afterwards is dropped: nobody is told a model is thinking or writing.
+    time.sleep(0.5)
+    assert stages == []
+    client.close()
 
 
 def test_the_time_limit_runs_while_the_model_is_only_thinking() -> None:
@@ -701,7 +753,7 @@ def test_the_gateway_only_changes_provider_to_one_it_was_given(services: Service
     with pytest.raises(Exception, match="does not know that AI provider") as raised:
         gateway.select("somewhere-else")
     assert getattr(raised.value, "status_code", None) == 404
-    assert vault.active_provider_id == "nvidia"
+    assert vault.selection == "nvidia"
 
 
 def test_where_no_count_comes_back_the_estimate_includes_what_the_model_thought(
@@ -723,8 +775,8 @@ def test_where_no_count_comes_back_the_estimate_includes_what_the_model_thought(
 # -- through the API ---------------------------------------------------------------------
 
 
-def choose(client: TestClient, provider_id: str) -> Any:
-    return client.put("/v1/provider/selection", json={"provider_id": provider_id})
+def choose(client: TestClient, selection: str) -> Any:
+    return client.put("/v1/provider/selection", json={"selection": selection})
 
 
 def topic_course(client: TestClient) -> dict[str, Any]:
@@ -749,13 +801,20 @@ def add_concept(client: TestClient, course_id: str) -> str:
     return str(curriculum.json()["concepts"][0]["id"])
 
 
-def test_the_interface_is_told_every_provider_and_which_is_in_use(client: TestClient) -> None:
+def test_the_interface_is_told_every_provider_and_what_was_chosen(client: TestClient) -> None:
     status = client.get("/v1/provider").json()
     assert (status["provider_id"], status["model_name"]) == ("aihubmix", "Coding Kimi K3 (free)")
+    # Nothing has been chosen yet, so no one provider is "the" one.
+    assert status["selection"] == "auto"
     assert [
         (choice["provider_id"], choice["selected"], choice["key_configured"])
         for choice in status["providers"]
-    ] == [("aihubmix", True, False), ("nvidia", False, False)]
+    ] == [("aihubmix", False, False), ("nvidia", False, False)]
+    assert choose(client, "aihubmix").status_code == 204
+    assert [choice["selected"] for choice in client.get("/v1/provider").json()["providers"]] == [
+        True,
+        False,
+    ]
     nvidia = status["providers"][1]
     assert nvidia["display_name"] == "NVIDIA NIM"
     assert nvidia["base_url"] == "https://integrate.api.nvidia.com/v1"
@@ -770,7 +829,7 @@ def test_choosing_a_provider_changes_what_is_in_use_and_nothing_else(client: Tes
 
     status = client.get("/v1/provider").json()
     assert (status["provider_id"], status["display_name"]) == ("nvidia", "NVIDIA NIM")
-    assert status["model"] == KIMI
+    assert (status["selection"], status["model"]) == ("nvidia", KIMI)
     # The key that was there belongs to the other provider. This one has none yet.
     assert status["key_configured"] is False
     assert [
@@ -789,10 +848,12 @@ def test_choosing_a_provider_changes_what_is_in_use_and_nothing_else(client: Tes
 @pytest.mark.parametrize(
     ("payload", "status"),
     [
-        ({"provider_id": "openai"}, 404),
-        ({"provider_id": "NVIDIA"}, 422),
-        ({"provider_id": "https://example.com/v1"}, 422),
-        ({"provider_id": "nvidia", "base_url": "https://attacker.example"}, 422),
+        ({"selection": "openai"}, 404),
+        ({"selection": "NVIDIA"}, 422),
+        ({"selection": "https://example.com/v1"}, 422),
+        ({"selection": "nvidia", "base_url": "https://attacker.example"}, 422),
+        # The name the field had before the choice could be "automatic".
+        ({"provider_id": "nvidia"}, 422),
         ({}, 422),
     ],
 )
@@ -801,7 +862,8 @@ def test_only_a_provider_adle_knows_can_be_chosen(
 ) -> None:
     assert choose(client, "aihubmix").status_code == 204
     assert client.put("/v1/provider/selection", json=payload).status_code == status
-    assert client.get("/v1/provider").json()["provider_id"] == "aihubmix"
+    after = client.get("/v1/provider").json()
+    assert (after["selection"], after["provider_id"]) == ("aihubmix", "aihubmix")
 
 
 def test_keys_are_handed_over_and_taken_back_one_provider_at_a_time(client: TestClient) -> None:
@@ -816,7 +878,7 @@ def test_keys_are_handed_over_and_taken_back_one_provider_at_a_time(client: Test
     )
     assert put.status_code == 204
     assert configured() == {"aihubmix": False, "nvidia": True}
-    # With no provider named, the key is for the one in use.
+    # With no provider named, the key is for the first provider there is.
     assert client.put("/v1/provider/credential", json={"api_key": AIHUBMIX_KEY}).status_code == 204
     assert configured() == {"aihubmix": True, "nvidia": True}
 
@@ -851,6 +913,7 @@ def test_the_provider_is_not_changed_while_it_is_writing_something(
     client: TestClient, services: Services, provider: FakeProvider
 ) -> None:
     client.put("/v1/provider/credential", json={"api_key": AIHUBMIX_KEY})
+    assert choose(client, "aihubmix").status_code == 204
     course = topic_course(client)
     started, release = threading.Event(), threading.Event()
 
@@ -866,11 +929,13 @@ def test_the_provider_is_not_changed_while_it_is_writing_something(
         assert started.wait(20)
         refused = choose(client, "nvidia")
         assert refused.status_code == 409
-        # It says who is writing, and what to do.
+        # It says what is happening, and what to do.
         message = refused.json()["error"]["message"]
-        assert "AIHubMix is writing" in message
+        assert "Something is being written for you" in message
         assert "then change the provider" in message
-        assert client.get("/v1/provider").json()["provider_id"] == "aihubmix"
+        # Letting Adle choose is a change of provider like any other.
+        assert choose(client, "auto").status_code == 409
+        assert client.get("/v1/provider").json()["selection"] == "aihubmix"
     finally:
         release.set()
     assert services.jobs.wait(job.json()["id"], timeout=30).status == "succeeded"
@@ -900,6 +965,7 @@ def test_a_lesson_through_nvidia_goes_only_there_and_says_which_model_wrote_it(
     assert job.result["written_by"] == {
         "provider": "NVIDIA NIM",
         "models": [MISTRAL_NAME],
+        "authors": [{"provider": "NVIDIA NIM", "model": MISTRAL_NAME}],
         "instead_of": KIMI_NAME,
         "note": note,
     }
@@ -960,6 +1026,7 @@ def test_what_the_first_model_wrote_carries_no_note(
     assert job.result["written_by"] == {
         "provider": "AIHubMix",
         "models": ["Coding Kimi K3 (free)"],
+        "authors": [{"provider": "AIHubMix", "model": "Coding Kimi K3 (free)"}],
         "instead_of": "",
         "note": "",
     }

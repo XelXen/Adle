@@ -12,8 +12,10 @@ understanding with short questions, and adapts the next step to what you have ac
 > **Status: in development.** The whole learning loop works on the sample course: a curriculum,
 > lessons with live pictures and questions, evidence about what you know, a suggested next step
 > with its reason, practice, and reviews that come due. Your data can be copied to a file,
-> restored, and deleted. It can be built into a folder that runs by itself; an installer and
-> a lesson written by the real AI provider are still to come. See
+> restored, and deleted. With a key for an AI provider (AIHubMix, NVIDIA NIM, or both
+> together) it writes curricula and lessons for your own topics and answers questions in the
+> middle of a lesson; a real model has done all three. It can be built into a folder that
+> runs by itself; an installer is still to come. See
 > [`docs/engineering/PROJECT_STATE.md`](docs/engineering/PROJECT_STATE.md) for exactly what works.
 
 ## What works today
@@ -154,5 +156,5 @@ Start with [AGENTS.md](AGENTS.md), then [CONTRIBUTING.md](CONTRIBUTING.md) and
 ## Licence
 
 Not yet licensed for redistribution (`UNLICENSED`). Third-party components keep their own
-licences; see `docs/decisions/ADR-001-stack-and-pins.md` and
-`skills/wanim-scene-authoring/reference.md`.
+licences: `docs/engineering/THIRD_PARTY.md` lists every one, and the packaged app carries
+that list and the licence texts in `resources/licenses`.

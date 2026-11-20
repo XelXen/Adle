@@ -1,13 +1,19 @@
-import { BookOpen, Library, Settings } from 'lucide-react';
+import { BookOpen, Coffee, Library, PenLine, Settings } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { AppShell, Logo, NavItem, NavSection, ToastProvider } from '@adle/design-system';
 
 import { useApp } from './app/AppContext';
+import { BreakProvider, useBreak } from './app/BreakContext';
 import { type Route, useRouter } from './app/router';
+import { useWriting, WritingProvider } from './app/WritingContext';
 import { CoreStatusIndicator } from './components/CoreStatusIndicator';
+import { clockText } from './lib/breaks';
 import { callCore } from './lib/core-client';
 import { courseRoute, RAIL_COURSES } from './lib/courses';
 import { useResource } from './lib/use-resource';
+import { KIND_LESSON } from './lib/generation';
+import { BreakScreen } from './screens/break/BreakScreen';
 import { CourseScreen } from './screens/course/CourseScreen';
 import { HomeScreen } from './screens/home/HomeScreen';
 import { LessonScreen } from './screens/lesson/LessonScreen';
@@ -36,9 +42,57 @@ function Screen({ route, visit }: { route: Route; visit: number }) {
           about={route.about}
         />
       );
+    case 'break':
+      return <BreakScreen />;
     case 'settings':
       return <SettingsScreen tab={route.tab} />;
   }
+}
+
+/**
+ * What is going on besides the screen in front of the learner: something being written,
+ * a break running. In the rail, so that it is one click away from anywhere, and so that
+ * "you do not have to wait here" is true.
+ */
+function RailActivity() {
+  const { route, navigate } = useRouter();
+  const rest = useBreak();
+  const { jobs } = useWriting();
+  const [first] = jobs;
+  if (!rest.times && !first) return null;
+  return (
+    <NavSection label="Now">
+      {first ? (
+        <NavItem
+          label={
+            jobs.length > 1
+              ? `Writing ${jobs.length} things`
+              : first.kind === KIND_LESSON
+                ? 'Writing a lesson'
+                : 'Suggesting concepts'
+          }
+          icon={<PenLine />}
+          disabled={!first.course_id}
+          onClick={() => {
+            if (!first.course_id) return;
+            navigate({
+              name: 'course',
+              courseId: first.course_id,
+              tab: first.kind === KIND_LESSON ? 'learn' : 'curriculum',
+            });
+          }}
+        />
+      ) : null}
+      {rest.times ? (
+        <NavItem
+          label={rest.over ? 'Break over' : `On a break · ${clockText(rest.left)}`}
+          icon={<Coffee />}
+          current={route.name === 'break'}
+          onClick={() => navigate({ name: 'break' })}
+        />
+      ) : null}
+    </NavSection>
+  );
 }
 
 /**
@@ -71,39 +125,52 @@ function RailCourses() {
   );
 }
 
+/** What goes on across screens: what is being written, and a break being taken. */
+function Activity({ children }: { children: ReactNode }) {
+  return (
+    <WritingProvider>
+      <BreakProvider>{children}</BreakProvider>
+    </WritingProvider>
+  );
+}
+
 export function App() {
   const { ui } = useApp();
   const { route, visit, navigate } = useRouter();
-  // A lesson, and a round of questions, are one thing to attend to: they get the window.
-  const focus = route.name === 'lesson' || route.name === 'practice';
+  // A lesson, a round of questions, and a break are each one thing to attend to: they
+  // get the window.
+  const focus = route.name === 'lesson' || route.name === 'practice' || route.name === 'break';
 
   return (
     <ToastProvider>
       {ui.onboardingCompleted ? (
-        <AppShell
-          brand={<Logo />}
-          focus={focus}
-          navigation={
-            <>
-              <NavItem
-                label="Library"
-                icon={<Library />}
-                current={route.name === 'home'}
-                onClick={() => navigate({ name: 'home' })}
-              />
-              <NavItem
-                label="Settings"
-                icon={<Settings />}
-                current={route.name === 'settings'}
-                onClick={() => navigate({ name: 'settings', tab: 'ai' })}
-              />
-              <RailCourses />
-            </>
-          }
-          footer={<CoreStatusIndicator />}
-        >
-          <Screen route={route} visit={visit} />
-        </AppShell>
+        <Activity>
+          <AppShell
+            brand={<Logo />}
+            focus={focus}
+            navigation={
+              <>
+                <NavItem
+                  label="Library"
+                  icon={<Library />}
+                  current={route.name === 'home'}
+                  onClick={() => navigate({ name: 'home' })}
+                />
+                <NavItem
+                  label="Settings"
+                  icon={<Settings />}
+                  current={route.name === 'settings'}
+                  onClick={() => navigate({ name: 'settings', tab: 'ai' })}
+                />
+                <RailCourses />
+                <RailActivity />
+              </>
+            }
+            footer={<CoreStatusIndicator />}
+          >
+            <Screen route={route} visit={visit} />
+          </AppShell>
+        </Activity>
       ) : (
         <WelcomeScreen />
       )}

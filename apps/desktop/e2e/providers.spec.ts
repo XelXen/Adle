@@ -1,11 +1,13 @@
 /**
- * Choosing between AI providers, through the whole real path (interface, main process,
- * key store, core, jobs), with two servers on this computer standing in for AIHubMix and
- * for NVIDIA. No request leaves the machine, and no test here reaches a real provider.
+ * The learner's AI providers, through the whole real path (interface, main process, key
+ * store, core, jobs), with two servers on this computer standing in for AIHubMix and for
+ * NVIDIA. No request leaves the machine, and no test here reaches a real provider.
  *
- * What these journeys are about (ADR-021): the learner chooses the provider and nothing
- * else does; a key is only ever sent to the provider and the address it was given for;
- * and when a provider's first model is away and another stands in, that is said.
+ * What these journeys are about. The learner chooses (ADR-021, ADR-023): one provider, or
+ * "automatic", which uses every provider they have given a key to, each for what it is
+ * good at. Nothing else changes that choice. A key is only ever sent to the provider and
+ * the address it was given for. And when what answers is not what was asked first
+ * (another model, or another provider), that is said.
  */
 import type { Page } from '@playwright/test';
 
@@ -22,6 +24,9 @@ import {
   createCourse,
   expectNoAccessibilityViolations,
   openCourseTab,
+  providerCard,
+  providerKeyField,
+  saveProviderKey,
   screenshot,
   showNarrationAsText,
 } from './support/courses';
@@ -33,6 +38,7 @@ const NVIDIA_KEY = 'nvapi-e2e-not-a-real-key-Qm81xTz5Lp2k';
 
 const AIHUBMIX = 'AIHubMix (custom endpoint 127.0.0.1)';
 const NVIDIA = 'NVIDIA NIM (custom endpoint 127.0.0.1)';
+const BOTH = `${AIHUBMIX}, or ${NVIDIA} if ${AIHUBMIX} cannot answer`;
 const KIMI = 'moonshotai/kimi-k3.1-pro';
 const MISTRAL = 'mistralai/mistral-large-4-1t-a52b';
 
@@ -59,12 +65,12 @@ async function launch(profileDir: string, servers: Servers, first = true): Promi
   return adle;
 }
 
-/** The card of one provider in the list of providers. */
-const card = (page: Page, name: string) =>
-  page
-    .getByRole('list', { name: 'AI providers' })
-    .getByRole('listitem')
-    .filter({ has: page.getByRole('heading', { name, exact: true }) });
+/** The choice between "automatic" and one provider alone. */
+const choice = (page: Page, name: string) =>
+  page.getByRole('group', { name: 'Which provider to use' }).getByRole('button', { name });
+
+/** Where each kind of request would go at this moment, as the settings say. */
+const routes = (page: Page) => page.getByRole('region', { name: 'Where requests go now' });
 
 const keyStates = (page: Page) => page.evaluate(() => window.adle!.provider.keyState());
 
@@ -72,6 +78,7 @@ const providerStatus = async (
   page: Page,
 ): Promise<{
   provider_id: string;
+  selection: string;
   providers: { provider_id: string; key_configured: boolean }[];
 }> => {
   const result = await page.evaluate(() => window.adle!.core.invoke('provider.status'));
@@ -79,8 +86,8 @@ const providerStatus = async (
   return result.data as never;
 };
 
-test.describe('choosing between AI providers', () => {
-  test('choose NVIDIA, give it its own key, and have it write: only NVIDIA is sent anything, and a stand-in is said', async ({
+test.describe('the AI providers', () => {
+  test('choose NVIDIA alone, give it its own key, and have it write: only NVIDIA is sent anything, and a stand-in is said', async ({
     profileDir,
   }) => {
     test.setTimeout(240_000);
@@ -94,58 +101,63 @@ test.describe('choosing between AI providers', () => {
 
     // ---- Both providers are shown, with where each is and what each asks ----
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(card(page, AIHUBMIX)).toContainText('In use');
-    await expect(card(page, NVIDIA)).not.toContainText('In use');
-    await expect(card(page, NVIDIA)).toContainText(servers.nvidia.baseUrl);
+    // Until the learner says otherwise: every provider they give a key to. There are none.
+    await expect(choice(page, 'Automatic')).toHaveAttribute('aria-pressed', 'true');
+    await expect(routes(page)).toContainText('Nowhere yet: there is no key for any provider.');
+    await expect(providerCard(page, AIHUBMIX)).not.toContainText('In use');
+    await expect(providerCard(page, NVIDIA)).not.toContainText('In use');
+    await expect(providerCard(page, NVIDIA)).toContainText(servers.nvidia.baseUrl);
     // The models, in the order they are asked, and what that order means.
-    await expect(card(page, NVIDIA).getByRole('list').getByRole('listitem')).toHaveText([
+    await expect(providerCard(page, NVIDIA).getByRole('list').getByRole('listitem')).toHaveText([
       /Kimi K3\.1 Pro\s*moonshotai\/kimi-k3\.1-pro/,
       /Mistral Large 4\s*mistralai\/mistral-large-4-1t-a52b/,
       /GLM 5\.3 Flash\s*z-ai\/glm-5\.3-flash/,
     ]);
-    await expect(card(page, NVIDIA)).toContainText(
-      'Requests go to Kimi K3.1 Pro. While it is not available, Mistral Large 4 and GLM 5.3 ' +
-        'Flash stand in, in that order, and Adle tells you when that happened.',
+    await expect(providerCard(page, NVIDIA)).toContainText(
+      'Requests here go to Kimi K3.1 Pro. While it is not available, Mistral Large 4 and GLM ' +
+        '5.3 Flash stand in, in that order, and Adle tells you when that happened.',
     );
-    await expect(card(page, AIHUBMIX).getByRole('button')).toHaveAttribute('aria-pressed', 'true');
-    await expect(card(page, NVIDIA).getByRole('button')).toHaveAttribute('aria-pressed', 'false');
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'settings-provider-choice');
 
-    // ---- A key for the provider in use ----
-    await page.getByLabel('API key', { exact: true }).fill(AIHUBMIX_KEY);
-    await page.getByRole('button', { name: 'Save key' }).click();
-    await expect(page.getByText('Saved · ends in 4Wd1')).toBeVisible();
-    await expect(card(page, AIHUBMIX)).toContainText('Key saved');
-    await expect(card(page, NVIDIA)).toContainText('No key yet');
+    // ---- A key for one provider: automatic is then simply that provider ----
+    await saveProviderKey(page, AIHUBMIX, AIHUBMIX_KEY);
+    await expect(providerCard(page, AIHUBMIX)).toContainText('In use');
+    await expect(providerCard(page, NVIDIA)).toContainText('No key yet');
+    await expect(routes(page).getByRole('definition')).toHaveText([AIHUBMIX, AIHUBMIX, AIHUBMIX]);
 
-    // ---- Choosing NVIDIA: it is in use from now on, and it has no key of its own yet ----
-    await card(page, NVIDIA)
-      .getByRole('button', { name: `Use ${NVIDIA}` })
-      .click();
-    await expect(page.getByRole('status').filter({ hasText: `Now using ${NVIDIA}` })).toContainText(
-      'Add its key below',
-    );
-    await expect(card(page, NVIDIA)).toContainText('In use');
-    await expect(card(page, AIHUBMIX)).not.toContainText('In use');
-    await expect(card(page, NVIDIA).getByRole('button')).toHaveAttribute('aria-pressed', 'true');
-    // The other provider's key did not come along: this one starts empty.
-    await expect(page.getByText(`${NVIDIA} key`, { exact: true })).toBeVisible();
-    await expect(page.getByText('Not set', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('API key', { exact: true })).toHaveValue('');
-    expect((await providerStatus(page)).provider_id).toBe('nvidia');
+    // ---- Choosing NVIDIA alone: everything goes there, and it has no key of its own yet ----
+    await choice(page, `${NVIDIA} only`).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: `Now using ${NVIDIA} only` }),
+    ).toContainText('Add its key below');
+    await expect(choice(page, `${NVIDIA} only`)).toHaveAttribute('aria-pressed', 'true');
+    await expect(choice(page, 'Automatic')).toHaveAttribute('aria-pressed', 'false');
+    // The other provider's key did not come along, and is no longer in use.
+    await expect(providerCard(page, AIHUBMIX)).not.toContainText('In use');
+    await expect(providerCard(page, NVIDIA)).not.toContainText('In use');
+    await expect(routes(page)).toContainText('there is no key for the provider you chose');
+    await expect(providerKeyField(page, NVIDIA)).toHaveValue('');
+    expect(await providerStatus(page)).toMatchObject({
+      selection: 'nvidia',
+      provider_id: 'nvidia',
+    });
 
-    await page.getByLabel('API key', { exact: true }).fill(NVIDIA_KEY);
-    await page.getByRole('button', { name: 'Save key' }).click();
-    await expect(page.getByText('Saved · ends in Lp2k')).toBeVisible();
+    await saveProviderKey(page, NVIDIA, NVIDIA_KEY);
+    await expect(providerCard(page, NVIDIA)).toContainText('In use');
+    await expect(routes(page).getByRole('definition')).toHaveText([NVIDIA, NVIDIA, NVIDIA]);
     expect(await keyStates(page)).toEqual({
       aihubmix: { stored: true, hint: '4Wd1' },
       nvidia: { stored: true, hint: 'Lp2k' },
     });
+    // Having keys for both and using one is a choice; the other way is offered, not taken.
+    await expect(page.getByText('You have keys for more than one provider')).toBeVisible();
 
     // The limits shown are said to be Adle's own: this provider publishes none.
-    await expect(page.getByText('0 of 200', { exact: true })).toBeVisible();
-    await expect(page.getByText(/does not publish a daily limit for these models/)).toBeVisible();
+    await expect(providerCard(page, NVIDIA).getByText('0 of 200', { exact: true })).toBeVisible();
+    await expect(providerCard(page, NVIDIA)).toContainText(
+      'does not publish a daily limit for these models',
+    );
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'settings-providers');
 
@@ -155,8 +167,9 @@ test.describe('choosing between AI providers', () => {
     servers.nvidia.queue({ status: 404 }, HANG);
     await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
     const ask = page.getByRole('dialog', { name: 'Ask the AI for concepts?' });
-    // Where it will go is said before anything is sent.
-    await expect(ask).toContainText(NVIDIA);
+    // Where it will go is said before anything is sent: one provider, and no "or".
+    await expect(ask).toContainText(`to ${NVIDIA}. It uses one of today's requests`);
+    await expect(ask).not.toContainText(AIHUBMIX);
     await ask.getByRole('button', { name: 'Send and suggest' }).click();
 
     // Said while it happens, not only afterwards.
@@ -166,15 +179,13 @@ test.describe('choosing between AI providers', () => {
       ),
     ).toBeVisible({ timeout: 30_000 });
 
-    // ---- The provider cannot be changed under work that is under way ----
+    // ---- The choice cannot be changed under work that is under way ----
     await page.getByRole('button', { name: 'Settings' }).click();
-    await card(page, AIHUBMIX)
-      .getByRole('button', { name: `Use ${AIHUBMIX}` })
-      .click();
-    const refused = page.getByRole('alert').filter({ hasText: 'The provider was not changed' });
-    await expect(refused).toContainText(`${NVIDIA} is writing something for you at the moment.`);
-    await expect(card(page, NVIDIA)).toContainText('In use');
-    expect((await providerStatus(page)).provider_id).toBe('nvidia');
+    await choice(page, `${AIHUBMIX} only`).click();
+    const refused = page.getByRole('alert').filter({ hasText: 'The choice was not changed' });
+    await expect(refused).toContainText('Something is being written for you at the moment.');
+    await expect(choice(page, `${NVIDIA} only`)).toHaveAttribute('aria-pressed', 'true');
+    expect((await providerStatus(page)).selection).toBe('nvidia');
 
     // ---- The answer arrives; who wrote it, and for whom, is said ----
     servers.nvidia.release();
@@ -236,6 +247,7 @@ test.describe('choosing between AI providers', () => {
     await expect
       .poll(async () => providerStatus(again.page))
       .toMatchObject({
+        selection: 'nvidia',
         provider_id: 'nvidia',
         providers: [
           { provider_id: 'aihubmix', key_configured: true },
@@ -243,16 +255,151 @@ test.describe('choosing between AI providers', () => {
         ],
       });
     await again.page.getByRole('button', { name: 'Settings' }).click();
-    await expect(card(again.page, NVIDIA)).toContainText('In use');
-    await expect(again.page.getByText('Saved · ends in Lp2k')).toBeVisible();
+    await expect(choice(again.page, `${NVIDIA} only`)).toHaveAttribute('aria-pressed', 'true');
+    await expect(providerCard(again.page, NVIDIA)).toContainText('Key saved · ends in Lp2k');
     // Both requests were counted, for this provider, and survived the restart.
-    await expect(again.page.getByText('2 of 200', { exact: true })).toBeVisible();
+    await expect(
+      providerCard(again.page, NVIDIA).getByText('2 of 200', { exact: true }),
+    ).toBeVisible();
     // Starting again sent nothing to anyone.
     expect(servers.aihubmix.requests).toHaveLength(0);
     expect(servers.nvidia.requests).toHaveLength(2);
     expect(again.problems).toEqual([]);
     await again.close();
     expect(filesContaining(profileDir, NVIDIA_KEY)).toEqual([]);
+
+    await servers.aihubmix.close();
+    await servers.nvidia.close();
+  });
+
+  test('with keys for both, each is used for what it is best at, a key can be checked, and a provider that stands in is said', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(240_000);
+    const servers: Servers = {
+      aihubmix: await startFakeProvider(),
+      nvidia: await startFakeProvider(),
+    };
+    const adle = await launch(profileDir, servers);
+    const { page } = adle;
+    await showNarrationAsText(page);
+    await page.getByRole('button', { name: 'Settings' }).click();
+
+    // ---- Two keys, and the choice left at "automatic": where each kind of request goes ----
+    await saveProviderKey(page, AIHUBMIX, AIHUBMIX_KEY);
+    await saveProviderKey(page, NVIDIA, NVIDIA_KEY);
+    await expect(choice(page, 'Automatic')).toHaveAttribute('aria-pressed', 'true');
+    await expect(providerCard(page, AIHUBMIX)).toContainText('In use');
+    await expect(providerCard(page, NVIDIA)).toContainText('In use');
+    // Said before anything is sent, with the reason: the quick one first, the other behind it.
+    await expect(routes(page).getByRole('term')).toHaveText([
+      'A question during a lesson',
+      'A list of suggested concepts',
+      'A lesson and its pictures',
+    ]);
+    for (const line of await routes(page).getByRole('definition').all()) {
+      await expect(line).toContainText(BOTH);
+    }
+    await expect(routes(page)).toContainText(`${AIHUBMIX} answers quickly`);
+    await expect(providerCard(page, AIHUBMIX)).toContainText('Quick to answer');
+    await expect(providerCard(page, NVIDIA)).toContainText('Slower to answer');
+    // Already on automatic, so there is nothing to suggest.
+    await expect(page.getByText('You have keys for more than one provider')).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'settings-providers-automatic');
+
+    // ---- Checking a key: one word from that provider, and from no other ----
+    await providerCard(page, NVIDIA).getByRole('button', { name: 'Check that it works' }).click();
+    await expect(providerCard(page, NVIDIA).getByRole('status')).toContainText(
+      /answered in .*\(Kimi K3\.1 Pro\)\. The key works\./,
+      { timeout: 30_000 },
+    );
+    expect(servers.nvidia.requests.map((request) => request.kind)).toEqual(['check']);
+    expect(servers.nvidia.requests[0]?.authorization).toBe(`Bearer ${NVIDIA_KEY}`);
+    // Nothing of the learner's is in a check.
+    expect(servers.nvidia.requests[0]?.prompt).toBe(
+      'You are checking that a connection works.\nReply with the single word "ready".',
+    );
+    expect(servers.aihubmix.requests).toHaveLength(0);
+    // It counted as one of today's requests there.
+    await expect(providerCard(page, NVIDIA).getByText('1 of 200', { exact: true })).toBeVisible();
+
+    // A key the provider does not accept is said in words, and only that provider is asked.
+    servers.aihubmix.queue({ status: 401 });
+    await providerCard(page, AIHUBMIX).getByRole('button', { name: 'Check that it works' }).click();
+    await expect(
+      page.getByRole('alert').filter({ hasText: `${AIHUBMIX} did not answer the check` }),
+    ).toBeVisible({ timeout: 30_000 });
+    expect(servers.aihubmix.requests.map((request) => request.kind)).toEqual(['check']);
+    expect(servers.nvidia.requests).toHaveLength(1);
+    // What the check found is not found out again at the cost of another request: a
+    // provider whose key was refused is asked second from now on, and the settings say why.
+    const afterwards = `${NVIDIA}, or ${AIHUBMIX} if ${NVIDIA} cannot answer`;
+    await expect(routes(page).getByRole('definition').first()).toContainText(afterwards);
+    await expect(routes(page)).toContainText(
+      `${AIHUBMIX} could not answer when it was last asked.`,
+    );
+
+    // ---- Suggestions: the first provider fails; the other writes, and that is said ----
+    await page.getByRole('button', { name: 'Library', exact: true }).click();
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits and derivatives.' });
+    await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
+    const ask = page.getByRole('dialog', { name: 'Ask the AI for concepts?' });
+    // Both are named before anything is sent: it never goes anywhere that was not said.
+    await expect(ask).toContainText(`to ${afterwards}. It uses one of today's requests`);
+    // None of NVIDIA's three models answers.
+    servers.nvidia.queue({ status: 500 }, { status: 500 }, { status: 500 });
+    await ask.getByRole('button', { name: 'Send and suggest' }).click();
+
+    // The learner stayed where they were, so the suggestions open by themselves when they
+    // arrive, and say who wrote them and for whom.
+    const review = page.getByRole('dialog', { name: 'Suggested concepts' });
+    await expect(review).toBeVisible({ timeout: 60_000 });
+    await expect(review).toContainText(`Suggested by Coding Kimi K3 (free) on ${AIHUBMIX}`);
+    await expect(review).toContainText(`${NVIDIA} could not answer, so ${AIHUBMIX} wrote this.`);
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'providers-other-provider-stood-in');
+    await review.getByRole('button', { name: 'Add 3 concepts' }).click();
+    await expect(review).toBeHidden();
+
+    // ---- What actually went where, and with which key ----
+    // NVIDIA: the check, then the suggestions, asked of each of its models in turn.
+    expect(servers.nvidia.requests.map((request) => request.kind)).toEqual([
+      'check',
+      'curriculum',
+      'curriculum',
+      'curriculum',
+    ]);
+    // AIHubMix: the check that was refused, then the suggestions it wrote in the other's place.
+    expect(servers.aihubmix.requests.map((request) => request.kind)).toEqual([
+      'check',
+      'curriculum',
+    ]);
+    for (const request of servers.nvidia.requests) {
+      expect(request.authorization).toBe(`Bearer ${NVIDIA_KEY}`);
+    }
+    for (const request of servers.aihubmix.requests) {
+      expect(request.authorization).toBe(`Bearer ${AIHUBMIX_KEY}`);
+    }
+
+    expect(filesContaining(profileDir, NVIDIA_KEY)).toEqual([]);
+    expect(filesContaining(profileDir, AIHUBMIX_KEY)).toEqual([]);
+    expect(adle.problems).toEqual([]);
+    await adle.close();
+
+    // ---- "Automatic" is what the learner left it at, and it is still that after a restart ----
+    const again = await launch(profileDir, servers, false);
+    await expect
+      .poll(async () => providerStatus(again.page))
+      .toMatchObject({
+        selection: 'auto',
+        providers: [
+          { provider_id: 'aihubmix', key_configured: true },
+          { provider_id: 'nvidia', key_configured: true },
+        ],
+      });
+    expect(again.problems).toEqual([]);
+    await again.close();
 
     await servers.aihubmix.close();
     await servers.nvidia.close();
@@ -266,13 +413,8 @@ test.describe('choosing between AI providers', () => {
     };
     const first = await launch(profileDir, servers);
     await first.page.getByRole('button', { name: 'Settings' }).click();
-    await card(first.page, NVIDIA)
-      .getByRole('button', { name: `Use ${NVIDIA}` })
-      .click();
-    await expect(card(first.page, NVIDIA)).toContainText('In use');
-    await first.page.getByLabel('API key', { exact: true }).fill(NVIDIA_KEY);
-    await first.page.getByRole('button', { name: 'Save key' }).click();
-    await expect(first.page.getByText('Saved · ends in Lp2k')).toBeVisible();
+    await saveProviderKey(first.page, NVIDIA, NVIDIA_KEY);
+    await expect(providerCard(first.page, NVIDIA)).toContainText('In use');
     await first.close();
 
     // The same profile, but "NVIDIA" is now somewhere else.
@@ -287,12 +429,11 @@ test.describe('choosing between AI providers', () => {
     await expect
       .poll(async () => providerStatus(moved.page))
       .toMatchObject({
-        provider_id: 'nvidia',
         providers: [{ provider_id: 'aihubmix' }, { provider_id: 'nvidia', key_configured: false }],
       });
     expect(await keyStates(moved.page)).toMatchObject({ nvidia: { stored: false, hint: null } });
     await moved.page.getByRole('button', { name: 'Settings' }).click();
-    await expect(moved.page.getByText('Not set', { exact: true })).toBeVisible();
+    await expect(providerCard(moved.page, NVIDIA)).toContainText('No key yet');
     await moved.close();
 
     // Back where it was saved for, it is there again: it was kept, not thrown away.
@@ -327,28 +468,36 @@ test.describe('choosing between AI providers', () => {
         unknownName: await code(() => provider.select!('openai')),
         anAddress: await code(() => provider.select!('https://attacker.example/v1')),
         notText: await code(() => provider.select!({ provider_id: 'nvidia' })),
+        almostAutomatic: await code(() => provider.select!('AUTO')),
         // A provider Adle keeps keys for, which this installation does not offer.
         notOffered: await code(() => provider.select!('custom')),
         keyForUnknown: await code(() => provider.setApiKey!('openai', key)),
+        keyForAutomatic: await code(() => provider.setApiKey!('auto', key)),
         keyWithAnAddress: await code(() =>
           provider.setApiKey!('nvidia', key, 'https://attacker.example/v1'),
         ),
         clearUnknown: await code(() => provider.clearApiKey!('https://attacker.example/v1')),
+        // The one choice that is not a provider's name.
+        automatic: await code(() => provider.select!('auto')),
       };
     }, NVIDIA_KEY);
     expect(outcomes).toEqual({
       unknownName: 'invalid_request',
       anAddress: 'invalid_request',
       notText: 'invalid_request',
+      almostAutomatic: 'invalid_request',
       notOffered: 'provider_unknown',
       keyForUnknown: 'invalid_request',
+      // "Automatic" is a choice, never somewhere a key can be kept for.
+      keyForAutomatic: 'invalid_request',
       // The extra argument is not part of the bridge: it is dropped, and the key is kept
       // for the provider's own address, which is the only place it can be sent.
       keyWithAnAddress: 'accepted',
       clearUnknown: 'invalid_request',
+      automatic: 'accepted',
     });
-    // Nothing above changed the provider in use.
-    expect((await providerStatus(page)).provider_id).toBe('aihubmix');
+    // Nothing that was refused changed the choice.
+    expect((await providerStatus(page)).selection).toBe('auto');
     expect(await keyStates(page)).toEqual({
       aihubmix: { stored: false, hint: null },
       nvidia: { stored: true, hint: 'Lp2k' },

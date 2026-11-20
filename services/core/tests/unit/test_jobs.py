@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from adle_core.application.jobs import JobContext, JobRunner
+from adle_core.application.jobs import LANE_QUICK, JobContext, JobRunner
 from adle_core.errors import AdleError, NotFoundError
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.migrate import migrate
@@ -201,3 +201,37 @@ def test_stopping_the_runner_asks_running_work_to_stop(database: Database) -> No
     assert started.wait(5)
     runner.stop()
     assert observed == [True]
+
+
+def test_short_work_does_not_wait_behind_long_work(runner: JobRunner) -> None:
+    """Two lanes: a question asked during a lesson must not queue behind a lesson being written."""
+    started, release = threading.Event(), threading.Event()
+
+    def long_work(_: JobContext) -> str:
+        started.set()
+        release.wait(20)
+        return "long"
+
+    long_job = runner.submit("lesson_generation", long_work)
+    queued_behind = runner.submit("lesson_generation", lambda _: "second")
+    try:
+        assert started.wait(20)
+        quick = runner.wait(runner.submit("lesson_ask", lambda _: "short", lane=LANE_QUICK).id)
+        assert (quick.status, quick.result) == ("succeeded", "short")
+        # Long work is still one job at a time.
+        assert runner.get(long_job.id).status == "running"
+        assert runner.get(queued_behind.id).status == "queued"
+        # Two jobs asked for in the same instant have no order between them.
+        assert {job.id for job in runner.list_all_active(["lesson_generation"])} == {
+            long_job.id,
+            queued_behind.id,
+        }
+        assert runner.list_all_active(["lesson_ask"]) == []
+    finally:
+        release.set()
+    assert runner.wait(queued_behind.id).result == "second"
+
+
+def test_a_job_says_when_it_was_asked_for(runner: JobRunner) -> None:
+    finished = runner.wait(runner.submit("import_sources", lambda _: None).id)
+    assert finished.created_at is not None

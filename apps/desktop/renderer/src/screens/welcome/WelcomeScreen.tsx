@@ -129,9 +129,10 @@ export function WelcomeScreen() {
                 no analytics.
               </p>
               <p>
-                One thing uses the internet: creating a course or lesson with AI sends the relevant
-                text to the one AI provider you choose (AIHubMix or NVIDIA NIM). Nothing is sent
-                until you add a key and ask for it.
+                One thing uses the internet: when you ask an AI to write a course, a lesson, or an
+                answer to your question, Adle sends the relevant text to an AI provider you have
+                given a key to (AIHubMix or NVIDIA NIM), and says which before it does. Nothing is
+                sent until you add a key and ask for it.
               </p>
             </div>
           </section>

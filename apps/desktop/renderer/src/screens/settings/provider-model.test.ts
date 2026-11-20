@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
 import { EXTERNAL_LINKS } from '../../../../electron/shared/ipc';
-import { keyBadge, keyPage, limitsNote, modelOrder } from './provider-model';
+import {
+  couldUseBoth,
+  keyBadge,
+  keyPage,
+  limitsNote,
+  modelOrder,
+  providerCharacter,
+  routeLines,
+  selectionOptions,
+} from './provider-model';
 
 describe('modelOrder', () => {
   it('says where every request goes when there is one model', () => {
     expect(modelOrder([{ name: 'Coding Kimi K3 (free)' }])).toBe(
-      'Every request goes to Coding Kimi K3 (free).',
+      'Every request here goes to Coding Kimi K3 (free).',
     );
   });
 
@@ -17,8 +26,8 @@ describe('modelOrder', () => {
       { name: 'GLM 5.3 Flash' },
     ]);
     expect(said).toBe(
-      'Requests go to Kimi K3.1 Pro. While it is not available, Mistral Large 4 and GLM 5.3 ' +
-        'Flash stand in, in that order, and Adle tells you when that happened.',
+      'Requests here go to Kimi K3.1 Pro. While it is not available, Mistral Large 4 and GLM ' +
+        '5.3 Flash stand in, in that order, and Adle tells you when that happened.',
     );
     // The first is never listed among its own stand-ins.
     expect(said.indexOf('Kimi K3.1 Pro')).toBe(said.lastIndexOf('Kimi K3.1 Pro'));
@@ -54,9 +63,9 @@ describe('keyPage', () => {
 });
 
 describe('keyBadge', () => {
-  it('says that a key is saved, and nothing of the key itself', () => {
+  it('says that a key is saved, and only the end of it, to tell keys apart', () => {
     expect(keyBadge({ stored: true, hint: '9876' })).toEqual({
-      text: 'Key saved',
+      text: 'Key saved · ends in 9876',
       tone: 'success',
     });
   });
@@ -67,6 +76,19 @@ describe('keyBadge', () => {
       tone: undefined,
     });
     expect(keyBadge(undefined)).toEqual({ text: 'No key yet', tone: undefined });
+  });
+});
+
+describe('providerCharacter', () => {
+  it('describes a provider by the two things automatic goes by', () => {
+    const quickAndSmall = providerCharacter({ quick: true, limits_published: true });
+    expect(quickAndSmall).toContain('Quick to answer');
+    expect(quickAndSmall).toContain('allowance is small');
+    const slowAndRoomy = providerCharacter({ quick: false, limits_published: false });
+    expect(slowAndRoomy).toContain('Slower to answer');
+    expect(slowAndRoomy).toContain('Room for many lessons');
+    // It never promises a speed.
+    for (const text of [quickAndSmall, slowAndRoomy]) expect(text).not.toMatch(/\d/);
   });
 });
 
@@ -96,5 +118,72 @@ describe('limitsNote', () => {
     expect(
       limitsNote(nvidia, { limits_published: false, requests_per_minute: 4 }, ''),
     ).not.toContain('starts again');
+  });
+});
+
+describe('selectionOptions', () => {
+  const providers = [
+    { provider_id: 'aihubmix', display_name: 'AIHubMix' },
+    { provider_id: 'nvidia', display_name: 'NVIDIA NIM' },
+  ];
+
+  it('offers automatic first, then each provider alone', () => {
+    const options = selectionOptions(providers);
+    expect(options.map((option) => [option.value, option.label, option.recommended])).toEqual([
+      ['auto', 'Automatic', true],
+      ['aihubmix', 'AIHubMix only', false],
+      ['nvidia', 'NVIDIA NIM only', false],
+    ]);
+  });
+
+  it('says of automatic that it only uses providers with a key, and that a stand-in is told', () => {
+    const [automatic, alone] = selectionOptions(providers);
+    expect(automatic?.description).toContain('every provider you have given a key to');
+    expect(automatic?.description).toContain('Adle tells you');
+    expect(alone?.description).toBe(
+      'Every request goes to AIHubMix and nowhere else, whatever happens.',
+    );
+  });
+});
+
+describe('routeLines', () => {
+  const route = (sentence: string, reason = '') => ({
+    sentence,
+    reason,
+    names: [],
+    provider_ids: [],
+    wait_seconds: 60,
+    wait_measured: false,
+  });
+
+  it('gives the destination of each kind of request in the words the core used', () => {
+    const lines = routeLines({
+      routes: {
+        ask: route('AIHubMix, or NVIDIA NIM if AIHubMix cannot answer', 'It answers quickly.'),
+        curriculum: route('AIHubMix'),
+        lesson: route('NVIDIA NIM', 'This is long work.'),
+      },
+    });
+    expect(lines.map((line) => line.work)).toEqual(['ask', 'curriculum', 'lesson']);
+    expect(lines[0]).toMatchObject({
+      label: 'A question during a lesson',
+      destination: 'AIHubMix, or NVIDIA NIM if AIHubMix cannot answer',
+      reason: 'It answers quickly.',
+    });
+    expect(lines[2]).toMatchObject({
+      label: 'A lesson and its pictures',
+      reason: 'This is long work.',
+    });
+  });
+});
+
+describe('couldUseBoth', () => {
+  const keyed = (...configured: boolean[]) =>
+    configured.map((key_configured) => ({ key_configured }));
+
+  it('suggests it only to a learner who chose one provider and has keys for two', () => {
+    expect(couldUseBoth({ selection: 'nvidia', providers: keyed(true, true) })).toBe(true);
+    expect(couldUseBoth({ selection: 'nvidia', providers: keyed(false, true) })).toBe(false);
+    expect(couldUseBoth({ selection: 'auto', providers: keyed(true, true) })).toBe(false);
   });
 });

@@ -307,8 +307,11 @@ def test_usage_older_than_a_day_no_longer_counts(services: Services) -> None:
 
 def test_the_interface_can_read_the_provider_and_the_local_estimate(client: TestClient) -> None:
     provider = client.get("/v1/provider").json()
-    # Every provider there is to choose from comes with it (test_provider_choice.py).
+    # Every provider there is, and where each kind of request would go, come with it
+    # (test_provider_choice.py, test_provider_routing.py).
     provider.pop("providers")
+    provider.pop("routes")
+    assert provider.pop("selection") == "auto"
     assert provider == {
         "provider_id": "aihubmix",
         "display_name": "AIHubMix",

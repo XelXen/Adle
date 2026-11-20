@@ -43,6 +43,7 @@
     "scene-guide:check": "node scripts/sync-scene-guide.mjs --check",
     "licenses": "node scripts/licenses.mjs",
     "licenses:check": "node scripts/licenses.mjs --check",
+    "secrets:check": "node scripts/check-secrets.mjs",
     "icons": "electron scripts/build-icons.cjs",
     "icons:verify": "electron scripts/build-icons.cjs --verify"
   },

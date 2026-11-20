@@ -121,6 +121,10 @@ describe('ProviderKeyStore', () => {
     store.clear('nvidia', NVIDIA);
     // Removing a key is not a change of provider.
     expect(store.selected()).toBe('nvidia');
+
+    // Letting Adle use every provider with a key is a choice like any other, and is kept.
+    expect(store.select('auto')).toBe(true);
+    expect(new ProviderKeyStore(xorEncryptor(), file).selected()).toBe('auto');
   });
 
   it('reads the one key an earlier version kept as the key of the provider there was', () => {
@@ -202,17 +206,26 @@ describe('parseProviderId', () => {
 describe('parseProviders', () => {
   const status = {
     provider_id: 'nvidia',
+    selection: 'nvidia',
     providers: [
       { provider_id: 'aihubmix', base_url: AIHUBMIX, selected: false, key_configured: true },
       { provider_id: 'nvidia', base_url: NVIDIA, selected: true, key_configured: false },
     ],
   };
 
-  it('reads each provider, where its key would go, and which is in use', () => {
-    expect(parseProviders(status)).toEqual([
-      { id: 'aihubmix', address: AIHUBMIX, selected: false },
-      { id: 'nvidia', address: NVIDIA, selected: true },
-    ]);
+  it('reads each provider, where its key would go, and what the core is going by', () => {
+    expect(parseProviders(status)).toEqual({
+      providers: [
+        { id: 'aihubmix', address: AIHUBMIX },
+        { id: 'nvidia', address: NVIDIA },
+      ],
+      selection: 'nvidia',
+    });
+    expect(parseProviders({ ...status, selection: 'auto' })?.selection).toBe('auto');
+    // A choice that is neither a provider Adle keeps keys for nor "automatic" is not one.
+    for (const selection of ['openai', 'AUTO', '', 7, null, undefined]) {
+      expect(parseProviders({ ...status, selection })?.selection).toBeNull();
+    }
   });
 
   it('leaves out anything a key must not be kept or sent for', () => {
@@ -228,7 +241,7 @@ describe('parseProviders', () => {
           null,
         ],
       }),
-    ).toEqual([{ id: 'aihubmix', address: AIHUBMIX, selected: false }]);
+    ).toEqual({ providers: [{ id: 'aihubmix', address: AIHUBMIX }], selection: null });
   });
 
   it('says nothing is known when the answer is not a list of providers', () => {
@@ -259,29 +272,50 @@ describe('createSecureEncryptor', () => {
   });
 });
 
+const DEFAULTS = { theme: 'system', onboardingCompleted: false, notifications: true };
+
 describe('UiStateStore', () => {
   it('starts with defaults and persists updates', () => {
     const file = path.join(directory, 'ui-state.json');
     const store = new UiStateStore(file);
-    expect(store.get()).toEqual({ theme: 'system', onboardingCompleted: false });
+    expect(store.get()).toEqual(DEFAULTS);
 
     store.update({ theme: 'dark' });
     store.update({ onboardingCompleted: true });
-    expect(new UiStateStore(file).get()).toEqual({ theme: 'dark', onboardingCompleted: true });
+    expect(new UiStateStore(file).get()).toEqual({
+      theme: 'dark',
+      onboardingCompleted: true,
+      notifications: true,
+    });
+    // Notifications are on until the learner turns them off, and that is remembered.
+    store.update({ notifications: false });
+    expect(new UiStateStore(file).get().notifications).toBe(false);
+  });
+
+  it('reads what an earlier version kept, which said nothing about notifications', () => {
+    const file = path.join(directory, 'ui-state.json');
+    writeFileSync(file, JSON.stringify({ theme: 'light', onboardingCompleted: true }));
+    expect(new UiStateStore(file).get()).toEqual({
+      theme: 'light',
+      onboardingCompleted: true,
+      notifications: true,
+    });
   });
 
   it('falls back to defaults when the file is corrupt or tampered with', () => {
     const file = path.join(directory, 'ui-state.json');
     writeFileSync(file, '{ not json');
-    expect(new UiStateStore(file).get()).toEqual({ theme: 'system', onboardingCompleted: false });
+    expect(new UiStateStore(file).get()).toEqual(DEFAULTS);
     writeFileSync(file, JSON.stringify({ theme: 'neon', onboardingCompleted: true }));
-    expect(new UiStateStore(file).get()).toEqual({ theme: 'system', onboardingCompleted: false });
+    expect(new UiStateStore(file).get()).toEqual(DEFAULTS);
   });
 
   it('rejects patches with unknown or mistyped fields', () => {
     expect(parseUiStatePatch({ theme: 'light' })).toEqual({ theme: 'light' });
     expect(parseUiStatePatch({ theme: 'light', admin: true })).toBeNull();
     expect(parseUiStatePatch({ onboardingCompleted: 'yes' })).toBeNull();
+    expect(parseUiStatePatch({ notifications: false })).toEqual({ notifications: false });
+    expect(parseUiStatePatch({ notifications: 'off' })).toBeNull();
     expect(parseUiStatePatch(['theme'])).toBeNull();
     expect(parseUiStatePatch(null)).toBeNull();
   });

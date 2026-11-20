@@ -13,6 +13,7 @@ import {
   type CoreStatus,
   type ExternalLinkId,
   IPC,
+  type NoticeKind,
   type UiState,
 } from '../shared/ipc';
 
@@ -22,6 +23,7 @@ const bridge: AdleBridge = {
     updateUiState: (patch: Partial<UiState>) => ipcRenderer.invoke(IPC.uiStateUpdate, patch),
     openExternal: (link: ExternalLinkId) => ipcRenderer.invoke(IPC.openExternal, link),
     showLogs: () => ipcRenderer.invoke(IPC.showLogs),
+    notify: (kind: NoticeKind) => ipcRenderer.invoke(IPC.appNotify, kind),
   },
   core: {
     status: () => ipcRenderer.invoke(IPC.coreStatus),
@@ -41,7 +43,7 @@ const bridge: AdleBridge = {
     setApiKey: (providerId: string, apiKey: string) =>
       ipcRenderer.invoke(IPC.providerSetApiKey, providerId, apiKey),
     clearApiKey: (providerId: string) => ipcRenderer.invoke(IPC.providerClearApiKey, providerId),
-    select: (providerId: string) => ipcRenderer.invoke(IPC.providerSelect, providerId),
+    select: (selection: string) => ipcRenderer.invoke(IPC.providerSelect, selection),
   },
   sources: {
     importWithPicker: (courseId: string) =>

@@ -17,6 +17,7 @@ import { expect, launchApp, test, waitForCore } from './support/app';
 import {
   courseCard,
   expectNoAccessibilityViolations,
+  saveProviderKey,
   screenshot,
   showNarrationAsText,
 } from './support/courses';
@@ -416,9 +417,7 @@ test.describe('learning', () => {
       const { page } = adle;
       await waitForCore(page);
       await page.getByRole('button', { name: 'Settings' }).click();
-      await page.getByLabel('API key', { exact: true }).fill(KEY);
-      await page.getByRole('button', { name: 'Save key' }).click();
-      await expect(page.getByText('Saved · ends in 4Wd1')).toBeVisible();
+      await saveProviderKey(page, /Custom endpoint/, KEY);
       await page.getByRole('button', { name: 'Library', exact: true }).click();
       await addSampleCourse(page);
 

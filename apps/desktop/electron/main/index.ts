@@ -164,7 +164,7 @@ async function start(): Promise<void> {
     }, 1000);
   });
 
-  registerIpcHandlers(deps);
+  registerIpcHandlers({ ...deps, getWindow: () => mainWindow });
   forwardCoreStatus(core, () => mainWindow?.webContents ?? null);
 
   const openWindow = (): void => {

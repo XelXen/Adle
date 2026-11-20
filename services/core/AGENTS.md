@@ -26,8 +26,9 @@ Add a dependency with `uv add <name>` (or `uv add --dev <name>`) inside `service
 adle_core/
   errors.py       AdleError and friends (no framework imports; usable everywhere)
   api/            FastAPI app factory, auth, error contract, schemas, routes (no domain logic)
-  application/    service container; courses, sources, jobs, curriculum, learner, retrieval,
-                  saving and restoring a copy of the data
+  application/    service container; courses, sources, jobs (two lanes), curriculum,
+                  learner, retrieval, lessons, asks (questions put to Adle during a lesson),
+                  generation and the model gateway, saving and restoring a copy of the data
   curriculum/     PURE rules: concept graph (loops, order, layers), outline from headings
   learner_model/  PURE rules: knowledge tracing, mastery states, review schedule, preferences,
                   hypotheses about mistakes, which questions to practise, the next step,
@@ -39,9 +40,11 @@ adle_core/
   infrastructure/ database, ORM models, migrate (with backup), asset store, ids
   migrations/     Alembic revisions (shipped inside the package)
   ingestion/      type detection, parsers, chunking, the parser worker process
-  generation/     provider credentials and client, quota rules (pure), scene policy,
-                  drafts (what a model writes -> Lesson IR), prompts, data/ (generated files)
-  orchestration/ audio/   (M5–M6)
+  generation/     provider credentials and client, quota rules (pure), routing (pure: which
+                  provider a request goes to), scene policy, drafts (what a model writes ->
+                  Lesson IR, or an answer), prompts, data/ (generated files)
+  orchestration/ audio/   empty: narration is spoken by the browser (ADR-013), and jobs are
+                  run by application/jobs.py
   tools/          developer entry points (contract export)
 tests/unit/        fast, isolated
 tests/integration/ real process, real database, fake provider
@@ -65,9 +68,15 @@ everything and decides nothing.
 - **A key goes to its own provider and nowhere else** (ADR-021). A `ChatClient` is bound to
   one provider and reads `vault.api_key(config.provider_id)`: never the "current" key. Do
   not add a client that can be pointed at another address after it is made.
-- **Which provider is in use is the learner's choice**, held by the vault and changed only
-  through `GenerationService.select_provider` (refused while a job is writing). Never
-  select one because another failed.
+- **Which providers may be used is the learner's choice**, held by the vault (one provider's
+  name, or `"auto"`) and changed only through `GenerationService.select_provider` (refused
+  while a job is writing). Never change it because something failed.
+- **Where a request goes is decided in `generation/routing.py`**, a pure module, and applied
+  only by `ModelGateway`. With one provider chosen the plan is that provider alone. With
+  `"auto"` it is the providers that have a key, best first for the request's `purpose`
+  (`ask`, `curriculum`, `check` are waited for; `lesson`, `scene` are long work). A new
+  kind of request needs a purpose there. Never add a path that reaches a provider without a
+  key of its own (ADR-023).
 - **Logging:** log event types and identifiers, not document text, answers, or prompts.
 - **Paths:** store only under `Settings.data_dir`, under generated names. Never use a
   user-supplied path as a destination. The one exception is `data.save_copy` (ADR-016): an
@@ -150,6 +159,14 @@ everything and decides nothing.
 - **A model request goes through `ModelGateway.complete`**, from inside a job. Nothing else
   may call `ChatClient`. Do not add sampling parameters, retries, or a second request "to fix
   it": the number of requests per job is fixed in `application/generation.py` (ADR-012).
+- **Jobs run in two lanes** (`application/jobs.py`). Long work (an import, a lesson, a list
+  of concepts) runs one at a time in the main lane. What the learner waits for (an ask, a
+  check of a key) runs in the quick lane, so it never queues behind a lesson. One request
+  is in flight at each provider, whichever lane asks.
+- **An ask is a note, not evidence** (`application/asks.py`, ADR-024). Only its existence is
+  ever read by anything else: an answer to a checkpoint given after an ask about that part
+  is an aided answer. Never send an answer key in `prompts.ask_request`: see
+  `_part_brief` for what a part may show a model.
 - **A provider's models are tried in order** (ADR-021), and only `ModelGateway` decides
   which. The next is asked when the one before is away (`ProviderModelUnavailableError`:
   gone, failing, or silent) or will not take its request (400, 422). Not for a refused key,

@@ -1,8 +1,13 @@
+import { Coffee } from 'lucide-react';
+
 import type { Job } from '@adle/contracts';
 import { Button, Callout, Card, ProgressBar, Stack } from '@adle/design-system';
 
+import { useBreak } from '../app/BreakContext';
 import { useRouter } from '../app/router';
+import { suggestedBreakMinutes } from '../lib/breaks';
 import { type JobFailure, jobFailure, jobProgress } from '../lib/generation';
+import { aboutHowLong } from '../lib/provider';
 import { isJobActive } from '../lib/use-job';
 import styles from './GenerationStatus.module.css';
 
@@ -17,6 +22,11 @@ export interface GenerationStatusProps {
   subject: string;
   /** Shown while the job waits for its turn or has not reported anything yet. */
   waitingText: string;
+  /**
+   * About how long this kind of work takes where it is being done, in seconds, where the
+   * core could say (`provider.status`). Said as "about", and what a break is sized by.
+   */
+  usualSeconds?: number | null;
   onCancel: () => void;
   onRetry: () => void;
   /** Put a failure or cancellation away. */
@@ -34,11 +44,13 @@ export function GenerationStatus({
   refusal,
   subject,
   waitingText,
+  usualSeconds = null,
   onCancel,
   onRetry,
   onDismiss,
 }: GenerationStatusProps) {
   const { navigate } = useRouter();
+  const rest = useBreak();
 
   if (starting || isJobActive(job)) {
     const progress = job
@@ -60,12 +72,28 @@ export function GenerationStatus({
               }
             />
             <p className={styles.note}>
-              This can take a minute or two. You can keep using Adle while it works.
+              {usualSeconds
+                ? `This usually takes ${aboutHowLong(usualSeconds)}. `
+                : 'This can take a few minutes. '}
+              You do not have to wait here: Adle will tell you when it is ready.
             </p>
           </div>
-          <Button size="small" disabled={!job} onClick={onCancel}>
-            Cancel
-          </Button>
+          <div className={styles.actions}>
+            {/* Minutes of waiting are better spent away from the screen. */}
+            <Button
+              size="small"
+              icon={<Coffee />}
+              onClick={() => {
+                if (!rest.times) rest.start(suggestedBreakMinutes(usualSeconds));
+                navigate({ name: 'break' });
+              }}
+            >
+              {rest.times ? 'Back to your break' : 'Take a break'}
+            </Button>
+            <Button size="small" variant="tertiary" disabled={!job} onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
         </Stack>
       </Card>
     );

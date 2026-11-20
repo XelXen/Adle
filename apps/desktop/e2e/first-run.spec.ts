@@ -16,10 +16,10 @@ test.describe('first launch without an AI key', () => {
     );
     // The external data path is disclosed before any AI operation is possible.
     await expect(page.getByText('Your learning stays on this computer')).toBeVisible();
-    // Both providers are named, and that it is one of them, chosen by the learner.
+    // Both providers are named, and that text only goes to one the learner gave a key to.
     await expect(
       page.getByText(
-        /sends the relevant\s+text\s+to the one AI provider you choose \(AIHubMix or NVIDIA NIM\)/,
+        /sends the relevant text to an AI provider you have\s+given a key to \(AIHubMix or NVIDIA NIM\), and says which before it does/,
       ),
     ).toBeVisible();
     // No main navigation until the learner has seen the welcome.

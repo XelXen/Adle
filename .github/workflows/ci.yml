@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Work happens on dev; main is what has been merged.
+    branches: [main, dev]
   pull_request:
 
 permissions:

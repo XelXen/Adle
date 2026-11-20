@@ -17,15 +17,18 @@ Rules that hold here:
 * Only fields a model's own API reference lists are sent to it.
 * Nothing from a request or a response body is logged. Errors carry a status
   code and a fixed sentence.
-* A response is bounded in size and in time, and can be abandoned between
-  chunks when the learner cancels.
+* A response is bounded in size and in time, and is given up the moment the
+  learner cancels: whoever asked is told at once, and the connection is closed
+  as soon as it next says anything (or its time runs out).
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import queue
 import re
+import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -130,6 +133,26 @@ NVIDIA_LIMITS = QuotaLimits(requests_per_minute=4, requests_per_day=200, tokens_
 
 
 @dataclass(frozen=True, slots=True)
+class TypicalSeconds:
+    """How long one answer of each kind usually takes at a provider.
+
+    Used to tell the learner what to expect before Adle has measured anything on this
+    computer. Once a few answers have arrived, what was measured is used instead
+    (``ModelGateway.seconds_for``).
+    """
+
+    lesson: int = 60
+    scene: int = 45
+    curriculum: int = 30
+    ask: int = 15
+    check: int = 8
+
+    def of(self, purpose: str) -> int:
+        found = getattr(self, purpose, None)
+        return found if isinstance(found, int) else self.lesson
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderConfig:
     provider_id: str = DEFAULT_PROVIDER_ID
     display_name: str = "AIHubMix"
@@ -141,6 +164,12 @@ class ProviderConfig:
     #: True when ``limits`` sit just under limits the provider publishes; False when they
     #: are only Adle's own caution. The interface says which.
     limits_published: bool = True
+    #: It answers in seconds rather than minutes. With ``limits_published`` this is what
+    #: ``generation.routing`` goes by when the learner lets Adle use more than one
+    #: provider: what is waited for goes to a quick one, long work to a roomy one.
+    quick: bool = True
+    #: What to expect of it before anything has been measured here.
+    typical: TypicalSeconds = TypicalSeconds()
     connect_timeout_seconds: float = 15.0
     #: The longest silence tolerated while an answer is arriving.
     read_timeout_seconds: float = 120.0
@@ -191,6 +220,11 @@ NVIDIA = ProviderConfig(
     models=NVIDIA_MODELS,
     limits=NVIDIA_LIMITS,
     limits_published=False,
+    # Its models think for a minute or more before the first word (ADR-021). Measured on
+    # 2026-11-20: a lesson's text in about five minutes, a picture in about three, a list
+    # of concepts in about two.
+    quick=False,
+    typical=TypicalSeconds(lesson=300, scene=200, curriculum=130, ask=60, check=45),
     # These models think before they answer, and the shared endpoints queue: a small
     # question took forty seconds to begin to be answered when this was written.
     read_timeout_seconds=180.0,
@@ -200,7 +234,11 @@ NVIDIA = ProviderConfig(
 
 @dataclass(frozen=True, slots=True)
 class ProviderCatalogue:
-    """The providers this installation can use. The learner chooses one; nothing else does."""
+    """The providers this installation can use.
+
+    The learner chooses one, or lets Adle use every one they have given a key for
+    (ADR-023). Nothing else decides.
+    """
 
     providers: tuple[ProviderConfig, ...] = (AIHUBMIX, NVIDIA)
 
@@ -462,6 +500,9 @@ _THINKING_FIELDS = ("reasoning_content", "reasoning")
 #: What a model is seen to be doing while its answer is on the way.
 Stage = Literal["thinking", "writing"]
 
+#: How often whoever is waiting for an answer looks up to see whether it is still wanted.
+_LOOK_UP_SECONDS = 0.2
+
 
 # -- one request -----------------------------------------------------------------
 
@@ -493,6 +534,11 @@ class ChatResult:
     #: The model that was meant to answer and was not available, when another stood in
     #: for it. Set by the gateway; empty when the first choice answered.
     instead_of: str = ""
+    #: Which provider answered, by its name. Set by the gateway.
+    provider_name: str = ""
+    #: The provider that was asked first and could not answer, when the learner let Adle
+    #: use more than one and another stood in. Set by the gateway; otherwise empty.
+    instead_of_provider: str = ""
 
 
 def _never_cancelled() -> bool:
@@ -551,10 +597,56 @@ class ChatClient:
 
         ``on_stage`` is told when the model is seen to begin thinking, and when it begins
         to write its answer: once each, at most.
+
+        Raises ``RequestCancelledError`` as soon as ``cancelled`` turns true, however
+        silent the provider is being. A model can take a minute before its first word,
+        and "Stop" must not take a minute too. The request itself is made on a thread of
+        its own, which lets go of the connection the next time anything arrives on it.
         """
         spec = model or self.config.models[0]
         if spec not in self.config.models:
             raise ValueError("That model does not belong to this provider.")
+        if cancelled is _never_cancelled:
+            # Nobody can change their mind, so there is nothing to wait beside.
+            return self._send(request, spec, cancelled, on_stage)
+
+        given_up = threading.Event()
+        outcome: queue.Queue[ChatResult | BaseException] = queue.Queue(maxsize=1)
+
+        def no_longer_wanted() -> bool:
+            return given_up.is_set() or cancelled()
+
+        def stage_while_wanted(stage: Stage) -> None:
+            if on_stage is not None and not given_up.is_set():
+                on_stage(stage)
+
+        def work() -> None:
+            try:
+                outcome.put(self._send(request, spec, no_longer_wanted, stage_while_wanted))
+            except BaseException as error:  # handed to whoever asked, or dropped with them
+                outcome.put(error)
+
+        threading.Thread(target=work, name="adle-provider-request", daemon=True).start()
+        while True:
+            try:
+                found = outcome.get(timeout=_LOOK_UP_SECONDS)
+            except queue.Empty:
+                if cancelled():
+                    given_up.set()
+                    raise RequestCancelledError from None
+                continue
+            if isinstance(found, BaseException):
+                raise found
+            return found
+
+    def _send(
+        self,
+        request: ChatRequest,
+        spec: ModelSpec,
+        cancelled: Callable[[], bool],
+        on_stage: Callable[[Stage], None] | None,
+    ) -> ChatResult:
+        """Make the request and read the answer. Blocks for as long as the provider does."""
         # This provider's key, and no other's: a key goes only to the address it was given for.
         api_key = self._vault.api_key(self.config.provider_id)
         if api_key is None:

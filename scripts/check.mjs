@@ -20,6 +20,7 @@ const steps = [
   ['Contracts up to date', ['run', 'contracts:check']],
   ['Scene name allowlist up to date', ['run', 'wanim-names:check']],
   ['Packaged scene guide up to date', ['run', 'scene-guide:check']],
+  ['No credential or learner data in what would be committed', ['run', 'secrets:check']],
   ['Third-party licences listed and accepted', ['run', 'licenses:check']],
   ['Format (prettier)', ['run', 'format:check']],
   ['Lint (eslint)', ['run', 'lint']],

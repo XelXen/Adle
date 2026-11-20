@@ -26,6 +26,8 @@ export type Route =
   | { name: 'lesson'; courseId: string; lessonId: string }
   /** A few questions on one concept: practice, a review, or a check on a suspected mistake. */
   | { name: 'practice'; courseId: string; conceptId: string; about?: MistakeKind }
+  /** A few minutes away from the screen, while something is written or between lessons. */
+  | { name: 'break' }
   | { name: 'settings'; tab: SettingsTab };
 
 interface RouterValue {
@@ -50,6 +52,7 @@ function isRoute(value: unknown): value is Route {
   };
   switch (candidate.name) {
     case 'home':
+    case 'break':
       return true;
     case 'lesson':
       return typeof candidate.courseId === 'string' && typeof candidate.lessonId === 'string';

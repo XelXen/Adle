@@ -69,11 +69,13 @@ have been restored from a copy the learner was given (ADR-016).
 
 ## The provider keys
 
-There are two providers (AIHubMix and NVIDIA NIM), the learner chooses one, and each has a
-key of its own. Reasoning: `docs/decisions/ADR-021-a-choice-of-providers.md`.
+There are two providers (AIHubMix and NVIDIA NIM), and each has a key of its own. The learner
+chooses one of them, or "automatic": every provider they have given a key to, each used for
+what it is good at. Reasoning: `docs/decisions/ADR-021-a-choice-of-providers.md` and
+`docs/decisions/ADR-023-every-provider-with-a-key.md`.
 
-1. Entered in Settings for the provider in use, and sent once over IPC to the main process
-   with that provider's **name**.
+1. Entered in Settings on that provider's own card, and sent once over IPC to the main
+   process with that provider's **name**.
 2. Validated (`validateApiKey`: printable ASCII, 8–512 characters, no whitespace or control
    characters, which also rules out header injection). The name is checked against a fixed
    list (`parseProviderId`).
@@ -97,8 +99,12 @@ four characters.
 | A key is only ever sent to the provider it was given for | Each provider has its own client, bound to one address, which asks the vault for its own provider's key and no other | `test_provider_choice.py` (both keys held: each address receives its own; one key held: nothing is sent to the other) ; `e2e/providers.spec.ts` (two servers; the one not chosen receives nothing) |
 | A key is only ever handed over for the address it was typed for | `ProviderKeyStore` keeps and returns a key by provider **and** address | `local-state.test.ts`; `e2e/providers.spec.ts` (the same profile with the provider moved: no key reaches the core) |
 | The page cannot say where a key goes | `setApiKey`, `clearApiKey`, `select` take a name from a fixed list; the address comes from the core | `e2e/providers.spec.ts` (an address, an unknown name, an extra argument); `local-state.test.ts` (`parseProviders`) |
-| Nothing changes the provider but the learner | `provider.select` is internal and is only called from the handler of the learner's click; there is no code path from a failure to another provider | `test_provider_choice.py`; `e2e/security.spec.ts` (the bridge's exact surface) |
-| The provider is not changed under work that is under way | The core refuses while a generation job is waiting or running | `test_provider_choice.py`; `e2e/providers.spec.ts` |
+| Nothing changes the learner's choice but the learner | `provider.select` is internal and is only called from the handler of the learner's click. The choice is one provider, or "automatic" | `test_provider_choice.py`; `e2e/security.spec.ts` (the bridge's exact surface) |
+| With one provider chosen, nothing moves a request to another | The plan for a request is that provider alone (`generation/routing.py`); its failure, a missing key, or a used-up allowance is the answer | `test_provider_routing.py` (a property over every state of every provider); `e2e/providers.spec.ts` (the one not chosen receives nothing) |
+| With "automatic", a request only ever goes to a provider the learner gave a key to | A provider without a key of its own is never in a plan while another has one, and is refused before anything is sent when none has | `test_provider_routing.py`; `e2e/providers.spec.ts` |
+| Where a request may go is said before it is sent, and who wrote the answer afterwards | Every control that sends names the plan the core has at that moment, including the provider that would be asked second; a job's progress says when one is passed over; `written_by` records each provider and model | `test_provider_routing.py`; `e2e/providers.spec.ts` (the second provider writes, and the dialog says so) |
+| Checking a key sends nothing of the learner's, and goes to that provider alone | `provider.check` is one fixed request of a few words to the provider named; it has no stand-in | `test_provider_routing.py` (the whole prompt is asserted); `e2e/providers.spec.ts` |
+| The choice is not changed under work that is under way | The core refuses while any job that asks a model is waiting or running | `test_provider_choice.py`; `e2e/providers.spec.ts` |
 | A provider's other model is still the same provider | A stand-in is asked at the same address with the same key; the models and their order are shown before anything is sent, and a stand-in is said while it happens and afterwards | `test_provider_choice.py`; `e2e/providers.spec.ts` |
 | A model's thinking is not kept | Counted for the token estimate; never stored, shown, or logged | `test_provider_choice.py` |
 
@@ -233,6 +239,21 @@ explanation did not help. None of it is sent to the provider; a request for anot
 carries the concept, its objectives, and the names of the ways it was taught before, and nothing
 about how the learner did.
 
+### A question asked during a lesson
+
+The one thing a learner types that is sent to a provider is a question they ask about a part
+of a lesson, when they press "Ask" (ADR-024).
+
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| What is sent is said first, and nothing is sent before "Ask" | The dialog names the destination and lists what goes: the question, the part, the lesson's outline, the course and concept, related passages | `e2e/ask.spec.ts` (no request before the button; the request itself is read) |
+| The learner's words cannot instruct the model | The question is placed in a quoted block whose closing tag cannot be forged, and the system prompt says it is something to answer, never an instruction | `test_asks.py` (a question that tries to close its block and speak as Adle) |
+| A question the lesson is asking is never answered for the learner | The request carries the stem and the choices only: never which is right, accepted answers, the expected number, the rubric, the hint, or per-choice feedback; ordering items are sent sorted | `test_asks.py`; `e2e/ask.spec.ts` |
+| Asking about an open question counts as help | The core records the next answer on that part as aided, like one given after the hint | `test_asks.py`; `e2e/ask.spec.ts` (read from the database) |
+| An answer cannot carry a link, markup, or a path, and cannot invent a source | Read strictly into one to four paragraphs of display text; a source is a number the prompt offered, or it is dropped | `test_asks.py` |
+| The learner's own words are shown as text | Rendered as plain text, never as mathematics or markup | `e2e/ask.spec.ts` |
+| A question costs a bounded number of requests | One, a second only if the first answer was unusable; one question per lesson at a time; 30 kept per lesson | `test_asks.py` |
+
 ## The model provider and its output
 
 Details and reasoning: `docs/decisions/ADR-012-provider-quota-and-generation.md`.
@@ -246,15 +267,16 @@ Details and reasoning: `docs/decisions/ADR-012-provider-quota-and-generation.md`
 | A learner's document cannot instruct the model through Adle | Learner text is quoted inside marked blocks whose closing tag cannot be forged; the standing rule is in the system prompt; the model has no tools | `test_generation_api.py` (hostile document) |
 | Model output cannot enter the database unchecked | Draft parsed leniently, compiled deterministically, then `parse_bundle` (ADR-010); scenes through the static policy | `test_drafts.py`, `test_generation_api.py` |
 | A model cannot invent an identifier or a citation | Identifiers are assigned by the core; a citation is a number the prompt offered, or it is dropped | `test_drafts.py` |
-| A model cannot make Adle loop | A fixed number of requests per job; one request in flight; local limits under the provider's | `test_model_gateway.py`, `test_generation_api.py` |
+| A model cannot make Adle loop | A fixed number of requests per job; one request in flight at each provider; local limits under the provider's | `test_model_gateway.py`, `test_generation_api.py`, `test_provider_routing.py` |
 | A notice the provider sends in the model's place is not taken for the model's answer, and its words cannot do anything | Recognised by the client (ADR-020) and raised as `provider_notice`; the words are made one line, cut at 300 characters, cleared of control and text-reordering characters, quoted, and shown as text with no link; never logged, never followed, never retried | `test_provider_notice.py`; `e2e/generation.spec.ts` (no link in the message; one request sent) |
 
 **Residual risks, accepted**
 
 - What is sent (the course's name, a concept and its objectives, a few words about where the
-  learner stands on it, their pace, depth, and goal, and a few passages) leaves the computer for the provider
-  once the learner asks. The provider's handling of it is outside Adle's control; the first-run
-  screen and the settings say so.
+  learner stands on it, their pace, depth, and goal, a few passages, and a question the
+  learner typed about a lesson) leaves the computer for a provider once the learner asks.
+  With "automatic" that may be either provider they gave a key to. The providers' handling
+  of it is outside Adle's control; the first-run screen and the settings say so.
 - A model can write a lesson that is valid and wrong. Validation checks form, not truth. The
   lesson says where it came from ("From general knowledge", or the passages it cites).
 
@@ -267,8 +289,13 @@ request in any case. See ADR-013.
 
 ## Privacy
 
-- No telemetry, analytics, or crash upload. No external service other than the configured AI
-  provider, and only when the learner starts a generation.
+- No telemetry, analytics, or crash upload. No external service other than the AI providers
+  the learner gave a key to, and only when the learner asks for something they write.
+- A notification of the operating system carries fixed words chosen in the main process by
+  its kind (`electron/main/notices.ts`, ADR-026). The page cannot supply text for one, so no
+  course title, lesson, or model output reaches the notification centre. None is shown while
+  Adle's window has the focus, or when the learner has turned them off.
+  Verified by `notices.test.ts` and `e2e/break.spec.ts`.
 - Logs contain event types and identifiers, never document text, answers, prompts, or secrets.
   There are two, both under the profile's `logs/` folder and both local: the core's
   (`core.log`, rewritten at each start) and the app's own failures (`app.log`, ADR-018).
@@ -310,7 +337,7 @@ Reasoning: `docs/decisions/ADR-019-packaging.md`.
 | Nothing on the learner's computer changes what the core runs | The private Python is started with `-I`: no `PYTHON*` variables, no user site-packages, nothing imported from the current folder. The parser worker inherits the same flags | `npm run package:check` (hostile `PYTHONHOME` and `PYTHONPATH`, bare `PATH`); `test_isolated_extraction.py`; `local-state.test.ts` |
 | The core is exactly what the lock file says | Dependencies installed from `uv.lock` with `--require-hashes` | The package build fails otherwise |
 | No package tree to audit at run time | Everything the app needs is bundled into `dist/`; the archive has no `node_modules` | `scripts/package.mjs` stages only `package.json`, `dist/`, and the icons |
-| Every boundary in this document holds in the packaged app | The whole end-to-end suite runs against it unchanged | `npm run e2e:packaged`: 83 journeys, including `security.spec.ts` and `scene-player.spec.ts` |
+| Every boundary in this document holds in the packaged app | The whole end-to-end suite runs against it unchanged | `npm run e2e:packaged`: every journey there is, including `security.spec.ts` and `scene-player.spec.ts` |
 
 ## Not yet done
 

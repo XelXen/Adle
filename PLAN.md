@@ -998,6 +998,19 @@ _Last updated: 2026-11-20._
   operated; radii are 6, 8, 12, and 16, not the 10–20 of section 4.2; badges are not pills;
   there are three grounds; a lesson has the whole window. The tokens, the contrast rules, and
   the brand's teal are as before (ADR-022).
+- **Both providers can be used together.** Section 6.3 says a provider change needs explicit
+  configuration and disclosure. "Automatic" is that configuration: a setting the learner can
+  see, which only ever uses providers they gave a key to, and every request says where it
+  may go before it is sent and who wrote the answer after. With one provider chosen, nothing
+  moves a request to another (ADR-023).
+- **One request in flight at each provider**, not one overall (section 6.3): two providers are
+  two accounts, and a question to one does not wait for a lesson at the other (ADR-023).
+- **A learner can ask a question during a lesson** (section 3.3's "request a simpler
+  explanation, derivation, example"), as a note beside the part and not as a chat (ADR-024).
+- **A break is offered while a lesson is written**, and the learner is told when it is ready
+  by a notification with fixed words. Section 12's "display the first ready segment while
+  later segments are generated" is still not done (ADR-026).
+- **The typefaces are Geist** (sans, mono, serif), at the owner's request (ADR-025).
 - **There are two AI providers, not one.** Section 6.1 names AIHubMix and one model. The
   owner asked for NVIDIA NIM beside it: Kimi K3.1 Pro, with Mistral Large 4 and then GLM 5.3
   Flash standing in while the one before is not available. The learner chooses the provider

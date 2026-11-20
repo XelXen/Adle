@@ -19,7 +19,7 @@ flowchart LR
   Renderer -- "window.adle (typed IPC)" --> Main
   Main -- "HTTP + launch token" --> Core
   Renderer -- "postMessage<br/>(validated protocol)" --> Player
-  Core -. "HTTPS, to the provider the learner chose" .-> Provider
+  Core -. "HTTPS, to a provider the learner gave a key to" .-> Provider
 ```
 
 | Process | Trust | May | May not |
@@ -27,7 +27,7 @@ flowchart LR
 | **Main** (`apps/desktop/electron/main`) | Trusted | Spawn the core, hold the token, read/write OS secure storage, serve app files | Execute scene code, hold learner data |
 | **Renderer** (`apps/desktop/renderer`) | Trusted code, hostile-input-facing | Render UI, call allowlisted core operations | Use Node, the network, the filesystem, or see the provider key |
 | **Player** (`apps/desktop/player/frame`) | **Untrusted** (runs generated code) | Draw on a canvas, post validated messages | Anything else |
-| **Core** (`services/core`) | Trusted | Own the database and files, call the provider the learner chose | Listen beyond loopback, persist a provider key, choose a provider |
+| **Core** (`services/core`) | Trusted | Own the database and files, call a provider the learner gave a key to, as their choice allows | Listen beyond loopback, persist a provider key, change the learner's choice of provider |
 
 ## How a request travels
 
@@ -57,8 +57,8 @@ The operation table and the TypeScript types come from the core's OpenAPI docume
    library. It is usable immediately.
 3. In parallel, main starts the core (ADR-002). On `ready` it asks the core which providers
    there are and where, pushes the key stored for each at that address, and then the
-   learner's choice of provider (`syncProviders`, ADR-021). Status changes are broadcast to
-   the renderer.
+   learner's choice: one provider, or "automatic" (`syncProviders`, ADR-021, ADR-023).
+   Status changes are broadcast to the renderer.
 4. On quit, main closes the core's stdin, waits for it to exit, then quits.
 
 ## Playing a scene
@@ -164,8 +164,10 @@ sequenceDiagram
 - The **Lesson IR** (`adle_core/lessons/ir.py`) is the one definition of a lesson. Whatever wrote
   it, a lesson is stored only through `parse_bundle`.
 - The renderer's `LessonController` decides what is on screen; it takes its timing from a
-  `Narrator`. Today that is silent captions at reading pace; speech arrives in M5 behind the
-  same interface.
+  `Narrator`: a voice installed on the computer, or silent captions at reading pace
+  (ADR-013).
+- A learner can ask about the part in front of them (`lessons.ask`). That is a job in the
+  quick lane; the answer is kept beside the part in `lesson_asks` (ADR-024).
 - If a scene fails in the player, or the core withholds it, the part shows its description in
   words and the lesson continues.
 - Answers are judged in the core. See ADR-010.
@@ -231,10 +233,20 @@ sequenceDiagram
   or citation comes from the model.
 - The gateway keeps a local count for each provider, under that provider's limits (or under
   Adle's own, where the provider publishes none). The interface shows it as an estimate.
-- Requests go to the provider the learner chose (AIHubMix or NVIDIA NIM), with that
-  provider's key and no other. Where a provider has several models, the gateway asks the
-  first; while that one is away it asks the next, at the same address with the same key,
-  and the job says so while it happens and in its record (`written_by`). See ADR-021.
+- Requests go to a provider the learner gave a key to (AIHubMix or NVIDIA NIM), with that
+  provider's key and no other. If they chose one provider, everything goes there. If they
+  chose "automatic", `generation/routing.py` plans each request: what is waited for goes to
+  the quick provider, long work to the roomy one once the quick one is half used for the
+  day, and the next in the plan is asked when the first cannot answer. The interface is told
+  the plan (`provider.status` → `routes`) and says it before anything is sent. See ADR-023.
+- Where a provider has several models, the gateway asks the first; while that one is away
+  it asks the next, at the same address with the same key. Every stand-in, model or
+  provider, is said while it happens and kept in the record (`written_by`). See ADR-021.
+- One request is in flight at each provider. Jobs run in two lanes: long work one at a
+  time, and what the learner waits for (a question during a lesson, a check of a key)
+  beside it.
+- A request that is stopped is given up at once; the connection is let go the next time
+  anything arrives on it.
 - While an answer is on its way the job says what the model is doing ("thinking it
   through", "writing"): these models think for a minute or more before the first word.
 - A curriculum proposal works the same way, in one request, and adds nothing until the learner
@@ -271,11 +283,11 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 
 | Path | Owner | Contents |
 |---|---|---|
-| `ui-state.json` | Main | Theme and whether the welcome was seen |
-| `credentials.bin` | Main | The provider keys (each with the provider and the address it is for) and which provider is in use, encrypted together by the OS |
-| `data/adle.db` (+ `-wal`, `-shm`) | Core | Courses, sources, sections, chunks, jobs, settings, curriculum, learner preferences, observations, derived states, lessons with their scenes, lesson progress, and answers |
+| `ui-state.json` | Main | Theme, whether the welcome was seen, and whether notifications are on |
+| `credentials.bin` | Main | The provider keys (each with the provider and the address it is for) and the learner's choice (one provider, or "automatic"), encrypted together by the OS |
+| `data/adle.db` (+ `-wal`, `-shm`) | Core | Courses, sources, sections, chunks, jobs, settings, curriculum, learner preferences, observations, derived states, lessons with their scenes, lesson progress, answers, questions asked about lessons with their answers, and a count of model requests |
 | `data/sources/<source id>.<ext>` | Core | A copy of each imported original, named by its generated id |
-| `data/assets/` | Core | Reserved for generated lesson assets (M5) |
+| `data/assets/` | Core | Unused: a lesson's scenes are stored in the database with it |
 | `data/backups/` | Core | Safety copies: `adle-before-*` made before a migration and `adle-replaced-*` made before a restore (the newest five of each are kept). Each is one file and can itself be restored |
 | `logs/core.log` | Main | The core's log output (no document text, answers, or secrets); rewritten at each start |
 | `logs/app.log` | Main | The app's own failures, one JSON line each: a page that crashed, an uncaught error, a core that would not start. No learner content; starts afresh at 512 KB (ADR-018) |
@@ -320,7 +332,7 @@ development it is the uv environment in `services/core`. See ADR-019.
 | `services/core/adle_core/learner_model` | Pure rules: knowledge tracing, mastery states, review scheduling, preferences |
 | `services/core/adle_core/infrastructure` | SQLite engine, ORM models, migrations with backup, asset store |
 | `services/core/adle_core/ingestion` | Type detection, parsers, chunking, and the parser worker process |
-| `services/core/adle_core/generation` | Provider credentials, scene policy (model client and quota manager arrive in M5) |
+| `services/core/adle_core/generation` | Provider credentials and client, quota rules, routing between providers, prompts, drafts, scene policy |
 | `skills/wanim-scene-authoring` | How to write a scene; tested examples |
 | `scripts` | Repository tooling: generated contracts and allowlists, the gate (`check.mjs`), packaging (`package.mjs`, `smoke-packaged.mjs`, `e2e-packaged.mjs`), the licence inventory, and timings |
 

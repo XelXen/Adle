@@ -10,6 +10,7 @@ import { NextSteps } from '../../components/NextSteps';
 import { SessionSummary } from '../../components/SessionSummary';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
+import { destination, usualWait } from '../../lib/provider';
 import { KIND_LESSON, lessonDisclosure, readLessonOutcome } from '../../lib/generation';
 import {
   formatWait,
@@ -73,8 +74,8 @@ export function LearnPanel({ course }: { course: Course }) {
   }
 
   const data = overview.resource.data;
-  const providerName =
-    provider.resource.status === 'ready' ? provider.resource.data.display_name : 'the AI provider';
+  const providerStatus = provider.resource.status === 'ready' ? provider.resource.data : undefined;
+  const lessonWait = usualWait(providerStatus, 'lesson');
   const reviews = reviewSentence(data.summary);
 
   const createLesson = (conceptId: string): Promise<void> =>
@@ -101,6 +102,7 @@ export function LearnPanel({ course }: { course: Course }) {
           refusal={refusal}
           subject="the lesson"
           waitingText="Waiting for its turn"
+          usualSeconds={providerStatus?.routes.lesson.wait_seconds}
           onCancel={() => generation.cancel(job)}
           onRetry={() => void createLesson(conceptId)}
           onDismiss={() => generation.putAway(conceptId, job)}
@@ -118,8 +120,9 @@ export function LearnPanel({ course }: { course: Course }) {
               </Button>
             </div>
             <p className={styles.aiNote}>
-              Sends to {providerName}: {lessonDisclosure(course.source_count > 0 ? 'some' : 'none')}
-              . It usually takes three of today&rsquo;s requests.
+              Sends to {destination(providerStatus, 'lesson')}:{' '}
+              {lessonDisclosure(course.source_count > 0 ? 'some' : 'none')}. It usually takes three
+              of today&rsquo;s requests{lessonWait ? `, and ${lessonWait}` : ''}.
             </p>
           </>
         ) : null}

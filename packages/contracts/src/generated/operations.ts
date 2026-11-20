@@ -4,6 +4,8 @@
 import type {
   AnswerRequest,
   AnswerResult,
+  AskList,
+  AskRequest,
   ConceptCreate,
   ConceptEvidence,
   ConceptOrder,
@@ -35,6 +37,7 @@ import type {
   PracticeSet,
   PrerequisitesUpdate,
   ProposalAcceptance,
+  ProviderCheck,
   ProviderCredential,
   ProviderSelection,
   ProviderStatus,
@@ -143,6 +146,7 @@ export const OPERATIONS = {
   'jobs.cancel': { method: 'POST', path: '/v1/jobs/{job_id}/cancel', internal: false },
   'jobs.get': { method: 'GET', path: '/v1/jobs/{job_id}', internal: false },
   'jobs.list_active': { method: 'GET', path: '/v1/courses/{course_id}/jobs', internal: false },
+  'jobs.list_writing': { method: 'GET', path: '/v1/jobs', internal: false },
   'learner.concept_evidence': {
     method: 'GET',
     path: '/v1/concepts/{concept_id}/evidence',
@@ -175,9 +179,16 @@ export const OPERATIONS = {
     path: '/v1/lessons/{lesson_id}/questions/{question_id}/answer',
     internal: false,
   },
+  'lessons.ask': { method: 'POST', path: '/v1/lessons/{lesson_id}/asks', internal: false },
   'lessons.delete': { method: 'DELETE', path: '/v1/lessons/{lesson_id}', internal: false },
+  'lessons.delete_ask': {
+    method: 'DELETE',
+    path: '/v1/lessons/{lesson_id}/asks/{ask_id}',
+    internal: false,
+  },
   'lessons.get': { method: 'GET', path: '/v1/lessons/{lesson_id}', internal: false },
   'lessons.list': { method: 'GET', path: '/v1/courses/{course_id}/lessons', internal: false },
+  'lessons.list_asks': { method: 'GET', path: '/v1/lessons/{lesson_id}/asks', internal: false },
   'lessons.report_unhelpful': {
     method: 'POST',
     path: '/v1/lessons/{lesson_id}/unhelpful',
@@ -188,6 +199,7 @@ export const OPERATIONS = {
     path: '/v1/lessons/{lesson_id}/progress',
     internal: false,
   },
+  'provider.check': { method: 'POST', path: '/v1/provider/check', internal: false },
   'provider.clear_credential': {
     method: 'DELETE',
     path: '/v1/provider/credential',
@@ -375,6 +387,12 @@ export interface OperationTypes {
     body: undefined;
     result: JobList;
   };
+  'jobs.list_writing': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: JobList;
+  };
   'learner.concept_evidence': {
     path: { concept_id: string };
     query: undefined;
@@ -434,8 +452,20 @@ export interface OperationTypes {
     body: AnswerRequest;
     result: AnswerResult;
   };
+  'lessons.ask': {
+    path: { lesson_id: string };
+    query: undefined;
+    body: AskRequest;
+    result: Job;
+  };
   'lessons.delete': {
     path: { lesson_id: string };
+    query: undefined;
+    body: undefined;
+    result: null;
+  };
+  'lessons.delete_ask': {
+    path: { lesson_id: string; ask_id: string };
     query: undefined;
     body: undefined;
     result: null;
@@ -452,6 +482,12 @@ export interface OperationTypes {
     body: undefined;
     result: LessonList;
   };
+  'lessons.list_asks': {
+    path: { lesson_id: string };
+    query: undefined;
+    body: undefined;
+    result: AskList;
+  };
   'lessons.report_unhelpful': {
     path: { lesson_id: string };
     query: undefined;
@@ -463,6 +499,12 @@ export interface OperationTypes {
     query: undefined;
     body: LessonProgressUpdate;
     result: LessonProgress;
+  };
+  'provider.check': {
+    path: undefined;
+    query: undefined;
+    body: ProviderCheck;
+    result: Job;
   };
   'provider.clear_credential': {
     path: undefined;
@@ -490,7 +532,7 @@ export interface OperationTypes {
   };
   'provider.usage': {
     path: undefined;
-    query: undefined;
+    query: { provider_id?: string | null } | undefined;
     body: undefined;
     result: ProviderUsage;
   };

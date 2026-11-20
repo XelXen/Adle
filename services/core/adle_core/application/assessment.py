@@ -14,6 +14,7 @@ from datetime import datetime
 
 from sqlalchemy import select
 
+from adle_core.application.asks import asked_since
 from adle_core.application.curriculum import (
     KnowledgeRecord,
     get_concept_or_404,
@@ -42,7 +43,7 @@ from adle_core.learner_model.misconceptions import (
 )
 from adle_core.learner_model.practice import FRESH_AGAIN_AFTER
 from adle_core.learner_model.tracing import Observation, ObservationKind
-from adle_core.lessons.ir import guess_probability
+from adle_core.lessons.ir import CheckpointSegment, guess_probability
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +87,15 @@ class AssessmentService:
         )
         if item is None:
             raise NotFoundError("That question is not part of this lesson.")
+        #: The part of the lesson that asks it, when it is asked in the lesson's flow.
+        segment_id = next(
+            (
+                segment.id
+                for segment in lesson.segments
+                if isinstance(segment, CheckpointSegment) and segment.question.id == question_id
+            ),
+            None,
+        )
 
         if response is None:
             result = Score(outcome=Outcome.SKIPPED)
@@ -112,6 +122,12 @@ class AssessmentService:
             # mind, so a repeat shows recall of that explanation at best. It counts as an
             # aided answer. After a real gap, answering again is recall, and counts in full.
             repeated = bool(earlier) and moment - earlier[-1].created_at < FRESH_AGAIN_AFTER
+            # Asking Adle about the question before answering it is help, like the hint.
+            # What was asked is not looked at: that it was is enough (ADR-024).
+            asked = segment_id is not None and asked_since(
+                session, lesson_id, segment_id, earlier[-1].created_at if earlier else None
+            )
+            hinted = hinted or asked
             aided = hinted or repeated
             doubtful = unsure or result.self_assessed
 

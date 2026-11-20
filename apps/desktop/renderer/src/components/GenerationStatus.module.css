@@ -3,6 +3,15 @@
   min-width: 0;
 }
 
+/* What can be done meanwhile, and the way to stop: side by side, under the bar on a narrow window. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ad-space-2);
+}
+
 .note {
   margin-top: var(--ad-space-2);
   font: var(--ad-text-supporting);

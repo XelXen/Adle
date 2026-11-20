@@ -25,6 +25,17 @@ export interface LaunchedApp {
   page: Page;
   /** Console errors and uncaught exceptions seen in the renderer. */
   problems: string[];
+  /**
+   * The notifications the app asked the operating system to show, oldest first. None is
+   * ever really shown during a test: see `recordNotices`.
+   */
+  notices: () => Promise<{ title: string; body: string }[]>;
+  /**
+   * Have the app believe its window does (or does not) have the focus. A notification is
+   * only asked for while it does not, and whether a test window has the focus depends on
+   * what else is on the screen.
+   */
+  setFocused: (focused: boolean) => Promise<void>;
   close: () => Promise<void>;
 }
 
@@ -106,6 +117,23 @@ async function focusAndConfirmPainting(app: ElectronApplication, page: Page): Pr
   if (!painting) throw new Error('The app window is visible but is not painting frames.');
 }
 
+/**
+ * Keep the app from showing real notifications, and remember what it would have shown.
+ *
+ * The app's own decision (which kind, which words, whether to show one at all) runs as it
+ * does for a learner; only the last step, handing it to the operating system, is replaced.
+ * A test run must never put notifications on the desk of whoever is running it.
+ */
+async function recordNotices(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ Notification }) => {
+    const shown: { title: string; body: string }[] = [];
+    (globalThis as unknown as { adleTestNotices: typeof shown }).adleTestNotices = shown;
+    Notification.prototype.show = function show(this: Electron.Notification): void {
+      shown.push({ title: this.title, body: this.body });
+    };
+  });
+}
+
 /** Start the built app against an isolated profile directory. */
 export async function launchApp(
   profileDir: string,
@@ -130,6 +158,7 @@ export async function launchApp(
   openApps.set(profileDir, running);
   running.add(app);
   app.on('close', () => running.delete(app));
+  await recordNotices(app);
   const page = await app.firstWindow();
   const problems: string[] = [];
   page.on('console', (message) => {
@@ -151,7 +180,22 @@ export async function launchApp(
     }
   }
 
-  return { app, page, problems, close: () => app.close() };
+  return {
+    app,
+    page,
+    problems,
+    notices: () =>
+      app.evaluate(
+        () =>
+          (globalThis as unknown as { adleTestNotices: { title: string; body: string }[] })
+            .adleTestNotices,
+      ),
+    setFocused: (focused) =>
+      app.evaluate(({ BrowserWindow }, value) => {
+        BrowserWindow.prototype.isFocused = () => value;
+      }, focused),
+    close: () => app.close(),
+  };
 }
 
 /** Wait until the managed Python core reports ready. */

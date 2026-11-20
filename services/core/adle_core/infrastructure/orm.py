@@ -529,6 +529,38 @@ class ModelUsage(Base):
     #: True while the token counts are Adle's own estimate rather than the provider's report.
     estimated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     outcome: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    #: How long the answer took to arrive, for one that did. What the learner is told to
+    #: expect next time comes from these.
+    seconds: Mapped[float | None] = mapped_column(Float)
+
+
+class LessonAsk(Base):
+    """A question the learner put to Adle in the middle of a lesson, and the answer.
+
+    Called an "ask" to keep it apart from the questions a lesson puts to the learner.
+    It is a note beside one part of one lesson, not evidence: nothing is scored from
+    it. That it was asked matters in one place only: an answer to the lesson's own
+    question on the same part, given afterwards, counts as an aided one.
+    """
+
+    __tablename__ = "lesson_asks"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    lesson_id: Mapped[str] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: The part of the lesson it was asked about.
+    segment_id: Mapped[str] = mapped_column(String(44), nullable=False)
+    #: The learner's own words.
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    #: The answer: ``{"paragraphs": [str], "citations": [{"source_name", "locator"}]}``.
+    answer: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    #: Which provider and model wrote the answer (see ``GenerationService._written_by``).
+    written_by: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
 
 
 class Job(Base):

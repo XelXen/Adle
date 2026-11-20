@@ -3,7 +3,11 @@ import path from 'node:path';
 
 import { THEME_PREFERENCES, type ThemePreference, type UiState } from '../shared/ipc';
 
-const DEFAULT_STATE: UiState = { theme: 'system', onboardingCompleted: false };
+const DEFAULT_STATE: UiState = {
+  theme: 'system',
+  onboardingCompleted: false,
+  notifications: true,
+};
 
 function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === 'string' && (THEME_PREFERENCES as readonly string[]).includes(value);
@@ -17,6 +21,8 @@ export function parseUiStatePatch(value: unknown): Partial<UiState> | null {
     if (key === 'theme' && isThemePreference(field)) patch.theme = field;
     else if (key === 'onboardingCompleted' && typeof field === 'boolean') {
       patch.onboardingCompleted = field;
+    } else if (key === 'notifications' && typeof field === 'boolean') {
+      patch.notifications = field;
     } else return null;
   }
   return patch;

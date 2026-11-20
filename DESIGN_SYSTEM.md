@@ -150,6 +150,7 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 | `Switch` | An immediate on/off setting | `role="switch"`, optional description |
 | `Checkbox` | One of several independent choices in a form that is submitted | Native checkbox; label, optional description, disabled |
 | `SegmentedControl` | Two to four exclusive options | Radio group, arrow keys, single tab stop |
+| `ChoiceButtons` | One of a few options that takes effect, and is recorded, the moment it is pressed (which provider to use) | A group of buttons with `aria-pressed`; arrow keys change nothing; each named by its title, badge, and description in that order; `pending` while the choice is being put into force |
 | `RadioGroup` | One of a few options that may each be a sentence long, confirmed with a button | Native radios in a fieldset; the whole row is the target; each option named by its own text, with an optional description; disabled; **`readOnly`**: a settled choice that can be read but not changed, nothing dimmed, the chosen row marked without the action tint |
 | `Slider` | A bounded number | Native range input; value always shown as text |
 | `Card` | Group related content | `surface` / `subtle`; padding `none`/`compact`/`comfortable`; semantic element via `as` |
@@ -200,6 +201,7 @@ render nothing while waiting.
 | Several independent options confirmed with a Save button | `Checkbox` |
 | An option whose selection *records* something | Separate `Button`s with `aria-pressed`. Never a control that changes as the arrow keys move through it |
 | One answer to a question, checked with a button | `RadioGroup`; after checking, `readOnly` with a description on the options that says what each turned out to be |
+| One of a few options, each a sentence, that takes effect at once and matters | `ChoiceButtons` |
 
 ### After an answer
 
@@ -233,7 +235,38 @@ Anything the provider is asked to do takes a while and may fail, so it is always
 way (`GenerationStatus`, in the app): a progress bar with what is happening now and a Cancel
 button; then either the result where it belongs, or a `Callout` that says what happened and
 offers the one useful next step ("Try again", "Open AI settings"), or nothing but "Dismiss"
-when waiting is the only remedy. Before the request: say what will be sent and to whom.
+when waiting is the only remedy. Before the request: say what will be sent and to whom, in the
+words the core plans at that moment (`destination` in `lib/provider.ts`).
+
+A lesson takes minutes. So the wait is said honestly ("This usually takes about 12 minutes"),
+the learner is told they need not watch it, and the same card offers a break. What is being
+written is in the rail under "Now", one click from anywhere.
+
+### A break
+
+A break (`screens/break`) has the whole window, like a lesson, and the opposite purpose: one
+clock that needs no watching, one small idea of what to do away from the screen, and what Adle
+is writing meanwhile. The time left is the only large number in the app that changes; it is
+set in the serif with `ad-tabular`, inside a ring that fills as the time passes.
+
+**Do** offer a break; **don't** start one, count them, or remind anyone they did not take one.
+Ending early and adding five minutes are equally good outcomes and look it.
+
+### A question asked during a lesson
+
+A learner can ask about the part in front of them ("Ask a question", in the lesson's bar).
+It is a note in the margin, not a conversation:
+
+- **Asking** is a dialog: their own words, or one of a few ready-made questions; what will
+  be sent and where; and one button. Nothing is sent before it.
+- **Waiting** is optional. The dialog says so and offers "Carry on with the lesson".
+- **The note** is kept beside its part, folded away under "Your questions about this part".
+  The learner's words are theirs: the sans, behind a rule, shown exactly as typed. The answer
+  is something to read: the serif, with mathematics typeset. Under it, who wrote it, and that
+  a model wrote it and can be wrong.
+
+**Don't** show earlier questions as a thread, give the field a "send" arrow, or put a typing
+indicator anywhere. Each question stands alone.
 
 ### A lesson has the whole window
 

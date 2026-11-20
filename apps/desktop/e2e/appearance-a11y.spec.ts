@@ -5,6 +5,7 @@ import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 
 import { desktopDir, expect, launchApp, test } from './support/app';
+import { providerKeyField } from './support/courses';
 
 const SCREENSHOT_DIR = path.join(desktopDir, 'test-results', 'screens');
 
@@ -137,7 +138,7 @@ test.describe('layout', () => {
       document.documentElement.style.fontSize = '200%';
     });
     await page.setViewportSize({ width: 1280, height: 832 });
-    await expect(page.getByLabel('API key', { exact: true })).toBeVisible();
+    await expect(providerKeyField(page, 'AIHubMix')).toBeVisible();
     expect(await overflowsHorizontally()).toBe(false);
     await capture(page, 'large-text-settings');
     await close();

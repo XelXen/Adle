@@ -221,8 +221,11 @@ export function PrivacySettings() {
             </li>
             <li>Safety copies Adle makes before it updates or replaces your data.</li>
             <li>
-              The key of each AI provider you set up, encrypted by your operating system, and which
-              provider you chose.
+              The key of each AI provider you set up, encrypted by your operating system, and
+              whether you chose one provider or let Adle use each you have a key for.
+            </li>
+            <li>
+              Questions you ask about a lesson, and the answers, beside the part they were about.
             </li>
           </ul>
         </Card>
@@ -242,6 +245,16 @@ export function PrivacySettings() {
                 where you stand on that concept in a few words, your preferences for pace and depth,
                 your goal, and a few related passages from your materials.
               </li>
+              <li>
+                When you ask a question during a lesson: your question as you typed it, what that
+                part of the lesson says and shows, the lesson&rsquo;s outline, the course&rsquo;s
+                name and the concept, and a few related passages from your materials. Never the
+                answer to a question the lesson is asking you.
+              </li>
+              <li>
+                When you check that a key works: one fixed sentence asking for one word, with
+                nothing of yours in it.
+              </li>
             </ul>
             <p className={styles.muted}>
               Nothing is sent until you start one of these, and each says what it sends before it
@@ -249,11 +262,14 @@ export function PrivacySettings() {
               are never sent as content. Your answers are checked on this computer.
             </p>
             <p className={styles.muted}>
-              These go to the one provider you chose under AI provider, with that provider&rsquo;s
-              key and no other. Adle never changes provider on its own and contacts no other
-              service. Where a provider offers several models, another of its models can stand in
-              while the first is not available; you are told there which ones, and told again
-              whenever it happens.
+              These go only to a provider you have given a key to, with that provider&rsquo;s key
+              and no other, and Adle contacts no other service. If you chose one provider under AI
+              provider, everything goes there, whatever happens. If you chose Automatic, Adle uses
+              each provider you have a key for, for what it is best at, and may ask the other when
+              one cannot answer. Either way it says where a request may go before sending it, and
+              who wrote the answer afterwards. Where a provider offers several models, another of
+              its models can stand in while the first is not available; you are told there which
+              ones, and told again whenever it happens.
             </p>
           </Stack>
         </Card>

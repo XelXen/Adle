@@ -3,28 +3,35 @@ import {
   ArrowRight,
   Captions,
   Check,
+  ChevronDown,
+  ChevronUp,
+  Coffee,
+  Hand,
   MessageCircleQuestion,
   Pause,
   Play,
   RotateCcw,
+  Trash2,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
-import type { LearnerPreferences, LessonForPlayer, SceneArtifact } from '@adle/contracts';
+import type { Ask, Job, LearnerPreferences, LessonForPlayer, SceneArtifact } from '@adle/contracts';
 import {
   Badge,
   Button,
   Callout,
   cx,
   ErrorState,
+  IconButton,
   LoadingState,
   Page,
   useToast,
 } from '@adle/design-system';
 
 import type { PlayerStatus } from '../../../../player/host/WanimPlayerAdapter';
+import { useBreak } from '../../app/BreakContext';
 import { useRouter } from '../../app/router';
 import { MathText } from '../../components/MathText';
 import { NextSteps } from '../../components/NextSteps';
@@ -45,9 +52,15 @@ import {
   SpeechNarrator,
   type Voice,
 } from '../../lesson/speech';
+import { answeredAskId, asksAbout } from '../../lib/asks';
+import { USUAL_BREAK_MINUTES } from '../../lib/breaks';
+import { getBridge } from '../../lib/bridge';
 import { callCore, CoreRequestError, describeError } from '../../lib/core-client';
+import { type JobFailure, jobFailure, refusalOf } from '../../lib/generation';
+import { isJobActive, useJob } from '../../lib/use-job';
 import { useResource } from '../../lib/use-resource';
 import { KNOWLEDGE_TONE } from '../course/ConceptDetail';
+import { AskDialog, AskNote } from './AskDialog';
 import { CheckpointPanel } from './CheckpointPanel';
 import styles from './Lesson.module.css';
 import { type ReportState, UnhelpfulDialog } from './UnhelpfulDialog';
@@ -231,6 +244,42 @@ function LessonPlayer({
   /** Set while the learner is choosing what to do after saying a part did not help. */
   const [unhelpful, setUnhelpful] = useState<ReportState | null>(null);
 
+  // -- questions the learner asks Adle about a part (ADR-024) ------------------------
+  const lessonId = lesson.lesson_id;
+  const asks = useResource(`lesson-asks:${lessonId}`, () =>
+    callCore('lessons.list_asks', { path: { lesson_id: lessonId } }),
+  );
+  /** The part the open dialog is about: it stays that part if the lesson moves on. */
+  const [askingAbout, setAskingAbout] = useState<number | null>(null);
+  const [askStarted, setAskStarted] = useState<Job | null>(null);
+  const [askStarting, setAskStarting] = useState(false);
+  const [askRefusal, setAskRefusal] = useState<JobFailure | null>(null);
+  /** The parts whose kept questions are unfolded. */
+  const [notesOpen, setNotesOpen] = useState<ReadonlySet<string>>(new Set());
+  const askJob = useJob(askStarted, (finished) => {
+    asks.reload();
+    if (finished.status !== 'succeeded') return;
+    const about =
+      typeof finished.result === 'object' && finished.result !== null
+        ? (finished.result as { segment_id?: unknown }).segment_id
+        : null;
+    if (typeof about === 'string') setNotesOpen((open) => new Set(open).add(about));
+    // Said only to a learner who went back to the lesson: in the dialog they see the answer.
+    // And by the computer itself if they have gone to another window meanwhile.
+    void getBridge().app.notify('answer_ready');
+    if (askingAbout === null) {
+      const index = lesson.segments.findIndex((item) => item.id === about);
+      toast.show({
+        tone: 'success',
+        title: 'Your question has an answer',
+        description: index >= 0 ? `It is beside part ${index + 1} of this lesson.` : undefined,
+      });
+    }
+  });
+  const kept: Ask[] = asks.resource.status === 'ready' ? asks.resource.data.asks : [];
+  const answeredId = answeredAskId(askJob);
+  const freshAnswer = kept.find((ask) => ask.id === answeredId) ?? null;
+
   /** Read aloud, or show the words at reading pace. The choice is kept for next time. */
   const readAloud = (next: boolean): void => {
     if (!spoken) return;
@@ -276,6 +325,65 @@ function LessonPlayer({
   };
   // A question or a pause for thought explains nothing, so there is nothing to report.
   const explains = segment.type !== 'checkpoint' && segment.type !== 'reflection';
+
+  const answering = askStarting || isJobActive(askJob);
+  const openAsk = (): void => {
+    controller.pause();
+    // A new question starts from an empty page: the last answer is beside its part already.
+    if (!answering) {
+      setAskStarted(null);
+      setAskRefusal(null);
+    }
+    setAskingAbout(state.segmentIndex);
+  };
+  const ask = async (question: string): Promise<void> => {
+    const about = lesson.segments[askingAbout ?? state.segmentIndex];
+    if (!about) return;
+    setAskStarting(true);
+    setAskRefusal(null);
+    setAskStarted(null);
+    try {
+      setAskStarted(
+        await callCore('lessons.ask', {
+          path: { lesson_id: lessonId },
+          body: { segment_id: about.id, question },
+        }),
+      );
+    } catch (error) {
+      setAskRefusal(refusalOf(error));
+    } finally {
+      setAskStarting(false);
+    }
+  };
+  const stopAsk = (): void => {
+    if (!askJob) return;
+    callCore('jobs.cancel', { path: { job_id: askJob.id } }).catch((error: unknown) => {
+      toast.show({
+        tone: 'danger',
+        title: 'It could not be stopped',
+        description: describeError(error),
+      });
+    });
+  };
+  const removeAsk = (removed: Ask): void => {
+    callCore('lessons.delete_ask', { path: { lesson_id: lessonId, ask_id: removed.id } }).then(
+      () => {
+        if (asks.resource.status !== 'ready') return;
+        const data = asks.resource.data;
+        asks.setData({ ...data, asks: data.asks.filter((item) => item.id !== removed.id) });
+      },
+      (error: unknown) => {
+        toast.show({
+          tone: 'danger',
+          title: 'The question could not be removed',
+          description: describeError(error),
+        });
+      },
+    );
+  };
+  const aboutThisPart = asksAbout(kept, segment.id);
+  const notesShown = notesOpen.has(segment.id);
+  const askedPart = askingAbout === null ? null : (lesson.segments[askingAbout] ?? null);
 
   return (
     <Page
@@ -371,6 +479,43 @@ function LessonPlayer({
             ) : null}
           </div>
 
+          {aboutThisPart.length > 0 ? (
+            <section className={styles.asked} aria-label="Your questions about this part">
+              <div>
+                <Button
+                  size="small"
+                  variant="tertiary"
+                  icon={notesShown ? <ChevronUp /> : <ChevronDown />}
+                  aria-expanded={notesShown}
+                  onClick={() =>
+                    setNotesOpen((open) => {
+                      const next = new Set(open);
+                      if (!next.delete(segment.id)) next.add(segment.id);
+                      return next;
+                    })
+                  }
+                >
+                  Your questions about this part ({aboutThisPart.length})
+                </Button>
+              </div>
+              {notesShown ? (
+                <ul className={styles.askedList}>
+                  {aboutThisPart.map((item) => (
+                    <li key={item.id} className={styles.askedItem}>
+                      <AskNote ask={item} />
+                      <IconButton
+                        label="Remove this question and its answer"
+                        icon={<Trash2 />}
+                        size="small"
+                        onClick={() => removeAsk(item)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ) : null}
+
           <div className={styles.controls}>
             <div className={styles.controlGroup}>
               <Button
@@ -422,6 +567,9 @@ function LessonPlayer({
               {!allowed ? (
                 <span className={styles.note}>Answer or skip the question to continue.</span>
               ) : null}
+              <Button variant="tertiary" icon={<Hand />} loading={answering} onClick={openAsk}>
+                {answering ? 'Answering' : 'Ask a question'}
+              </Button>
               {explains ? (
                 <Button variant="tertiary" icon={<MessageCircleQuestion />} onClick={sayUnhelpful}>
                   This did not help
@@ -439,6 +587,35 @@ function LessonPlayer({
           </div>
         </div>
       )}
+      {askedPart !== null && askingAbout !== null ? (
+        <AskDialog
+          partLabel={`Part ${askingAbout + 1}: ${askedPart.title}`}
+          kind={askedPart.type}
+          unanswered={
+            askedPart.type === 'checkpoint' &&
+            askingAbout === state.segmentIndex &&
+            !canContinue(state, askedPart)
+          }
+          job={askJob}
+          starting={askStarting}
+          failure={askRefusal ?? jobFailure(askJob)}
+          answer={freshAnswer}
+          onAsk={(question) => void ask(question)}
+          onStop={stopAsk}
+          onAnother={() => {
+            setAskStarted(null);
+            setAskRefusal(null);
+          }}
+          onClose={() => {
+            setAskingAbout(null);
+            // An answer that has been read, or a failure that has been seen, is put away.
+            if (!answering) {
+              setAskStarted(null);
+              setAskRefusal(null);
+            }
+          }}
+        />
+      ) : null}
       {unhelpful !== null ? (
         <UnhelpfulDialog
           lesson={lesson}
@@ -669,6 +846,8 @@ function FinishedPanel({
   onLeave: () => void;
   onReview: () => void;
 }) {
+  const { navigate } = useRouter();
+  const rest = useBreak();
   const conceptId = data.lesson.concept_ids[0] ?? '';
   const evidence = useResource(`lesson-evidence:${data.lesson.lesson_id}`, () =>
     callCore('learner.concept_evidence', { path: { concept_id: conceptId } }),
@@ -740,6 +919,17 @@ function FinishedPanel({
         </Button>
         <Button variant="tertiary" icon={<RotateCcw />} onClick={onReview}>
           Go through it again
+        </Button>
+        {/* The end of a lesson is a natural place to stop for a few minutes. Offered, never urged. */}
+        <Button
+          variant="tertiary"
+          icon={<Coffee />}
+          onClick={() => {
+            if (!rest.times) rest.start(USUAL_BREAK_MINUTES);
+            navigate({ name: 'break' });
+          }}
+        >
+          {rest.times ? 'Back to your break' : 'Take a ' + USUAL_BREAK_MINUTES + '-minute break'}
         </Button>
       </div>
     </section>

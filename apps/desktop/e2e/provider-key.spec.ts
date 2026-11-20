@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 import { expect, filesContaining, launchApp, test, waitForCore } from './support/app';
+import { providerCard, providerKeyField, saveProviderKey } from './support/courses';
 
 /** A recognisable fake key. It is never sent anywhere: these tests make no provider calls. */
 const KEY = 'sk-e2e-not-a-real-key-7Hq2mZx94Wd1';
@@ -12,17 +13,18 @@ test.describe('configuring the AI provider', () => {
     await waitForCore(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
-    await expect(page.getByText('Not set', { exact: true })).toBeVisible();
-    const field = page.getByLabel('API key', { exact: true });
+    const aihubmix = providerCard(page, 'AIHubMix');
+    await expect(aihubmix).toContainText('No key yet');
+    const field = page.getByRole('textbox', { name: 'AIHubMix API key' });
     await expect(field).toHaveAttribute('type', 'password');
-    await field.fill(KEY);
-    await page.getByRole('button', { name: 'Save key' }).click();
-
-    await expect(page.getByText('Saved · ends in 4Wd1')).toBeVisible();
-    await expect(page.getByRole('status').filter({ hasText: 'Key saved' })).toBeVisible();
+    await saveProviderKey(page, 'AIHubMix', KEY);
+    await expect(page.getByRole('status').filter({ hasText: 'Key saved' }).first()).toBeVisible();
+    // With one key, "automatic" is simply that provider, and it says so.
+    await expect(aihubmix).toContainText('In use');
+    await expect(providerCard(page, 'NVIDIA NIM')).not.toContainText('In use');
 
     // 1. The renderer no longer holds the key anywhere in the document.
-    await expect(page.getByLabel('Replace key')).toHaveValue('');
+    await expect(page.getByRole('textbox', { name: 'Replace the AIHubMix key' })).toHaveValue('');
     expect(await page.content()).not.toContain(KEY);
     // 2. Nothing on the bridge returns it.
     const keyState = await page.evaluate(() => window.adle!.provider.keyState());
@@ -50,11 +52,11 @@ test.describe('configuring the AI provider', () => {
       .toMatchObject({ ok: true, data: { key_configured: true } });
 
     await second.page.getByRole('button', { name: 'Settings' }).click();
-    await second.page.getByRole('button', { name: 'Remove key' }).click();
+    await providerCard(second.page, 'AIHubMix').getByRole('button', { name: 'Remove key' }).click();
     const dialog = second.page.getByRole('dialog', { name: 'Remove the saved AIHubMix key?' });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Remove key' }).click();
-    await expect(second.page.getByText('Not set', { exact: true })).toBeVisible();
+    await expect(providerCard(second.page, 'AIHubMix')).toContainText('No key yet');
     expect(await second.page.evaluate(() => window.adle!.provider.keyState())).toEqual({
       aihubmix: { stored: false, hint: null },
       nvidia: { stored: false, hint: null },
@@ -68,31 +70,29 @@ test.describe('configuring the AI provider', () => {
   test('explains an invalid key instead of saving it', async ({ adle }) => {
     const { page } = adle;
     await page.getByRole('button', { name: 'Settings' }).click();
+    const aihubmix = providerCard(page, 'AIHubMix');
 
-    await page.getByRole('button', { name: 'Save key' }).click();
+    await aihubmix.getByRole('button', { name: 'Save key' }).click();
     await expect(
       page.getByRole('alert').filter({ hasText: 'Enter your API key first.' }),
     ).toBeVisible();
 
-    await page.getByLabel('API key', { exact: true }).fill('short');
-    await page.getByRole('button', { name: 'Save key' }).click();
+    await providerKeyField(page, 'AIHubMix').fill('short');
+    await aihubmix.getByRole('button', { name: 'Save key' }).click();
     await expect(page.getByRole('alert').filter({ hasText: 'looks too short' })).toBeVisible();
-    await expect(page.getByLabel('API key', { exact: true })).toHaveAttribute(
-      'aria-invalid',
-      'true',
-    );
-    await expect(page.getByText('Not set', { exact: true })).toBeVisible();
+    await expect(providerKeyField(page, 'AIHubMix')).toHaveAttribute('aria-invalid', 'true');
+    await expect(aihubmix).toContainText('No key yet');
+    // A mistake made at one provider says nothing at the other.
+    await expect(providerKeyField(page, 'NVIDIA NIM')).not.toHaveAttribute('aria-invalid', 'true');
   });
 
   test('the removal dialog can be cancelled with Escape and traps focus', async ({ adle }) => {
     const { page } = adle;
     await waitForCore(page);
     await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByLabel('API key', { exact: true }).fill(KEY);
-    await page.getByRole('button', { name: 'Save key' }).click();
-    await expect(page.getByText('Saved · ends in 4Wd1')).toBeVisible();
+    await saveProviderKey(page, 'AIHubMix', KEY);
 
-    await page.getByRole('button', { name: 'Remove key' }).click();
+    await providerCard(page, 'AIHubMix').getByRole('button', { name: 'Remove key' }).click();
     const dialog = page.getByRole('dialog', { name: 'Remove the saved AIHubMix key?' });
     await expect(dialog).toBeVisible();
     // Focus stays inside the modal while tabbing.
@@ -104,6 +104,6 @@ test.describe('configuring the AI provider', () => {
     }
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
-    await expect(page.getByText('Saved · ends in 4Wd1')).toBeVisible();
+    await expect(providerCard(page, 'AIHubMix')).toContainText('Key saved · ends in 4Wd1');
   });
 });

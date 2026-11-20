@@ -30,6 +30,7 @@ import { useRouter } from '../../app/router';
 import { GenerationStatus } from '../../components/GenerationStatus';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
+import { destination, usualWait } from '../../lib/provider';
 import {
   authorName,
   KIND_LESSON,
@@ -140,8 +141,9 @@ export function CurriculumPanel({ course }: { course: Course }) {
     };
   }, [courseId, track]);
 
-  const providerName =
-    provider.resource.status === 'ready' ? provider.resource.data.display_name : 'the AI provider';
+  const providerStatus = provider.resource.status === 'ready' ? provider.resource.data : undefined;
+  // Who to name as the author of something written before authors were recorded.
+  const providerName = providerStatus?.display_name ?? 'the AI provider';
 
   const suggest = (): Promise<void> =>
     begin(courseId, () =>
@@ -333,6 +335,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
         refusal={refusals.get(courseId) ?? null}
         subject="the suggestions"
         waitingText="Waiting to ask for suggestions"
+        usualSeconds={providerStatus?.routes.curriculum.wait_seconds}
         onCancel={() => cancelJob(proposalJob)}
         onRetry={() => void suggest()}
         onDismiss={() => putAway(courseId, proposalJob)}
@@ -496,7 +499,9 @@ export function CurriculumPanel({ course }: { course: Course }) {
                     job: jobs.find(KIND_LESSON, selected.id),
                     starting: starting.has(selected.id),
                     refusal: refusals.get(selected.id) ?? null,
-                    providerName,
+                    destination: destination(providerStatus, 'lesson'),
+                    usualWait: usualWait(providerStatus, 'lesson'),
+                    usualSeconds: providerStatus?.routes.lesson.wait_seconds ?? null,
                     onCreate: (strategy) => void createLesson(selected.id, strategy),
                     onCancel: () => cancelJob(jobs.find(KIND_LESSON, selected.id)),
                     onDismiss: () => putAway(selected.id, jobs.find(KIND_LESSON, selected.id)),
@@ -579,7 +584,11 @@ export function CurriculumPanel({ course }: { course: Course }) {
         title="Ask the AI for concepts?"
         description={`Adle will send this course's name, topic, and description, your goal, the names of the concepts it already has${
           hasMaterials ? ', and the headings of your materials with a few short excerpts' : ''
-        } to ${providerName}. It uses one of today's requests, sometimes two. Nothing is added to the course until you have looked at the suggestions.`}
+        } to ${destination(providerStatus, 'curriculum')}. It uses one of today's requests, sometimes two${
+          usualWait(providerStatus, 'curriculum')
+            ? `, and usually takes ${usualWait(providerStatus, 'curriculum')}`
+            : ''
+        }. Nothing is added to the course until you have looked at the suggestions.`}
         actions={
           <>
             <Button onClick={() => setDialog(null)}>Not now</Button>

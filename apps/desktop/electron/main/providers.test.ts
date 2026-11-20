@@ -40,15 +40,17 @@ const sent = (): [unknown, unknown][] =>
     .filter(([, operation]) => operation !== OPERATIONS['provider.status'])
     .map(([, operation, params]) => [operation, (params as { body?: unknown }).body]);
 
+/** What the core offers, and what it is going by: "auto" until it is told otherwise. */
 function coreOffers(
-  providers: { provider_id: string; base_url: string; selected: boolean }[] | null,
+  providers: { provider_id: string; base_url: string }[] | null,
+  selection = 'auto',
 ): void {
   client.callCore.mockImplementation((_connection: unknown, operation: unknown) => {
     const result: CoreResult =
       operation !== OPERATIONS['provider.status']
         ? { ok: true, data: null }
         : providers
-          ? { ok: true, data: { providers } }
+          ? { ok: true, data: { providers, selection } }
           : { ok: false, error: { code: 'core_unavailable', message: 'starting', status: 0 } };
     return Promise.resolve(result);
   });
@@ -66,8 +68,8 @@ afterEach(() => {
 
 describe('syncProviders', () => {
   const both = [
-    { provider_id: 'aihubmix', base_url: AIHUBMIX, selected: true },
-    { provider_id: 'nvidia', base_url: NVIDIA, selected: false },
+    { provider_id: 'aihubmix', base_url: AIHUBMIX },
+    { provider_id: 'nvidia', base_url: NVIDIA },
   ];
 
   it('hands each provider its own key, named, and then the choice of provider', async () => {
@@ -87,16 +89,25 @@ describe('syncProviders', () => {
         OPERATIONS['provider.set_credential'],
         { api_key: 'nvapi-nvidia-key-2222', provider_id: 'nvidia' },
       ],
-      [OPERATIONS['provider.select'], { provider_id: 'nvidia' }],
+      [OPERATIONS['provider.select'], { selection: 'nvidia' }],
     ]);
+  });
+
+  it('hands over a choice to let Adle use every provider, when the core is on one', async () => {
+    keyStore.select('auto');
+    coreOffers(both, 'nvidia');
+
+    await syncProviders({ core, keyStore });
+
+    expect(sent()).toEqual([[OPERATIONS['provider.select'], { selection: 'auto' }]]);
   });
 
   it('does not hand a key over for an address it was not stored for', async () => {
     keyStore.save('nvidia', NVIDIA, 'nvapi-real-key-4444');
     coreOffers([
-      { provider_id: 'aihubmix', base_url: AIHUBMIX, selected: true },
+      { provider_id: 'aihubmix', base_url: AIHUBMIX },
       // The same name, somewhere else: a developer's endpoint, or anything at all.
-      { provider_id: 'nvidia', base_url: 'http://127.0.0.1:9100/v1', selected: false },
+      { provider_id: 'nvidia', base_url: 'http://127.0.0.1:9100/v1' },
     ]);
 
     await syncProviders({ core, keyStore });
@@ -106,19 +117,26 @@ describe('syncProviders', () => {
     expect(keyStore.load('nvidia', NVIDIA)).toBe('nvapi-real-key-4444');
   });
 
-  it('says nothing about the provider when the learner has not chosen, or it is in use', async () => {
+  it('says nothing about the choice when the learner has not made one, or the core has it', async () => {
+    // Never chosen: the core starts on "automatic", and that is left as it is.
     coreOffers(both);
     await syncProviders({ core, keyStore });
     expect(sent()).toEqual([]);
 
     keyStore.select('aihubmix');
+    coreOffers(both, 'aihubmix');
+    await syncProviders({ core, keyStore });
+    expect(sent()).toEqual([]);
+
+    keyStore.select('auto');
+    coreOffers(both, 'auto');
     await syncProviders({ core, keyStore });
     expect(sent()).toEqual([]);
   });
 
   it('keeps a choice the core does not offer, and does not choose another in its place', async () => {
     keyStore.select('nvidia');
-    coreOffers([{ provider_id: 'custom', base_url: 'http://127.0.0.1:9000/v1', selected: true }]);
+    coreOffers([{ provider_id: 'custom', base_url: 'http://127.0.0.1:9000/v1' }]);
 
     await syncProviders({ core, keyStore });
 
@@ -139,12 +157,8 @@ describe('syncProviders', () => {
   it('never sends a key to a provider whose name it does not know', async () => {
     keyStore.save('aihubmix', AIHUBMIX, 'sk-aihubmix-key-1111');
     coreOffers([
-      { provider_id: 'openai', base_url: AIHUBMIX, selected: true },
-      {
-        provider_id: 'aihubmix',
-        base_url: 'https://aihubmix.com.attacker.example/v1',
-        selected: false,
-      },
+      { provider_id: 'openai', base_url: AIHUBMIX },
+      { provider_id: 'aihubmix', base_url: 'https://aihubmix.com.attacker.example/v1' },
     ]);
 
     await syncProviders({ core, keyStore });

@@ -24,11 +24,13 @@ Installs JavaScript dependencies (`npm ci`), the pinned Electron binary, and the
 
 ## Branches and commits
 
-- Work on `main` in small commits, or on a short-lived branch `type/short-description`.
+- Work on `dev` in small commits, or on a short-lived branch `type/short-description` off it.
+  `main` is what the owner has merged.
 - [Conventional Commits](https://www.conventionalcommits.org/):
   `feat(scope): …`, `fix(scope): …`, `test(scope): …`, `docs(scope): …`, `refactor(scope): …`,
-  `chore(scope): …`. Scopes in use: `desktop`, `renderer`, `player`, `core`, `design-system`,
-  `protocol`, `contracts`, `skill`, `repo`.
+  `chore(scope): …`. Scopes in use: `desktop`, `renderer`, `player`, `core`, `generation`,
+  `lessons`, `learning`, `design`, `design-system`, `protocol`, `contracts`, `scenes`, `skill`,
+  `plan`, `repo`.
 - One coherent change per commit. Subject in the imperative, under about 72 characters. The body
   says why, and how it was verified if that is not obvious.
 - Commit only when the gates for what you touched pass. If something is knowingly incomplete, say
@@ -65,8 +67,13 @@ Never edit by hand; regenerate and commit the result.
 |---|---|---|
 | `packages/contracts/schemas/openapi.json`, `src/generated/*` | `npm run contracts` | A core route or model changed |
 | `services/core/adle_core/generation/data/wanim_names.json` | `npm run wanim-names` | `@wanimjs/wanim` was upgraded |
+| `services/core/adle_core/generation/data/scene_guide.md` and its examples | `npm run scene-guide` | The scene skill or one of its examples changed |
+| `docs/engineering/THIRD_PARTY.md` | `npm run licenses` | A dependency was added, removed, or upgraded |
+| `apps/desktop/assets/icons/*` | `npm run icons` | The mark changed |
 
-`npm run check` fails if either is stale.
+`npm run check` fails if any of the first four is stale. It also fails if something that
+looks like a credential, a database, or a saved copy of a learner's data is about to be
+committed (`npm run secrets:check`).
 
 ## Decisions
 

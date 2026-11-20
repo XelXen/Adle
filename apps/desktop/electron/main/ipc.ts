@@ -7,6 +7,7 @@ import {
   ipcMain,
   type IpcMainInvokeEvent,
   nativeTheme,
+  Notification,
   shell,
   type WebContents,
 } from 'electron';
@@ -22,7 +23,9 @@ import {
   type ExternalLinkId,
   type ImportJob,
   IPC,
+  PROVIDER_AUTOMATIC,
   type ProviderKeyStates,
+  type ProviderSelection,
   type UiState,
 } from '../shared/ipc';
 import { callCore } from './core/client';
@@ -34,6 +37,8 @@ import {
   parseImportPaths,
   SOURCE_FILE_EXTENSIONS,
 } from './imports';
+import { noticeFor, parseNoticeKind, shouldNotify } from './notices';
+import { paths } from './paths';
 import { type KnownProvider, readProviders, syncProviders } from './providers';
 import {
   parseProviderId,
@@ -51,6 +56,8 @@ export interface IpcDependencies {
   core: CoreProcess;
   keyStore: ProviderKeyStore;
   uiState: UiStateStore;
+  /** The app's window, if it has one at the moment. */
+  getWindow: () => BrowserWindow | null;
   /** Everything the core persists. Deleted as a whole when the learner deletes everything. */
   dataDir: string;
   /** Where the app's own log files are. */
@@ -189,6 +196,30 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       : { ok: true, data: null };
   });
 
+  handle(IPC.appNotify, (candidate: unknown): boolean => {
+    // The page says what kind of thing happened. The words are chosen here.
+    const kind = parseNoticeKind(candidate);
+    if (!kind) throw new Error('Unknown notice.');
+    const window = deps.getWindow();
+    const open = window !== null && !window.isDestroyed();
+    const show = shouldNotify({
+      enabled: uiState.get().notifications,
+      supported: Notification.isSupported(),
+      focused: open && window.isFocused(),
+    });
+    if (!show) return false;
+    const notice = new Notification({ ...noticeFor(kind), icon: paths.windowIcon });
+    notice.on('click', () => {
+      // Bring back the window the learner already has; never open a second one.
+      const current = deps.getWindow();
+      if (!current || current.isDestroyed()) return;
+      if (current.isMinimized()) current.restore();
+      current.focus();
+    });
+    notice.show();
+    return true;
+  });
+
   handle(IPC.coreStatus, () => core.status);
   handle(IPC.coreRestart, async () => {
     const status = await core.restart();
@@ -203,7 +234,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   });
 
   /** What is stored for each provider the core offers. The keys themselves stay here. */
-  const keyStates = (providers: KnownProvider[] | null): ProviderKeyStates =>
+  const keyStates = (providers: KnownProvider[] | undefined): ProviderKeyStates =>
     Object.fromEntries(
       (providers ?? []).map((provider) => [
         provider.id,
@@ -228,7 +259,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         error: failure('invalid_request', 'Adle does not know that AI provider.'),
       };
     }
-    const all = await readProviders(core);
+    const all = (await readProviders(core))?.providers;
     const provider = all?.find((known) => known.id === id);
     if (!all || !provider) {
       return {
@@ -244,7 +275,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   };
 
   handle(IPC.providerKeyState, async (): Promise<ProviderKeyStates> =>
-    keyStates(await readProviders(core)),
+    keyStates((await readProviders(core))?.providers),
   );
 
   handle(
@@ -300,16 +331,24 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     },
   );
 
-  handle(IPC.providerSelect, async (providerId: unknown): Promise<CoreResult<null>> => {
-    const found = await findProvider(providerId);
-    if (!found.ok) return found.error;
+  handle(IPC.providerSelect, async (candidate: unknown): Promise<CoreResult<null>> => {
+    // "Automatic" names no provider: there is nothing to look up. Any other choice must
+    // be a provider the core offers.
+    let selection: ProviderSelection;
+    if (candidate === PROVIDER_AUTOMATIC) {
+      selection = PROVIDER_AUTOMATIC;
+    } else {
+      const found = await findProvider(candidate);
+      if (!found.ok) return found.error;
+      selection = found.provider.id;
+    }
     // The core decides whether this is a moment to change (not while it is writing).
     const chosen = await callCore(core.getConnection(), OPERATIONS['provider.select'], {
-      body: { provider_id: found.provider.id },
+      body: { selection },
     });
     if (!chosen.ok) return chosen;
     // Remembered for the next launch only once it is true now.
-    keyStore.select(found.provider.id);
+    keyStore.select(selection);
     return { ok: true, data: null };
   });
 }

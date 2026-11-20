@@ -78,6 +78,17 @@ def generate_lesson(
     )
 
 
+@router.get("/jobs", operation_id="jobs.list_writing", response_model=schemas.JobList)
+def list_writing(services: ServicesDep) -> schemas.JobList:
+    """Lessons and lists of concepts being written, in any course.
+
+    So that the app can say, wherever the learner is, that something is on its way.
+    """
+    return schemas.JobList(
+        jobs=[schemas.Job.model_validate(job) for job in services.generation.writing()]
+    )
+
+
 @router.get(
     "/courses/{course_id}/jobs",
     operation_id="jobs.list_active",

@@ -39,6 +39,50 @@ export interface Knowledge {
   state: 'not_assessed' | 'building' | 'needs_evidence' | 'demonstrated';
 }
 /**
+ * A question the learner asked about a part of a lesson, and the answer.
+ *
+ */
+export interface Ask {
+  citations: AskCitation[];
+  created_at: string;
+  id: string;
+  lesson_id: string;
+  paragraphs: string[];
+  question: string;
+  segment_id: string;
+  written_by: WrittenBy;
+}
+export interface AskCitation {
+  locator: string;
+  source_name: string;
+}
+/**
+ * Who wrote something a model wrote.
+ *
+ */
+export interface WrittenBy {
+  authors?: Author[];
+  models?: string[];
+  note?: string;
+  provider?: string;
+}
+export interface Author {
+  model: string;
+  provider: string;
+}
+export interface AskList {
+  asks: Ask[];
+  limit: number;
+}
+/**
+ * Something the learner wants to ask about one part of a lesson.
+ *
+ */
+export interface AskRequest {
+  question: string;
+  segment_id: string;
+}
+/**
  * One breath of narration, and what appears on screen as it starts.
  *
  */
@@ -250,6 +294,7 @@ export interface InteractionSegment {
 }
 export interface Job {
   course_id: string | null;
+  created_at?: string | null;
   error_code: string | null;
   error_message: string | null;
   id: string;
@@ -665,45 +710,31 @@ export interface ProposalAcceptance {
    */
   selected: number[];
 }
+export interface ProviderCheck {
+  provider_id: string;
+}
 /**
- * One provider the learner can choose.
+ * One provider there is.
  *
  */
 export interface ProviderChoice {
   base_url: string;
   display_name: string;
+  in_use: boolean;
   key_configured: boolean;
   limits_published: boolean;
   models: ProviderModel[];
   provider_id: string;
+  quick: boolean;
   selected: boolean;
+  usage: ProviderUsage;
 }
 export interface ProviderModel {
   id: string;
   name: string;
 }
-export interface ProviderCredential {
-  api_key: string;
-  provider_id?: string | null;
-}
-export interface ProviderSelection {
-  provider_id: string;
-}
 /**
- * The provider in use, and every provider there is to choose from.
- *
- */
-export interface ProviderStatus {
-  base_url: string;
-  display_name: string;
-  key_configured: boolean;
-  model: string;
-  model_name: string;
-  provider_id: string;
-  providers: ProviderChoice[];
-}
-/**
- * Adle's own count of today's requests to the provider in use.
+ * Adle's own count of today's requests to one provider.
  *
  * An estimate: the provider keeps the real one.
  *
@@ -718,6 +749,49 @@ export interface ProviderUsage {
   resets_at: string;
   tokens_per_day: number;
   tokens_today: number;
+}
+export interface ProviderCredential {
+  api_key: string;
+  provider_id?: string | null;
+}
+/**
+ * Where one kind of request would go at this moment, and how long it may take.
+ *
+ */
+export interface ProviderRoute {
+  names: string[];
+  provider_ids: string[];
+  reason: string;
+  sentence: string;
+  wait_measured: boolean;
+  wait_seconds: number;
+}
+/**
+ * Where each kind of request would go. Read just before saying where one will go.
+ *
+ */
+export interface ProviderRoutes {
+  ask: ProviderRoute;
+  curriculum: ProviderRoute;
+  lesson: ProviderRoute;
+}
+export interface ProviderSelection {
+  selection: string;
+}
+/**
+ * The learner's choice, every provider there is, and where requests would go.
+ *
+ */
+export interface ProviderStatus {
+  base_url: string;
+  display_name: string;
+  key_configured: boolean;
+  model: string;
+  model_name: string;
+  provider_id: string;
+  providers: ProviderChoice[];
+  routes: ProviderRoutes;
+  selection: string;
 }
 export interface SearchHit {
   chunk_id: number;

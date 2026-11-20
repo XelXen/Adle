@@ -6,6 +6,9 @@
  *   node scripts/licenses.mjs            write docs/engineering/THIRD_PARTY.md
  *   node scripts/licenses.mjs --check    fail if a licence is not accepted or not stated, or if
  *                                        something that ships is missing from that file
+ *   node scripts/licenses.mjs --collect=<folder>
+ *                                        put the inventory, and the licence text of everything
+ *                                        bundled into the app, into a folder (the packaged app's)
  *
  * The check does not compare the whole file. What npm and uv install for development
  * differs from one operating system to the next (a tool's Windows-only helper, a bundler's
@@ -23,13 +26,23 @@
  * in the repository itself (a font no package manager offers) is listed by hand, below.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputFile = path.join(repoRoot, 'docs', 'engineering', 'THIRD_PARTY.md');
 const check = process.argv.includes('--check');
+const collectInto =
+  process.argv.find((argument) => argument.startsWith('--collect='))?.slice('--collect='.length) ??
+  null;
 
 /** Licences that may not be used at all: they would bind the whole of Adle. */
 const REFUSED = /\b(A?GPL|LGPL|SSPL|EUPL|OSL|CC-BY-NC|CC-BY-SA|BUSL|Commons Clause)\b/i;
@@ -117,6 +130,7 @@ function npmPackages() {
       version: manifest.version,
       licence: licenceOfManifest(manifest),
       needs: Object.keys(manifest.dependencies ?? {}),
+      dir: packageDir,
     });
     visit(path.join(packageDir, 'node_modules'));
   };
@@ -320,10 +334,66 @@ ${countByLicence(npm)}
 ${table(python.filter((item) => !item.shipped))}
 `;
   const shippedRows = [...[...shippedJs, ...shippedPython].map(row), ...vendoredRows];
-  return { text, problems, shippedRows };
+  return { text, problems, shippedRows, shippedJs };
 }
 
-const { text, problems, shippedRows } = build();
+/** The file in a package that holds the text of its licence, if it ships one. */
+function licenceFileOf(packageDir) {
+  const names = readdirSync(packageDir).filter((name) =>
+    /^(licen[cs]e|copying|notice)(\.[a-z]+|-[a-z0-9.-]+)?$/i.test(name),
+  );
+  return names.length > 0 ? path.join(packageDir, names.sort()[0]) : null;
+}
+
+/**
+ * Put what a learner is owed with the app into a folder: the inventory, and the text of
+ * the licence of everything bundled into the app's own code and styles. The Python
+ * packages carry their licences inside the core already (their `dist-info` folders), and
+ * Electron and Python bring their own.
+ */
+function collect(folder, inventory, shippedJs) {
+  const texts = path.join(folder, 'texts');
+  mkdirSync(texts, { recursive: true });
+  writeFileSync(path.join(folder, 'THIRD-PARTY.md'), inventory);
+  const without = [];
+  for (const item of shippedJs) {
+    const source = licenceFileOf(item.dir);
+    if (!source) {
+      without.push(`${item.name} ${item.version} (${item.licence})`);
+      continue;
+    }
+    copyFileSync(source, path.join(texts, `${item.name.replace(/[@/]/g, '_')}.txt`));
+  }
+  for (const item of VENDORED) {
+    copyFileSync(
+      path.join(repoRoot, item.where, 'LICENSE.txt'),
+      path.join(texts, `${item.name.replace(/[^A-Za-z0-9]+/g, '_').replace(/_+$/, '')}.txt`),
+    );
+  }
+  writeFileSync(
+    path.join(folder, 'README.txt'),
+    [
+      "Adle is built from other people's work, used under their licences.",
+      '',
+      'THIRD-PARTY.md lists every package and its licence.',
+      'texts/ has the licence text of what is bundled into the app itself.',
+      'The Python packages inside resources/core each carry their own licence',
+      '(in their .dist-info folders), and Electron and Chromium theirs, beside',
+      'the app.',
+      ...(without.length > 0
+        ? [
+            '',
+            'These packages ship no licence file of their own; THIRD-PARTY.md names their licence:',
+            ...without.map((line) => `  ${line}`),
+          ]
+        : []),
+      '',
+    ].join('\n'),
+  );
+  return { copied: shippedJs.length + VENDORED.length - without.length, without };
+}
+
+const { text, problems, shippedRows, shippedJs } = build();
 if (problems.length > 0) {
   console.error('Licences that need attention:');
   for (const problem of problems) console.error(`  - ${problem}`);
@@ -342,6 +412,12 @@ if (check) {
   } else if (problems.length === 0) {
     console.log('Third-party licences are listed and accepted.');
   }
+} else if (collectInto) {
+  const { copied, without } = collect(path.resolve(collectInto), text, shippedJs);
+  console.log(
+    `Collected the inventory and ${copied} licence texts` +
+      (without.length > 0 ? ` (${without.length} packages ship none of their own)` : ''),
+  );
 } else {
   writeFileSync(outputFile, text);
   console.log(`Wrote ${path.relative(repoRoot, outputFile)}`);

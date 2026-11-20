@@ -147,3 +147,80 @@
 .voiceField {
   max-width: 28rem;
 }
+
+/* A provider's name at the head of its card. */
+.providerName {
+  margin: 0;
+  font: var(--ad-text-heading);
+  letter-spacing: var(--ad-tracking-tight);
+}
+
+/* Where each kind of request would go: the kind on one side, the destination on the other. */
+.routes {
+  display: grid;
+  gap: var(--ad-space-2);
+  margin: 0;
+}
+
+.routes > div {
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) 1fr;
+  gap: var(--ad-space-1) var(--ad-space-5);
+  align-items: baseline;
+}
+
+.routes dt {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.routes dd {
+  margin: 0;
+  font: var(--ad-text-body);
+}
+
+.routeReason {
+  display: block;
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+@media (max-width: 720px) {
+  .routes > div {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* What was sent to one provider today, under a hairline inside its card. */
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  padding-top: var(--ad-space-5);
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+}
+
+.usageTitle {
+  margin: 0;
+  font: var(--ad-text-eyebrow);
+  letter-spacing: var(--ad-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ad-color-faint);
+}
+
+/* A check of a key that came back well. */
+.checkOk {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ad-space-2);
+  margin: 0;
+  font: var(--ad-text-body);
+  color: var(--ad-color-success-text);
+}
+
+.checkOk svg {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.1875rem;
+}

@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -33,6 +34,7 @@ from adle_core.lessons.ir import (
     SCHEMA_VERSION,
     STRATEGIES,
     AssessmentItem,
+    Display,
 )
 
 #: A lesson asks for at most this many scenes: each one is a separate model request.
@@ -727,3 +729,70 @@ def compile_curriculum(
             ["The proposal contains no concept that the course does not already have."]
         )
     return proposed
+
+
+# -- an answer to a question the learner asked ------------------------------------------
+
+MAX_ANSWER_PARAGRAPHS = 4
+MAX_ANSWER_CITATIONS = 3
+
+
+class AnswerDraft(_Draft):
+    paragraphs: list[str] = Field(min_length=1)
+    #: Numbers of the supplied excerpts the answer draws on.
+    sources: list[int] = Field(default_factory=list)
+
+
+class _Answer(BaseModel):
+    """An answer as it is kept: text to read, a few short paragraphs of it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    paragraphs: list[Display] = Field(min_length=1, max_length=MAX_ANSWER_PARAGRAPHS)
+
+
+@dataclass(frozen=True, slots=True)
+class CompiledAnswer:
+    paragraphs: list[str]
+    #: The passages the answer says it used, of those it was shown.
+    citations: list[PassageRef]
+
+
+_BLANK_LINE = re.compile(r"\n\s*\n")
+
+
+def compile_answer(text: str, passages: Sequence[PassageRef] = ()) -> CompiledAnswer:
+    """Read a model's answer to a learner's question.
+
+    It was asked for a JSON object. A model that answers in plain sentences has still
+    answered, so those are taken as the answer: there is no structure in it to get
+    wrong. Either way the text is display text like any other (no links, no markup),
+    and a source is a number the prompt offered or it is dropped.
+    """
+    stripped = text.strip()
+    numbers: list[int] = []
+    if "{" in stripped and '"paragraphs"' in stripped:
+        try:
+            draft = AnswerDraft.model_validate(extract_json_object(stripped))
+        except ValidationError as error:
+            raise DraftError(_problems(error)) from error
+        raw, numbers = draft.paragraphs, draft.sources
+    elif stripped.startswith(("{", "[", "```")):
+        raise DraftError(
+            ['The answer must be one JSON object with a "paragraphs" list and nothing else.']
+        )
+    else:
+        raw = _BLANK_LINE.split(stripped)
+    cleaned = [paragraph for paragraph in (tidy(part) for part in raw) if paragraph]
+    try:
+        answer = _Answer.model_validate({"paragraphs": cleaned})
+    except ValidationError as error:
+        raise DraftError(_problems(error)) from error
+    cited: dict[int, PassageRef] = {}
+    for number in numbers:
+        if 1 <= number <= len(passages):
+            cited.setdefault(number, passages[number - 1])
+    return CompiledAnswer(
+        paragraphs=list(answer.paragraphs),
+        citations=list(cited.values())[:MAX_ANSWER_CITATIONS],
+    )

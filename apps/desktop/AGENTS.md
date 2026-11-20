@@ -34,9 +34,12 @@ Prefer a core operation (`callCore`) over a new IPC channel whenever the work be
 - `ProviderKeyStore` keeps a key by provider **and** address and returns it only for that
   pair. Do not add a way to read "the key" without both.
 - `syncProviders` runs after every start of the core (launch, restart, restore, erase): keys
-  first, then the learner's choice of provider. A new way of starting the core must call it.
+  first, then the learner's choice (one provider, or `'auto'`). A new way of starting the
+  core must call it.
 - Only the handler of the learner's own click calls `provider.select`. Nothing may change the
-  provider because something failed.
+  choice because something failed. "Automatic" is itself a choice the learner made.
+- Where a request will go is what the core plans (`provider.status` → `routes`): say it with
+  `destination(status, work)` from `lib/provider.ts`, never with one provider's name.
 - Name a provider and a model in the interface by the names the core gives
   (`provider.status`, a job's `written_by`). Who wrote something is what its job recorded,
   not whichever provider is in use now (`authorName` in `lib/generation.ts`).
@@ -153,7 +156,11 @@ most, a file's name.
   (what is on screen), `Narrator` engines, `SceneCues` (narration to scene), `answers`.
   `screens/lesson/` only draws what they say.
 - **The narrator is the clock.** Do not add timers to the controller or the screen; a new way of
-  reading a lesson is a new `Narrator`.
+  reading a lesson is a new `Narrator`. A break's clock is the app's (`app/BreakContext.tsx`)
+  and is never part of a lesson.
+- A question the learner asks about a part (`AskDialog`, `lib/asks.ts`) is a job like any
+  other. The lesson holds the job, so the dialog can be closed while it is answered. Show the
+  learner's own words as plain text and the answer with `MathText`.
 - A narrator calls `onWord` only if it really knows the position. Never fake word highlighting.
 - The renderer has no answer keys. Anything that needs one (what was right, why) comes back from
   `lessons.answer`. Do not add a field to the player view to "save a round trip".
@@ -194,7 +201,14 @@ most, a file's name.
 - Work the AI provider does is a **job**. Start it and follow it with `useGeneration`
   (`lib/use-generation.ts`), which also picks up work that was already under way. Show it with
   `GenerationStatus`, which has every state: waiting, running with a way to cancel, refused
-  before it started, failed with what to do next, cancelled.
+  before it started, failed with what to do next, cancelled. Give it `usualSeconds` from the
+  core's plan: it says how long the wait usually is and offers a break of that length.
+- Long work is watched app-wide by `WritingProvider` (the rail's "Now", the toast and the
+  notification when it is ready). A screen that shows a job's outcome itself needs nothing
+  more; do not add a second announcement.
+- A notification is `getBridge().app.notify(kind)`. In end-to-end tests none is shown:
+  read what would have been with `adle.notices()`, and set the focus with
+  `adle.setFocused(false)` first (one is only asked for while Adle is in the background).
 - Read a job's `result` only through `lib/generation.ts`. It is free-form in the contract and is
   checked there.
 - Say what will be sent before it is sent, beside the control that sends it, and name the

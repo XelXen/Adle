@@ -391,6 +391,58 @@ class LessonProgressUpdate(_Input):
     completed: bool = False
 
 
+# -- questions the learner asks in the middle of a lesson -----------------------
+
+
+class AskRequest(_Input):
+    """Something the learner wants to ask about one part of a lesson."""
+
+    segment_id: Annotated[str, StringConstraints(pattern=r"^seg_[a-z0-9_]{1,40}$")]
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+
+
+class Author(_Output):
+    provider: str
+    model: str
+
+
+class WrittenBy(_Output):
+    """Who wrote something a model wrote."""
+
+    provider: str = ""
+    models: list[str] = Field(default_factory=list)
+    #: Each provider and model that wrote part of it, in order.
+    authors: list[Author] = Field(default_factory=list)
+    #: A sentence to show when what wrote it was not what was asked first.
+    note: str = ""
+
+
+class AskCitation(_Output):
+    source_name: str
+    locator: str
+
+
+class Ask(_Output):
+    """A question the learner asked about a part of a lesson, and the answer."""
+
+    id: str
+    lesson_id: str
+    segment_id: str
+    #: The learner's own words. Shown as plain text.
+    question: str
+    #: The answer. Display text: may contain $math$.
+    paragraphs: list[str]
+    citations: list[AskCitation]
+    written_by: WrittenBy
+    created_at: datetime
+
+
+class AskList(_Output):
+    asks: list[Ask]
+    #: How many a lesson keeps. Past this, one is removed before another is asked.
+    limit: int
+
+
 class AnswerRequest(_Input):
     """An answer to a question. Fill in the one field that matches the question's form."""
 
@@ -594,6 +646,8 @@ class Job(_Output):
     result: Any | None
     error_code: str | None
     error_message: str | None
+    #: When it was asked for.
+    created_at: datetime | None = None
 
 
 class JobList(_Output):

@@ -1,0 +1,7 @@
+{
+  "paragraphs": [
+    "A weight says how much one input counts. Doubling a weight doubles what that input adds to the sum, whatever the other inputs are doing.",
+    "Try it with numbers: with $w = 2$ and $x = 3$ the input adds $6$. Change the weight to $4$ and the same input adds $12$."
+  ],
+  "sources": []
+}

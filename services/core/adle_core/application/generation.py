@@ -1,4 +1,4 @@
-"""Asking the model for a curriculum or a lesson, as background jobs.
+"""Asking the model for a curriculum, a lesson, or an answer, as background jobs.
 
 Each job is a short, fixed sequence of requests. Nothing here loops on the
 model's output:
@@ -8,6 +8,14 @@ model's output:
   the learner picks from it (``accept_proposal``).
 * a **lesson** is one request for the lesson (two at most), then one request
   per scene (two at most each), and a lesson asks for at most two scenes.
+* an **answer** to something the learner asked in the middle of a lesson is one
+  request (two if the first answer was not usable). It is kept beside the part
+  it was asked about (ADR-024).
+* a **check** that a provider's key works is one request of a few words, with
+  nothing of the learner's in it.
+
+The first two are long work and run one at a time. The last two are what the
+learner is sitting and waiting for, and run in the quick lane beside them.
 
 A scene that cannot be made does not cost the learner the lesson: that part is
 kept as words. Everything the model writes goes through the same validation as
@@ -17,6 +25,7 @@ any other lesson before it is stored.
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -25,6 +34,13 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from adle_core.application.asks import (
+    MAX_ASKS_PER_LESSON,
+    MAX_QUESTION_CHARACTERS,
+    MIN_QUESTION_CHARACTERS,
+    AskCitation,
+    AskService,
+)
 from adle_core.application.courses import get_course_or_404
 from adle_core.application.curriculum import (
     ConceptRecord,
@@ -33,7 +49,13 @@ from adle_core.application.curriculum import (
     ProposedConceptInput,
     get_concept_or_404,
 )
-from adle_core.application.jobs import JobCancelledError, JobContext, JobRunner, JobSnapshot
+from adle_core.application.jobs import (
+    LANE_QUICK,
+    JobCancelledError,
+    JobContext,
+    JobRunner,
+    JobSnapshot,
+)
 from adle_core.application.learner import LearnerService
 from adle_core.application.lessons import LessonService
 from adle_core.application.model_gateway import ModelGateway, QuotaExhaustedError
@@ -42,12 +64,14 @@ from adle_core.application.retrieval import Retriever
 from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
 from adle_core.generation import prompts
 from adle_core.generation.drafts import (
+    MAX_SCENES_PER_LESSON,
     DraftError,
     LessonContext,
     ObjectiveRef,
     PassageRef,
     SceneBrief,
     as_visualization,
+    compile_answer,
     compile_curriculum,
     compile_lesson,
     extract_json_object,
@@ -64,24 +88,51 @@ from adle_core.generation.provider import (
 )
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.ids import new_id
-from adle_core.infrastructure.orm import Concept, Course, StoredLesson
+from adle_core.infrastructure.orm import Attempt, Concept, Course, StoredLesson
 from adle_core.ingestion.types import heading_leaf
 from adle_core.learner_model.next_step import MAX_LESSONS_PER_CONCEPT
 from adle_core.learner_model.preferences import LearnerPreferences
 from adle_core.lessons.bundle import SceneRejectedError, inspect_scene, parse_bundle
-from adle_core.lessons.ir import STRATEGIES, Lesson, SceneArtifact
+from adle_core.lessons.ir import (
+    STRATEGIES,
+    CheckpointSegment,
+    ChoiceItem,
+    Lesson,
+    OrderingItem,
+    SceneArtifact,
+    SceneRef,
+    TrueFalseItem,
+)
 
 logger = logging.getLogger(__name__)
 
 KIND_CURRICULUM = "curriculum_proposal"
 KIND_LESSON = "lesson_generation"
+KIND_ASK = "lesson_ask"
+KIND_CHECK = "provider_check"
+#: Long work: what the learner may leave to itself and come back to.
+LONG_JOB_KINDS: tuple[str, ...] = (KIND_CURRICULUM, KIND_LESSON)
+#: Every kind of job that asks a model for something.
+MODEL_JOB_KINDS: tuple[str, ...] = (*LONG_JOB_KINDS, KIND_ASK, KIND_CHECK)
 
-#: Why a provider's next model is being asked, in the learner's words.
+#: Why a provider's next model, or the next provider, is being asked, in the learner's words.
 _PASSED_OVER = {
     "gone": "is not available at the moment",
     "failing": "is having trouble at the moment",
     "silent": "is not answering",
     "refused": "did not accept the request",
+    "spent": "has no allowance left today",
+    "rate_limited": "is limiting requests at the moment",
+    "notice": "answered with a notice about your account there",
+    "key_rejected": "did not accept its key",
+    "unreachable": "could not be reached",
+    "unreadable": "sent an answer that could not be read",
+}
+#: The requests one piece of work usually takes, for saying how long it will be.
+_REQUESTS_FOR = {
+    "lesson": ("lesson", *("scene",) * MAX_SCENES_PER_LESSON),
+    "curriculum": ("curriculum",),
+    "ask": ("ask",),
 }
 #: What a model is seen to be doing while its answer is on the way, in the learner's words.
 _STAGES = {"thinking": "thinking it through", "writing": "writing"}
@@ -104,6 +155,52 @@ class GenerationFailedError(AdleError):
 
     status_code = 502
     code = "generation_failed"
+
+
+@dataclass(frozen=True, slots=True)
+class Wait:
+    """How long something is likely to take. Said as "about", never as a promise."""
+
+    seconds: int
+    #: From answers that arrived on this computer, not only from what is usual.
+    measured: bool
+
+
+def _part_brief(lesson: Lesson, index: int, *, answered: bool) -> prompts.PartBrief:
+    """One part of a lesson as a model is shown it. Never what its question's answer is.
+
+    An ordering question lists its items in the right order, so they are shown sorted
+    by their words. Accepted answers, the expected number, the rubric, and the hint
+    are left out. The lesson's own explanation is included only once the learner has
+    answered: by then they have seen it.
+    """
+    segment = lesson.segments[index]
+    scene = getattr(segment, "scene", None)
+    question, options, explanation = "", [], ""
+    if isinstance(segment, CheckpointSegment):
+        item = segment.question
+        question = item.stem
+        if isinstance(item, ChoiceItem):
+            options = [option.text for option in item.options]
+        elif isinstance(item, OrderingItem):
+            options = sorted(option.text for option in item.items)
+        elif isinstance(item, TrueFalseItem):
+            options = ["True", "False"]
+        if answered:
+            explanation = item.explanation
+    return prompts.PartBrief(
+        number=index + 1,
+        title=segment.title,
+        kind=segment.type,
+        said=[beat.text for beat in segment.narration],
+        shown=[beat.show for beat in segment.narration if beat.show],
+        picture=scene.fallback_text if isinstance(scene, SceneRef) else "",
+        task=str(getattr(segment, "prompt", "") or getattr(segment, "problem", "") or ""),
+        question=question,
+        options=options,
+        answered=answered,
+        explanation=explanation,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +304,7 @@ class GenerationService:
         lessons: LessonService,
         learner: LearnerService,
         retriever: Retriever,
+        asks: AskService,
     ) -> None:
         self._database = database
         self._jobs = jobs
@@ -215,18 +313,30 @@ class GenerationService:
         self._lessons = lessons
         self._learner = learner
         self._retriever = retriever
+        self._asks = asks
 
     # -- the one way a request is made ---------------------------------------
 
     def _ask(
-        self, request: ChatRequest, context: JobContext, done: int, total: int, doing: str
+        self,
+        request: ChatRequest,
+        context: JobContext,
+        done: int,
+        total: int,
+        doing: str,
+        *,
+        provider_id: str | None = None,
     ) -> ChatResult:
         """Send one request from inside a job, keeping the job's progress honest while it waits.
 
         ``doing`` is what the job is doing, in the words the learner is shown. A model
         that thinks before it writes can take minutes over one answer, so what it is
         seen to be doing is said beside it: a long wait should not look like a stall.
+        ``provider_id`` asks one provider whatever the learner's choice would plan.
         """
+
+        def busy(provider: str) -> None:
+            context.report(done, total, f"Waiting for {provider} to finish what it is writing")
 
         def at_stage(model: str, stage: str) -> None:
             context.report(done, total, f"{doing}: {model} is {_STAGES.get(stage, 'working')}")
@@ -255,6 +365,8 @@ class GenerationService:
                 on_wait=waiting,
                 on_fallback=standing_in,
                 on_stage=at_stage,
+                on_busy=busy,
+                provider_id=provider_id,
             )
         except RequestCancelledError as error:
             raise JobCancelledError from error
@@ -263,45 +375,81 @@ class GenerationService:
         if not self._gateway.has_key:
             raise ProviderKeyMissingError
 
-    def select_provider(self, provider_id: str) -> None:
-        """Use another provider from now on, because the learner chose it.
+    def select_provider(self, selection: str) -> None:
+        """Record the learner's choice: one provider, or "automatic".
 
         Refused while something is being written: what is under way was started with
-        one provider named beside it, and must not finish at another.
+        its destination named beside it, and must not finish somewhere else.
         """
-        if not self._gateway.knows(provider_id):
+        if not self._gateway.accepts(selection):
             raise NotFoundError("Adle does not know that AI provider.")
-        if provider_id == self._gateway.config.provider_id:
+        if selection == self._gateway.selection:
             return
-        if self._jobs.any_active((KIND_CURRICULUM, KIND_LESSON)):
+        if self._jobs.any_active(MODEL_JOB_KINDS):
             raise ConflictError(
-                f"{self._gateway.config.display_name} is writing something for you at the "
-                "moment. Wait for it to finish, or stop it, and then change the provider."
+                "Something is being written for you at the moment. Wait for it to finish, "
+                "or stop it, and then change the provider."
             )
-        self._gateway.select(provider_id)
+        self._gateway.select(selection)
 
     def _written_by(self, results: Sequence[ChatResult]) -> dict[str, Any]:
-        """Who wrote something, for its record: the provider, and each model that answered.
+        """Who wrote something, for its record: each provider and model that answered.
 
-        ``note`` is a sentence for the learner when the provider's first model was not
-        the one that wrote all of it. A stand-in is never left unsaid.
+        ``note`` is one or two sentences for the learner when what wrote it was not what
+        was asked first: another model of the provider, or another provider. A stand-in
+        is never left unsaid.
         """
-        models = list(dict.fromkeys(result.model_name for result in results if result.model_name))
+        authors = list(
+            dict.fromkeys(
+                (result.provider_name, result.model_name) for result in results if result.model_name
+            )
+        )
+        providers = list(dict.fromkeys(provider for provider, _ in authors if provider))
+        models = list(dict.fromkeys(model for _, model in authors))
+        notes = []
+        asked_first = next(
+            (result.instead_of_provider for result in results if result.instead_of_provider), ""
+        )
+        others = [name for name in providers if name != asked_first]
+        if asked_first and others:
+            share = "part of this" if asked_first in providers else "this"
+            notes.append(f"{asked_first} could not answer, so {_listed(others)} wrote {share}.")
         expected = next((result.instead_of for result in results if result.instead_of), "")
         stand_ins = [name for name in models if name != expected]
-        note = ""
         if expected and stand_ins:
             share = "part of this" if expected in models else "this"
-            note = (
+            notes.append(
                 f"{expected} was not available, so {_listed(stand_ins)} wrote {share} in its place."
             )
         return {
-            "provider": self._gateway.config.display_name,
+            # The first provider that wrote any of it; all of them are in ``authors``.
+            "provider": providers[0] if providers else self._gateway.config.display_name,
             "models": models,
+            "authors": [{"provider": provider, "model": model} for provider, model in authors],
             # The model that was meant to write it, when it was not available.
             "instead_of": expected,
-            "note": note,
+            "note": " ".join(notes),
         }
+
+    # -- what to expect, and what is under way ---------------------------------
+
+    def expected_wait(self, work: str) -> Wait:
+        """How long a lesson, a list of concepts, or an answer is likely to take now.
+
+        From the provider it would be asked of first: what its last few answers of each
+        kind took on this computer, or what is usual for it before any have arrived.
+        """
+        purposes = _REQUESTS_FOR[work]
+        first = self._gateway.plan(purposes[0]).provider_ids[0]
+        found = [self._gateway.seconds_for(first, purpose) for purpose in purposes]
+        return Wait(
+            seconds=sum(seconds for seconds, _ in found),
+            measured=all(measured for _, measured in found),
+        )
+
+    def writing(self) -> list[JobSnapshot]:
+        """Long work that is waiting or under way, in any course, oldest first."""
+        return self._jobs.list_all_active(LONG_JOB_KINDS)
 
     # -- curriculum ------------------------------------------------------------
 
@@ -711,3 +859,174 @@ class GenerationService:
                 continue
             return artifact, result
         return fallback
+
+    # -- a question the learner asks in the middle of a lesson -------------------
+
+    def ask(self, lesson_id: str, segment_id: str, question: str) -> JobSnapshot:
+        """Start a job that answers something the learner asked about one part of a lesson."""
+        words = " ".join(question.split())
+        if not MIN_QUESTION_CHARACTERS <= len(words) <= MAX_QUESTION_CHARACTERS:
+            raise ValidationFailedError(
+                f"A question is between {MIN_QUESTION_CHARACTERS} and "
+                f"{MAX_QUESTION_CHARACTERS} characters long."
+            )
+        lesson = self._lessons.get_lesson(lesson_id)
+        if not any(segment.id == segment_id for segment in lesson.segments):
+            raise NotFoundError("That is not a part of this lesson.")
+        if self._asks.count(lesson_id) >= MAX_ASKS_PER_LESSON:
+            raise ConflictError(
+                f"This lesson already has {MAX_ASKS_PER_LESSON} questions kept beside it. "
+                "Remove one you no longer need before asking another."
+            )
+        self._require_key()
+        if self._jobs.find_active(KIND_ASK, lesson_id) is not None:
+            raise ConflictError(
+                "Your last question about this lesson is still being answered. "
+                "Wait for it, or stop it, and then ask the next."
+            )
+        return self._jobs.submit(
+            KIND_ASK,
+            lambda context: self._answer(lesson_id, segment_id, words, context),
+            course_id=lesson.course_id,
+            subject_id=lesson_id,
+            lane=LANE_QUICK,
+        )
+
+    def _answer(
+        self, lesson_id: str, segment_id: str, question: str, context: JobContext
+    ) -> dict[str, Any]:
+        lesson = self._lessons.get_lesson(lesson_id)
+        index = next(
+            (place for place, segment in enumerate(lesson.segments) if segment.id == segment_id),
+            None,
+        )
+        if index is None:
+            raise NotFoundError("That is not a part of this lesson.")
+        segment = lesson.segments[index]
+        concept_id = lesson.concept_ids[0]
+        with self._database.read() as session:
+            course_title = get_course_or_404(session, lesson.course_id).title
+            concept_row = get_concept_or_404(session, concept_id)
+            concept = prompts.ConceptBrief(
+                title=concept_row.title,
+                summary=concept_row.summary or "",
+                objectives=[],
+                prerequisites=[],
+            )
+            answered = isinstance(segment, CheckpointSegment) and (
+                session.scalars(
+                    select(Attempt.id)
+                    .where(
+                        Attempt.lesson_id == lesson_id,
+                        Attempt.question_id == segment.question.id,
+                        Attempt.outcome != "skipped",
+                    )
+                    .limit(1)
+                ).first()
+                is not None
+            )
+        # Looked up by the learner's own words, so the answer can use their materials.
+        stored = self._retriever.retrieve(
+            lesson.course_id, f"{question} {segment.title}", limit=prompts.MAX_ASK_PASSAGES
+        )
+        passages = [
+            prompts.Passage(
+                source_name=passage.source_name, locator=_locator(passage), text=passage.text
+            )
+            for passage in stored
+        ]
+        citable = [
+            PassageRef(
+                source_id=passage.source_id,
+                section_id=passage.section_id,
+                source_name=_citable(passage.source_name),
+                locator=_citable(_locator(passage)),
+            )
+            for passage in stored
+        ]
+        part = _part_brief(lesson, index, answered=answered)
+
+        problems: list[str] = []
+        for attempt in (1, 2):
+            context.check_cancelled()
+            doing = (
+                "Answering your question"
+                if attempt == 1
+                else "The first answer was not usable. Asking once more"
+            )
+            context.report(attempt - 1, 2, doing)
+            request = prompts.ask_request(
+                course_title=course_title,
+                concept=concept,
+                lesson_title=lesson.title,
+                part_titles=[item.title for item in lesson.segments],
+                part=part,
+                question=question,
+                passages=passages,
+                problems=problems,
+            )
+            result = self._ask(request, context, attempt - 1, 2, doing)
+            try:
+                compiled = compile_answer(result.text, citable)
+            except DraftError as error:
+                logger.info("generation.answer_unusable attempt=%s", attempt)
+                problems = error.problems
+                continue
+            written_by = self._written_by([result])
+            kept = self._asks.store(
+                lesson_id=lesson_id,
+                segment_id=segment_id,
+                question=question,
+                paragraphs=compiled.paragraphs,
+                citations=[
+                    AskCitation(source_name=item.source_name, locator=item.locator)
+                    for item in compiled.citations
+                ],
+                written_by=written_by,
+            )
+            context.report(2, 2, "Done")
+            return {
+                "kind": KIND_ASK,
+                "ask_id": kept.id,
+                "lesson_id": lesson_id,
+                "segment_id": segment_id,
+                "written_by": written_by,
+            }
+        raise GenerationFailedError(
+            "The answer did not come out in a usable form, twice. Nothing was kept. "
+            "You can ask again, perhaps in other words."
+        )
+
+    # -- finding out whether a key works -----------------------------------------
+
+    def check_provider(self, provider_id: str) -> JobSnapshot:
+        """Start a job that sends one provider a request of a few words, to see it answer."""
+        if not self._gateway.knows(provider_id):
+            raise NotFoundError("Adle does not know that AI provider.")
+        if not self._gateway.has_key_for(provider_id):
+            raise ProviderKeyMissingError
+        running = self._jobs.find_active(KIND_CHECK, provider_id)
+        if running is not None:
+            return running
+        return self._jobs.submit(
+            KIND_CHECK,
+            lambda context: self._check(provider_id, context),
+            subject_id=provider_id,
+            lane=LANE_QUICK,
+        )
+
+    def _check(self, provider_id: str, context: JobContext) -> dict[str, Any]:
+        doing = "Asking for one word"
+        context.report(0, 1, doing)
+        began = time.monotonic()
+        result = self._ask(prompts.check_request(), context, 0, 1, doing, provider_id=provider_id)
+        seconds = time.monotonic() - began
+        context.report(1, 1, "Done")
+        return {
+            "kind": KIND_CHECK,
+            "provider_id": provider_id,
+            "provider": result.provider_name,
+            "model": result.model_name,
+            "seconds": round(seconds, 1),
+            "note": self._written_by([result])["note"],
+        }
