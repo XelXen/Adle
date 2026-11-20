@@ -153,6 +153,54 @@ test.describe('scene player frame', () => {
     expect(light.equals(dark)).toBe(false);
   });
 
+  test('a curve shown by its stroke is a line; shown with set_opacity it is filled in', async ({
+    adle,
+  }) => {
+    const { app, page } = adle;
+    const player = await mountRawPlayer(page, 'e2ecurve');
+    await player.waitFor(`m.type === 'ready'`);
+    const box = await player.canvasBox();
+
+    /** The colour the window really shows at a point of the scene, read by the main process. */
+    const colourAt = async (worldX: number, worldY: number): Promise<number[]> => {
+      const point = worldToPage(box, worldX, worldY);
+      const encoded = await app.evaluate(async ({ BrowserWindow }, { x, y }): Promise<string> => {
+        const image = await BrowserWindow.getAllWindows()[0]!.webContents.capturePage({
+          x: Math.round(x),
+          y: Math.round(y),
+          width: 1,
+          height: 1,
+        });
+        return image.toBitmap().toString('base64');
+      }, point);
+      // One pixel, as the window holds it: blue, green, red, alpha.
+      const [blue = 0, green = 0, red = 0] = [...Buffer.from(encoded, 'base64')];
+      return [red, green, blue];
+    };
+    const finishedRuns = async (): Promise<number> =>
+      (await player.messages()).filter((message) => message.type === 'finished').length;
+
+    // Between the sigmoid and the straight line from its first point to its last: at
+    // z = 5 the curve is at 0.99 and that line at 0.75. Nothing is drawn at 0.87.
+    const between: [number, number] = [2.0, -2 + 0.87 * 4];
+    const emptyCorner: [number, number] = [-6.5, 3.5];
+
+    await player.load(fixtureScene('curve_stroke.py'), { theme: 'light' });
+    await expect.poll(finishedRuns, { timeout: 20_000 }).toBe(1);
+    const background = await colourAt(...emptyCorner);
+    expect(await colourAt(...between)).toEqual(background);
+
+    // The mistake a real model made in its first interactive scene (2026-11-20):
+    // set_opacity sets the fill as well, and an open path is filled across its ends.
+    await player.load(fixtureScene('curve_opacity.py'), { theme: 'light' });
+    await expect.poll(finishedRuns, { timeout: 20_000 }).toBe(2);
+    expect(await colourAt(...emptyCorner)).toEqual(background);
+    const filled = await colourAt(...between);
+    expect(filled).not.toEqual(background);
+    // It is the curve's own blue: more blue than red.
+    expect(filled[2]!).toBeGreaterThan(filled[0]! + 40);
+  });
+
   for (const [file, stage, pattern] of [
     ['syntax_error.py', 'compile', /indentation/i],
     ['bad_import.py', 'compile', /cannot use Python module 'os'/],

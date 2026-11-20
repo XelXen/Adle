@@ -166,6 +166,10 @@ Reactions run **every frame** while a `blueprint()` page is live.
   one `DecimalNumber` and `set_value(...)`.
 - Reactions do not run during `construct()`. Use `add_updater`, `ValueTracker`, and
   `always_redraw` there.
+- **Show or hide a curve by its stroke.** For anything drawn as a line (`Axes.plot`, `Line`,
+  an arc, any open path) use `curve.set_stroke(opacity=1)` and `curve.set_stroke(opacity=0)`.
+  `set_opacity(...)` also sets the fill, and a filled curve is painted solid between its two
+  ends. **Verified.** `set_opacity` is right for `Text`, `MathTex`, `Dot`, and filled shapes.
 
 ## Prohibited (enforced)
 

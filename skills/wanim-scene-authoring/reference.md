@@ -111,6 +111,14 @@ Write ordinary manim Community v0.21 Python. Only the Wanim-specific parts are l
 `add_reaction`, `on_input`; positioning with `to_edge`, `next_to`, `move_to`, `shift`, `arrange`;
 `set_value`, `set_color`, `set_width`, `stretch_to_fit_height`; `np.exp`.
 
+### Verified by a test of its own
+
+- `set_stroke(opacity=...)` shows and hides a plotted curve and leaves it a line.
+  `set_opacity(1)` on the same curve fills the area between it and the straight line joining
+  its ends (`e2e/fixtures/scenes/curve_stroke.py` and `curve_opacity.py`, read back pixel by
+  pixel in `e2e/scene-player.spec.ts`). Found in the first interactive scene a real model
+  wrote for Adle, 2026-11-20.
+
 ### Documented upstream, not yet exercised here
 
 `PathSlider`, `DraggablePoint`, `Chip`, `InputDecimalNumber`, `InputInteger`,
