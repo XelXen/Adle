@@ -22,7 +22,7 @@ import {
   type ExternalLinkId,
   type ImportJob,
   IPC,
-  type ProviderKeyState,
+  type ProviderKeyStates,
   type UiState,
 } from '../shared/ipc';
 import { callCore } from './core/client';
@@ -34,7 +34,13 @@ import {
   parseImportPaths,
   SOURCE_FILE_EXTENSIONS,
 } from './imports';
-import { type ProviderKeyStore, SecureStorageUnavailableError, validateApiKey } from './secrets';
+import { type KnownProvider, readProviders, syncProviders } from './providers';
+import {
+  parseProviderId,
+  type ProviderKeyStore,
+  SecureStorageUnavailableError,
+  validateApiKey,
+} from './secrets';
 import { openExternalLink } from './security';
 import { parseUiStatePatch, type UiStateStore } from './ui-state';
 
@@ -127,15 +133,6 @@ export function parseInvokeRequest(
   };
 }
 
-/** Push the stored provider key to a freshly started core. */
-export async function syncProviderKey(deps: IpcDependencies): Promise<void> {
-  const key = deps.keyStore.load();
-  if (!key) return;
-  await callCore(deps.core.getConnection(), OPERATIONS['provider.set_credential'], {
-    body: { api_key: key },
-  });
-}
-
 export function registerIpcHandlers(deps: IpcDependencies): void {
   const { core, keyStore, uiState } = deps;
 
@@ -195,7 +192,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   handle(IPC.coreStatus, () => core.status);
   handle(IPC.coreRestart, async () => {
     const status = await core.restart();
-    if (status.state === 'ready') await syncProviderKey(deps);
+    if (status.state === 'ready') await syncProviders(deps);
     return status;
   });
 
@@ -205,19 +202,66 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     return callCore(core.getConnection(), OPERATIONS[request.operation], request.params);
   });
 
-  handle(IPC.providerKeyState, (): ProviderKeyState => keyStore.state());
+  /** What is stored for each provider the core offers. The keys themselves stay here. */
+  const keyStates = (providers: KnownProvider[] | null): ProviderKeyStates =>
+    Object.fromEntries(
+      (providers ?? []).map((provider) => [
+        provider.id,
+        keyStore.state(provider.id, provider.address),
+      ]),
+    );
+
+  /**
+   * One of the core's providers, by a name the page sent. The page only names it: where
+   * its key goes is what the core says, never anything from the page.
+   */
+  const findProvider = async (
+    candidate: unknown,
+  ): Promise<
+    | { ok: true; provider: KnownProvider; all: KnownProvider[] }
+    | { ok: false; error: CoreResult<never> }
+  > => {
+    const id = parseProviderId(candidate);
+    if (!id) {
+      return {
+        ok: false,
+        error: failure('invalid_request', 'Adle does not know that AI provider.'),
+      };
+    }
+    const all = await readProviders(core);
+    const provider = all?.find((known) => known.id === id);
+    if (!all || !provider) {
+      return {
+        ok: false,
+        error: failure(
+          'provider_unknown',
+          'Adle could not check which AI provider that is, so nothing was changed. ' +
+            'Try again in a moment.',
+        ),
+      };
+    }
+    return { ok: true, provider, all };
+  };
+
+  handle(IPC.providerKeyState, async (): Promise<ProviderKeyStates> =>
+    keyStates(await readProviders(core)),
+  );
 
   handle(
     IPC.providerSetApiKey,
-    async (candidate: unknown): Promise<CoreResult<ProviderKeyState>> => {
+    async (providerId: unknown, candidate: unknown): Promise<CoreResult<ProviderKeyStates>> => {
       let apiKey: string;
       try {
         apiKey = validateApiKey(candidate);
       } catch (error) {
         return failure('invalid_api_key', error instanceof Error ? error.message : 'Invalid key.');
       }
+      const found = await findProvider(providerId);
+      if (!found.ok) return found.error;
+      const { provider } = found;
       try {
-        keyStore.save(apiKey);
+        // Kept with the address it is for: it is never handed over for another.
+        keyStore.save(provider.id, provider.address, apiKey);
       } catch (error) {
         if (error instanceof SecureStorageUnavailableError) {
           return failure('secure_storage_unavailable', error.message);
@@ -225,25 +269,48 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return failure('key_not_saved', 'The key could not be saved on this computer.');
       }
       const pushed = await callCore(core.getConnection(), OPERATIONS['provider.set_credential'], {
-        body: { api_key: apiKey },
+        body: { api_key: apiKey, provider_id: provider.id },
       });
       if (!pushed.ok) return pushed;
-      return { ok: true, data: keyStore.state() };
+      return { ok: true, data: keyStates(found.all) };
     },
   );
 
   registerImportHandlers(core, handle);
   registerDataHandlers(
-    { core, dataDir: deps.dataDir, afterStart: () => syncProviderKey(deps) },
+    { core, dataDir: deps.dataDir, afterStart: () => syncProviders(deps) },
     handle,
   );
 
-  handle(IPC.providerClearApiKey, async (): Promise<CoreResult<ProviderKeyState>> => {
-    keyStore.clear();
-    const cleared = await callCore(core.getConnection(), OPERATIONS['provider.clear_credential']);
-    // The key is gone from disk regardless; a stopped core holds nothing in memory.
-    if (!cleared.ok && cleared.error.code !== 'core_unavailable') return cleared;
-    return { ok: true, data: keyStore.state() };
+  handle(
+    IPC.providerClearApiKey,
+    async (providerId: unknown): Promise<CoreResult<ProviderKeyStates>> => {
+      const found = await findProvider(providerId);
+      if (!found.ok) return found.error;
+      const { provider } = found;
+      keyStore.clear(provider.id, provider.address);
+      const cleared = await callCore(
+        core.getConnection(),
+        OPERATIONS['provider.clear_credential'],
+        { query: { provider_id: provider.id } },
+      );
+      // The key is gone from disk regardless; a stopped core holds nothing in memory.
+      if (!cleared.ok && cleared.error.code !== 'core_unavailable') return cleared;
+      return { ok: true, data: keyStates(found.all) };
+    },
+  );
+
+  handle(IPC.providerSelect, async (providerId: unknown): Promise<CoreResult<null>> => {
+    const found = await findProvider(providerId);
+    if (!found.ok) return found.error;
+    // The core decides whether this is a moment to change (not while it is writing).
+    const chosen = await callCore(core.getConnection(), OPERATIONS['provider.select'], {
+      body: { provider_id: found.provider.id },
+    });
+    if (!chosen.ok) return chosen;
+    // Remembered for the next launch only once it is true now.
+    keyStore.select(found.provider.id);
+    return { ok: true, data: null };
   });
 }
 

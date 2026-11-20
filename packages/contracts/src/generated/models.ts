@@ -665,21 +665,52 @@ export interface ProposalAcceptance {
    */
   selected: number[];
 }
+/**
+ * One provider the learner can choose.
+ *
+ */
+export interface ProviderChoice {
+  base_url: string;
+  display_name: string;
+  key_configured: boolean;
+  limits_published: boolean;
+  models: ProviderModel[];
+  provider_id: string;
+  selected: boolean;
+}
+export interface ProviderModel {
+  id: string;
+  name: string;
+}
 export interface ProviderCredential {
   api_key: string;
+  provider_id?: string | null;
 }
+export interface ProviderSelection {
+  provider_id: string;
+}
+/**
+ * The provider in use, and every provider there is to choose from.
+ *
+ */
 export interface ProviderStatus {
   base_url: string;
   display_name: string;
   key_configured: boolean;
   model: string;
+  model_name: string;
   provider_id: string;
+  providers: ProviderChoice[];
 }
 /**
- * Adle's own count of today's requests. An estimate: the provider keeps the real one.
+ * Adle's own count of today's requests to the provider in use.
+ *
+ * An estimate: the provider keeps the real one.
  *
  */
 export interface ProviderUsage {
+  limits_published: boolean;
+  provider_id: string;
   requests_last_minute: number;
   requests_per_day: number;
   requests_per_minute: number;

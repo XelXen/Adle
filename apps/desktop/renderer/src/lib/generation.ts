@@ -43,12 +43,24 @@ export interface ProposedConcept {
   needs: ProposedNeed[];
 }
 
+/** Who wrote something, as the core recorded it when it was written. */
+export interface WrittenBy {
+  /** The provider, by the name it went by then. The one in use now may be another. */
+  provider: string;
+  /** The models that answered, by the names a person would use. */
+  models: string[];
+  /** A sentence saying that another model stood in, and for which; empty when none did. */
+  note: string;
+}
+
 export interface Proposal {
   concepts: ProposedConcept[];
   /** The proposal drew on the headings of the learner's own materials. */
   groundedInMaterials: boolean;
   /** It has already been added to the course, or set aside. */
   closed: boolean;
+  /** Who suggested it, where the job says. Older proposals do not. */
+  writtenBy: WrittenBy | null;
 }
 
 export interface LessonOutcome {
@@ -56,6 +68,27 @@ export interface LessonOutcome {
   title: string;
   /** Things that did not go as planned but did not stop the lesson, in sentences. */
   notes: string[];
+}
+
+function readWrittenBy(value: unknown): WrittenBy | null {
+  if (!isRecord(value) || typeof value.provider !== 'string' || !value.provider) return null;
+  return {
+    provider: value.provider,
+    models: strings(value.models),
+    note: typeof value.note === 'string' ? value.note : '',
+  };
+}
+
+/**
+ * Who to name as the author: "Mistral Large 4 on NVIDIA NIM", or the provider alone where
+ * the model is not known. `fallback` is for work recorded before authors were.
+ */
+export function authorName(writtenBy: WrittenBy | null, fallback: string): string {
+  if (!writtenBy) return fallback;
+  const [model, ...others] = writtenBy.models;
+  return model !== undefined && others.length === 0
+    ? `${model} on ${writtenBy.provider}`
+    : writtenBy.provider;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -93,6 +126,7 @@ export function readProposal(job: Job | null): Proposal | null {
     concepts,
     groundedInMaterials: result.grounded_in_materials === true,
     closed: result.accepted === true || result.dismissed === true,
+    writtenBy: readWrittenBy(result.written_by),
   };
 }
 

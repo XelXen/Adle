@@ -26,7 +26,11 @@ test.describe('configuring the AI provider', () => {
     expect(await page.content()).not.toContain(KEY);
     // 2. Nothing on the bridge returns it.
     const keyState = await page.evaluate(() => window.adle!.provider.keyState());
-    expect(keyState).toEqual({ stored: true, hint: '4Wd1' });
+    // It is the key of the provider in use, and of no other.
+    expect(keyState).toEqual({
+      aihubmix: { stored: true, hint: '4Wd1' },
+      nvidia: { stored: false, hint: null },
+    });
     const provider = await page.evaluate(() => window.adle!.core.invoke('provider.status'));
     expect(JSON.stringify(provider)).not.toContain(KEY);
     expect(provider).toMatchObject({ ok: true, data: { key_configured: true } });
@@ -47,13 +51,13 @@ test.describe('configuring the AI provider', () => {
 
     await second.page.getByRole('button', { name: 'Settings' }).click();
     await second.page.getByRole('button', { name: 'Remove key' }).click();
-    const dialog = second.page.getByRole('dialog', { name: 'Remove the saved key?' });
+    const dialog = second.page.getByRole('dialog', { name: 'Remove the saved AIHubMix key?' });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Remove key' }).click();
     await expect(second.page.getByText('Not set', { exact: true })).toBeVisible();
     expect(await second.page.evaluate(() => window.adle!.provider.keyState())).toEqual({
-      stored: false,
-      hint: null,
+      aihubmix: { stored: false, hint: null },
+      nvidia: { stored: false, hint: null },
     });
     await expect
       .poll(async () => second.page.evaluate(() => window.adle!.core.invoke('provider.status')))
@@ -89,7 +93,7 @@ test.describe('configuring the AI provider', () => {
     await expect(page.getByText('Saved · ends in 4Wd1')).toBeVisible();
 
     await page.getByRole('button', { name: 'Remove key' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Remove the saved key?' });
+    const dialog = page.getByRole('dialog', { name: 'Remove the saved AIHubMix key?' });
     await expect(dialog).toBeVisible();
     // Focus stays inside the modal while tabbing.
     for (let presses = 0; presses < 6; presses += 1) {

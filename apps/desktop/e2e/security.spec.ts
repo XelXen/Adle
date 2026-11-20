@@ -34,7 +34,7 @@ test.describe('renderer boundary', () => {
         app: ['info', 'openExternal', 'showLogs', 'updateUiState'],
         core: ['invoke', 'onStatus', 'restart', 'status'],
         data: ['eraseAll', 'restoreCopy', 'saveCopy', 'showSafetyCopies'],
-        provider: ['clearApiKey', 'keyState', 'setApiKey'],
+        provider: ['clearApiKey', 'keyState', 'select', 'setApiKey'],
         sources: ['importDropped', 'importWithPicker'],
       },
     });

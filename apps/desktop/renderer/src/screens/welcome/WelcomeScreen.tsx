@@ -74,8 +74,8 @@ export function WelcomeScreen() {
           </p>
           <p className={styles.calloutSecond}>
             One thing uses the internet: creating a course or lesson with AI sends the relevant text
-            to the provider you set up (AIHubMix by default). Nothing is sent until you add a key
-            and ask for it.
+            to the one AI provider you choose (AIHubMix or NVIDIA NIM). Nothing is sent until you
+            add a key and ask for it.
           </p>
         </Callout>
 

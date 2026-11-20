@@ -27,6 +27,8 @@ supersedes the old one and update this index.
 | [019](../decisions/ADR-019-packaging.md) | Packed with `@electron/packager` into a folder; the core ships as a private Python (not a frozen executable) started cut off from the computer it is on; fuses set; one build for release and the same build with the debugger reachable for the end-to-end suite. No installer, signature, or updater yet. |
 | [020](../decisions/ADR-020-provider-notices.md) | A successful answer that the provider wrote itself in the model's place (an account notice) is recognised, ends the job after one request, and is shown to the learner in the provider's own words, quoted, cleaned, and as plain text. |
 
+| [021](../decisions/ADR-021-a-choice-of-providers.md) | A second provider (NVIDIA NIM) chosen by the learner and by nothing else; a key kept and sent per provider and address; a provider's next model stands in when its first is away, and that is always said; each provider counted alone | Accepted |
+
 ## Smaller standing choices (no ADR)
 
 - **Routing:** a small in-house router that keeps the route in `history.state`. A routing library

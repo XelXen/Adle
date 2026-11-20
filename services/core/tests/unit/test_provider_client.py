@@ -210,8 +210,9 @@ def test_without_a_key_nothing_is_sent() -> None:
         (401, ProviderKeyRejectedError, "provider_key_rejected"),
         (403, ProviderKeyRejectedError, "provider_key_rejected"),
         (400, ProviderRequestRefusedError, "provider_request_refused"),
-        (404, ProviderRequestRefusedError, "provider_request_refused"),
         (422, ProviderRequestRefusedError, "provider_request_refused"),
+        # "There is no such model" is the model being away, not the request being wrong.
+        (404, ProviderUnavailableError, "provider_unavailable"),
         (500, ProviderUnavailableError, "provider_unavailable"),
         (503, ProviderUnavailableError, "provider_unavailable"),
     ],

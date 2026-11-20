@@ -8,8 +8,9 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Last commit:** see `git log -1`
 - **Active milestone:** M8 — release hardening, done as far as this machine can take it:
   failure handling (ADR-018), packaging (ADR-019), the licence inventory, the audits, the
-  performance report, and the release checklist. What is left needs the owner or the
-  provider; see "Next actions"
+  performance report, and the release checklist. Since then: a second AI provider, NVIDIA
+  NIM, beside AIHubMix (ADR-021), through which **a real model has written lessons for the
+  first time**. What is left needs the owner; see "Next actions"
 - **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
   `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
 
@@ -21,11 +22,11 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 | M1 — Desktop shell and Sprout | **Done** | App launches without a key; welcome, library, settings; key add/remove without exposure; themes; a11y gates. |
 | M2 — Persistence and ingestion | **Done** | Database with safe migrations, backup and restore; import of PDF, DOCX, Markdown, text with provenance; duplicate detection; FTS5 search; course and materials screens. Vector search deliberately not built (ADR-007). |
 | M3 — Curriculum and learner model | **Done** | Concept graph validated on every write (loops, references, order, layers); curriculum screen (list and map; add, edit, reorder, remove; objectives; prerequisites with reasons; links to materials; outline from headings); learner preferences; knowledge as an append-only record folded through BKT into four states with reasons; review scheduling; retrieval with provenance (ADR-009). **Deferred to the lesson work:** working memory and the interaction event log. Answer evidence is exercised through the service in tests; in the app only self-rating can create evidence until questions exist. |
-| M4 — Wanim and Lesson IR | **Done** | Player frame, adapter, static scene policy, skill, threat model (ADR-004). Lesson IR 1.0 with a generated JSON Schema; one validating gateway; scenes re-checked on every read; answer keys kept in the core with deterministic scoring; the lesson player; the first lesson of the sample course (ADR-010). The packaged-build check is BLOCKED on M8 packaging. |
-| M5 — Generation, audio, timeline | **Done** (real provider BLOCKED) | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Every path is tested against a fake provider. **The real model has not produced a lesson yet:** the provider failed every request upstream on 2026-11-19, so the prompts are unchecked. |
+| M4 — Wanim and Lesson IR | **Done** | Player frame, adapter, static scene policy, skill, threat model (ADR-004). Lesson IR 1.0 with a generated JSON Schema; one validating gateway; scenes re-checked on every read; answer keys kept in the core with deterministic scoring; the lesson player; the first lesson of the sample course (ADR-010). The same journeys pass against the packaged build. |
+| M5 — Generation, audio, timeline | **Done** | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Two providers, chosen by the learner, each with its own key and count; a provider's next model stands in when its first is not available, and that is always said (ADR-021). Every path is tested against stand-ins. **A real model has written lessons** (Kimi K3.1 Pro and Mistral Large 4 through NVIDIA NIM, 2026-11-20); see "The real providers". |
 | M6 — Assessment and adaptation | **Done** | Hypotheses about mistakes computed from the record (tentative, supported, rejected, resolved), checked with questions that would show them, and dismissible by the learner; slips counted as partly right; repeats counted in full only after a gap; questions kept for practice in the Lesson IR; a next-step policy with a reason for every step; the Learn tab, practice and review, "what next" after a lesson, "This did not help"; teaching strategy chosen or rotated (ADR-014). Not built by decision: model grading of open answers and model-proposed hypotheses. |
 | M7 — Complete UX and sample course | **Done** (two items left as known gaps) | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Also done: Settings → Privacy & data can save a copy of everything as one file, restore from one (checked and upgraded before anything is replaced; what is replaced is kept; undoable), and delete everything (ADR-016). Also done: the session summary (ADR-017). Polish done: every outcome of the new screens checked with axe, focus kept after "That was a slip". Left as known gaps, by decision: narration and animation are synchronised per segment (Wanim's slides mode was not tried), and screenshots are saved for review rather than compared against baselines. |
-| M8 — Release hardening | **In progress** | Done: a crashed or hung page, an uncaught error in the main process, and a core that dies are each handled, with a local log and no reporting (ADR-018). Packaging (ADR-019): a folder that runs by itself, with a private Python for the core, fuses set; the whole end-to-end suite passes against the packaged app, and the release build passes a start-up check from outside. Licence inventory generated and checked in every gate; `npm audit` and `pip-audit` clean; `PERFORMANCE.md` and `RELEASE_CHECKLIST.md` written. **Not done, and not doable here:** an installer and code signing (the owner's certificates), macOS and Linux (no machine), a clean computer, a lesson from the real model (provider). |
+| M8 — Release hardening | **Done as far as this machine allows** | Done: a crashed or hung page, an uncaught error in the main process, and a core that dies are each handled, with a local log and no reporting (ADR-018). Packaging (ADR-019): a folder that runs by itself, with a private Python for the core, fuses set; the whole end-to-end suite passes against the packaged app, and the release build passes a start-up check from outside. Licence inventory generated and checked in every gate; `npm audit` and `pip-audit` clean; `PERFORMANCE.md` and `RELEASE_CHECKLIST.md` written. **Not done, and not doable here:** an installer and code signing (the owner's certificates), macOS and Linux (no machine), a clean computer, a generated lesson sat by a person (the owner's key is the owner's to type in). |
 
 ## What works in the running app
 
@@ -95,12 +96,24 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   Cancel, and adds a lesson that plays like any other. For another lesson on the same concept
   the learner can choose how it should explain; left alone, Adle uses a way not used yet. A
   concept has at most four lessons. No key, a rate-limit wait, a used-up day, a provider failure, and a cancelled job each
-  have their own words and their own way forward.
+  have their own words and their own way forward. While a model is at work the job says
+  what it is doing ("Writing the lesson: Kimi K3.1 Pro is thinking it through", then "is
+  writing"): the models that work today take minutes over one answer.
+- **Which model wrote it:** if a provider's first model is not available, its next one is
+  asked, and that is said while it happens ("Kimi K3.1 Pro is not available at the moment.
+  Asking Mistral Large 4 instead") and afterwards: in the notice that a lesson is ready, and
+  in the review of suggested concepts, which names its author ("Suggested by Mistral Large 4
+  on NVIDIA NIM").
 - **Narration aloud:** the lesson is read by a voice installed on the computer (never an online
   one), with "Read aloud" and "Transcript" switches in the lesson. Without a voice, or if the
   voice fails, the narration is shown as text at the learner's reading pace.
-- Settings → AI provider: save / replace / remove the key (OS-encrypted); provider facts from the
-  core; how much of today's request and token allowance is used and when it resets.
+- Settings → AI provider: **choose between AIHubMix and NVIDIA NIM.** Each card shows the
+  provider's address, its models in the order they are asked, and what that order means.
+  The provider is changed only by that button, and not while something is being written.
+  Below it: save / replace / remove the key of the provider in use (OS-encrypted; a key is
+  kept for one provider at one address and never sent anywhere else), and how much of today's
+  request and token allowance is used **at that provider** and when it resets, with a
+  sentence saying whether the limits are the provider's or Adle's own.
 - Settings → Learning: pace, explanation depth, narration, voice, volume (with a sample),
   captions, goal (stored by the core).
 - Settings → Privacy & data: what is stored and exactly what each kind of request sends.
@@ -124,13 +137,14 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   and a private Python for the core that takes nothing from the computer it is on. Everything
   above works in it; the end-to-end suite says so.
 
-Not present yet (do not assume): a lesson written by the real model (see "The real provider"),
-exporting a single course to share (not planned; ADR-016), an installer, a signed build.
+Not present yet (do not assume): a generated lesson sat by a person in the app (see "The real
+providers"), exporting a single course to share (not planned; ADR-016), an installer, a
+signed build.
 
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-020, on 2026-11-20.
+`node scripts/check.mjs --e2e` on the tree that became the commits for ADR-021, on 2026-11-20.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -140,21 +154,21 @@ Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 498 tests, 23 files |
+| Vitest | PASS | 531 tests, 25 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 88 source files |
-| pytest | PASS | 1044 tests |
-| Playwright + Electron (E2E) | PASS | 84 tests in 11 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
+| mypy (strict) | PASS | 89 source files |
+| pytest | PASS | 1130 tests |
+| Playwright + Electron (E2E) | PASS | 88 tests in 12 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 411 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-20 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-20 (pip-audit 2.10.1) |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
-| Packaged build: every journey (`npm run e2e:packaged`) | PASS | 83 tests against the packaged app for ADR-019, none flaky; for ADR-020 the generation and security journeys were run again against a rebuilt package |
+| Packaged build: every journey (`npm run e2e:packaged`) | PASS, one flaky | 88 tests against the rebuilt packaged app in 10 minutes. One, the pointer drag in `scene-player.spec.ts`, missed its first try and passed its retry, while a real-provider script was running on the same machine; run on its own afterwards it passed 8 times of 8 with no retries |
 | Packaged build: release start-up check (`npm run package:check`) | PASS | Fuses, will not run as Node, starts on an empty profile with a stripped environment, no orphaned core |
 | Packaged build on a computer that never had the project | NOT RUN | Needs another machine |
 | Installer, code signing | BLOCKED | Need the owner's certificates |
 | macOS / Linux | NOT RUN | Developed on Windows only |
-| Real AI provider | BLOCKED | First key: HTTP 500 from the provider's relay. Second key: the account must be topped up before anything reaches the model; see "The real provider" |
+| Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: two lessons with three scenes and two curricula were written through Adle's generation service on 2026-11-20, one of them by the stand-in model; see "The real providers" |
 
 ## Launch reliability (ADR-008)
 
@@ -181,6 +195,22 @@ investigated, not ignored.
 
 ## Findings worth knowing (all recorded in ADRs, nested AGENTS files, or the Wanim skill)
 
+- **A provider's reference is not its endpoint** (ADR-021). Kimi K3.1 Pro's documented
+  default for `reasoning_effort` is not what it does when the field is left out: without it
+  the model thought for eight minutes over a lesson and wrote nothing. Mistral Large 4
+  refuses the value its reference lists and needs one it does not list. What works, and
+  the date it was seen to, is written beside each model in `generation/provider.py`. Try a
+  new field against the real endpoint by hand before relying on it.
+- **A model writes TeX in JSON with one backslash as often as with two.** `\sigma` is then
+  not JSON, and `\frac` is: a form feed and "rac". `drafts.mend_backslashes` mends an
+  answer before it is parsed; do not parse a model's JSON any other way.
+- **`set_opacity` fills a plotted curve.** The first interactive scene a real model wrote
+  showed a curve as a solid shape for that reason. The scene guide says to use
+  `set_stroke(opacity=...)`, and `e2e/scene-player.spec.ts` reads the window's own pixels
+  to check both.
+- **Real models take minutes.** A lesson's text: about five minutes from Kimi, seven and a
+  half from Mistral. A scene: two to four. "Stop" and the time limit are checked on every
+  line a provider sends, because the first piece of an answer arrives minutes in.
 - Wanim 0.1.3 evaluates scenes in a same-origin child frame: needs `unsafe-eval` and a real origin.
 - A scene stuck in a loop blocks its process; a new frame on the same origin never starts. Hence a
   fresh `adle://<id>.player` origin per frame.
@@ -251,75 +281,99 @@ investigated, not ignored.
   cue to leave a live page). Finer synchronisation needs Wanim's slides mode
   (`self.next_slide()`), which is documented upstream and not yet tested here.
 
-## The real provider
+## The real providers
 
-**BLOCKED at the provider.** On 2026-11-19 the owner's key was valid (`GET /v1/models` lists
-exactly `coding-kimi-k3-free`) but all nine completion requests failed with HTTP 500
-`do_request_failed` (`Post "https://***/coding/v1/messages": Bad Request`): on both the
-OpenAI-compatible and Anthropic-compatible endpoints, with the smallest possible body. That is
-AIHubMix's call to its upstream failing, not the request. The prompts
-(`generation/prompts.py`) are therefore unchecked against the real model. To retry, from the
-repository root:
+Two providers (ADR-021). No test calls either: what follows was done by hand, with scripts
+kept outside the repository that drive the core's own services, and is described so that it
+can be done again.
+
+### NVIDIA NIM: it works
+
+Tried on 2026-11-20 with the owner's key, against
+`https://integrate.api.nvidia.com/v1/chat/completions`. Requests that day: about thirty,
+most of them small.
+
+| What was asked for | By | Requests | Time | Outcome |
+|---|---|---|---|---|
+| A lesson on activation functions (sample course) | Kimi K3.1 Pro | 4 | 17.5 min | Nine segments, three checkpoints, two scenes. The first draft was refused (TeX with one backslash; now read), the second accepted. Both scenes passed the static policy as first written |
+| A curriculum for "Probability for data analysis" | Kimi K3.1 Pro | 1 | 2 min | Twelve concepts, three objectives each, prerequisites that form a valid order; added without an issue |
+| A lesson on gradient descent, after the fixes | Kimi K3.1 Pro | 2 | 8.7 min | Nine segments, one interactive scene; draft and scene each accepted as first written |
+| A curriculum, with a first model that does not exist | Mistral Large 4 | 2 | 5 min | NVIDIA's own HTTP 404 for the absent model; Adle said so, asked Mistral, and recorded "… was not available, so Mistral Large 4 wrote this in its place" |
+
+- All three generated scenes were then run in the isolated player, in both themes, with a
+  one-off Playwright spec that is not in the suite: each loads, draws, and either finishes or
+  waits for the learner with its controls announced.
+- What the runs changed in the product: `reasoning_effort` for both thinking models; the
+  reader that mends TeX backslashes, and a line in the prompt; a rule in the scene guide
+  about showing a curve; "stop" and the time limit on every line; a refused request moving
+  on to the next model; the job saying what the model is doing.
+- GLM 5.3 Flash, the third in line, has not answered once: no line in three minutes, in
+  three attempts. If the first two are both away, a request waits three minutes and fails.
+- Not done: nobody has sat one of these lessons in the app. The key has to be typed into
+  Settings by the owner; automation does not enter credentials.
+
+To do it again, from the repository root (the scripts are in the session's scratch folder,
+`tools/`; they are described here because that folder does not last):
 
 ```bash
-uv run --directory services/core python <scratch>/tools/real_smoke.py <key file> <output dir> probe
+uv run --directory services/core python <scratch>/tools/real_smoke_nim.py nvidia <key file> <output dir> probe "lesson:Loss" curriculum
+uv run --directory services/core python <scratch>/tools/nvidia_stream_diag.py <key file> <model id> <saved prompt> <answer file> usage effort=low
 ```
 
-(The script lives outside the repository on purpose; it is described in ADR-012. Nine of the
-day's 80 budgeted requests were used on 2026-11-19.) When it answers: run it with `curriculum`
-and `lesson`, read what the model actually writes, and adjust the prompts and the leniency of
-`generation/drafts.py` to it. Do not loosen the Lesson IR or the scene policy to fit the model.
+The first builds the real services on an empty profile, chooses the provider, puts the key
+in the in-memory vault, and saves every prompt and answer. The second sends one saved prompt
+to one model and prints, every twenty seconds, how much thinking and how much answer has
+arrived: it is how the `reasoning_effort` findings were made.
 
-**Retried on 2026-11-20: still BLOCKED, and it is not the request.** Two requests were sent.
-Adle's own client got the same HTTP 500. Then the request shown on the model's own page
-(`https://aihubmix.com/model/coding-kimi-k3-free`: one user message, `max_tokens` 1024, not
-streamed, to `/v1/chat/completions`) was sent as it stands, and got the same answer:
-`do_request_failed`, `Post "https://***/coding/v1/messages": Bad Request`. The provider's
-documentation names no required header, no restriction to particular clients, and no outage
-for this model. So the relay between AIHubMix and the model is refusing, for this key or for
-everyone; nothing in Adle can be changed to fix it, and Adle was not made to pretend to be
-another program to find out. For the owner: ask AIHubMix about that error with this model,
-or try the key in their own playground. In the app this state is handled: the job ends with
-"The AI provider reported a problem on its side. Nothing was changed; try again in a little
-while", nothing is saved, and no request is repeated.
+### AIHubMix: still blocked at the provider
 
-**A second key, the same day: no HTTP 500, and no model either.** The owner supplied another
-key. The request on the model's page came back with HTTP 200, and its text was the provider's
-own: "Sorry, to prevent abuse of free resources, accounts that have not been recharged can
-only try 10 times. You can increase the free quota after recharging;
-https://console.aihubmix.com/topup". Its identifier began `chatcmpl-fake` and it reported no
-tokens used; streamed, it was one chunk with no usage at all. Two requests were sent with
-this key, both answered this way. So with this account **the model is reachable in
-principle, and what stands in the way is topping the account up at AIHubMix**. That is the
-owner's to do; after it, run the smoke script above with `probe`, then `curriculum` and
-`lesson`.
+On 2026-11-19 the owner's key was valid (`GET /v1/models` lists exactly
+`coding-kimi-k3-free`) but all nine completion requests failed with HTTP 500
+`do_request_failed` (`Post "https://***/coding/v1/messages": Bad Request`): on both the
+OpenAI-compatible and Anthropic-compatible endpoints, with the smallest possible body.
+Retried on 2026-11-20 with the request printed on the model's own page: the same answer. So
+the relay between AIHubMix and the model is refusing, for this key or for everyone; nothing
+in Adle can be changed to fix it, and Adle was not made to pretend to be another program to
+find out.
 
-Adle did not recognise such an answer: it would have been taken for an unreadable draft,
-asked for again, and reported as "the lesson could not be used". It is now a failure of its
-own (`provider_notice`, ADR-020): one request, the provider's words shown to the learner,
-the settings offered. This is the first thing the real provider has taught the client.
+A second key, the same day: HTTP 200, and the text was the provider's own: "Sorry, to
+prevent abuse of free resources, accounts that have not been recharged can only try 10
+times. You can increase the free quota after recharging; https://console.aihubmix.com/topup".
+With that account the model is reachable in principle, and what stands in the way is topping
+the account up, which is the owner's to do. Adle recognises such an answer (`provider_notice`,
+ADR-020): one request, the provider's words shown, the settings offered.
+
+AIHubMix stays the provider in use until the learner chooses otherwise, because it was the
+only one when people first installed Adle. That is one line (`ProviderCatalogue.providers`)
+if the owner would rather new installations start on NVIDIA.
 
 ## Next actions
 
-Everything that could be done on this machine without the owner is done. What remains, in
-the order it matters:
+What remains needs the owner. In the order it matters:
 
-1. **Top up the AIHubMix account of the second key, then retry the real provider** (see "The
-   real provider"). When it answers, read what the model actually writes and adjust the
-   prompts and the leniency of `generation/drafts.py`. This is the one part of the product
-   no test has exercised for real.
+1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
+   They are in a transcript; treat them as used. Then type the new NVIDIA key into
+   Settings → AI provider yourself, choose NVIDIA, and **sit a generated lesson from start
+   to finish**. That is the one thing about generation nobody has done yet. Expect about ten
+   minutes for a lesson to be written.
 2. **Push the branch** so that CI runs for the first time, on Windows and Linux. Expect
    surprises on Linux: nothing has run there.
 3. **Choose a licence, get signing certificates, and add an installer** (ADR-019 says what
    and why). `docs/engineering/RELEASE_CHECKLIST.md` is the list.
 4. **Try the packaged folder on a computer that never had the project**, and on macOS.
-5. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
-   single course; a screen-reader pass by a person.
+5. Decide whether new installations should start on NVIDIA rather than AIHubMix (see "The
+   real providers"), and whether GLM 5.3 Flash should stay third while it does not answer.
+6. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
+   single course; a screen-reader pass by a person; showing on a lesson, not only on its
+   job, which model wrote it.
 
 ## Known gaps (tracked, not forgotten)
 
 | Gap | Planned |
 |---|---|
+| "Stop" on a generation waits for the provider's next line: usually under a second, up to three minutes if the provider is silent | By decision (ADR-021): closing a connection from another thread is not dependable across platforms |
+| Which model wrote a lesson is kept with the job that made it, not with the lesson | When someone wants to see it later than the notice |
+| GLM 5.3 Flash, NVIDIA's third model, has never answered | The owner's choice of order (ADR-021) |
 | The parser worker has no OS-level sandbox | Not built. It is a separate, short-lived, isolated process that returns only checked JSON (SECURITY.md) |
 | No installer, no signature, no automatic update; Windows only | Needs the owner (ADR-019, `RELEASE_CHECKLIST.md`) |
 | A single course cannot be exported to share with someone else; a copy holds everything | By decision (ADR-016) |

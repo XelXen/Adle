@@ -1353,6 +1353,33 @@
         "title": "ProposalAcceptance",
         "type": "object"
       },
+      "ProviderChoice": {
+        "description": "One provider the learner can choose.",
+        "properties": {
+          "base_url": { "title": "Base Url", "type": "string" },
+          "display_name": { "title": "Display Name", "type": "string" },
+          "key_configured": { "title": "Key Configured", "type": "boolean" },
+          "limits_published": { "title": "Limits Published", "type": "boolean" },
+          "models": {
+            "items": { "$ref": "#/components/schemas/ProviderModel" },
+            "title": "Models",
+            "type": "array"
+          },
+          "provider_id": { "title": "Provider Id", "type": "string" },
+          "selected": { "title": "Selected", "type": "boolean" }
+        },
+        "required": [
+          "provider_id",
+          "display_name",
+          "base_url",
+          "models",
+          "key_configured",
+          "selected",
+          "limits_published"
+        ],
+        "title": "ProviderChoice",
+        "type": "object"
+      },
       "ProviderCredential": {
         "additionalProperties": false,
         "properties": {
@@ -1362,27 +1389,73 @@
             "pattern": "^[\\x21-\\x7e]+$",
             "title": "Api Key",
             "type": "string"
+          },
+          "provider_id": {
+            "anyOf": [
+              { "pattern": "^[a-z][a-z0-9_-]{0,31}$", "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Provider Id"
           }
         },
         "required": ["api_key"],
         "title": "ProviderCredential",
         "type": "object"
       },
+      "ProviderModel": {
+        "properties": {
+          "id": { "title": "Id", "type": "string" },
+          "name": { "title": "Name", "type": "string" }
+        },
+        "required": ["id", "name"],
+        "title": "ProviderModel",
+        "type": "object"
+      },
+      "ProviderSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "provider_id": {
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$",
+            "title": "Provider Id",
+            "type": "string"
+          }
+        },
+        "required": ["provider_id"],
+        "title": "ProviderSelection",
+        "type": "object"
+      },
       "ProviderStatus": {
+        "description": "The provider in use, and every provider there is to choose from.",
         "properties": {
           "base_url": { "title": "Base Url", "type": "string" },
           "display_name": { "title": "Display Name", "type": "string" },
           "key_configured": { "title": "Key Configured", "type": "boolean" },
           "model": { "title": "Model", "type": "string" },
-          "provider_id": { "title": "Provider Id", "type": "string" }
+          "model_name": { "title": "Model Name", "type": "string" },
+          "provider_id": { "title": "Provider Id", "type": "string" },
+          "providers": {
+            "items": { "$ref": "#/components/schemas/ProviderChoice" },
+            "title": "Providers",
+            "type": "array"
+          }
         },
-        "required": ["provider_id", "display_name", "base_url", "model", "key_configured"],
+        "required": [
+          "provider_id",
+          "display_name",
+          "base_url",
+          "model",
+          "model_name",
+          "key_configured",
+          "providers"
+        ],
         "title": "ProviderStatus",
         "type": "object"
       },
       "ProviderUsage": {
-        "description": "Adle's own count of today's requests. An estimate: the provider keeps the real one.",
+        "description": "Adle's own count of today's requests to the provider in use.\n\nAn estimate: the provider keeps the real one.",
         "properties": {
+          "limits_published": { "title": "Limits Published", "type": "boolean" },
+          "provider_id": { "title": "Provider Id", "type": "string" },
           "requests_last_minute": { "title": "Requests Last Minute", "type": "integer" },
           "requests_per_day": { "title": "Requests Per Day", "type": "integer" },
           "requests_per_minute": { "title": "Requests Per Minute", "type": "integer" },
@@ -1392,13 +1465,15 @@
           "tokens_today": { "title": "Tokens Today", "type": "integer" }
         },
         "required": [
+          "provider_id",
           "requests_today",
           "requests_per_day",
           "tokens_today",
           "tokens_per_day",
           "requests_last_minute",
           "requests_per_minute",
-          "resets_at"
+          "resets_at",
+          "limits_published"
         ],
         "title": "ProviderUsage",
         "type": "object"
@@ -3544,6 +3619,20 @@
     "/v1/provider/credential": {
       "delete": {
         "operationId": "provider.clear_credential",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "provider_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                { "pattern": "^[a-z][a-z0-9_-]{0,31}$", "type": "string" },
+                { "type": "null" }
+              ],
+              "title": "Provider Id"
+            }
+          }
+        ],
         "responses": {
           "204": { "description": "Successful Response" },
           "401": {
@@ -3587,6 +3676,36 @@
           }
         },
         "summary": "Set Credential",
+        "tags": ["provider"],
+        "x-adle-internal": true
+      }
+    },
+    "/v1/provider/selection": {
+      "put": {
+        "description": "Use another provider from now on. Its key stays where it is; so do the others'.",
+        "operationId": "provider.select",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ProviderSelection" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": { "description": "Successful Response" },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Select Provider",
         "tags": ["provider"],
         "x-adle-internal": true
       }

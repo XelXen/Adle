@@ -37,7 +37,7 @@ None of these is done. Each needs something only the owner has.
 | A licence for the project | The repository is marked `UNLICENSED` |
 | A build and a test run on macOS and on Linux | The script has the paths for both and has run on neither |
 | A run on a computer that has never had the project on it | Step 8 strips the environment, which is not the same thing |
-| A lesson written by the real model, read by a person | The model has not answered yet: one key gets HTTP 500 from the provider's relay; the other account must be topped up first |
+| A generated lesson sat by a person, from start to finish, in the app | A real model has written lessons (Kimi K3.1 Pro through NVIDIA NIM, 2026-11-20), and they were checked by a script and by looking at them. Nobody has yet learnt from one. The owner's key has to be typed in by the owner |
 
 ## The acceptance list (PLAN.md section 17)
 
@@ -48,7 +48,7 @@ None of these is done. Each needs something only the owner has.
 | Topic or syllabus import and source provenance work locally | PASS | `e2e/course-materials`; `test_ingestion`, `test_courses_and_sources` |
 | Curriculum graph is reviewable and editable | PASS | `e2e/curriculum`; `test_curriculum_graph`, `test_curriculum_api` |
 | Lesson IR is versioned and validated | PASS | `test_lesson_ir`, `test_lessons_api`; schema generated into `packages/contracts` and checked for drift |
-| Complete Wanim scene files are generated and executed only in the isolated player | PASS for execution; BLOCKED for generation by the real model | Isolation: `e2e/security`, `e2e/scene-player`, in development and **in the packaged build**. Generation: `e2e/generation` and `test_generation_api` against the fake provider; the real provider has returned only errors |
+| Complete Wanim scene files are generated and executed only in the isolated player | PASS | Isolation: `e2e/security`, `e2e/scene-player`, in development and **in the packaged build**. Generation: `e2e/generation`, `e2e/providers` and `test_generation_api` against stand-ins; and **by a real model** on 2026-11-20 (Kimi K3.1 Pro through NVIDIA NIM, ADR-021): two lessons through Adle's own generation service, three scenes between them, each of which passed the static policy on the first try and ran in the isolated player in both themes. Those runs were by hand: no test may call a real provider |
 | Audio and transcript controls work, with honest alignment fallback | PASS | `e2e/narration`; `speech.test.ts` (words are highlighted only when the engine says where it is) |
 | Learner interactions produce persistent events | PASS | `test_answers_api`, `test_learning_api`; `e2e/learning` across a restart |
 | Mastery is evidence-based and explainable | PASS | `test_knowledge_tracing` (property tests), `test_learner_api`; no score in any payload |
@@ -59,16 +59,25 @@ None of these is done. Each needs something only the owner has.
 | Data export, deletion, backup, and restore are tested | PASS | `e2e/data`, `test_data_copy`, `test_database`, `test_process_lifecycle`. "Export" is a copy of everything; one course alone cannot be exported (ADR-016) |
 | Light and dark themes, accessibility, and reduced motion are tested | PASS, with a gap | `e2e/appearance-a11y` (both themes, axe on every screen, reduced motion in the shell); axe on each state in the other specs. Not tested with a screen reader by a person |
 | CI, unit, integration, E2E, security, and packaging checks pass | PASS locally; CI NOT RUN | The gates above on this machine. The workflow in `.github/` has never run: the repository has no remote |
-| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-019 |
+| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-021 |
 | Git history is coherent, atomic, and honest | PASS | One Conventional Commit per slice on `dev`, each with its gate results, all signed; nothing pushed |
 
 ## Known limitations
 
-- **No lesson from the real model has been seen.** Every path is tested against a stand-in
-  that answers as the documentation says the provider does. The prompts are unchecked. Two
-  keys were tried: the provider's relay answers the first with HTTP 500, and the second
-  belongs to an account that must be topped up before the provider passes anything to the
-  model (it says so in a notice, which Adle now shows; ADR-020).
+- **AIHubMix's free model has never answered.** Two keys were tried: the provider's relay
+  answers the first with HTTP 500, and the second belongs to an account that must be topped
+  up before the provider passes anything to the model (it says so in a notice, which Adle
+  shows; ADR-020). Generation was checked against a real model through NVIDIA NIM instead
+  (ADR-021).
+- **Generation through NVIDIA is slow.** Its models think before they write: about six
+  minutes for a lesson's text and two to three for each picture with Kimi K3.1 Pro, on
+  2026-11-20. Adle says what the model is doing and stays usable meanwhile.
+- **What a provider documents and what its endpoint does differ**, in both directions
+  (ADR-021), and can change. When it does, a model stops finishing or refuses its request;
+  Adle then asks the provider's next model and says so. The settings that work are written
+  beside each model in `services/core/adle_core/generation/provider.py`, with the date.
+- **No person has sat a generated lesson yet.** Two were generated and inspected; see
+  `PROJECT_STATE.md`.
 - **Narration and animation are synchronised per part of a lesson**, not per sentence.
 - **PDFs are read with `pypdf`.** Columns, tables, and equations come out as that library
   gives them. Scanned pages are flagged, not read.

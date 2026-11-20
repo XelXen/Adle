@@ -307,14 +307,19 @@ def test_usage_older_than_a_day_no_longer_counts(services: Services) -> None:
 
 def test_the_interface_can_read_the_provider_and_the_local_estimate(client: TestClient) -> None:
     provider = client.get("/v1/provider").json()
+    # Every provider there is to choose from comes with it (test_provider_choice.py).
+    provider.pop("providers")
     assert provider == {
         "provider_id": "aihubmix",
         "display_name": "AIHubMix",
         "base_url": "https://aihubmix.com/v1",
         "model": "coding-kimi-k3-free",
+        "model_name": "Coding Kimi K3 (free)",
         "key_configured": False,
     }
     usage = client.get("/v1/provider/usage").json()
+    # AIHubMix publishes its limits, and Adle stays under them.
+    assert (usage["provider_id"], usage["limits_published"]) == ("aihubmix", True)
     assert usage["requests_today"] == 0
     assert usage["tokens_today"] == 0
     # The daily allowance is the real default; the test fixture lifts the per-minute limit.

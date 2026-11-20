@@ -19,7 +19,7 @@ flowchart LR
   Renderer -- "window.adle (typed IPC)" --> Main
   Main -- "HTTP + launch token" --> Core
   Renderer -- "postMessage<br/>(validated protocol)" --> Player
-  Core -. "HTTPS, user-configured" .-> Provider
+  Core -. "HTTPS, to the provider the learner chose" .-> Provider
 ```
 
 | Process | Trust | May | May not |
@@ -27,7 +27,7 @@ flowchart LR
 | **Main** (`apps/desktop/electron/main`) | Trusted | Spawn the core, hold the token, read/write OS secure storage, serve app files | Execute scene code, hold learner data |
 | **Renderer** (`apps/desktop/renderer`) | Trusted code, hostile-input-facing | Render UI, call allowlisted core operations | Use Node, the network, the filesystem, or see the provider key |
 | **Player** (`apps/desktop/player/frame`) | **Untrusted** (runs generated code) | Draw on a canvas, post validated messages | Anything else |
-| **Core** (`services/core`) | Trusted | Own the database and files, call the provider | Listen beyond loopback, persist the provider key |
+| **Core** (`services/core`) | Trusted | Own the database and files, call the provider the learner chose | Listen beyond loopback, persist a provider key, choose a provider |
 
 ## How a request travels
 
@@ -55,8 +55,10 @@ The operation table and the TypeScript types come from the core's OpenAPI docume
    no permissions, storage cleared), and opens the window on `adle://app/index.html`.
 2. The renderer reads app info and UI state through the bridge and shows the welcome screen or the
    library. It is usable immediately.
-3. In parallel, main starts the core (ADR-002). On `ready` it pushes the stored provider key to the
-   core. Status changes are broadcast to the renderer.
+3. In parallel, main starts the core (ADR-002). On `ready` it asks the core which providers
+   there are and where, pushes the key stored for each at that address, and then the
+   learner's choice of provider (`syncProviders`, ADR-021). Status changes are broadcast to
+   the renderer.
 4. On quit, main closes the core's stdin, waits for it to exit, then quits.
 
 ## Playing a scene
@@ -227,8 +229,14 @@ sequenceDiagram
 
 - The model writes a forgiving draft. The core compiles it into the Lesson IR, so no identifier
   or citation comes from the model.
-- The gateway keeps a local count under the provider's limits. The interface shows it as an
-  estimate.
+- The gateway keeps a local count for each provider, under that provider's limits (or under
+  Adle's own, where the provider publishes none). The interface shows it as an estimate.
+- Requests go to the provider the learner chose (AIHubMix or NVIDIA NIM), with that
+  provider's key and no other. Where a provider has several models, the gateway asks the
+  first; while that one is away it asks the next, at the same address with the same key,
+  and the job says so while it happens and in its record (`written_by`). See ADR-021.
+- While an answer is on its way the job says what the model is doing ("thinking it
+  through", "writing"): these models think for a minute or more before the first word.
 - A curriculum proposal works the same way, in one request, and adds nothing until the learner
   has chosen from it. See ADR-012.
 
@@ -264,7 +272,7 @@ Everything lives under the profile directory (`ADLE_USER_DATA_DIR`, or the OS de
 | Path | Owner | Contents |
 |---|---|---|
 | `ui-state.json` | Main | Theme and whether the welcome was seen |
-| `credentials.bin` | Main | The provider key, encrypted by the OS |
+| `credentials.bin` | Main | The provider keys (each with the provider and the address it is for) and which provider is in use, encrypted together by the OS |
 | `data/adle.db` (+ `-wal`, `-shm`) | Core | Courses, sources, sections, chunks, jobs, settings, curriculum, learner preferences, observations, derived states, lessons with their scenes, lesson progress, and answers |
 | `data/sources/<source id>.<ext>` | Core | A copy of each imported original, named by its generated id |
 | `data/assets/` | Core | Reserved for generated lesson assets (M5) |

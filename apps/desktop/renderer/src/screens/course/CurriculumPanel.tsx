@@ -30,7 +30,13 @@ import { useRouter } from '../../app/router';
 import { GenerationStatus } from '../../components/GenerationStatus';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
-import { KIND_LESSON, KIND_PROPOSAL, readLessonOutcome, readProposal } from '../../lib/generation';
+import {
+  authorName,
+  KIND_LESSON,
+  KIND_PROPOSAL,
+  readLessonOutcome,
+  readProposal,
+} from '../../lib/generation';
 import { useGeneration } from '../../lib/use-generation';
 import { isJobActive } from '../../lib/use-job';
 import { useResource } from '../../lib/use-resource';
@@ -344,8 +350,9 @@ export function CurriculumPanel({ course }: { course: Course }) {
             </Button>
           }
         >
-          {providerName} suggested {pluralise(proposal.concepts.length, 'concept')} for this course.
-          Nothing is added until you choose.
+          {authorName(proposal.writtenBy, providerName)} suggested{' '}
+          {pluralise(proposal.concepts.length, 'concept')} for this course. Nothing is added until
+          you choose.
         </Callout>
       ) : null}
     </div>

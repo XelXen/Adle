@@ -25,6 +25,22 @@ ESLint enforces the import rules (`no-restricted-imports`, `no-restricted-global
 
 Prefer a core operation (`callCore`) over a new IPC channel whenever the work belongs to the core.
 
+## Providers and their keys
+
+- `window.adle.provider.*` take a provider's **name** and, for `setApiKey`, the key. The name
+  is checked against `PROVIDER_IDS`; where the provider is comes from the core
+  (`parseProviders` in `electron/main/providers.ts`). Never add an argument that is, or could
+  carry, an address.
+- `ProviderKeyStore` keeps a key by provider **and** address and returns it only for that
+  pair. Do not add a way to read "the key" without both.
+- `syncProviders` runs after every start of the core (launch, restart, restore, erase): keys
+  first, then the learner's choice of provider. A new way of starting the core must call it.
+- Only the handler of the learner's own click calls `provider.select`. Nothing may change the
+  provider because something failed.
+- Name a provider and a model in the interface by the names the core gives
+  (`provider.status`, a job's `written_by`). Who wrote something is what its job recorded,
+  not whichever provider is in use now (`authorName` in `lib/generation.ts`).
+
 ## File paths
 
 Renderer script must never be able to name a file. A path may enter the app in two ways only:
@@ -180,9 +196,12 @@ most, a file's name.
 - Speech uses **local voices only** (`loadLocalVoices`). Do not list or use a voice whose
   `localService` is false.
 - End-to-end journeys that are not about speech call `showNarrationAsText(page)` first.
-- No end-to-end test reaches the real provider: start `startFakeProvider()` and pass its
-  address in `ADLE_PROVIDER_BASE_URL`. The app keeps its real limit of four requests a minute,
-  so a journey that needs a fifth will see the app wait: test that, or stay under it.
+- No end-to-end test reaches a real provider: start `startFakeProvider()` and pass its
+  address in `ADLE_PROVIDER_BASE_URL` (one endpoint in place of the choice), or start two and
+  pass both in `ADLE_PROVIDER_ENDPOINTS` (the two providers, moved; `e2e/providers.spec.ts`).
+  The app keeps its real limit of four requests a minute, so a journey that needs a fifth
+  will see the app wait: test that, or stay under it.
+- A toast that reports a failure is an `alert`; one that reports a success is a `status`.
 
 ## Renderer conventions
 

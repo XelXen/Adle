@@ -321,9 +321,8 @@ test.describe('your data as a whole', () => {
     await expect(page.getByRole('heading', { name: 'No courses yet' })).toBeVisible();
 
     // The key is still stored, is still nowhere in the clear, and the new core has it.
-    expect(await page.evaluate(() => window.adle!.provider.keyState())).toEqual({
-      stored: true,
-      hint: '1Kp7',
+    expect(await page.evaluate(() => window.adle!.provider.keyState())).toMatchObject({
+      aihubmix: { stored: true, hint: '1Kp7' },
     });
     await expect
       .poll(async () => page.evaluate(() => window.adle!.core.invoke('provider.status')))

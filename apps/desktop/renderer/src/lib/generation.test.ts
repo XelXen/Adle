@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Job } from '@adle/contracts';
 
 import {
+  authorName,
   jobFailure,
   jobProgress,
   keptNeeds,
@@ -90,7 +91,58 @@ describe('readProposal', () => {
       ],
       groundedInMaterials: true,
       closed: false,
+      // A proposal made before authors were recorded does not say who made it.
+      writtenBy: null,
     });
+  });
+
+  it('reads who suggested it, and whether another model stood in', () => {
+    const note = 'Kimi K3.1 Pro was not available, so Mistral Large 4 wrote this in its place.';
+    const proposal = readProposal(
+      job({
+        result: {
+          ...PROPOSAL,
+          written_by: {
+            provider: 'NVIDIA NIM',
+            models: ['Mistral Large 4', 7],
+            instead_of: 'Kimi K3.1 Pro',
+            note,
+          },
+        },
+      }),
+    );
+    expect(proposal?.writtenBy).toEqual({
+      provider: 'NVIDIA NIM',
+      models: ['Mistral Large 4'],
+      note,
+    });
+  });
+
+  it.each([
+    ['text', 'NVIDIA NIM'],
+    ['no provider', { models: ['Mistral Large 4'] }],
+    ['an empty provider', { provider: '', models: [] }],
+  ])('does not name an author from %s', (_label, value) => {
+    expect(readProposal(job({ result: { ...PROPOSAL, written_by: value } }))?.writtenBy).toBeNull();
+  });
+});
+
+describe('authorName', () => {
+  it('names the model and the provider when one model wrote it', () => {
+    expect(
+      authorName({ provider: 'NVIDIA NIM', models: ['Mistral Large 4'], note: '' }, 'AIHubMix'),
+    ).toBe('Mistral Large 4 on NVIDIA NIM');
+  });
+
+  it('names the provider alone when several models wrote it, or none is known', () => {
+    expect(authorName({ provider: 'NVIDIA NIM', models: ['A', 'B'], note: '' }, 'x')).toBe(
+      'NVIDIA NIM',
+    );
+    expect(authorName({ provider: 'NVIDIA NIM', models: [], note: '' }, 'x')).toBe('NVIDIA NIM');
+  });
+
+  it('falls back to the name it was given for work recorded before authors were', () => {
+    expect(authorName(null, 'AIHubMix')).toBe('AIHubMix');
   });
 
   it('knows when a proposal has been used or set aside', () => {

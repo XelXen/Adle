@@ -51,6 +51,7 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Core: lint / types / tests | `npm run core:lint` / `core:typecheck` / `core:test` |
 | Core: auto-format | `npm run core:format` |
 | Regenerate API contract | `npm run contracts` (after any route or model change) |
+| Two fake providers in a run | `ADLE_PROVIDER_ENDPOINTS='{"aihubmix":"http://127.0.0.1:9000/v1","nvidia":"http://127.0.0.1:9100/v1"}'` (see `e2e/providers.spec.ts`) |
 | Regenerate scene name allowlist | `npm run wanim-names` (after a Wanim upgrade) |
 | Repackage the scene guide for prompts | `npm run scene-guide` (after editing the scene skill or its examples) |
 | Re-render the app icons | `npm run icons` (after the mark changes; `npm run icons:verify` compares it with the artwork) |
@@ -85,8 +86,12 @@ end-to-end suite can drive it: never hand that one to anyone.
   `electron/shared/ipc.ts`. No generic filesystem, shell, or "invoke any channel".
 - The renderer reaches the core only via `callCore(operationId)`. New endpoints need an
   `operation_id` and `npm run contracts`. Main-only routes are marked `x-adle-internal`.
-- The provider key lives in OS secure storage and core memory. It must never appear in the
+- A provider key lives in OS secure storage and core memory. It must never appear in the
   renderer, argv, the environment, a log, the database, or a fixture.
+- There are two providers and the learner chooses one (ADR-021). Nothing else may change it:
+  no failure, missing key, or used-up quota moves a request to another provider. A key is
+  sent only to the provider, and the address, it was given for. A provider's next model
+  (same address, same key) may stand in for its first, and that is always said.
 - Scene code is untrusted. It runs only in the player frame, passes `scene_policy`, and talks
   only through `@adle/event-protocol`. Do not add message types casually; never pass callbacks,
   URLs, or paths through it.
@@ -116,11 +121,17 @@ end-to-end suite can drive it: never hand that one to anyone.
 - Use Sprout tokens and components. No raw colours, radii, or spacing in screens (a test enforces
   colours). New visual patterns go into the design system first.
 
-**Model quota** (AIHubMix `coding-kimi-k3-free`: 5 requests/min, 100/day, 1M tokens/day per account)
+**Model quota** (AIHubMix `coding-kimi-k3-free`: 5 requests/min, 100/day, 1M tokens/day per
+account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day of its own)
 
-- Tests never call the real provider; use the fake server.
+- Tests never call a real provider; use the fake server.
 - One request in flight, at most 4/minute, budget 80 requests and 800k tokens per day.
 - One scene = one request = one complete file. No repair loops; at most one deliberate retry.
+  Asking a provider's next model because the one before is away is not a retry of the answer,
+  and is bounded by the number of models.
+- Send a model only the fields its own reference lists (`ModelSpec` in `provider.py`), and
+  check a new field against the real endpoint by hand before relying on it: a documented
+  default was not the default, and a documented value was refused (ADR-021).
 - If the quota is hit, stop model work, continue deterministic work, record it in PROJECT_STATE.
 
 ## Working method

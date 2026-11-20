@@ -74,7 +74,9 @@ test.describe('generation with the AI provider', () => {
 
     // The learner is told where requests go: this is not the default provider.
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByText('Custom endpoint (127.0.0.1)')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Custom endpoint (127.0.0.1)' })).toBeVisible();
+    // It is the only provider there is, so there is nothing to choose between.
+    await expect(page.getByRole('button', { name: /^Us(e|ing) / })).toHaveCount(0);
     await expect(page.getByText('0 of 90', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Library', exact: true }).click();
 

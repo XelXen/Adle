@@ -3,7 +3,7 @@ import { app, BrowserWindow, dialog, Menu, nativeTheme, safeStorage } from 'elec
 import { createAppLog } from './app-log';
 import { resolveLaunchSpec } from './core/launch-spec';
 import { CoreProcess } from './core/process';
-import { forwardCoreStatus, registerIpcHandlers, syncProviderKey } from './ipc';
+import { forwardCoreStatus, registerIpcHandlers } from './ipc';
 import { paths } from './paths';
 import { installProtocolHandler, registerSchemes } from './protocol';
 import {
@@ -15,6 +15,7 @@ import {
   whenPageGone,
   whenPageHung,
 } from './recovery';
+import { syncProviders } from './providers';
 import { createSecureEncryptor, ProviderKeyStore } from './secrets';
 import { hardenSession, hardenWebContents } from './security';
 import { UiStateStore } from './ui-state';
@@ -158,7 +159,7 @@ async function start(): Promise<void> {
     appLog.record('core-restarted', { attempt: automaticRestarts.length });
     setTimeout(() => {
       void core.start().then(async (status) => {
-        if (status.state === 'ready') await syncProviderKey(deps);
+        if (status.state === 'ready') await syncProviders(deps);
       });
     }, 1000);
   });
@@ -200,7 +201,7 @@ async function start(): Promise<void> {
 
   // The window is usable (sample content, settings) while the core starts.
   void core.start().then(async (status) => {
-    if (status.state === 'ready') await syncProviderKey(deps);
+    if (status.state === 'ready') await syncProviders(deps);
   });
 
   app.on('window-all-closed', () => {

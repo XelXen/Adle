@@ -6,9 +6,12 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { resolveLaunchSpec, CoreNotInstalledError } from './core/launch-spec';
+import { parseProviders } from './providers';
 import {
   createSecureEncryptor,
   type Encryptor,
+  LEGACY_PROVIDER,
+  parseProviderId,
   ProviderKeyStore,
   SecureStorageUnavailableError,
   validateApiKey,
@@ -50,27 +53,101 @@ describe('validateApiKey', () => {
   });
 });
 
+const AIHUBMIX = 'https://aihubmix.com/v1';
+const NVIDIA = 'https://integrate.api.nvidia.com/v1';
+
 describe('ProviderKeyStore', () => {
   it('round-trips a key without ever writing it in the clear', () => {
     const file = path.join(directory, 'nested', 'credentials.bin');
     const store = new ProviderKeyStore(xorEncryptor(), file);
-    expect(store.state()).toEqual({ stored: false, hint: null });
+    expect(store.state('aihubmix', AIHUBMIX)).toEqual({ stored: false, hint: null });
 
-    store.save('sk-test-secret-value-9876');
-    expect(readFileSync(file).includes('sk-test-secret-value-9876')).toBe(false);
-    expect(store.load()).toBe('sk-test-secret-value-9876');
+    store.save('aihubmix', AIHUBMIX, 'sk-test-secret-value-9876');
+    const written = readFileSync(file);
+    expect(written.includes('sk-test-secret-value-9876')).toBe(false);
+    // Not which providers have a key, either: the whole record is encrypted.
+    expect(written.includes('aihubmix')).toBe(false);
+    expect(store.load('aihubmix', AIHUBMIX)).toBe('sk-test-secret-value-9876');
     // The renderer only ever learns that a key exists and its last four characters.
-    expect(store.state()).toEqual({ stored: true, hint: '9876' });
+    expect(store.state('aihubmix', AIHUBMIX)).toEqual({ stored: true, hint: '9876' });
 
-    store.clear();
-    expect(store.load()).toBeNull();
-    expect(store.state()).toEqual({ stored: false, hint: null });
+    store.clear('aihubmix', AIHUBMIX);
+    expect(store.load('aihubmix', AIHUBMIX)).toBeNull();
+    expect(store.state('aihubmix', AIHUBMIX)).toEqual({ stored: false, hint: null });
+  });
+
+  it('keeps a key for each provider and never hands one out for another', () => {
+    const store = new ProviderKeyStore(xorEncryptor(), path.join(directory, 'c.bin'));
+    store.save('aihubmix', AIHUBMIX, 'sk-aihubmix-key-1111');
+    store.save('nvidia', NVIDIA, 'nvapi-nvidia-key-2222');
+
+    expect(store.load('aihubmix', AIHUBMIX)).toBe('sk-aihubmix-key-1111');
+    expect(store.load('nvidia', NVIDIA)).toBe('nvapi-nvidia-key-2222');
+    // One provider's name with the other's address finds nothing.
+    expect(store.load('nvidia', AIHUBMIX)).toBeNull();
+    expect(store.load('aihubmix', NVIDIA)).toBeNull();
+
+    // Replacing or removing one leaves the other exactly as it was.
+    store.save('nvidia', NVIDIA, 'nvapi-nvidia-key-3333');
+    expect(store.state('nvidia', NVIDIA)).toEqual({ stored: true, hint: '3333' });
+    store.clear('nvidia', NVIDIA);
+    expect(store.load('nvidia', NVIDIA)).toBeNull();
+    expect(store.load('aihubmix', AIHUBMIX)).toBe('sk-aihubmix-key-1111');
+  });
+
+  it('hands a key back only for the address it was given for', () => {
+    const store = new ProviderKeyStore(xorEncryptor(), path.join(directory, 'c.bin'));
+    store.save('nvidia', NVIDIA, 'nvapi-real-key-4444');
+
+    // The same provider moved somewhere else (a developer's endpoint) does not get it.
+    expect(store.load('nvidia', 'http://127.0.0.1:9100/v1')).toBeNull();
+    expect(store.load('nvidia', 'https://integrate.api.nvidia.com.attacker.example/v1')).toBeNull();
+    // A key typed there is kept beside the real one, not over it.
+    store.save('nvidia', 'http://127.0.0.1:9100/v1', 'nvapi-test-key-5555');
+    expect(store.load('nvidia', NVIDIA)).toBe('nvapi-real-key-4444');
+    expect(store.load('nvidia', 'http://127.0.0.1:9100/v1')).toBe('nvapi-test-key-5555');
+    // The same address written with a slash at its end is the same address.
+    expect(store.load('nvidia', `${NVIDIA}/`)).toBe('nvapi-real-key-4444');
+  });
+
+  it('remembers which provider was chosen, apart from the keys', () => {
+    const file = path.join(directory, 'c.bin');
+    const store = new ProviderKeyStore(xorEncryptor(), file);
+    expect(store.selected()).toBeNull();
+
+    expect(store.select('nvidia')).toBe(true);
+    expect(new ProviderKeyStore(xorEncryptor(), file).selected()).toBe('nvidia');
+    store.save('nvidia', NVIDIA, 'nvapi-nvidia-key-2222');
+    store.clear('nvidia', NVIDIA);
+    // Removing a key is not a change of provider.
+    expect(store.selected()).toBe('nvidia');
+  });
+
+  it('reads the one key an earlier version kept as the key of the provider there was', () => {
+    const file = path.join(directory, 'c.bin');
+    const encryptor = xorEncryptor();
+    writeFileSync(file, encryptor.encryptString('sk-kept-since-before-7777'));
+    const store = new ProviderKeyStore(encryptor, file);
+
+    expect(LEGACY_PROVIDER).toEqual({ id: 'aihubmix', address: AIHUBMIX });
+    expect(store.load('aihubmix', AIHUBMIX)).toBe('sk-kept-since-before-7777');
+    expect(store.load('nvidia', NVIDIA)).toBeNull();
+    expect(store.selected()).toBeNull();
+
+    // Adding another provider's key keeps it.
+    store.save('nvidia', NVIDIA, 'nvapi-nvidia-key-2222');
+    expect(store.load('aihubmix', AIHUBMIX)).toBe('sk-kept-since-before-7777');
   });
 
   it('refuses to save when the OS offers no encryption', () => {
     const store = new ProviderKeyStore(xorEncryptor(false), path.join(directory, 'c.bin'));
-    expect(() => store.save('sk-test-secret-value')).toThrow(SecureStorageUnavailableError);
-    expect(store.load()).toBeNull();
+    expect(() => store.save('aihubmix', AIHUBMIX, 'sk-test-secret-value')).toThrow(
+      SecureStorageUnavailableError,
+    );
+    expect(store.load('aihubmix', AIHUBMIX)).toBeNull();
+    // The choice cannot be kept either, and says so instead of failing.
+    expect(store.select('nvidia')).toBe(false);
+    expect(store.selected()).toBeNull();
   });
 
   it('treats an undecryptable file as "no key" rather than crashing', () => {
@@ -85,7 +162,79 @@ describe('ProviderKeyStore', () => {
       },
       file,
     );
-    expect(store.state()).toEqual({ stored: false, hint: null });
+    expect(store.state('aihubmix', AIHUBMIX)).toEqual({ stored: false, hint: null });
+    expect(store.selected()).toBeNull();
+  });
+
+  it('keeps nothing from a record it did not write itself', () => {
+    const file = path.join(directory, 'c.bin');
+    const encryptor = xorEncryptor();
+    const tampered = {
+      version: 2,
+      selected: 'somewhere-else',
+      keys: [
+        { provider: 'openai', address: 'https://api.example/v1', key: 'sk-not-ours-0000' },
+        { provider: 'nvidia', address: NVIDIA, key: 'has spaces in it' },
+        { provider: 'nvidia', address: 42, key: 'nvapi-no-address-0000' },
+        'not an entry',
+        { provider: 'aihubmix', address: AIHUBMIX, key: 'sk-the-good-one-8888' },
+      ],
+    };
+    writeFileSync(file, encryptor.encryptString(JSON.stringify(tampered)));
+    const store = new ProviderKeyStore(encryptor, file);
+    expect(store.selected()).toBeNull();
+    expect(store.load('aihubmix', AIHUBMIX)).toBe('sk-the-good-one-8888');
+    expect(store.load('nvidia', NVIDIA)).toBeNull();
+  });
+});
+
+describe('parseProviderId', () => {
+  it('accepts the providers Adle keeps keys for and nothing else', () => {
+    expect(parseProviderId('aihubmix')).toBe('aihubmix');
+    expect(parseProviderId('nvidia')).toBe('nvidia');
+    expect(parseProviderId('custom')).toBe('custom');
+    for (const value of ['NVIDIA', 'openai', '', 'https://example.com', '__proto__', 7, null]) {
+      expect(parseProviderId(value)).toBeNull();
+    }
+  });
+});
+
+describe('parseProviders', () => {
+  const status = {
+    provider_id: 'nvidia',
+    providers: [
+      { provider_id: 'aihubmix', base_url: AIHUBMIX, selected: false, key_configured: true },
+      { provider_id: 'nvidia', base_url: NVIDIA, selected: true, key_configured: false },
+    ],
+  };
+
+  it('reads each provider, where its key would go, and which is in use', () => {
+    expect(parseProviders(status)).toEqual([
+      { id: 'aihubmix', address: AIHUBMIX, selected: false },
+      { id: 'nvidia', address: NVIDIA, selected: true },
+    ]);
+  });
+
+  it('leaves out anything a key must not be kept or sent for', () => {
+    expect(
+      parseProviders({
+        providers: [
+          { provider_id: 'openai', base_url: 'https://api.example/v1', selected: true },
+          { provider_id: 'nvidia', base_url: 'file:///etc/passwd' },
+          { provider_id: 'nvidia', base_url: 7 },
+          { provider_id: 'aihubmix', base_url: AIHUBMIX, selected: 'yes' },
+          // A name that appears twice is not given two addresses.
+          { provider_id: 'aihubmix', base_url: 'https://elsewhere.example/v1', selected: true },
+          null,
+        ],
+      }),
+    ).toEqual([{ id: 'aihubmix', address: AIHUBMIX, selected: false }]);
+  });
+
+  it('says nothing is known when the answer is not a list of providers', () => {
+    for (const value of [null, 'providers', {}, { providers: 'nvidia' }]) {
+      expect(parseProviders(value)).toBeNull();
+    }
   });
 });
 

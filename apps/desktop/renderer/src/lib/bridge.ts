@@ -24,6 +24,7 @@ export type {
   CoreStatus,
   ExternalLinkId,
   ProviderKeyState,
+  ProviderKeyStates,
   ThemePreference,
   UiState,
 } from '../../../electron/shared/ipc';

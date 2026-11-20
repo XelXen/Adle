@@ -38,8 +38,10 @@ const bridge: AdleBridge = {
   },
   provider: {
     keyState: () => ipcRenderer.invoke(IPC.providerKeyState),
-    setApiKey: (apiKey: string) => ipcRenderer.invoke(IPC.providerSetApiKey, apiKey),
-    clearApiKey: () => ipcRenderer.invoke(IPC.providerClearApiKey),
+    setApiKey: (providerId: string, apiKey: string) =>
+      ipcRenderer.invoke(IPC.providerSetApiKey, providerId, apiKey),
+    clearApiKey: (providerId: string) => ipcRenderer.invoke(IPC.providerClearApiKey, providerId),
+    select: (providerId: string) => ipcRenderer.invoke(IPC.providerSelect, providerId),
   },
   sources: {
     importWithPicker: (courseId: string) =>

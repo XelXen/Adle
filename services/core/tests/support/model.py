@@ -54,6 +54,8 @@ class FakeProvider:
         self.requests: list[dict[str, Any]] = []
         #: The ``Authorization`` header of every request.
         self.authorizations: list[str | None] = []
+        #: The address every request was sent to.
+        self.urls: list[str] = []
         self._queued: list[Answer] = []
 
     def queue(self, *answers: Answer) -> None:
@@ -90,6 +92,7 @@ class FakeProvider:
         body = json.loads(request.content)
         self.requests.append(body)
         self.authorizations.append(request.headers.get("authorization"))
+        self.urls.append(str(request.url))
         answer: Answer = self._queued.pop(0) if self._queued else self.default(body)
         if callable(answer) and not isinstance(answer, httpx.Response | Exception):
             answer = answer(body)

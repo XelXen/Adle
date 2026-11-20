@@ -708,6 +708,41 @@ def _upgrade_to(database: Database, revision: str) -> None:
         command.upgrade(config, revision)
 
 
+def test_requests_recorded_before_there_was_a_choice_belong_to_the_only_provider_there_was(
+    database: Database, backups: Path
+) -> None:
+    """Revision 0006 says which provider each request went to. Before it, there was one."""
+    _upgrade_to(database, "0005")
+    with database.engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO model_usage (started_at, purpose, model, prompt_tokens, "
+                "completion_tokens, estimated, outcome) VALUES "
+                "('2026-11-19 10:00:00.000000', 'lesson', 'coding-kimi-k3-free', 900, 400, 0, 'ok')"
+            )
+        )
+
+    outcome = migrate(database, backups)
+    assert (outcome.previous_revision, outcome.current_revision) == ("0005", head_revision())
+
+    with database.engine.begin() as connection:
+        rows = connection.execute(
+            text("SELECT provider, model, prompt_tokens, outcome FROM model_usage")
+        ).all()
+        # Nothing that was counted is lost, and it is counted for the right provider.
+        assert [tuple(row) for row in rows] == [("aihubmix", "coding-kimi-k3-free", 900, "ok")]
+        # A row written without saying where it went cannot be for anyone else either.
+        connection.execute(
+            text(
+                "INSERT INTO model_usage (started_at, purpose, model, prompt_tokens, "
+                "completion_tokens, estimated, outcome) VALUES "
+                "('2026-11-20 10:00:00.000000', 'scene', 'm', 1, 1, 1, 'ok')"
+            )
+        )
+        providers = connection.execute(text("SELECT DISTINCT provider FROM model_usage")).all()
+        assert [tuple(row) for row in providers] == [("aihubmix",)]
+
+
 def test_learner_evidence_survives_the_rebuild_that_adds_dismissals(
     database: Database, backups: Path
 ) -> None:

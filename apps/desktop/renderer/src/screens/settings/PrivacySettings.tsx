@@ -220,7 +220,10 @@ export function PrivacySettings() {
               spoken by a voice already on this computer and is never recorded.
             </li>
             <li>Safety copies Adle makes before it updates or replaces your data.</li>
-            <li>Your AI provider key, encrypted by your operating system.</li>
+            <li>
+              The key of each AI provider you set up, encrypted by your operating system, and which
+              provider you chose.
+            </li>
           </ul>
         </Card>
       </Section>
@@ -243,8 +246,14 @@ export function PrivacySettings() {
             <p className={styles.muted}>
               Nothing is sent until you start one of these, and each says what it sends before it
               does. Whole documents, your answers, the record of what you have learnt, and your key
-              are never sent as content. Your answers are checked on this computer. Adle does not
-              switch providers or contact any other service on its own.
+              are never sent as content. Your answers are checked on this computer.
+            </p>
+            <p className={styles.muted}>
+              These go to the one provider you chose under AI provider, with that provider&rsquo;s
+              key and no other. Adle never changes provider on its own and contacts no other
+              service. Where a provider offers several models, another of its models can stand in
+              while the first is not available; you are told there which ones, and told again
+              whenever it happens.
             </p>
           </Stack>
         </Card>

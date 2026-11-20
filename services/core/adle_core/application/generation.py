@@ -76,6 +76,16 @@ logger = logging.getLogger(__name__)
 KIND_CURRICULUM = "curriculum_proposal"
 KIND_LESSON = "lesson_generation"
 
+#: Why a provider's next model is being asked, in the learner's words.
+_PASSED_OVER = {
+    "gone": "is not available at the moment",
+    "failing": "is having trouble at the moment",
+    "silent": "is not answering",
+    "refused": "did not accept the request",
+}
+#: What a model is seen to be doing while its answer is on the way, in the learner's words.
+_STAGES = {"thinking": "thinking it through", "writing": "writing"}
+
 _PACE = {"relaxed": "unhurried", "standard": "moderate", "brisk": "brisk"}
 _DENSITY = {
     "concise": "brief: the essential steps only",
@@ -126,6 +136,13 @@ def next_strategy(used: Sequence[str]) -> str | None:
     if not used:
         return None
     return next((name for name in STRATEGY_ROTATION if name not in used), None)
+
+
+def _listed(names: Sequence[str]) -> str:
+    """ "A", "A and B", "A, B, and C"."""
+    if len(names) <= 2:
+        return " and ".join(names)
+    return f"{', '.join(names[:-1])}, and {names[-1]}"
 
 
 def _locator(passage: StoredPassage) -> str:
@@ -201,8 +218,18 @@ class GenerationService:
 
     # -- the one way a request is made ---------------------------------------
 
-    def _ask(self, request: ChatRequest, context: JobContext, done: int, total: int) -> ChatResult:
-        """Send one request from inside a job, keeping the job's progress honest while it waits."""
+    def _ask(
+        self, request: ChatRequest, context: JobContext, done: int, total: int, doing: str
+    ) -> ChatResult:
+        """Send one request from inside a job, keeping the job's progress honest while it waits.
+
+        ``doing`` is what the job is doing, in the words the learner is shown. A model
+        that thinks before it writes can take minutes over one answer, so what it is
+        seen to be doing is said beside it: a long wait should not look like a stall.
+        """
+
+        def at_stage(model: str, stage: str) -> None:
+            context.report(done, total, f"{doing}: {model} is {_STAGES.get(stage, 'working')}")
 
         def waiting(seconds: float) -> None:
             context.report(
@@ -212,9 +239,22 @@ class GenerationService:
                 "provider's rate limit",
             )
 
+        def standing_in(unavailable: str, following: str, why: str) -> None:
+            # Said while it happens, so that a longer wait has its reason beside it.
+            context.report(
+                done,
+                total,
+                f"{unavailable} {_PASSED_OVER.get(why, 'is not answering')}. "
+                f"Asking {following} instead",
+            )
+
         try:
             return self._gateway.complete(
-                request, cancelled=lambda: context.cancelled, on_wait=waiting
+                request,
+                cancelled=lambda: context.cancelled,
+                on_wait=waiting,
+                on_fallback=standing_in,
+                on_stage=at_stage,
             )
         except RequestCancelledError as error:
             raise JobCancelledError from error
@@ -222,6 +262,46 @@ class GenerationService:
     def _require_key(self) -> None:
         if not self._gateway.has_key:
             raise ProviderKeyMissingError
+
+    def select_provider(self, provider_id: str) -> None:
+        """Use another provider from now on, because the learner chose it.
+
+        Refused while something is being written: what is under way was started with
+        one provider named beside it, and must not finish at another.
+        """
+        if not self._gateway.knows(provider_id):
+            raise NotFoundError("Adle does not know that AI provider.")
+        if provider_id == self._gateway.config.provider_id:
+            return
+        if self._jobs.any_active((KIND_CURRICULUM, KIND_LESSON)):
+            raise ConflictError(
+                f"{self._gateway.config.display_name} is writing something for you at the "
+                "moment. Wait for it to finish, or stop it, and then change the provider."
+            )
+        self._gateway.select(provider_id)
+
+    def _written_by(self, results: Sequence[ChatResult]) -> dict[str, Any]:
+        """Who wrote something, for its record: the provider, and each model that answered.
+
+        ``note`` is a sentence for the learner when the provider's first model was not
+        the one that wrote all of it. A stand-in is never left unsaid.
+        """
+        models = list(dict.fromkeys(result.model_name for result in results if result.model_name))
+        expected = next((result.instead_of for result in results if result.instead_of), "")
+        stand_ins = [name for name in models if name != expected]
+        note = ""
+        if expected and stand_ins:
+            share = "part of this" if expected in models else "this"
+            note = (
+                f"{expected} was not available, so {_listed(stand_ins)} wrote {share} in its place."
+            )
+        return {
+            "provider": self._gateway.config.display_name,
+            "models": models,
+            # The model that was meant to write it, when it was not available.
+            "instead_of": expected,
+            "note": note,
+        }
 
     # -- curriculum ------------------------------------------------------------
 
@@ -266,13 +346,12 @@ class GenerationService:
         problems: list[str] = []
         for attempt in (1, 2):
             context.check_cancelled()
-            context.report(
-                attempt - 1,
-                2,
+            doing = (
                 "Asking for a list of concepts"
                 if attempt == 1
-                else "The first answer was not usable. Asking once more",
+                else "The first answer was not usable. Asking once more"
             )
+            context.report(attempt - 1, 2, doing)
             request = prompts.curriculum_request(
                 course_title=title,
                 topic=topic,
@@ -283,7 +362,7 @@ class GenerationService:
                 passages=excerpts,
                 problems=problems,
             )
-            result = self._ask(request, context, attempt - 1, 2)
+            result = self._ask(request, context, attempt - 1, 2, doing)
             try:
                 proposed = compile_curriculum(
                     extract_json_object(result.text),
@@ -301,6 +380,7 @@ class GenerationService:
                 "grounded_in_materials": bool(headings),
                 "accepted": False,
                 "dismissed": False,
+                "written_by": self._written_by([result]),
             }
         raise GenerationFailedError(
             "The AI's proposal did not come out in a usable form, twice. Nothing was added. "
@@ -495,15 +575,16 @@ class GenerationService:
         lesson: dict[str, Any] | None = None
         briefs: list[SceneBrief] = []
         problems: list[str] = []
+        #: The answers that end up in the lesson: its text, then each picture kept.
+        answers: list[ChatResult] = []
         for attempt in (1, 2):
             context.check_cancelled()
-            context.report(
-                0,
-                planned,
+            doing = (
                 "Writing the lesson"
                 if attempt == 1
-                else "The first draft was not usable. Writing it once more",
+                else "The first draft was not usable. Writing it once more"
             )
+            context.report(0, planned, doing)
             request = prompts.lesson_request(
                 course_title=inputs.course_title,
                 concept=inputs.concept,
@@ -513,7 +594,7 @@ class GenerationService:
                 approach=inputs.approach,
                 earlier=inputs.earlier,
             )
-            result = self._ask(request, context, 0, planned)
+            result = self._ask(request, context, 0, planned, doing)
             try:
                 compiled = compile_lesson(
                     parse_lesson_draft(extract_json_object(result.text)), inputs.context
@@ -527,6 +608,7 @@ class GenerationService:
                 problems = _problem_list(error)
             else:
                 lesson, briefs = compiled.lesson, compiled.scenes
+                answers.append(result)
                 break
             logger.info("generation.lesson_unusable attempt=%s", attempt)
         if lesson is None:
@@ -543,13 +625,15 @@ class GenerationService:
             label = f"Drawing picture {number} of {len(briefs)}"
             context.report(number, total, label)
             try:
-                artifact = self._write_scene(brief, context, number, total, label)
+                artifact, answer = self._write_scene(brief, context, number, total, label)
             except JobCancelledError:
                 raise
             except (ProviderError, QuotaExhaustedError) as error:
                 # The lesson itself is written. Losing its pictures is better than losing it.
                 logger.info("generation.scene_skipped code=%s", error.code)
-                artifact = None
+                artifact, answer = None, None
+            if artifact is not None and answer is not None:
+                answers.append(answer)
             if artifact is None:
                 lesson = without_scene(lesson, brief.scene_id)
                 notes.append(
@@ -571,6 +655,9 @@ class GenerationService:
         context.report(total, total, "Checking the lesson")
         bundle = parse_bundle({"lesson": lesson, "scenes": scenes})
         stored = self._lessons.store(bundle, origin="generated")
+        written_by = self._written_by(answers)
+        if written_by["note"]:
+            notes.append(written_by["note"])
         return {
             "kind": KIND_LESSON,
             "lesson_id": stored.id,
@@ -578,20 +665,25 @@ class GenerationService:
             "pictures_planned": len(briefs),
             "pictures_made": len(scenes),
             "notes": notes,
+            "written_by": written_by,
         }
 
     def _write_scene(
         self, brief: SceneBrief, context: JobContext, done: int, total: int, label: str
-    ) -> SceneArtifact | None:
-        """One scene file, or ``None``. One request, and one more only if the file was refused."""
+    ) -> tuple[SceneArtifact | None, ChatResult | None]:
+        """One scene file and the answer it came in, or neither.
+
+        One request, and one more only if the file was refused.
+        """
         problems: list[str] = []
-        fallback: SceneArtifact | None = None
+        fallback: tuple[SceneArtifact | None, ChatResult | None] = (None, None)
         for attempt in (1, 2):
             context.check_cancelled()
+            doing = label if attempt == 1 else f"{label} (second and last try)"
             if attempt == 2:
-                context.report(done, total, f"{label} (second and last try)")
+                context.report(done, total, doing)
             result = self._ask(
-                prompts.scene_request(brief, problems=problems), context, done, total
+                prompts.scene_request(brief, problems=problems), context, done, total, doing
             )
             source = extract_python_file(result.text)
             try:
@@ -610,12 +702,12 @@ class GenerationService:
                 continue
             if brief.kind == "interactive" and not artifact.interactive:
                 # Usable as a picture, but not what was asked for: worth one more try.
-                fallback = artifact
+                fallback = (artifact, result)
                 problems = [
                     "The file has no control the learner can operate. An interactive scene "
                     "subclasses InteractiveScene, creates a Slider or a Switch in blueprint(), "
                     "and lists it in self.adle_controls."
                 ]
                 continue
-            return artifact
+            return artifact, result
         return fallback

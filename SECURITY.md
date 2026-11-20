@@ -10,7 +10,7 @@ one, change the other in the same commit.
 |---|---|---|
 | Course materials, answers, learning history | The core's data directory on disk | Leaving the device; being replaced or destroyed |
 | A copy of the data the learner saved | Wherever the learner put it: an ordinary, unencrypted file | Outside Adle's control once written; the interface says so |
-| The AI provider key | OS secure storage; core memory while running | Disclosure to the UI, logs, disk, or a scene |
+| The AI provider keys (one per provider) | OS secure storage; core memory while running | Disclosure to the UI, logs, disk, a scene, or the other provider |
 | The learner's machine | — | Code execution, file access, or network access by untrusted content |
 
 Untrusted inputs: imported documents, model output (lesson data **and scene code**), and anything
@@ -67,19 +67,44 @@ reads runs where SQLite refuses any write. Nothing in a database file's schema i
 (`trusted_schema = OFF`, `cell_size_check = ON` on every connection), because the file may
 have been restored from a copy the learner was given (ADR-016).
 
-## The provider key
+## The provider keys
 
-1. Entered in Settings and sent once over IPC to the main process.
+There are two providers (AIHubMix and NVIDIA NIM), the learner chooses one, and each has a
+key of its own. Reasoning: `docs/decisions/ADR-021-a-choice-of-providers.md`.
+
+1. Entered in Settings for the provider in use, and sent once over IPC to the main process
+   with that provider's **name**.
 2. Validated (`validateApiKey`: printable ASCII, 8–512 characters, no whitespace or control
-   characters, which also rules out header injection).
-3. Encrypted with Electron `safeStorage` (Windows DPAPI, macOS Keychain, Linux libsecret/KWallet)
-   and written to `credentials.bin` in the profile.
+   characters, which also rules out header injection). The name is checked against a fixed
+   list (`parseProviderId`).
+3. The main process asks the **core** where that provider is (`provider.status`), and keeps
+   the key with the provider's name and that address. Everything is encrypted together with
+   Electron `safeStorage` (Windows DPAPI, macOS Keychain, Linux libsecret/KWallet) and
+   written to `credentials.bin` in the profile. The file does not show which providers have
+   a key.
 4. Pushed to the core over the authenticated loopback route `provider.set_credential`, which is
-   internal: the renderer cannot call it.
-5. Held by the core in memory only (`CredentialVault`). Never in the database, a file, or a log;
-   a redaction filter on every log handler is the backstop.
+   internal: the renderer cannot call it. After each start, a key is pushed only for a
+   provider whose address is the one the key was stored for.
+5. Held by the core in memory only (`CredentialVault`), one per provider. Never in the
+   database, a file, or a log; a redaction filter on every log handler covers every key held,
+   not only the one in use.
 
-The renderer only ever receives `{ stored, hint }`, where `hint` is the last four characters.
+The renderer only ever receives `{ stored, hint }` for each provider, where `hint` is the last
+four characters.
+
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| A key is only ever sent to the provider it was given for | Each provider has its own client, bound to one address, which asks the vault for its own provider's key and no other | `test_provider_choice.py` (both keys held: each address receives its own; one key held: nothing is sent to the other) ; `e2e/providers.spec.ts` (two servers; the one not chosen receives nothing) |
+| A key is only ever handed over for the address it was typed for | `ProviderKeyStore` keeps and returns a key by provider **and** address | `local-state.test.ts`; `e2e/providers.spec.ts` (the same profile with the provider moved: no key reaches the core) |
+| The page cannot say where a key goes | `setApiKey`, `clearApiKey`, `select` take a name from a fixed list; the address comes from the core | `e2e/providers.spec.ts` (an address, an unknown name, an extra argument); `local-state.test.ts` (`parseProviders`) |
+| Nothing changes the provider but the learner | `provider.select` is internal and is only called from the handler of the learner's click; there is no code path from a failure to another provider | `test_provider_choice.py`; `e2e/security.spec.ts` (the bridge's exact surface) |
+| The provider is not changed under work that is under way | The core refuses while a generation job is waiting or running | `test_provider_choice.py`; `e2e/providers.spec.ts` |
+| A provider's other model is still the same provider | A stand-in is asked at the same address with the same key; the models and their order are shown before anything is sent, and a stand-in is said while it happens and afterwards | `test_provider_choice.py`; `e2e/providers.spec.ts` |
+| A model's thinking is not kept | Counted for the token estimate; never stored, shown, or logged | `test_provider_choice.py` |
+
+A developer can move a known provider to another address before launch
+(`ADLE_PROVIDER_ENDPOINTS`). It is then named with that address everywhere it is shown, and it
+is not handed the key that was stored for the real address.
 
 On Linux without a keyring Electron would fall back to a hard-coded password (`basic_text`).
 Adle treats that as "no secure storage" and refuses to save the key (`createSecureEncryptor`).

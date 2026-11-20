@@ -12,6 +12,26 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Library screen and navigation, with light and dark themes and a "follow system" option.
 - Settings → AI provider: save, replace, or remove an AIHubMix key. The key is encrypted by the
   operating system and never displayed again.
+- **A second AI provider: NVIDIA NIM.** Choose between AIHubMix and NVIDIA in Settings → AI
+  provider. Each has its own key, which is only ever sent to that provider. Adle never
+  changes provider by itself, and not while something is being written.
+- With NVIDIA, requests go to Kimi K3.1 Pro. While it is not available, Mistral Large 4 and
+  then GLM 5.3 Flash stand in. You are told this where you choose the provider, again while
+  it happens, and afterwards with what was written.
+- While a lesson is being made you can see what the model is doing: thinking it through, or
+  writing. Suggested concepts say which model suggested them.
+- "Use today" counts each provider separately, and says when the limits shown are Adle's own
+  rather than the provider's.
+
+### Fixed
+
+- A lesson whose formulas the model wrote with single backslashes is now read as it was
+  meant. Before, it was refused as unreadable and written again, or, worse, could have been
+  accepted with its mathematics damaged.
+- "Stop" now takes effect while a model is still thinking, not only once it has begun to
+  write.
+- Pictures written by the AI no longer show a curve as a filled shape when they switch
+  between two curves.
 - Settings → Privacy & data: a plain statement of what is stored locally and what is sent.
 - **Save a copy of your data** as one file you can keep anywhere or take to another computer.
   Your AI provider key is not in it.

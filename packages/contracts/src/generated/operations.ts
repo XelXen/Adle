@@ -36,6 +36,7 @@ import type {
   PrerequisitesUpdate,
   ProposalAcceptance,
   ProviderCredential,
+  ProviderSelection,
   ProviderStatus,
   ProviderUsage,
   SearchResults,
@@ -192,6 +193,7 @@ export const OPERATIONS = {
     path: '/v1/provider/credential',
     internal: true,
   },
+  'provider.select': { method: 'PUT', path: '/v1/provider/selection', internal: true },
   'provider.set_credential': { method: 'PUT', path: '/v1/provider/credential', internal: true },
   'provider.status': { method: 'GET', path: '/v1/provider', internal: false },
   'provider.usage': { method: 'GET', path: '/v1/provider/usage', internal: false },
@@ -464,8 +466,14 @@ export interface OperationTypes {
   };
   'provider.clear_credential': {
     path: undefined;
-    query: undefined;
+    query: { provider_id?: string | null } | undefined;
     body: undefined;
+    result: null;
+  };
+  'provider.select': {
+    path: undefined;
+    query: undefined;
+    body: ProviderSelection;
     result: null;
   };
   'provider.set_credential': {

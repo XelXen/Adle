@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -186,6 +186,14 @@ class JobRunner:
                 .order_by(Job.created_at.desc(), Job.id.desc())
             ).first()
             return _snapshot(job) if job is not None else None
+
+    def any_active(self, kinds: Sequence[str]) -> bool:
+        """Whether a job of one of these kinds is waiting or running, in any course."""
+        with self._database.read() as session:
+            found = session.scalars(
+                select(Job.id).where(Job.kind.in_(kinds), Job.status.in_(ACTIVE_STATUSES)).limit(1)
+            ).first()
+            return found is not None
 
     def list_active(self, course_id: str) -> list[JobSnapshot]:
         """Jobs of a course that are waiting or running, oldest first."""

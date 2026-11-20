@@ -59,8 +59,15 @@ everything and decides nothing.
 - Routes only the main process may call get `openapi_extra={"x-adle-internal": True}`.
 - **Errors:** raise an `AdleError` subclass with a stable `code` and a learner-readable message.
   Never return framework error shapes; never put submitted values or internals in a message.
-- **Secrets:** the provider key lives in `CredentialVault` (memory). Never write it anywhere,
-  include it in a model's `repr`, or log it. Loggers carry `SecretRedactionFilter` as a backstop.
+- **Secrets:** the provider keys live in `CredentialVault` (memory), one per provider. Never
+  write one anywhere, include it in a model's `repr`, or log it. Loggers carry
+  `SecretRedactionFilter` as a backstop, for every key held.
+- **A key goes to its own provider and nowhere else** (ADR-021). A `ChatClient` is bound to
+  one provider and reads `vault.api_key(config.provider_id)`: never the "current" key. Do
+  not add a client that can be pointed at another address after it is made.
+- **Which provider is in use is the learner's choice**, held by the vault and changed only
+  through `GenerationService.select_provider` (refused while a job is writing). Never
+  select one because another failed.
 - **Logging:** log event types and identifiers, not document text, answers, or prompts.
 - **Paths:** store only under `Settings.data_dir`, under generated names. Never use a
   user-supplied path as a destination. The one exception is `data.save_copy` (ADR-016): an
@@ -143,6 +150,21 @@ everything and decides nothing.
 - **A model request goes through `ModelGateway.complete`**, from inside a job. Nothing else
   may call `ChatClient`. Do not add sampling parameters, retries, or a second request "to fix
   it": the number of requests per job is fixed in `application/generation.py` (ADR-012).
+- **A provider's models are tried in order** (ADR-021), and only `ModelGateway` decides
+  which. The next is asked when the one before is away (`ProviderModelUnavailableError`:
+  gone, failing, or silent) or will not take its request (400, 422). Not for a refused key,
+  a rate limit, a provider's notice, or a provider that cannot be reached. Pass
+  `on_fallback` and `on_stage` on to the job's progress, and record `written_by` with
+  anything a model wrote: a stand-in is never left unsaid.
+- **Each model is sent only what its reference lists** (`ModelSpec`). Adding a field means
+  reading the model's page, then trying it against the real endpoint by hand: the page has
+  been wrong in both directions.
+- **Each provider is counted alone** (`model_usage.provider`), against `ProviderConfig.limits`.
+  Where a provider publishes no limits, set `limits_published=False` so the interface does
+  not call Adle's caution "the provider's limit".
+- **"Stop" and the time limit are checked on every line of a streamed answer**, not on each
+  piece of the answer: a model's thinking and a provider's keep-alives arrive for minutes
+  before the first piece does.
 - **A provider can answer in the model's place.** `ChatClient` raises `ProviderNoticeError`
   for a successful answer that the provider wrote itself (ADR-020). It carries the
   provider's words through `clean_notice`: quote them to the learner, never log them, never

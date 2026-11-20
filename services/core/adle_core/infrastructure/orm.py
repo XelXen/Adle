@@ -517,6 +517,10 @@ class ModelUsage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     started_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, index=True)
+    #: Which provider it went to. Each has its own allowance, so each is counted alone.
+    provider: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="aihubmix", server_default="aihubmix"
+    )
     #: What the request was for (``curriculum``, ``lesson``, ``scene``). Never its content.
     purpose: Mapped[str] = mapped_column(String(40), nullable=False)
     model: Mapped[str] = mapped_column(String(100), nullable=False)

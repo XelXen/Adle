@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from adle_core.generation.provider import ProviderConfig, ProviderConfigError
+from adle_core.generation.provider import ProviderCatalogue, ProviderConfigError
 
 DATA_DIR_ENV = "ADLE_DATA_DIR"
 
@@ -28,8 +28,9 @@ class Settings:
     """
 
     data_dir: Path
-    #: Where model requests go. The documented provider unless a developer set another.
-    provider: ProviderConfig = field(default_factory=ProviderConfig)
+    #: Where model requests can go: the providers the learner chooses between, unless a
+    #: developer set something else before launch.
+    providers: ProviderCatalogue = field(default_factory=ProviderCatalogue)
 
     @property
     def db_path(self) -> Path:
@@ -62,7 +63,7 @@ class Settings:
                 f"No data directory configured. Pass --data-dir or set {DATA_DIR_ENV}."
             )
         try:
-            provider = ProviderConfig.from_environment(os.environ)
+            providers = ProviderCatalogue.from_environment(os.environ)
         except ProviderConfigError as error:
             raise SettingsError(str(error)) from error
-        return cls(data_dir=Path(raw).expanduser().resolve(), provider=provider)
+        return cls(data_dir=Path(raw).expanduser().resolve(), providers=providers)

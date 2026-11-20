@@ -21,7 +21,11 @@ MINUTE = timedelta(minutes=1)
 
 @dataclass(frozen=True, slots=True)
 class QuotaLimits:
-    """Safety margins under the provider's documented limits (5/min, 100/day, 1M tokens/day)."""
+    """How much may be asked of one provider. Each provider has its own (``ProviderConfig``).
+
+    The defaults are safety margins under the limits AIHubMix documents for its free
+    model (5/min, 100/day, 1M tokens/day).
+    """
 
     requests_per_minute: int = 4
     requests_per_day: int = 90
@@ -137,4 +141,9 @@ def estimate_tokens(text: str) -> int:
     magnitude: the daily budget has a margin, and the provider's own count
     replaces the estimate whenever it is reported.
     """
-    return (len(text) + 2) // 3
+    return tokens_for_characters(len(text))
+
+
+def tokens_for_characters(count: int) -> int:
+    """The same estimate for text that was counted and not kept (a model's thinking)."""
+    return (max(0, count) + 2) // 3

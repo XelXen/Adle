@@ -27,7 +27,7 @@ from adle_core.application.sources import SourceService
 from adle_core.config import Settings
 from adle_core.generation.credentials import CredentialVault
 from adle_core.generation.provider import ChatClient
-from adle_core.generation.quota import DEFAULT_LIMITS, QuotaLimits
+from adle_core.generation.quota import QuotaLimits
 from adle_core.infrastructure.asset_store import AssetStore
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.migrate import MigrationOutcome, migrate
@@ -51,14 +51,15 @@ class Services:
     assessment: AssessmentService
     learning: LearningService
     sample_course: SampleCourseService
-    provider_client: ChatClient
+    provider_clients: tuple[ChatClient, ...]
     gateway: ModelGateway
     generation: GenerationService
 
     def close(self) -> None:
         """Stop background work and release the database. Safe to call more than once."""
         self.jobs.stop()
-        self.provider_client.close()
+        for client in self.provider_clients:
+            client.close()
         self.database.dispose()
 
 
@@ -68,7 +69,7 @@ def build_services(
     *,
     extract: Extractor = extract_isolated,
     provider_transport: httpx.BaseTransport | None = None,
-    quota_limits: QuotaLimits = DEFAULT_LIMITS,
+    quota_limits: QuotaLimits | None = None,
 ) -> Services:
     """Open (and if needed migrate) the database, then assemble the services.
 
@@ -91,9 +92,15 @@ def build_services(
     curriculum = CurriculumService(database, retriever)
     lessons = LessonService(database)
     learner = LearnerService(database)
-    credentials = CredentialVault()
-    provider_client = ChatClient(settings.provider, credentials, transport=provider_transport)
-    gateway = ModelGateway(database, provider_client, limits=quota_limits)
+    # One vault, and one client for each provider. A client asks the vault for its own
+    # provider's key and for no other, and only ever talks to its own address.
+    credentials = CredentialVault(settings.providers.default.provider_id)
+    provider_clients = tuple(
+        ChatClient(config, credentials, transport=provider_transport)
+        for config in settings.providers.providers
+    )
+    # Each provider is held to its own limits, unless a test lifts them.
+    gateway = ModelGateway(database, provider_clients, limits=quota_limits)
     return Services(
         settings=settings,
         launch_token=launch_token,
@@ -110,7 +117,7 @@ def build_services(
         assessment=AssessmentService(database, lessons, learner),
         learning=LearningService(database, curriculum, learner, credentials),
         sample_course=SampleCourseService(database, courses, curriculum, lessons),
-        provider_client=provider_client,
+        provider_clients=provider_clients,
         gateway=gateway,
         generation=GenerationService(
             database, jobs, gateway, curriculum, lessons, learner, retriever

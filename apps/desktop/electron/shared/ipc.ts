@@ -20,6 +20,7 @@ export const IPC = {
   providerKeyState: 'adle:provider:key-state',
   providerSetApiKey: 'adle:provider:set-api-key',
   providerClearApiKey: 'adle:provider:clear-api-key',
+  providerSelect: 'adle:provider:select',
   sourcesImportWithPicker: 'adle:sources:import-with-picker',
   sourcesImportPaths: 'adle:sources:import-paths',
   dataSaveCopy: 'adle:data:save-copy',
@@ -81,12 +82,25 @@ export interface CoreInvokeParams {
   body?: unknown;
 }
 
+/**
+ * The providers Adle keeps a key for. The core says which of them this installation
+ * offers (`provider.status`); a name that is not in this list is refused by the main process.
+ */
+export const PROVIDER_IDS = ['aihubmix', 'nvidia', 'custom'] as const;
+export type ProviderId = (typeof PROVIDER_IDS)[number];
+
 /** Whether a provider key is stored. The key itself never crosses to the renderer. */
 export interface ProviderKeyState {
   stored: boolean;
   /** Last four characters, for recognition only. */
   hint: string | null;
 }
+
+/**
+ * What is stored for each provider the core offers, by the provider's name. Empty while
+ * the core cannot be asked which providers there are.
+ */
+export type ProviderKeyStates = Readonly<Record<string, ProviderKeyState | undefined>>;
 
 /** A background import as reported by the core (see `Job` in the generated contract). */
 export type ImportJob = Job;
@@ -101,6 +115,7 @@ export interface SavedCopy {
 export const EXTERNAL_LINKS = {
   aihubmixKeys: 'https://aihubmix.com/token',
   aihubmixModel: 'https://aihubmix.com/model/coding-kimi-k3-free',
+  nvidiaKeys: 'https://build.nvidia.com/settings/api-keys',
   wanim: 'https://wanim.org/',
 } as const;
 
@@ -125,9 +140,16 @@ export interface AdleBridge {
     invoke(operation: string, params?: CoreInvokeParams): Promise<CoreResult>;
   };
   provider: {
-    keyState(): Promise<ProviderKeyState>;
-    setApiKey(apiKey: string): Promise<CoreResult<ProviderKeyState>>;
-    clearApiKey(): Promise<CoreResult<ProviderKeyState>>;
+    /** For each provider on offer: whether a key for it is stored on this computer. */
+    keyState(): Promise<ProviderKeyStates>;
+    /** Keep a key for one provider. It is only ever sent to that provider's address. */
+    setApiKey(providerId: string, apiKey: string): Promise<CoreResult<ProviderKeyStates>>;
+    clearApiKey(providerId: string): Promise<CoreResult<ProviderKeyStates>>;
+    /**
+     * Use another provider from now on. Only ever called because the learner chose it:
+     * nothing in Adle changes provider by itself.
+     */
+    select(providerId: string): Promise<CoreResult<null>>;
   };
   sources: {
     /**

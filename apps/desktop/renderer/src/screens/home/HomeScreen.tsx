@@ -16,7 +16,6 @@ import {
 
 import { useApp } from '../../app/AppContext';
 import { useRouter } from '../../app/router';
-import { getBridge } from '../../lib/bridge';
 import { callCore, describeError } from '../../lib/core-client';
 import { formatRelativeDay, pluralise } from '../../lib/format';
 import { useResource } from '../../lib/use-resource';
@@ -47,8 +46,11 @@ export function HomeScreen() {
   const [addingSample, setAddingSample] = useState(false);
   // Reload when the local service becomes ready (it may still be starting at first paint).
   const courses = useResource(`courses:${coreStatus.state}`, () => callCore('courses.list'));
-  const keyState = useResource('provider-key', () => getBridge().provider.keyState());
-  const aiReady = keyState.resource.status === 'ready' && keyState.resource.data.stored;
+  // The provider in use, and whether it has a key. Asked again once the service is ready.
+  const provider = useResource(`provider-status:${coreStatus.state}`, () =>
+    callCore('provider.status'),
+  );
+  const aiMissing = provider.resource.status === 'ready' && !provider.resource.data.key_configured;
 
   // A course with something to learn opens on what to do next. One that is still being set
   // up opens where the setting up happens: its materials if it is waiting for them, else its
@@ -167,12 +169,12 @@ export function HomeScreen() {
         </Section>
       ) : null}
 
-      {keyState.resource.status === 'ready' && !aiReady ? (
+      {aiMissing ? (
         <Section title="Set up">
           <ActionCard
             media={<KeyRound />}
             title="AI provider"
-            description="Add an AIHubMix key to generate curricula and lessons. Your library and materials work without one."
+            description="Choose an AI provider and add its key to generate curricula and lessons. Your library and materials work without one."
             meta={
               <>
                 <Badge>Not set up</Badge>

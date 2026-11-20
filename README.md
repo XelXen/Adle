@@ -58,8 +58,9 @@ understanding with short questions, and adapts the next step to what you have ac
   anywhere. Without a voice, narration is shown as text.
 - **Settings → Learning:** pace, explanation depth, narration, voice and volume, captions, and
   your goal.
-- **Settings → AI provider:** save or remove an AIHubMix key. It is encrypted by your operating
-  system and never shown again.
+- **Settings → AI provider:** choose between AIHubMix and NVIDIA NIM, and save or remove the
+  key of the one you use. A key is encrypted by your operating system, never shown again, and
+  only ever sent to the provider it is for. Adle never changes provider by itself.
 - **Settings → About & diagnostics:** restart the local service and run a live check of the
   interactive visual runtime.
 
@@ -67,7 +68,7 @@ understanding with short questions, and adapts the next step to what you have ac
 
 - Course files, answers, and progress are stored only on your computer.
 - One thing uses the internet: when you ask Adle to generate a course or lesson, the text needed
-  for that request is sent to the AI provider you configured (AIHubMix by default). Nothing is
+  for that request is sent to the one AI provider you chose (AIHubMix or NVIDIA NIM). Nothing is
   sent before you add a key and ask.
 - No accounts, no analytics, no telemetry, no crash uploads.
 - In Settings → Privacy & data you can save a copy of everything as one file, restore from a
@@ -115,15 +116,21 @@ still missing: [`docs/engineering/RELEASE_CHECKLIST.md`](docs/engineering/RELEAS
 
 | Setting | Where |
 |---|---|
-| AI provider key | Settings → AI provider. Get one from [AIHubMix](https://aihubmix.com/token). On 2026-11-20 AIHubMix answered a new account that had never been topped up with a notice that it "can only try 10 times" on the free model, and that topping up raises the allowance. Adle shows such a notice as it stands. |
+| AI provider | Settings → AI provider: AIHubMix (the one in use until you choose) or NVIDIA NIM. With NVIDIA, requests go to Kimi K3.1 Pro; while it is not available, Mistral Large 4 and then GLM 5.3 Flash stand in, and Adle says when that happened. |
+| AI provider key | Settings → AI provider, for the provider in use. Get one from [AIHubMix](https://aihubmix.com/token) or from [NVIDIA](https://build.nvidia.com/settings/api-keys). On 2026-11-20 AIHubMix answered a new account that had never been topped up with a notice that it "can only try 10 times" on the free model, and that topping up raises the allowance. Adle shows such a notice as it stands. |
 | Theme | Settings → Appearance |
-| Provider address and model | Shown in Settings → AI provider (`https://aihubmix.com/v1`, `coding-kimi-k3-free`). For development, start with `ADLE_PROVIDER_BASE_URL` and `ADLE_PROVIDER_MODEL` set: `https` only, or `http` on this computer. Another address is always shown as "Custom endpoint". |
+| Provider address and model | Shown in Settings → AI provider (`https://aihubmix.com/v1` with `coding-kimi-k3-free`; `https://integrate.api.nvidia.com/v1` with its three models). For development, start with `ADLE_PROVIDER_BASE_URL` and `ADLE_PROVIDER_MODEL` set to use one endpoint of your own, or with `ADLE_PROVIDER_ENDPOINTS` set to a JSON object such as `{"nvidia": "http://127.0.0.1:9100/v1"}` to move a known provider: `https` only, or `http` on this computer. Another address is always shown as a custom endpoint, and is not given a key that was saved for the real one. |
 | Narration voice and volume | Settings → Learning |
 | Use a separate data folder | Start with the environment variable `ADLE_USER_DATA_DIR` set to an empty folder |
 
 The free AIHubMix model allows 5 requests per minute, 100 per day, and one million tokens per day
 per account (as published on 2026-11-19; the provider's page is authoritative). Adle paces itself
-below those limits.
+below those limits. NVIDIA publishes no daily limit for its models, so there Adle keeps to limits
+of its own (4 requests a minute, 200 a day, three million tokens a day) and says that they are
+its own.
+
+NVIDIA's models think before they write. On 2026-11-20 a lesson's text took Kimi K3.1 Pro about
+six minutes; Adle says what the model is doing meanwhile, and you can keep using the app.
 
 ## Troubleshooting
 

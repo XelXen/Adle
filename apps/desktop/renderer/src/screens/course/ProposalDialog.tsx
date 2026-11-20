@@ -4,7 +4,7 @@ import { Button, Checkbox, Dialog } from '@adle/design-system';
 
 import { describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
-import { keptNeeds, type Proposal } from '../../lib/generation';
+import { authorName, keptNeeds, type Proposal } from '../../lib/generation';
 import styles from './Curriculum.module.css';
 
 /**
@@ -33,6 +33,9 @@ export function ProposalDialog({
   );
   const [busy, setBusy] = useState<'add' | 'discard' | null>(null);
   const [formError, setFormError] = useState<string>();
+  // Who suggested it is what the job recorded, not whichever provider is in use by now.
+  const author = authorName(proposal.writtenBy, providerName);
+  const standIn = proposal.writtenBy?.note ? ` ${proposal.writtenBy.note}` : '';
   const allChosen = chosen.size === proposal.concepts.length;
 
   const run = async (kind: 'add' | 'discard', work: () => Promise<void>): Promise<void> => {
@@ -64,8 +67,8 @@ export function ProposalDialog({
       title="Suggested concepts"
       description={
         proposal.groundedInMaterials
-          ? `Suggested by ${providerName} from your course details and the headings of your materials. Keep what fits; you can edit, reorder, and remove anything afterwards.`
-          : `Suggested by ${providerName} from your course details. It did not see any of your materials. Keep what fits; you can edit, reorder, and remove anything afterwards.`
+          ? `Suggested by ${author} from your course details and the headings of your materials.${standIn} Keep what fits; you can edit, reorder, and remove anything afterwards.`
+          : `Suggested by ${author} from your course details. It did not see any of your materials.${standIn} Keep what fits; you can edit, reorder, and remove anything afterwards.`
       }
       size="medium"
       dismissible={busy === null}

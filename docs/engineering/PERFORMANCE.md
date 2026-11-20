@@ -60,11 +60,32 @@ The largest parts of the core are SQLAlchemy (20 MB with bytecode), lxml (10 MB,
 files), and Pydantic's compiled core (6 MB). Tests, Tk, IDLE, pip, and headers are left out
 of the Python that ships.
 
+## Waiting for a real model
+
+Everything above is Adle's own time. Once a learner asks for a lesson, almost all of the
+wait is the provider's. Measured on 2026-11-20 through NVIDIA NIM, by hand (no test calls a
+real provider), one request at a time:
+
+| What is written | By | Time | Of which before the first word of the answer |
+|---|---|---|---|
+| A lesson's text (about 12,000 characters) | Kimi K3.1 Pro | 4.6 to 5.9 min | 1.5 to 2.5 min (the model thinks first) |
+| The same | Mistral Large 4 | 7.6 min | 4 min |
+| One scene file (about 4,500 characters) | Kimi K3.1 Pro | 2.6 to 4.1 min | about 1.5 min |
+| A curriculum of ten to twelve concepts | Kimi K3.1 Pro | 2.1 min | 1.2 min |
+| The same | Mistral Large 4 | 5 min | not timed |
+
+A whole lesson is the text and one or two scenes: nine to twelve minutes when every answer
+is usable as first written. Adle cannot shorten this. What it does instead: the work is a
+job that leaves the app usable, the job says what the model is doing ("thinking it
+through", "writing"), and it can be stopped. Finding out that a model is not there takes a
+quarter of a second; finding out that it is silent takes three minutes, once, after which
+that model is left alone for ten.
+
 ## What was not measured
 
-- **Generating a lesson with the model.** The provider has not answered a request yet (see
-  PROJECT_STATE.md), and its time would be the provider's, not Adle's. Each request is one
-  at a time, at most four a minute, by design.
+- **Generating with AIHubMix's model.** That provider has not answered a request yet (see
+  PROJECT_STATE.md). The times above are NVIDIA's models on one afternoon; they are a shared
+  service and will vary. Each request is one at a time, at most four a minute, by design.
 - **Large courses.** The sample course has eight concepts and eight lessons. Opening a course
   reads every answer given in it; the session summary bounds its own look back at 600.
   Nothing here says how a course with thousands of answers behaves.
@@ -76,6 +97,6 @@ of the Python that ships.
 
 ## The end-to-end suite as a timing check
 
-The whole suite (83 journeys) takes about eleven minutes against either build, with one
+The whole suite (88 journeys) takes ten to twelve minutes against either build, with one
 worker. No journey waits on a fixed delay for the app; a regression in any of the paths above
 shows up there as a slower run long before it becomes a failure.
