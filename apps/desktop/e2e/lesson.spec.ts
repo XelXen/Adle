@@ -10,6 +10,7 @@ import type { Locator, Page } from '@playwright/test';
 
 import { expect, launchApp, test, waitForCore } from './support/app';
 import {
+  courseCard,
   expectNoAccessibilityViolations,
   openCourseTab,
   screenshot,
@@ -349,15 +350,19 @@ test.describe('lesson', () => {
     await expect(
       first.page.getByText('Press Start to play the animation with its narration.'),
     ).toBeVisible();
+    // The stage itself, not the figure around it: the bar of controls floats over the
+    // page, and where it lies over the figure depends on how far the page has scrolled.
+    const stage = picture.locator('iframe');
+    await stage.scrollIntoViewIfNeeded();
     await first.page.waitForTimeout(800);
-    const held = await picture.screenshot();
+    const held = await stage.screenshot();
     await first.page.waitForTimeout(1200);
-    expect(Buffer.compare(held, await picture.screenshot())).toBe(0);
+    expect(Buffer.compare(held, await stage.screenshot())).toBe(0);
 
     await first.page.getByRole('button', { name: 'Start', exact: true }).click();
     await expect(first.page.getByRole('button', { name: 'Pause' })).toBeVisible();
     await first.page.waitForTimeout(5000);
-    expect(Buffer.compare(held, await picture.screenshot())).not.toBe(0);
+    expect(Buffer.compare(held, await stage.screenshot())).not.toBe(0);
 
     await first.page.getByRole('button', { name: 'Back to the course' }).click();
     await openCourseTab(first.page, 'Curriculum');
@@ -373,7 +378,7 @@ test.describe('lesson', () => {
     const second = await launchApp(profileDir, { onboarded: true, theme: 'dark' });
     const { page } = second;
     await waitForCore(page);
-    await page.getByRole('button', { name: new RegExp(COURSE) }).click();
+    await courseCard(page, new RegExp(COURSE)).click();
     await openCourseTab(page, 'Curriculum');
     await lessons(page)
       .getByRole('button', { name: /^Continue: / })

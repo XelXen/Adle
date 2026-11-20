@@ -18,6 +18,7 @@ import {
   waitForCore,
 } from './support/app';
 import {
+  courseCard,
   createCourse,
   expectNoAccessibilityViolations,
   openCourseTab,
@@ -178,7 +179,7 @@ test.describe('choosing between AI providers', () => {
     // ---- The answer arrives; who wrote it, and for whom, is said ----
     servers.nvidia.release();
     await page.getByRole('button', { name: 'Library', exact: true }).click();
-    await page.getByRole('button', { name: /Calculus refresher/ }).click();
+    await courseCard(page, /Calculus refresher/).click();
     await openCourseTab(page, 'Curriculum');
     const waiting = page.getByText(/suggested 3 concepts for this course/);
     await expect(waiting).toBeVisible({ timeout: 30_000 });

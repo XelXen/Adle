@@ -71,6 +71,13 @@ export async function importAndWait(
   );
 }
 
+/**
+ * A course's card in the library. The rail lists courses too, by the same name, so a
+ * course is always asked for where it is meant: here, in the main region.
+ */
+export const courseCard = (page: Page, name: string | RegExp) =>
+  page.getByRole('main').getByRole('button', { name });
+
 /** Open one of a course's tabs. A course with concepts opens on "Learn". */
 export async function openCourseTab(
   page: Page,
@@ -81,8 +88,29 @@ export async function openCourseTab(
   await expect(tab).toHaveAttribute('aria-selected', 'true');
 }
 
+/**
+ * Wait until nothing on the page is still moving into place.
+ *
+ * A panel that is fading in, or a line of text changing colour, is measured by axe as
+ * the colour it has at that instant, which is a colour nobody is meant to read. Motion
+ * that never ends (a spinner, a bar that slides for as long as work goes on) is left
+ * alone: it is not on its way to anything.
+ */
+export async function settled(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const finite = document
+      .getAnimations()
+      .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity);
+    await Promise.race([
+      Promise.allSettled(finite.map((animation) => animation.finished)),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  });
+}
+
 /** Fail on any WCAG 2.2 AA violation axe can detect on the current screen. */
 export async function expectNoAccessibilityViolations(page: Page): Promise<void> {
+  await settled(page);
   const axe = await new AxeBuilder({ page })
     .setLegacyMode(true)
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -97,6 +125,7 @@ export async function expectNoAccessibilityViolations(page: Page): Promise<void>
 
 /** Save a screenshot of the window for visual review (not compared against a baseline). */
 export async function screenshot(page: Page, name: string): Promise<void> {
+  await settled(page);
   await page.screenshot({
     path: path.join(desktopDir, 'test-results', 'screens', `${name}.png`),
     fullPage: false,

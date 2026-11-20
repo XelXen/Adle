@@ -993,6 +993,11 @@ _Last updated: 2026-11-20._
 
 ### Deviations from this plan (each has an ADR)
 
+- **The design system is a second edition, and no longer "playful" in its chrome.** The owner
+  asked for a professional-grade design. A serif sets what is read and a sans what is
+  operated; radii are 6, 8, 12, and 16, not the 10–20 of section 4.2; badges are not pills;
+  there are three grounds; a lesson has the whole window. The tokens, the contrast rules, and
+  the brand's teal are as before (ADR-022).
 - **There are two AI providers, not one.** Section 6.1 names AIHubMix and one model. The
   owner asked for NVIDIA NIM beside it: Kimi K3.1 Pro, with Mistral Large 4 and then GLM 5.3
   Flash standing in while the one before is not available. The learner chooses the provider

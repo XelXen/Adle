@@ -44,11 +44,11 @@ test.describe('theme', () => {
 
     await page.getByRole('radio', { name: 'Dark' }).click();
     await expect.poll(() => prefersDark(page)).toBe(true);
-    await expect.poll(() => canvasColour(page)).toBe('rgb(16, 23, 19)');
+    await expect.poll(() => canvasColour(page)).toBe('rgb(12, 16, 14)');
 
     await page.getByRole('radio', { name: 'Light' }).click();
     await expect.poll(() => prefersDark(page)).toBe(false);
-    await expect.poll(() => canvasColour(page)).toBe('rgb(246, 248, 244)');
+    await expect.poll(() => canvasColour(page)).toBe('rgb(243, 244, 241)');
 
     await page.getByRole('radio', { name: 'Dark' }).click();
     await expect.poll(() => prefersDark(page)).toBe(true);

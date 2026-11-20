@@ -1,27 +1,33 @@
 .indicator {
   display: flex;
   align-items: center;
-  gap: var(--ad-space-2);
+  gap: 0.625rem;
   width: 100%;
-  padding: var(--ad-space-2);
+  height: 2rem;
+  padding: 0 var(--ad-space-2);
   border: 0;
   border-radius: var(--ad-radius-small);
   background: transparent;
   font: var(--ad-text-caption);
-  color: var(--ad-color-muted);
+  color: var(--ad-color-faint);
   text-align: left;
   cursor: pointer;
+  transition:
+    background-color var(--ad-duration-fast) var(--ad-ease-out),
+    color var(--ad-duration-fast) var(--ad-ease-out);
 }
 
 .indicator:hover {
-  background: var(--ad-color-surface-subtle);
+  background: var(--ad-color-surface-sunken);
   color: var(--ad-color-ink);
 }
 
+/* Sized and placed like an icon of the rail, so it lines up with the ones above it. */
 .dot {
   flex: none;
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin: 0 0.28125rem;
   border-radius: var(--ad-radius-pill);
   background: var(--ad-color-border-strong);
 }
@@ -32,6 +38,13 @@
 
 .starting .dot {
   background: var(--ad-color-sun);
+  animation: pulse 1200ms var(--ad-ease-out) infinite alternate;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.35;
+  }
 }
 
 .failed .dot,
@@ -51,6 +64,8 @@
 @media (width <= 60rem) {
   .indicator {
     justify-content: center;
+    width: 2.25rem;
+    padding: 0;
   }
 
   .text {

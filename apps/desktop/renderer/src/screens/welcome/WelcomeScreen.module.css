@@ -3,30 +3,46 @@
   align-items: flex-start;
   justify-content: center;
   min-height: 100vh;
-  padding: var(--ad-space-8) var(--ad-space-5);
+  padding: var(--ad-space-9) var(--ad-space-6) var(--ad-space-8);
   overflow-y: auto;
+}
+
+/* The words on the left; beside them, where there is room, a lesson in miniature. */
+.layout {
+  display: grid;
+  gap: var(--ad-space-9);
+  align-items: center;
+  width: 100%;
+  max-width: var(--ad-layout-reading-max);
+}
+
+@media (min-width: 72rem) {
+  .layout {
+    grid-template-columns: minmax(0, 34rem) minmax(0, 27rem);
+    max-width: 69rem;
+  }
 }
 
 .panel {
   display: flex;
   flex-direction: column;
   gap: var(--ad-space-6);
-  width: 100%;
-  max-width: var(--ad-layout-reading-max);
+  min-width: 0;
 }
 
 .header {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-4);
+  gap: var(--ad-space-5);
 }
 
 .headline {
   font: var(--ad-text-display);
-  letter-spacing: var(--ad-tracking-tight);
+  letter-spacing: var(--ad-tracking-display);
 }
 
 .lede {
+  max-width: 32rem;
   font-size: 1.0625rem;
   line-height: 1.625rem;
   color: var(--ad-color-muted);
@@ -35,7 +51,6 @@
 .highlights {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-5);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -44,48 +59,223 @@
 .highlight {
   display: flex;
   gap: var(--ad-space-4);
+  padding: var(--ad-space-4) 0;
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+}
+
+.highlight:last-child {
+  border-bottom: var(--ad-border-width) solid var(--ad-color-border);
 }
 
 .highlightIcon {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
   flex: none;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--ad-radius-control);
-  background: var(--ad-color-primary-soft);
+  margin-top: 0.1875rem;
   color: var(--ad-color-primary-text);
 }
 
 .highlightIcon svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  stroke-width: 1.75;
 }
 
 .highlightTitle {
   font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
 .highlightBody {
-  margin-top: var(--ad-space-1);
-  font: var(--ad-text-body);
+  margin-top: 0.125rem;
+  font: var(--ad-text-supporting);
+  line-height: 1.375rem;
   color: var(--ad-color-muted);
 }
 
-.inlineIcon {
-  width: 1rem;
-  height: 1rem;
-  margin-right: var(--ad-space-1);
-  vertical-align: -0.1875rem;
+/* What stays here and what does not: said plainly, before the first button. */
+.promise {
+  display: flex;
+  gap: var(--ad-space-4);
+  padding: var(--ad-space-4);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-1);
 }
 
-.calloutSecond {
-  margin-top: var(--ad-space-2);
+.promiseIcon {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.1875rem;
+  color: var(--ad-color-muted);
+  stroke-width: 1.75;
+}
+
+.promiseText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  min-width: 0;
+  font: var(--ad-text-supporting);
+  line-height: 1.375rem;
+  color: var(--ad-color-muted);
+}
+
+.promiseTitle {
+  font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
+  color: var(--ad-color-ink);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ad-space-3);
+}
+
+/* ---- The lesson in miniature ------------------------------------------------ */
+.sketch {
+  display: none;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+  padding: var(--ad-space-5);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-large);
+  background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-3);
+  transform: rotate(1.25deg);
+}
+
+@media (min-width: 72rem) {
+  .sketch {
+    display: flex;
+  }
+}
+
+.sketchStrip {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.sketchStrip span {
+  flex: 1;
+  height: 0.25rem;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-surface-sunken);
+}
+
+.sketchStrip .sketchDone {
+  background: var(--ad-color-primary);
+}
+
+.sketchStrip .sketchNow {
+  background: var(--ad-color-ink);
+}
+
+.sketchTitle {
+  font: var(--ad-text-subtitle);
+  font-size: 1.1875rem;
+  line-height: 1.5rem;
+  letter-spacing: var(--ad-tracking-tight);
+}
+
+.sketchBody {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--ad-space-4);
+  align-items: center;
+}
+
+.sketchStage {
+  width: 100%;
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-control);
+  background: var(--ad-color-scene-background);
+}
+
+.sketchAxis {
+  stroke: var(--ad-color-border-control);
+  stroke-width: 1;
+}
+
+.sketchCurve {
+  fill: none;
+  stroke: var(--ad-color-blue);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.sketchGuide {
+  stroke: var(--ad-color-border-control);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.sketchDot {
+  fill: var(--ad-color-coral);
+}
+
+.sketchTrack {
+  stroke: var(--ad-color-surface-sunken);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.sketchFill {
+  stroke: var(--ad-color-success);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.sketchKnob {
+  fill: var(--ad-color-success);
+  stroke: var(--ad-color-scene-background);
+  stroke-width: 2;
+}
+
+.sketchWords {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4375rem;
+}
+
+.sketchWords span {
+  height: 0.375rem;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-surface-sunken);
+}
+
+.sketchWords span:nth-child(2n) {
+  width: 72%;
+  margin-bottom: 0.375rem;
+}
+
+.sketchWords .sketchSaid {
+  background: var(--ad-color-border-control);
+}
+
+.sketchWords .sketchSaying {
+  background: var(--ad-color-muted);
+}
+
+.sketchNext {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ad-space-3);
+  padding-top: var(--ad-space-4);
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+}
+
+.sketchNextLabel {
+  flex: none;
+  font: var(--ad-text-eyebrow);
+  letter-spacing: var(--ad-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ad-color-primary-text);
+}
+
+.sketchNextText {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
 }

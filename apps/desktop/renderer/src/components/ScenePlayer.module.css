@@ -13,7 +13,9 @@
   overflow: hidden;
   border: var(--ad-border-width) solid var(--ad-color-border);
   border-radius: var(--ad-radius-card);
-  background: var(--ad-color-surface);
+  /* The stage has colours of its own: scenes are drawn for exactly these. */
+  background: var(--ad-color-scene-background);
+  box-shadow: var(--ad-shadow-1);
 }
 
 .frameHost {
@@ -36,8 +38,8 @@
   align-items: center;
   justify-content: center;
   gap: var(--ad-space-3);
-  background: var(--ad-color-surface);
-  color: var(--ad-color-muted);
+  background: var(--ad-color-scene-background);
+  color: var(--ad-color-scene-muted);
   font: var(--ad-text-supporting);
 }
 

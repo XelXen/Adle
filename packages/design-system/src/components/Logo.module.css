@@ -1,7 +1,7 @@
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: var(--ad-space-2);
+  gap: 0.5625rem;
   color: var(--ad-color-ink);
 }
 
@@ -9,12 +9,12 @@
 .mark {
   flex: none;
   width: auto;
-  height: 1.625rem;
+  height: 1.375rem;
   aspect-ratio: 72 / 63;
 }
 
 .large .mark {
-  height: 3rem;
+  height: 2.25rem;
 }
 
 .a {
@@ -28,13 +28,13 @@
   stroke-linecap: round;
 }
 
+/* The name is set in the interface's own face, whatever sets the titles around it. */
 .wordmark {
-  font: var(--ad-text-heading);
-  font-weight: 700;
-  letter-spacing: var(--ad-tracking-tight);
+  font: 650 1.0625rem/1.5rem var(--ad-font-sans);
+  letter-spacing: -0.02em;
 }
 
 .large .wordmark {
-  font: var(--ad-text-display);
-  letter-spacing: var(--ad-tracking-tight);
+  font: 650 1.625rem/2rem var(--ad-font-sans);
+  letter-spacing: -0.025em;
 }

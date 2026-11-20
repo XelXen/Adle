@@ -1,10 +1,13 @@
-import { Library, Settings } from 'lucide-react';
+import { BookOpen, Library, Settings } from 'lucide-react';
 
-import { AppShell, Logo, NavItem, ToastProvider } from '@adle/design-system';
+import { AppShell, Logo, NavItem, NavSection, ToastProvider } from '@adle/design-system';
 
 import { useApp } from './app/AppContext';
 import { type Route, useRouter } from './app/router';
 import { CoreStatusIndicator } from './components/CoreStatusIndicator';
+import { callCore } from './lib/core-client';
+import { courseRoute, RAIL_COURSES } from './lib/courses';
+import { useResource } from './lib/use-resource';
 import { CourseScreen } from './screens/course/CourseScreen';
 import { HomeScreen } from './screens/home/HomeScreen';
 import { LessonScreen } from './screens/lesson/LessonScreen';
@@ -38,21 +41,54 @@ function Screen({ route, visit }: { route: Route; visit: number }) {
   }
 }
 
+/**
+ * The most recent courses, in the rail: one click from anywhere to any of them. Read again
+ * on every navigation, which is when the list can have changed (a course was made, opened
+ * or removed). While it cannot be read the rail simply has no such group; the library
+ * says why.
+ */
+function RailCourses() {
+  const { coreStatus } = useApp();
+  const { route, visit, navigate } = useRouter();
+  const courses = useResource(`rail-courses:${coreStatus.state}:${visit}`, () =>
+    callCore('courses.list'),
+  );
+  if (courses.resource.status !== 'ready' || courses.resource.data.courses.length === 0) {
+    return null;
+  }
+  return (
+    <NavSection label="Courses">
+      {courses.resource.data.courses.slice(0, RAIL_COURSES).map((course) => (
+        <NavItem
+          key={course.id}
+          label={course.title}
+          icon={<BookOpen />}
+          current={route.name === 'course' && route.courseId === course.id}
+          onClick={() => navigate(courseRoute(course))}
+        />
+      ))}
+    </NavSection>
+  );
+}
+
 export function App() {
   const { ui } = useApp();
   const { route, visit, navigate } = useRouter();
+  // A lesson, and a round of questions, are one thing to attend to: they get the window.
+  const focus = route.name === 'lesson' || route.name === 'practice';
 
   return (
     <ToastProvider>
       {ui.onboardingCompleted ? (
         <AppShell
           brand={<Logo />}
+          focus={focus}
           navigation={
             <>
               <NavItem
                 label="Library"
                 icon={<Library />}
-                current={route.name !== 'settings'}
+                current={route.name === 'home'}
                 onClick={() => navigate({ name: 'home' })}
               />
               <NavItem
@@ -61,6 +97,7 @@ export function App() {
                 current={route.name === 'settings'}
                 onClick={() => navigate({ name: 'settings', tab: 'ai' })}
               />
+              <RailCourses />
             </>
           }
           footer={<CoreStatusIndicator />}

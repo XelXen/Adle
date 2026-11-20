@@ -23,6 +23,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - "Use today" counts each provider separately, and says when the limits shown are Adle's own
   rather than the provider's.
 
+### Changed
+
+- **A new look throughout.** Titles, lesson text, and questions are set in a serif made for
+  reading, and the interface around them in a quieter sans. Corners, borders, and shadows are
+  finer; the brand's teal is kept for the one thing to press.
+- **A lesson has the whole window.** The side rail steps aside, your place in the lesson is a
+  single strip across the top, and the controls float at the bottom edge.
+- The side rail lists your courses, so any of them is one click away.
+- The welcome shows what a lesson looks like.
+
 ### Fixed
 
 - A lesson whose formulas the model wrote with single backslashes is now read as it was

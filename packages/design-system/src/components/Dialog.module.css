@@ -3,10 +3,10 @@
   max-height: calc(100vh - var(--ad-space-6));
   padding: 0;
   border: var(--ad-border-width) solid var(--ad-color-border);
-  border-radius: var(--ad-radius-card);
+  border-radius: var(--ad-radius-large);
   background: var(--ad-color-surface);
   color: var(--ad-color-ink);
-  box-shadow: var(--ad-shadow-2);
+  box-shadow: var(--ad-shadow-3);
 }
 
 .medium {
@@ -15,16 +15,27 @@
 
 .dialog::backdrop {
   background: var(--ad-color-overlay);
+  backdrop-filter: blur(3px);
 }
 
 .dialog[open] {
   animation: appear var(--ad-duration-base) var(--ad-ease-out);
 }
 
+.dialog[open]::backdrop {
+  animation: dim var(--ad-duration-base) var(--ad-ease-out);
+}
+
 @keyframes appear {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+@keyframes dim {
+  from {
+    opacity: 0;
   }
 }
 
@@ -43,7 +54,8 @@
 }
 
 .title {
-  font: var(--ad-text-heading);
+  font: var(--ad-text-subtitle);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
 .description {
@@ -62,6 +74,6 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: var(--ad-space-3);
+  gap: var(--ad-space-2);
   margin-top: var(--ad-space-2);
 }

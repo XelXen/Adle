@@ -5,39 +5,50 @@
   min-width: 0;
 }
 
-/* ---- The suggestion -------------------------------------------------------- */
+/* ---- The suggestion --------------------------------------------------------
+ * The one thing on the page that asks to be done. It is marked by a wash of the brand
+ * colour from its top edge, and by nothing else: no bar, no badge, no second border. */
 .recommended {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--ad-space-3);
-  padding: var(--ad-space-5) var(--ad-space-6);
+  padding: var(--ad-space-6);
   border: var(--ad-border-width) solid var(--ad-color-border);
-  border-left: var(--ad-space-1) solid var(--ad-color-primary);
-  border-radius: var(--ad-radius-card);
-  background: var(--ad-color-surface);
+  border-radius: var(--ad-radius-large);
+  background:
+    linear-gradient(180deg, var(--ad-color-primary-soft), transparent 5.5rem),
+    var(--ad-color-surface);
   box-shadow: var(--ad-shadow-1);
 }
 
 .eyebrow {
   margin: 0;
-  font: var(--ad-text-caption);
+  font: var(--ad-text-eyebrow);
+  letter-spacing: var(--ad-tracking-eyebrow);
+  text-transform: uppercase;
   color: var(--ad-color-primary-text);
 }
 
 .title {
   margin: 0;
+  max-width: 44rem;
   font: var(--ad-text-title);
+  font-size: 1.625rem;
+  line-height: 2rem;
+  letter-spacing: var(--ad-tracking-display);
   overflow-wrap: anywhere;
 }
 
 .reason {
   margin: 0;
   max-width: var(--ad-layout-reading-max);
+  color: var(--ad-color-muted);
 }
 
 .why {
   font: var(--ad-text-body-strong);
+  color: var(--ad-color-ink);
 }
 
 .note {
@@ -52,6 +63,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--ad-space-2) var(--ad-space-3);
+  margin-top: var(--ad-space-2);
 }
 
 .hint {
@@ -66,19 +78,22 @@
   gap: var(--ad-space-3);
   align-self: stretch;
   min-width: 0;
+  margin-top: var(--ad-space-2);
 }
 
 /* ---- What could be done instead ---------------------------------------------- */
 .others {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-3);
+  gap: var(--ad-space-2);
 }
 
 .othersTitle {
   margin: 0;
-  font: var(--ad-text-body-strong);
-  color: var(--ad-color-muted);
+  font: var(--ad-text-eyebrow);
+  letter-spacing: var(--ad-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ad-color-faint);
 }
 
 .list {
@@ -90,6 +105,7 @@
   border: var(--ad-border-width) solid var(--ad-color-border);
   border-radius: var(--ad-radius-card);
   background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-1);
 }
 
 .item {
@@ -98,7 +114,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--ad-space-3) var(--ad-space-5);
-  padding: var(--ad-space-4) var(--ad-space-5);
+  padding: 0.875rem var(--ad-space-5);
 }
 
 .item + .item {
@@ -109,12 +125,13 @@
   display: flex;
   flex: 1 1 18rem;
   flex-direction: column;
-  gap: var(--ad-space-1);
+  gap: 0.125rem;
   min-width: 0;
 }
 
 .itemTitle {
   font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
   overflow-wrap: anywhere;
 }
 

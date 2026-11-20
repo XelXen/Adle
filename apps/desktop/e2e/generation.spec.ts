@@ -8,6 +8,7 @@ import type { Page } from '@playwright/test';
 
 import { expect, launchApp, type LaunchedApp, test, waitForCore } from './support/app';
 import {
+  courseCard,
   createCourse,
   expectNoAccessibilityViolations,
   screenshot,
@@ -170,7 +171,9 @@ test.describe('generation with the AI provider', () => {
     await expect(page.getByText('That is right')).toBeVisible();
 
     // ---- The local count of what was sent ----
-    await page.getByRole('button', { name: 'Settings' }).click();
+    // A lesson has the whole window; the way to the rest of the app is back through the course.
+    await page.getByRole('button', { name: 'Back to the course' }).click();
+    await page.getByRole('navigation').getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByText('4 of 90', { exact: true })).toBeVisible();
     await expect(page.getByText(/about 7,200 of 900,000/)).toBeVisible();
     await expectNoAccessibilityViolations(page);
@@ -321,7 +324,7 @@ test.describe('generation with the AI provider', () => {
     await page.getByRole('main').getByRole('button', { name: 'Library', exact: true }).click();
     provider.release();
     await page.waitForTimeout(1500);
-    await page.getByRole('button', { name: /Calculus refresher/ }).click();
+    await courseCard(page, /Calculus refresher/).click();
 
     const ready = page.getByRole('status').filter({ hasText: 'Suggestions are ready' });
     await expect(ready).toBeVisible({ timeout: 30_000 });

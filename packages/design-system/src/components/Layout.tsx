@@ -10,26 +10,55 @@ export interface AppShellProps {
   navigation: ReactNode;
   /** Content pinned to the bottom of the rail, e.g. service status. */
   footer?: ReactNode;
+  /**
+   * Give the whole window to the main region and leave the rail out. For the one kind of
+   * screen that is a single thing to attend to (a lesson). That screen must then offer its
+   * own way back.
+   */
+  focus?: boolean;
   children: ReactNode;
 }
 
-/** The application frame: a persistent navigation rail and one scrolling main region. */
-export function AppShell({ brand, navigation, footer, children }: AppShellProps) {
+/**
+ * The application frame: a navigation rail lying on the canvas, and one scrolling main
+ * region set into it as a panel.
+ */
+export function AppShell({ brand, navigation, footer, focus = false, children }: AppShellProps) {
   return (
-    <div className={styles.shell}>
+    <div className={cx(styles.shell, focus && styles.focus)}>
       <a className={styles.skipLink} href="#ad-main">
         Skip to content
       </a>
-      <aside className={styles.rail}>
-        <div className={styles.brand}>{brand}</div>
-        <nav className={styles.nav} aria-label="Primary">
-          {navigation}
-        </nav>
-        {footer ? <div className={styles.railFooter}>{footer}</div> : null}
-      </aside>
+      {focus ? null : (
+        <aside className={styles.rail}>
+          <div className={styles.brand}>{brand}</div>
+          <nav className={styles.nav} aria-label="Primary">
+            {navigation}
+          </nav>
+          {footer ? <div className={styles.railFooter}>{footer}</div> : null}
+        </aside>
+      )}
       <main id="ad-main" className={styles.main} tabIndex={-1}>
         {children}
       </main>
+    </div>
+  );
+}
+
+export interface NavSectionProps {
+  /** What the items in this group are, e.g. "Courses". */
+  label: string;
+  children: ReactNode;
+}
+
+/** A labelled group of destinations in the rail, below the primary ones. */
+export function NavSection({ label, children }: NavSectionProps) {
+  return (
+    <div className={styles.navSection} role="group" aria-label={label}>
+      <span className={styles.navSectionLabel} aria-hidden="true">
+        {label}
+      </span>
+      {children}
     </div>
   );
 }
@@ -52,7 +81,7 @@ export function NavItem({ label, icon, current = false, className, ...rest }: Na
       <span className={styles.navIcon} aria-hidden="true">
         {icon}
       </span>
-      {label}
+      <span className={styles.navLabel}>{label}</span>
     </button>
   );
 }
@@ -82,12 +111,12 @@ export function Page({
   return (
     <div className={cx(styles.page, styles[width])}>
       <header className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          {eyebrow ? <div className={styles.eyebrow}>{eyebrow}</div> : null}
+        {eyebrow ? <div className={styles.eyebrow}>{eyebrow}</div> : null}
+        <div className={styles.pageTitleRow}>
           <h1 className={styles.pageTitle}>{title}</h1>
-          {description ? <p className={styles.pageDescription}>{description}</p> : null}
+          {actions ? <div className={styles.pageActions}>{actions}</div> : null}
         </div>
-        {actions ? <div className={styles.pageActions}>{actions}</div> : null}
+        {description ? <div className={styles.pageDescription}>{description}</div> : null}
       </header>
       {children}
     </div>

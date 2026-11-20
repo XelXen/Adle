@@ -10,7 +10,12 @@
 import type { Page } from '@playwright/test';
 
 import { expect, test, waitForCore } from './support/app';
-import { expectNoAccessibilityViolations, openCourseTab, screenshot } from './support/courses';
+import {
+  courseCard,
+  expectNoAccessibilityViolations,
+  openCourseTab,
+  screenshot,
+} from './support/courses';
 
 /** The voices that speak on this computer, as the app would list them. */
 async function localVoices(page: Page): Promise<string[]> {
@@ -42,7 +47,7 @@ async function localVoices(page: Page): Promise<string[]> {
 
 async function openSampleLesson(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Library', exact: true }).click();
-  const sample = page.getByRole('button', { name: /Introduction to neural networks/ });
+  const sample = courseCard(page, /Introduction to neural networks/);
   if (await sample.isVisible()) await sample.click();
   else await page.getByRole('button', { name: 'Try the sample course' }).click();
   await expect(

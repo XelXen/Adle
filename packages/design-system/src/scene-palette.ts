@@ -5,6 +5,11 @@
  * bridge: the player supplies `background`, and the scene-authoring skill and
  * the generation prompt list the foreground colours. `tokens.test.ts` asserts
  * that every value here still equals the token it mirrors.
+ *
+ * The stage, its ink and its muted text have tokens of their own (`--ad-color-scene-*`).
+ * These values are written into every scene file there is, in the sample course and in
+ * lessons already generated on people's computers, so they stay as they are when the
+ * interface around the stage is redesigned.
  */
 
 export interface ScenePalette {
@@ -21,9 +26,9 @@ export interface ScenePalette {
 
 /** Scene colour name -> design token it mirrors. */
 export const SCENE_PALETTE_TOKENS: Record<keyof ScenePalette, string> = {
-  background: '--ad-color-surface',
-  ink: '--ad-color-ink',
-  muted: '--ad-color-muted',
+  background: '--ad-color-scene-background',
+  ink: '--ad-color-scene-ink',
+  muted: '--ad-color-scene-muted',
   // Scenes keep their green. It is the success green, not the brand's teal.
   green: '--ad-color-success',
   sun: '--ad-color-sun',

@@ -31,22 +31,24 @@
   align-items: center;
   gap: var(--ad-space-4);
   width: 100%;
-  padding: var(--ad-space-4) var(--ad-space-5);
+  padding: var(--ad-space-4) var(--ad-space-5) var(--ad-space-4) var(--ad-space-4);
   text-align: left;
   cursor: pointer;
   transition:
     border-color var(--ad-duration-fast) var(--ad-ease-out),
     box-shadow var(--ad-duration-base) var(--ad-ease-out),
-    transform var(--ad-duration-fast) var(--ad-ease-out);
+    transform var(--ad-duration-base) var(--ad-ease-out);
 }
 
 .action:hover:not(:disabled) {
-  border-color: var(--ad-color-primary);
+  border-color: var(--ad-color-border-control);
   box-shadow: var(--ad-shadow-2);
+  transform: translateY(-1px);
 }
 
 .action:active:not(:disabled) {
-  transform: translateY(1px);
+  box-shadow: var(--ad-shadow-1);
+  transform: none;
 }
 
 .action:disabled {
@@ -59,28 +61,30 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 3rem;
-  height: 3rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: var(--ad-radius-control);
   background: var(--ad-color-primary-soft);
   color: var(--ad-color-primary-text);
 }
 
 .media svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke-width: 1.75;
 }
 
 .actionText {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-1);
+  gap: 0.125rem;
   flex: 1;
   min-width: 0;
 }
 
 .actionTitle {
   font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
   color: var(--ad-color-ink);
 }
 
@@ -94,5 +98,18 @@
   align-items: center;
   gap: var(--ad-space-3);
   flex: none;
-  color: var(--ad-color-muted);
+  color: var(--ad-color-faint);
+  transition:
+    color var(--ad-duration-fast) var(--ad-ease-out),
+    transform var(--ad-duration-base) var(--ad-ease-out);
+}
+
+.meta svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* The arrow leans towards where the card leads. */
+.action:hover:not(:disabled) .meta {
+  color: var(--ad-color-ink);
 }

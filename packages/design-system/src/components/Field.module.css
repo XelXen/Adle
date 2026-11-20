@@ -1,12 +1,13 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-2);
+  gap: 0.375rem;
   min-width: 0;
 }
 
 .label {
-  font: var(--ad-text-body-strong);
+  font: var(--ad-text-control);
+  letter-spacing: var(--ad-tracking-tight);
   color: var(--ad-color-ink);
 }
 
@@ -28,17 +29,21 @@
   background: var(--ad-color-surface);
   border: var(--ad-border-width) solid var(--ad-color-border-strong);
   border-radius: var(--ad-radius-control);
-  transition: border-color var(--ad-duration-fast) var(--ad-ease-out);
+  box-shadow: var(--ad-shadow-control);
+  transition:
+    border-color var(--ad-duration-fast) var(--ad-ease-out),
+    box-shadow var(--ad-duration-fast) var(--ad-ease-out);
 }
 
 .control:hover {
-  border-color: var(--ad-color-ink);
+  border-color: var(--ad-color-muted);
 }
 
 /* The wrapper draws the ring so trailing buttons sit inside it. */
 .control:focus-within {
+  border-color: var(--ad-color-focus);
   outline: var(--ad-focus-ring);
-  outline-offset: var(--ad-focus-offset);
+  outline-offset: 0;
 }
 
 .invalid,
@@ -65,7 +70,7 @@
 }
 
 .input::placeholder {
-  color: var(--ad-color-muted);
+  color: var(--ad-color-faint);
   opacity: 1;
 }
 
@@ -79,9 +84,10 @@
 }
 
 .textarea {
-  padding: var(--ad-space-3);
+  padding: 0.625rem var(--ad-space-3);
   resize: vertical;
   min-height: 6rem;
+  line-height: 1.5rem;
 }
 
 .select {
@@ -91,11 +97,11 @@
     linear-gradient(45deg, transparent 50%, currentcolor 50%),
     linear-gradient(135deg, currentcolor 50%, transparent 50%);
   background-position:
-    calc(100% - 1.125rem) 50%,
+    calc(100% - 1.0625rem) 50%,
     calc(100% - 0.8125rem) 50%;
   background-size:
-    0.3125rem 0.3125rem,
-    0.3125rem 0.3125rem;
+    0.25rem 0.25rem,
+    0.25rem 0.25rem;
   background-repeat: no-repeat;
   cursor: pointer;
 }

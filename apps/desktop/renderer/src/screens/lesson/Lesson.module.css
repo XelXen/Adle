@@ -2,7 +2,7 @@
 .player {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-4);
+  gap: var(--ad-space-5);
   min-width: 0;
 }
 
@@ -16,21 +16,23 @@
 
 .segmentTitle {
   margin: 0;
-  font: var(--ad-text-heading);
+  font: var(--ad-text-subtitle);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
 .position {
-  font: var(--ad-text-supporting);
-  color: var(--ad-color-muted);
+  font: var(--ad-text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--ad-color-faint);
 }
 
 .body {
   display: grid;
-  gap: var(--ad-space-5);
+  gap: var(--ad-space-6);
   align-items: start;
 }
 
-@media (min-width: 72rem) {
+@media (min-width: 68rem) {
   .body.withSide {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
@@ -52,105 +54,149 @@
 
 .sideTitle {
   margin: 0;
-  font: var(--ad-text-caption);
-  color: var(--ad-color-muted);
+  font: var(--ad-text-eyebrow);
+  letter-spacing: var(--ad-tracking-eyebrow);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--ad-color-faint);
 }
 
-/* ---- Parts of the lesson ----------------------------------------------------- */
+/* ---- Parts of the lesson -----------------------------------------------------
+ * One strip, cut into as many pieces as the lesson has parts. Each piece is a button
+ * with a comfortable target; what is drawn inside it is a thin bar. */
 .parts {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--ad-space-2);
+  gap: 0.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.parts li {
+  flex: 1;
+  min-width: 0;
+}
+
 .part {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2rem;
-  height: 2rem;
-  padding: 0 var(--ad-space-2);
-  border: var(--ad-border-width) solid var(--ad-color-border-strong);
-  border-radius: var(--ad-radius-pill);
-  background: var(--ad-color-surface);
-  color: var(--ad-color-ink);
-  font: var(--ad-text-caption);
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ad-radius-small);
+  background: transparent;
+  /* The number is the button's text for anything that reads it; the strip shows a bar. */
+  font-size: 0;
+  color: transparent;
   cursor: pointer;
 }
 
+.part::before {
+  content: '';
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 0.25rem;
+  border-radius: var(--ad-radius-pill);
+  /* A part that can be opened has a bar that can be seen against the page. */
+  background: var(--ad-color-border-strong);
+  transform: translateY(-50%);
+  transition:
+    height var(--ad-duration-fast) var(--ad-ease-out),
+    background-color var(--ad-duration-base) var(--ad-ease-out);
+}
+
+.part:hover:not(:disabled)::before {
+  height: 0.5rem;
+}
+
 .part:disabled {
-  border-color: var(--ad-color-border);
-  background: transparent;
-  color: var(--ad-color-muted);
   cursor: default;
 }
 
-.partDone {
-  border-color: var(--ad-color-primary-text);
-  background: var(--ad-color-primary-soft);
-  color: var(--ad-color-primary-text);
+.part:disabled::before {
+  background: var(--ad-color-surface-sunken);
 }
 
-.partCurrent,
-.partCurrent:disabled {
-  border-color: var(--ad-color-action);
-  background: var(--ad-color-action);
-  color: var(--ad-color-on-action);
+.partDone::before {
+  background: var(--ad-color-primary);
+}
+
+.partCurrent::before,
+.partCurrent:disabled::before {
+  height: 0.375rem;
+  background: var(--ad-color-ink);
 }
 
 /* ---- The board: what the narration has put on screen so far ------------------ */
 .board {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-3);
-  padding: var(--ad-space-5);
+  gap: var(--ad-space-4);
+  padding: var(--ad-space-6);
   border: var(--ad-border-width) solid var(--ad-color-border);
   border-radius: var(--ad-radius-card);
   background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-1);
 }
 
 .boardEmpty {
   font: var(--ad-text-supporting);
-  color: var(--ad-color-muted);
+  color: var(--ad-color-faint);
 }
 
 .problemStatement {
-  padding-bottom: var(--ad-space-3);
+  padding-bottom: var(--ad-space-4);
   border-bottom: var(--ad-border-width) solid var(--ad-color-border);
-  font: var(--ad-text-body-strong);
+  font: var(--ad-text-reading);
+  color: var(--ad-color-muted);
 }
 
 .points {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-3);
+  gap: var(--ad-space-4);
   margin: 0;
   padding-left: var(--ad-space-5);
-  font: var(--ad-text-heading);
-  font-weight: 500;
+  font: var(--ad-text-reading-large);
+}
+
+.points li::marker {
+  font: var(--ad-text-supporting);
+  font-variant-numeric: tabular-nums;
+  color: var(--ad-color-faint);
+}
+
+/* Each line arrives as it is said. */
+.points li {
+  padding-left: var(--ad-space-1);
+  animation: written var(--ad-duration-slow) var(--ad-ease-out);
+}
+
+@keyframes written {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
 }
 
 .prompt {
-  font: var(--ad-text-heading);
-  font-weight: 500;
+  font: var(--ad-text-reading-large);
 }
 
 .alternative {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--ad-space-2);
 }
 
 .alternativeText {
+  align-self: stretch;
   padding: var(--ad-space-3) var(--ad-space-4);
   border-radius: var(--ad-radius-control);
   background: var(--ad-color-surface-subtle);
   font: var(--ad-text-supporting);
+  line-height: 1.375rem;
 }
 
 /* ---- Transcript ---------------------------------------------------------------- */
@@ -161,16 +207,20 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  font: var(--ad-text-reading);
 }
 
 .beat {
-  padding-left: var(--ad-space-3);
-  border-left: 3px solid transparent;
-  color: var(--ad-color-muted);
+  padding-left: var(--ad-space-4);
+  border-left: 2px solid transparent;
+  color: var(--ad-color-faint);
+  transition:
+    color var(--ad-duration-slow) var(--ad-ease-out),
+    border-color var(--ad-duration-slow) var(--ad-ease-out);
 }
 
 .beatSpoken {
-  color: var(--ad-color-ink);
+  color: var(--ad-color-muted);
 }
 
 .beatCurrent {
@@ -179,25 +229,31 @@
 }
 
 .word {
-  border-radius: calc(var(--ad-radius-small) / 2);
+  border-radius: 0.1875rem;
   background: var(--ad-color-primary-soft);
   color: var(--ad-color-ink);
+  /* The mark is wider than the word by a hair, so it does not clip the letters. */
+  box-shadow: 0 0 0 0.125rem var(--ad-color-primary-soft);
 }
 
-/* ---- Controls ------------------------------------------------------------------- */
-/* Always within reach: the bar stays at the bottom edge while a long part scrolls behind it. */
+/* ---- Controls --------------------------------------------------------------------
+ * Always within reach: one bar that floats at the bottom edge while a long part scrolls
+ * behind it. */
 .controls {
   position: sticky;
-  bottom: 0;
+  bottom: var(--ad-space-4);
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--ad-space-3);
-  padding: var(--ad-space-3) 0;
-  border-top: var(--ad-border-width) solid var(--ad-color-border);
-  background: var(--ad-color-canvas);
+  gap: var(--ad-space-2) var(--ad-space-3);
+  margin-top: var(--ad-space-2);
+  padding: var(--ad-space-2);
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-large);
+  background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-2);
 }
 
 .controlGroup {
@@ -213,6 +269,7 @@
 }
 
 .note {
+  padding: 0 var(--ad-space-2);
   font: var(--ad-text-supporting);
   color: var(--ad-color-muted);
 }
@@ -221,16 +278,17 @@
 .question {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-4);
-  padding: var(--ad-space-5);
+  gap: var(--ad-space-5);
+  padding: var(--ad-space-6);
   border: var(--ad-border-width) solid var(--ad-color-border);
   border-radius: var(--ad-radius-card);
   background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-1);
 }
 
 .stem {
-  font: var(--ad-text-heading);
-  font-weight: 500;
+  max-width: var(--ad-layout-reading-max);
+  font: var(--ad-text-reading-large);
 }
 
 .answerField {
@@ -252,9 +310,10 @@
   align-items: center;
   gap: var(--ad-space-2);
   padding: var(--ad-space-2) var(--ad-space-2) var(--ad-space-2) var(--ad-space-4);
-  border: var(--ad-border-width) solid var(--ad-color-border-strong);
-  border-radius: var(--ad-radius-control);
+  border: var(--ad-border-width) solid var(--ad-color-border-control);
+  border-radius: var(--ad-radius-card);
   background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-control);
   counter-increment: order;
 }
 
@@ -265,7 +324,8 @@
 
 .orderingText::before {
   content: counter(order) '. ';
-  color: var(--ad-color-muted);
+  font-variant-numeric: tabular-nums;
+  color: var(--ad-color-faint);
 }
 
 .compare {
@@ -273,7 +333,7 @@
   flex-direction: column;
   gap: var(--ad-space-4);
   padding: var(--ad-space-4);
-  border-radius: var(--ad-radius-control);
+  border-radius: var(--ad-radius-card);
   background: var(--ad-color-surface-subtle);
 }
 
@@ -321,15 +381,17 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--ad-space-4);
-  padding: var(--ad-space-6);
+  padding: var(--ad-space-7);
   border: var(--ad-border-width) solid var(--ad-color-border);
-  border-radius: var(--ad-radius-card);
+  border-radius: var(--ad-radius-large);
   background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-1);
 }
 
 .finishedTitle {
   margin: 0;
   font: var(--ad-text-title);
+  letter-spacing: var(--ad-tracking-display);
 }
 
 .finishedLine {
@@ -361,12 +423,13 @@
   gap: var(--ad-space-2);
   padding: var(--ad-space-4);
   border: var(--ad-border-width) solid var(--ad-color-border);
-  border-radius: var(--ad-radius-control);
+  border-radius: var(--ad-radius-card);
 }
 
 .wayTitle {
   margin: 0;
   font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
 .wayField {

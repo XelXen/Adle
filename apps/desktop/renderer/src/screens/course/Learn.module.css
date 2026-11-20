@@ -8,21 +8,24 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-4);
+  gap: var(--ad-space-3);
   min-width: 0;
 }
 
 .heading {
   margin: 0;
   font: var(--ad-text-heading);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
 .summary {
   margin: 0;
+  color: var(--ad-color-muted);
 }
 
 .aiNote {
   margin: 0;
+  max-width: var(--ad-layout-reading-max);
   font: var(--ad-text-supporting);
   color: var(--ad-color-muted);
 }
@@ -40,9 +43,11 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  counter-reset: concept;
   border: var(--ad-border-width) solid var(--ad-color-border);
   border-radius: var(--ad-radius-card);
   background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-1);
 }
 
 .concept {
@@ -51,7 +56,20 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--ad-space-3) var(--ad-space-5);
-  padding: var(--ad-space-4) var(--ad-space-5);
+  padding: var(--ad-space-4) var(--ad-space-5) var(--ad-space-4) 3.25rem;
+  position: relative;
+  counter-increment: concept;
+}
+
+/* Its place in the order, set like the number of a line in a table of contents. */
+.concept::before {
+  content: counter(concept, decimal-leading-zero);
+  position: absolute;
+  top: 1.125rem;
+  left: var(--ad-space-5);
+  font: var(--ad-text-caption);
+  font-family: var(--ad-font-mono);
+  color: var(--ad-color-faint);
 }
 
 .concept + .concept {
@@ -75,6 +93,7 @@
 
 .conceptTitle {
   font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
   overflow-wrap: anywhere;
 }
 

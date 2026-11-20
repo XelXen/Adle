@@ -1,7 +1,7 @@
 import { Blocks, HardDrive, Route as RouteIcon, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
-import { Button, Callout, Logo } from '@adle/design-system';
+import { Button, Logo } from '@adle/design-system';
 
 import { useApp } from '../../app/AppContext';
 import { useRouter } from '../../app/router';
@@ -25,6 +25,56 @@ const HIGHLIGHTS = [
   },
 ] as const;
 
+/**
+ * A lesson in miniature, drawn rather than photographed: a picture with something to move,
+ * the words beside it, and where the learner is in the whole. It decorates the welcome and
+ * says nothing a reader of the text beside it would miss.
+ */
+function LessonSketch() {
+  return (
+    <div className={styles.sketch} aria-hidden="true">
+      <div className={styles.sketchStrip}>
+        <span className={styles.sketchDone} />
+        <span className={styles.sketchDone} />
+        <span className={styles.sketchNow} />
+        <span />
+        <span />
+        <span />
+      </div>
+      <p className={styles.sketchTitle}>What a neuron does with its sum</p>
+      <div className={styles.sketchBody}>
+        <svg className={styles.sketchStage} viewBox="0 0 240 150">
+          <line className={styles.sketchAxis} x1="20" y1="124" x2="224" y2="124" />
+          <line className={styles.sketchAxis} x1="122" y1="16" x2="122" y2="130" />
+          <path
+            className={styles.sketchCurve}
+            d="M20 122 C 80 122, 98 114, 122 72 S 164 24, 224 22"
+          />
+          <line className={styles.sketchGuide} x1="150" y1="124" x2="150" y2="42" />
+          <circle className={styles.sketchDot} cx="150" cy="42" r="5.5" />
+          <line className={styles.sketchTrack} x1="42" y1="142" x2="202" y2="142" />
+          <line className={styles.sketchFill} x1="42" y1="142" x2="150" y2="142" />
+          <circle className={styles.sketchKnob} cx="150" cy="142" r="5" />
+        </svg>
+        <div className={styles.sketchWords}>
+          <span className={styles.sketchSaid} />
+          <span className={styles.sketchSaid} />
+          <span className={styles.sketchSaying} />
+          <span className={styles.sketchSaying} />
+          <span className={styles.sketchUnsaid} />
+          <span className={styles.sketchUnsaid} />
+        </div>
+      </div>
+      <div className={styles.sketchNext}>
+        <span className={styles.sketchNextLabel}>Next</span>
+        <span className={styles.sketchNextText}>
+          The perceptron, because it builds on what you have just shown
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /** First-run screen: what Adle is, and exactly what does and does not leave this computer. */
 export function WelcomeScreen() {
   const { updateUi } = useApp();
@@ -43,50 +93,64 @@ export function WelcomeScreen() {
 
   return (
     <main className={styles.screen}>
-      <div className={styles.panel}>
-        <header className={styles.header}>
-          <Logo size="large" />
-          <h1 className={styles.headline}>Learn at your own pace. Understand for real.</h1>
-          <p className={styles.lede}>
-            Adle is a learning environment that works out what you already understand and teaches
-            what you need next.
-          </p>
-        </header>
+      <div className={styles.layout}>
+        <div className={styles.panel}>
+          <header className={styles.header}>
+            <Logo size="large" />
+            <h1 className={styles.headline}>Learn at your own pace. Understand for real.</h1>
+            <p className={styles.lede}>
+              Adle is a learning environment that works out what you already understand and teaches
+              what you need next.
+            </p>
+          </header>
 
-        <ul className={styles.highlights}>
-          {HIGHLIGHTS.map(({ icon: Icon, title, body }) => (
-            <li key={title} className={styles.highlight}>
-              <span className={styles.highlightIcon} aria-hidden="true">
-                <Icon />
-              </span>
-              <div>
-                <h2 className={styles.highlightTitle}>{title}</h2>
-                <p className={styles.highlightBody}>{body}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+          <ul className={styles.highlights}>
+            {HIGHLIGHTS.map(({ icon: Icon, title, body }) => (
+              <li key={title} className={styles.highlight}>
+                <span className={styles.highlightIcon} aria-hidden="true">
+                  <Icon />
+                </span>
+                <div>
+                  <h2 className={styles.highlightTitle}>{title}</h2>
+                  <p className={styles.highlightBody}>{body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
 
-        <Callout tone="info" title="Your learning stays on this computer">
-          <p>
-            <HardDrive className={styles.inlineIcon} aria-hidden="true" /> Course files, answers,
-            and progress are stored only here. There are no accounts and no analytics.
-          </p>
-          <p className={styles.calloutSecond}>
-            One thing uses the internet: creating a course or lesson with AI sends the relevant text
-            to the one AI provider you choose (AIHubMix or NVIDIA NIM). Nothing is sent until you
-            add a key and ask for it.
-          </p>
-        </Callout>
+          <section className={styles.promise} aria-labelledby="welcome-promise">
+            <HardDrive className={styles.promiseIcon} aria-hidden="true" />
+            <div className={styles.promiseText}>
+              <h2 id="welcome-promise" className={styles.promiseTitle}>
+                Your learning stays on this computer
+              </h2>
+              <p>
+                Course files, answers, and progress are stored only here. There are no accounts and
+                no analytics.
+              </p>
+              <p>
+                One thing uses the internet: creating a course or lesson with AI sends the relevant
+                text to the one AI provider you choose (AIHubMix or NVIDIA NIM). Nothing is sent
+                until you add a key and ask for it.
+              </p>
+            </div>
+          </section>
 
-        <div className={styles.actions}>
-          <Button variant="primary" size="large" loading={busy} onClick={() => void finish('home')}>
-            Get started
-          </Button>
-          <Button size="large" disabled={busy} onClick={() => void finish('ai')}>
-            Set up AI first
-          </Button>
+          <div className={styles.actions}>
+            <Button
+              variant="primary"
+              size="large"
+              loading={busy}
+              onClick={() => void finish('home')}
+            >
+              Get started
+            </Button>
+            <Button size="large" disabled={busy} onClick={() => void finish('ai')}>
+              Set up AI first
+            </Button>
+          </div>
         </div>
+        <LessonSketch />
       </div>
     </main>
   );

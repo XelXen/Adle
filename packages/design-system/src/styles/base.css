@@ -1,5 +1,7 @@
 /* Global element defaults. Component styling lives in each component's CSS module. */
 @import '@fontsource-variable/inter/wght.css';
+@import '@fontsource-variable/newsreader/opsz.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
 @import './tokens.css';
 
 *,
@@ -20,7 +22,10 @@ body {
   background: var(--ad-color-canvas);
   color: var(--ad-color-ink);
   font: var(--ad-text-body);
-  font-feature-settings: 'cv11', 'ss03';
+  /* Inter as drawn (the two-storey "a"), with round quotation marks and commas, and an
+     "l" with a tail so that it is never read as a capital "I". */
+  font-feature-settings: 'ss03', 'cv05';
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -36,6 +41,19 @@ figure {
   margin: 0;
 }
 
+/* A heading that breaks into lines of even length; a paragraph without a stray last word. */
+h1,
+h2,
+h3,
+h4 {
+  text-wrap: balance;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
 button,
 input,
 select,
@@ -47,6 +65,20 @@ textarea {
 a {
   color: var(--ad-color-primary-text);
   text-underline-offset: 0.2em;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.25rem;
+  padding: 0 var(--ad-space-1);
+  border: var(--ad-border-width) solid var(--ad-color-border-control);
+  border-bottom-width: 2px;
+  border-radius: var(--ad-radius-small);
+  background: var(--ad-color-surface);
+  font: var(--ad-text-caption);
+  font-family: var(--ad-font-mono);
+  color: var(--ad-color-muted);
+  text-align: center;
 }
 
 /* One focus treatment for every interactive element, visible on any surface. */
@@ -62,7 +94,7 @@ a {
 /* Quiet scrollbars that match the surface they sit on. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--ad-color-border-strong) transparent;
+  scrollbar-color: var(--ad-color-border-control) transparent;
 }
 
 ::selection {
@@ -73,6 +105,14 @@ a {
 /* Quantities that change (timers, counts, progress) should not jitter. */
 .ad-tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* A small label above a group: what kind of thing follows. */
+.ad-eyebrow {
+  font: var(--ad-text-eyebrow);
+  letter-spacing: var(--ad-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ad-color-faint);
 }
 
 /* Visually hidden but available to assistive technology. */

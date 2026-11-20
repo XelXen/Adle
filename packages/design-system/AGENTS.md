@@ -12,8 +12,16 @@ Read the root `AGENTS.md` and `DESIGN_SYSTEM.md` first.
 - **Brand and success are different colours.** `primary` / `action` are the teal of the mark;
   `success` is green and means only "this went well". `brand-ink` is for the logo alone
   (ADR-011).
-- If you change a token that scenes use, update `src/scene-palette.ts` and the palette table in
-  `skills/wanim-scene-authoring/SKILL.md` (a test checks the first; you check the second).
+- **Two voices** (ADR-022): the serif (`text-display`, `-title`, `-subtitle`, `-reading*`) is
+  for what is read; the sans is for what is operated. Never a serif button or a sans lesson.
+- **Three grounds:** `canvas` (the frame), `page` (the main panel), `surface` (a thing on the
+  page). A new text colour needs a contrast pair on each ground it is used on.
+- **Teal is for the filled action and for selection.** Do not use it to decorate, and do not
+  mark importance with a coloured edge.
+- The `scene-*` tokens are frozen: scene files have those values written into them. If you
+  change an accent that scenes share (`success`, `sun`, `coral`, `blue`, `violet`), update
+  `src/scene-palette.ts` and the palette table in `skills/wanim-scene-authoring/SKILL.md` (a
+  test checks the first; you check the second), then `npm run scene-guide`.
 - **One component, one file pair:** `Name.tsx` + `Name.module.css`, exported from `src/index.ts`.
   No one-off variants in screens: extend the component here.
 - **Accessibility is part of the component.** Real elements (`button`, `input`, `dialog`), a

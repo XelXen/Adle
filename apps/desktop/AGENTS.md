@@ -134,6 +134,12 @@ most, a file's name.
 - Set a theme with `launchApp(dir, { theme })`, not media emulation: it exercises the real path.
 - `getByRole(role, { name })` matches substrings. Add `exact: true` for short names such as
   navigation items; a card on the same screen may contain the same word.
+- A course is in two places: its card in the library and its entry in the rail. Ask for the
+  card with `courseCard(page, name)`.
+- A lesson and a round of questions have no rail (`AppShell focus`). A journey that needs
+  Settings or the library from there goes back to the course first.
+- `expectNoAccessibilityViolations` and `screenshot` wait for motion to finish (`settled`).
+  Do the same before measuring a colour or comparing two pictures yourself.
 - Never drive a native dialog. Replace `dialog.showOpenDialog` in the main process with
   `app.evaluate` (`chooseInFileDialog` in `e2e/support/courses.ts`, which also has the shared
   steps for creating a course, importing, running axe, and saving a screenshot).

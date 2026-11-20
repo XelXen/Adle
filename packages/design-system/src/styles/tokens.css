@@ -4,8 +4,14 @@
  * Rules:
  *   - Components and screens use these variables. No raw hex values, radii, or
  *     spacing numbers anywhere else (enforced by tokens.test.ts).
- *   - The brand colour is the teal of the Adle mark. Success has a green of its own,
+ *   - Three levels of surface, and each has one job: `canvas` is the frame of the app
+ *     (the rail, the lesson's backdrop), `page` is what content is read on, and
+ *     `surface` is a thing lying on the page (a card, a dialog, a field).
+ *   - The brand colour is the teal of the Adle mark. It is the one filled action and the
+ *     mark of selection, and is not used to decorate. Success has a green of its own,
  *     so "this is the product" and "this went well" never look the same.
+ *   - Two typefaces, each with one job: the serif sets what is read (titles, a lesson's
+ *     own words), the sans sets what is operated (labels, controls, data).
  *   - The dark theme is designed, not inverted: deep surfaces, softened accents, and
  *     its own action colours.
  *   - The theme follows `prefers-color-scheme`. The desktop shell maps the
@@ -19,70 +25,101 @@
   color-scheme: light dark;
 
   /* ---- Colour: surfaces and text --------------------------------------- */
-  --ad-color-canvas: #f6f8f4;
+  --ad-color-canvas: #f3f4f1;
+  --ad-color-page: #fbfbfa;
   --ad-color-surface: #ffffff;
-  --ad-color-surface-subtle: #eef3ed;
-  --ad-color-ink: #17251e;
-  --ad-color-muted: #5f6e65;
-  --ad-color-border: #dce5dc;
-  /* Boundaries of interactive controls need 3:1 against their background. */
-  --ad-color-border-strong: #7f9084;
+  --ad-color-surface-subtle: #f2f3f0;
+  /* A well: something set into the page (a track, the ground of a segmented control). */
+  --ad-color-surface-sunken: #e9ebe7;
+  --ad-color-ink: #141b18;
+  --ad-color-muted: #55605a;
+  /* The quietest text that is still text: a count, a date, a unit. */
+  --ad-color-faint: #66706b;
+  --ad-color-border: #e4e6e2;
+  /* The edge of a button, which its label already identifies. */
+  --ad-color-border-control: #cdd2cc;
+  /* Boundaries of fields and switches need 3:1 against their background. */
+  --ad-color-border-strong: #7b8780;
 
   /* ---- Colour: brand and actions ---------------------------------------- */
-  /* The teal of the mark. White labels on it reach 4.5:1, so it is also the filled action. */
+  /* The teal of the mark. */
   --ad-color-primary: #167d8d;
-  --ad-color-primary-soft: #dff1f3;
-  --ad-color-action: #167d8d;
-  --ad-color-action-hover: #116876;
-  --ad-color-action-pressed: #0d545f;
+  --ad-color-primary-soft: #e3f1f2;
+  /* The filled action: a little deeper than the mark, so white labels sit well clear of 4.5:1. */
+  --ad-color-action: #12707e;
+  --ad-color-action-hover: #0e616d;
+  --ad-color-action-pressed: #0b525c;
   --ad-color-on-action: #ffffff;
   /* Teal used as text or icon on light surfaces, including on primary-soft. */
-  --ad-color-primary-text: #0f6672;
+  --ad-color-primary-text: #0d6370;
   /* The dark letter of the mark. Only the logo uses it. */
   --ad-color-brand-ink: #071b2b;
 
   /* ---- Colour: success ---------------------------------------------------- */
   --ad-color-success: #269b62;
-  --ad-color-success-soft: #e2f4e9;
+  --ad-color-success-soft: #e4f3ea;
   --ad-color-success-text: #1b7549;
 
   /* ---- Colour: accents --------------------------------------------------- */
   --ad-color-sun: #f2c14e;
-  --ad-color-sun-soft: #fcf3d9;
+  --ad-color-sun-soft: #fbf2d9;
   --ad-color-sun-text: #7a5a05;
   --ad-color-coral: #ef806c;
-  --ad-color-coral-soft: #fce9e5;
+  --ad-color-coral-soft: #fbeae6;
   --ad-color-coral-text: #a8412c;
   --ad-color-blue: #5b8de6;
-  --ad-color-blue-soft: #e6eefb;
+  --ad-color-blue-soft: #e8effb;
   --ad-color-blue-text: #2a5bb5;
   --ad-color-violet: #9178d7;
-  --ad-color-violet-soft: #ede8f9;
+  --ad-color-violet-soft: #eeeaf9;
   --ad-color-violet-text: #5d43a8;
 
   /* ---- Colour: feedback -------------------------------------------------- */
   --ad-color-danger: #c84e4e;
   --ad-color-danger-hover: #ac3d3d;
-  --ad-color-danger-soft: #fbe9e9;
+  --ad-color-danger-soft: #fbeaea;
   --ad-color-danger-text: #a23636;
   --ad-color-on-danger: #ffffff;
   --ad-color-focus: #1f6fd6;
-  --ad-color-overlay: rgb(23 37 30 / 0.5);
+  --ad-color-overlay: rgb(16 22 19 / 0.42);
+
+  /* ---- Colour: the scene stage ----------------------------------------------
+   * What generated scenes are drawn on and with. Scenes are Python files with these
+   * values written into them (scene-palette.ts, the authoring skill), so they do not
+   * move when the interface's own colours do. */
+  --ad-color-scene-background: #ffffff;
+  --ad-color-scene-ink: #17251e;
+  --ad-color-scene-muted: #5f6e65;
 
   /* ---- Typography ------------------------------------------------------- */
   --ad-font-sans:
     'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
-  --ad-font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+  --ad-font-serif:
+    'Newsreader Variable', Newsreader, 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia,
+    'Times New Roman', serif;
+  --ad-font-mono:
+    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'SF Mono', Menlo,
+    Consolas, monospace;
 
-  --ad-text-display: 700 2rem/2.5rem var(--ad-font-sans);
-  --ad-text-title: 650 1.5rem/2rem var(--ad-font-sans);
-  --ad-text-heading: 600 1.125rem/1.625rem var(--ad-font-sans);
+  /* What is read. */
+  --ad-text-display: 500 2.75rem/3rem var(--ad-font-serif);
+  --ad-text-title: 500 1.875rem/2.25rem var(--ad-font-serif);
+  --ad-text-subtitle: 500 1.375rem/1.75rem var(--ad-font-serif);
+  --ad-text-reading: 400 1.125rem/1.75rem var(--ad-font-serif);
+  --ad-text-reading-large: 400 1.3125rem/1.875rem var(--ad-font-serif);
+  /* What is operated. */
+  --ad-text-heading: 600 1rem/1.5rem var(--ad-font-sans);
   --ad-text-body: 400 0.9375rem/1.5rem var(--ad-font-sans);
-  --ad-text-body-strong: 600 0.9375rem/1.5rem var(--ad-font-sans);
-  --ad-text-supporting: 400 0.875rem/1.25rem var(--ad-font-sans);
-  --ad-text-caption: 500 0.8125rem/1.125rem var(--ad-font-sans);
-  --ad-tracking-tight: -0.015em;
+  --ad-text-body-strong: 550 0.9375rem/1.5rem var(--ad-font-sans);
+  --ad-text-control: 550 0.875rem/1.25rem var(--ad-font-sans);
+  --ad-text-supporting: 400 0.84375rem/1.25rem var(--ad-font-sans);
+  --ad-text-caption: 500 0.75rem/1rem var(--ad-font-sans);
+  --ad-text-eyebrow: 600 0.6875rem/1rem var(--ad-font-sans);
+  --ad-text-mono: 400 0.8125rem/1.25rem var(--ad-font-mono);
+  --ad-tracking-tight: -0.011em;
+  --ad-tracking-display: -0.02em;
+  --ad-tracking-eyebrow: 0.07em;
 
   /* ---- Spacing: 8 px grid with a 4 px half step -------------------------- */
   --ad-space-1: 0.25rem;
@@ -96,80 +133,104 @@
   --ad-space-9: 4rem;
 
   /* ---- Shape ------------------------------------------------------------ */
-  --ad-radius-small: 8px;
-  --ad-radius-control: 12px;
-  --ad-radius-card: 18px;
+  --ad-radius-small: 6px;
+  --ad-radius-control: 8px;
+  --ad-radius-card: 12px;
+  --ad-radius-large: 16px;
   --ad-radius-pill: 999px;
   --ad-border-width: 1px;
   --ad-focus-ring: 2px solid var(--ad-color-focus);
   --ad-focus-offset: 2px;
 
-  /* ---- Elevation: restrained ------------------------------------------- */
-  --ad-shadow-1: 0 1px 2px rgb(23 37 30 / 0.06), 0 1px 1px rgb(23 37 30 / 0.04);
-  --ad-shadow-2: 0 10px 28px rgb(23 37 30 / 0.12), 0 2px 6px rgb(23 37 30 / 0.06);
+  /* ---- Elevation: three heights, and most things have none ---------------- */
+  /* Resting: a card on the page. */
+  --ad-shadow-1: 0 1px 2px rgb(16 22 19 / 0.05);
+  /* Lifted: a card under the pointer, a menu. */
+  --ad-shadow-2: 0 6px 16px -4px rgb(16 22 19 / 0.1), 0 2px 4px -2px rgb(16 22 19 / 0.06);
+  /* Above everything: a dialog, a toast. */
+  --ad-shadow-3: 0 24px 48px -12px rgb(16 22 19 / 0.22), 0 8px 16px -8px rgb(16 22 19 / 0.1);
+  /* The edge of a control that can be pressed. */
+  --ad-shadow-control: 0 1px 1px rgb(16 22 19 / 0.05);
+  /* A filled action: lit from above, standing a little off the page. */
+  --ad-shadow-action: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px rgb(9 62 70 / 0.3);
+  --ad-shadow-danger: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px rgb(110 30 30 / 0.3);
 
   /* ---- Motion: feedback and orientation only ----------------------------- */
   --ad-duration-fast: 120ms;
   --ad-duration-base: 200ms;
+  --ad-duration-slow: 320ms;
   --ad-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* ---- Layout ----------------------------------------------------------- */
   --ad-layout-nav-width: 15rem;
-  --ad-layout-content-max: 70rem;
-  --ad-layout-reading-max: 44rem;
-  --ad-control-height: 2.5rem;
-  --ad-control-height-large: 3rem;
-  --ad-control-height-small: 2rem;
+  --ad-layout-content-max: 66rem;
+  --ad-layout-reading-max: 42rem;
+  --ad-layout-bar-height: 3.5rem;
+  --ad-control-height: 2.25rem;
+  --ad-control-height-large: 2.75rem;
+  --ad-control-height-small: 1.875rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ad-color-canvas: #101713;
-    --ad-color-surface: #18211c;
-    --ad-color-surface-subtle: #1f2a24;
-    --ad-color-ink: #e7efe9;
-    --ad-color-muted: #9db0a5;
-    --ad-color-border: #2c3a32;
-    --ad-color-border-strong: #6c8176;
+    --ad-color-canvas: #0c100e;
+    --ad-color-page: #111614;
+    --ad-color-surface: #171d1a;
+    --ad-color-surface-subtle: #1c2320;
+    --ad-color-surface-sunken: #090c0b;
+    --ad-color-ink: #e8eeea;
+    --ad-color-muted: #a2aea7;
+    --ad-color-faint: #8f9b94;
+    --ad-color-border: #262e2a;
+    --ad-color-border-control: #3a443f;
+    --ad-color-border-strong: #6a776f;
 
     --ad-color-primary: #3fb4c5;
-    --ad-color-primary-soft: #16323a;
+    --ad-color-primary-soft: #12292e;
     /* On dark surfaces the action is a bright fill with dark text. */
     --ad-color-action: #4cc0d0;
     --ad-color-action-hover: #66cddb;
     --ad-color-action-pressed: #80d9e5;
     --ad-color-on-action: #06161a;
     --ad-color-primary-text: #6fd1dd;
-    --ad-color-brand-ink: #e7efe9;
+    --ad-color-brand-ink: #e8eeea;
 
     --ad-color-success: #3dbe7f;
-    --ad-color-success-soft: #1c3327;
+    --ad-color-success-soft: #16291f;
     --ad-color-success-text: #6ad3a0;
 
     --ad-color-sun: #e9be5a;
-    --ad-color-sun-soft: #33290f;
+    --ad-color-sun-soft: #2c230d;
     --ad-color-sun-text: #edc971;
     --ad-color-coral: #f08f7d;
-    --ad-color-coral-soft: #3a1f1a;
+    --ad-color-coral-soft: #331b17;
     --ad-color-coral-text: #f4a394;
     --ad-color-blue: #7ba4ee;
-    --ad-color-blue-soft: #1a2740;
+    --ad-color-blue-soft: #172238;
     --ad-color-blue-text: #9dbcf3;
     --ad-color-violet: #a694e3;
-    --ad-color-violet-soft: #272040;
+    --ad-color-violet-soft: #221c38;
     --ad-color-violet-text: #bcaeea;
 
     --ad-color-danger: #e57373;
     --ad-color-danger-hover: #ec8d8d;
-    --ad-color-danger-soft: #3a1c1c;
+    --ad-color-danger-soft: #331818;
     --ad-color-danger-text: #f09a9a;
     --ad-color-on-danger: #1a0c0c;
     --ad-color-focus: #8ab4f8;
-    --ad-color-overlay: rgb(4 8 6 / 0.66);
+    --ad-color-overlay: rgb(3 6 5 / 0.68);
+
+    --ad-color-scene-background: #18211c;
+    --ad-color-scene-ink: #e7efe9;
+    --ad-color-scene-muted: #9db0a5;
 
     /* Shadows read poorly on dark surfaces; borders carry the separation. */
     --ad-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
-    --ad-shadow-2: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+    --ad-shadow-2: 0 8px 20px -4px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+    --ad-shadow-3: 0 24px 48px -12px rgb(0 0 0 / 0.7), 0 8px 16px -8px rgb(0 0 0 / 0.5);
+    --ad-shadow-control: 0 1px 1px rgb(0 0 0 / 0.3);
+    --ad-shadow-action: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 1px 2px rgb(0 0 0 / 0.4);
+    --ad-shadow-danger: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 1px 2px rgb(0 0 0 / 0.4);
   }
 }
 
@@ -177,5 +238,6 @@
   :root {
     --ad-duration-fast: 0.01ms;
     --ad-duration-base: 0.01ms;
+    --ad-duration-slow: 0.01ms;
   }
 }

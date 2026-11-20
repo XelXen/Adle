@@ -1,8 +1,11 @@
 # Sprout — Adle's design system
 
-**Playful precision.** Warm, optimistic, and crisp; friendly enough to invite a first try and
-serious enough for a university student or an adult learner. Sprout is original: it borrows the
-clarity of good learning apps, not anyone's mascot, palette, layouts, or sounds.
+**A quiet study.** Adle should look like a well-made book that happens to be software: calm,
+exact, and warm enough to invite a first try. The second edition (ADR-022) keeps what the first
+got right (tokens, one accent, honest states) and replaces what made it look like every other
+app: one typeface at one weight for everything, large radii, a tinted ground with white boxes
+on it. Sprout is original: it borrows the clarity of good learning tools and good editorial
+design, not anyone's mascot, palette, layouts, or sounds.
 
 Code: `packages/design-system`. Import components from `@adle/design-system`; import
 `@adle/design-system/base.css` once at the app entry.
@@ -11,77 +14,117 @@ Code: `packages/design-system`. Import components from `@adle/design-system`; im
 
 1. **Clarity before charm.** If a flourish makes a state harder to read, it goes.
 2. **One primary action per view.** Everything else is secondary or tertiary.
-3. **Honest progress.** Show what the evidence supports. Qualitative labels for learning state;
-   percentages only for tasks with a real denominator (an import, a lesson's segments).
-4. **Encourage, never pressure.** No streaks, guilt, or "you failed". Say what happened and what
+3. **Two voices.** What is *read* (a title, a lesson's own words, a question) is set in the
+   serif. What is *operated* (a label, a button, a count) is set in the sans. The difference
+   tells the learner which is which before they have read a word.
+4. **Three grounds.** The `canvas` is the frame of the app. The `page` is what content is
+   read on. A `surface` is a thing lying on the page. Nothing else gets a background of its
+   own without a reason.
+5. **The brand colour is spent sparingly.** Teal is the one filled action and the mark of
+   selection. It does not decorate. A page with teal everywhere has no primary action.
+6. **Honest progress.** Show what the evidence supports. Qualitative labels for learning state;
+   percentages only for tasks with a real denominator (an import, a lesson's parts).
+7. **Encourage, never pressure.** No streaks, guilt, or "you failed". Say what happened and what
    to try next.
-5. **Works without colour, mouse, sound, or motion.** Each is an enhancement.
+8. **Works without colour, mouse, sound, or motion.** Each is an enhancement.
 
 ## Tokens
 
 All values live in `src/styles/tokens.css` as `--ad-*` custom properties. Nothing else may define
-a colour (a test enforces this). Changes from the starting palette are explained in
-`docs/decisions/ADR-006-design-tokens-and-theme.md`, and the brand colour in
-`docs/decisions/ADR-011-brand-mark-and-colour.md`.
+a colour (a test enforces this). Why the values are what they are:
+`docs/decisions/ADR-006-design-tokens-and-theme.md` (the first edition),
+`docs/decisions/ADR-011-brand-mark-and-colour.md` (the brand colour), and
+`docs/decisions/ADR-022-sprout-second-edition.md` (this one).
 
 ### Colour
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `canvas` | `#F6F8F4` | `#101713` | App background |
-| `surface` | `#FFFFFF` | `#18211C` | Cards, panels, the scene stage |
-| `surface-subtle` | `#EEF3ED` | `#1F2A24` | Quiet regions, hover fills |
-| `ink` | `#17251E` | `#E7EFE9` | Main text |
-| `muted` | `#5F6E65` | `#9DB0A5` | Secondary text |
-| `border` | `#DCE5DC` | `#2C3A32` | Hairlines, card outlines |
-| `border-strong` | `#7F9084` | `#6C8176` | Boundaries of inputs and switches (3:1) |
+| `canvas` | `#F3F4F1` | `#0C100E` | The frame of the app: the rail lies on it |
+| `page` | `#FBFBFA` | `#111614` | What content is read on: the main panel |
+| `surface` | `#FFFFFF` | `#171D1A` | A thing on the page: cards, dialogs, fields |
+| `surface-subtle` | `#F2F3F0` | `#1C2320` | Quiet regions, hover fills |
+| `surface-sunken` | `#E9EBE7` | `#090C0B` | A well: a track, the ground of a segmented control, a neutral badge |
+| `ink` | `#141B18` | `#E8EEEA` | Main text |
+| `muted` | `#55605A` | `#A2AEA7` | Secondary text |
+| `faint` | `#66706B` | `#8F9B94` | The quietest text that is still text: a count, a date, a label above a group |
+| `border` | `#E4E6E2` | `#262E2A` | Hairlines, card outlines |
+| `border-control` | `#CDD2CC` | `#3A443F` | The edge of a button, which its label already identifies |
+| `border-strong` | `#7B8780` | `#6A776F` | Boundaries of fields and switches (3:1) |
 | `primary` | `#167D8D` | `#3FB4C5` | The brand teal: the mark, progress, selection |
-| `primary-soft` | `#DFF1F3` | `#16323A` | Selected and highlighted backgrounds |
-| `primary-text` | `#0F6672` | `#6FD1DD` | Teal used as text or icon |
-| `action` / `-hover` / `-pressed` | `#167D8D` / `#116876` / `#0D545F` | `#4CC0D0` / `#66CDDB` / `#80D9E5` | Filled primary buttons |
+| `primary-soft` | `#E3F1F2` | `#12292E` | Selected and highlighted backgrounds |
+| `primary-text` | `#0D6370` | `#6FD1DD` | Teal used as text or icon |
+| `action` / `-hover` / `-pressed` | `#12707E` / `#0E616D` / `#0B525C` | `#4CC0D0` / `#66CDDB` / `#80D9E5` | Filled primary buttons |
 | `on-action` | `#FFFFFF` | `#06161A` | Text on `action` |
-| `brand-ink` | `#071B2B` | `#E7EFE9` | The dark letter of the mark. Nothing else |
-| `success` / `-soft` / `-text` | `#269B62` / `#E2F4E9` / `#1B7549` | `#3DBE7F` / `#1C3327` / `#6AD3A0` | Something went well: success badges, callouts, toasts |
+| `brand-ink` | `#071B2B` | `#E8EEEA` | The dark letter of the mark. Nothing else |
+| `success` / `-soft` / `-text` | `#269B62` / `#E4F3EA` / `#1B7549` | `#3DBE7F` / `#16291F` / `#6AD3A0` | Something went well: success badges, callouts, toasts |
 | `sun`, `coral`, `blue`, `violet` | `#F2C14E` `#EF806C` `#5B8DE6` `#9178D7` | `#E9BE5A` `#F08F7D` `#7BA4EE` `#A694E3` | Accents and visualization. **Not for text.** |
 | `*-soft` / `*-text` | — | — | Tinted background and its readable text, per accent |
 | `danger` / `-soft` / `-text` | `#C84E4E` … | `#E57373` … | Errors and destructive actions |
 | `focus` | `#1F6FD6` | `#8AB4F8` | Focus ring |
+| `scene-background` / `-ink` / `-muted` | `#FFFFFF` `#17251E` `#5F6E65` | `#18211C` `#E7EFE9` `#9DB0A5` | The stage of a scene and what is drawn on it. Frozen: see "Scenes" |
 
 Contrast is checked by `tokens.test.ts` for both themes: text pairs ≥ 4.5:1 (ink ≥ 7:1), control
-boundaries and marks ≥ 3:1.
+boundaries and marks ≥ 3:1, on every ground a text colour is used on.
 
 **Do** pair an accent's `-soft` background with its `-text` colour.
 **Do** use `success` for an outcome and `primary` for the product: they are different colours on
 purpose.
 **Don't** put `sun`, `coral`, `blue`, or `violet` text on a surface. For a filled control use
 `action` with `on-action`, never a colour pair of your own.
+**Don't** mark a card as important with a coloured bar down its side. If one thing on a page
+matters most, it is the only one with a filled button, and it may carry a wash of
+`primary-soft` from its top edge (`NextSteps`).
 
 ### Typography
 
-Inter Variable, bundled (no network). Six steps:
+Three families, all bundled (no network), each with one job:
 
-| Token | Size / line | Weight | Use |
-|---|---|---|---|
-| `text-display` | 32 / 40 | 700 | Welcome headline only |
-| `text-title` | 24 / 32 | 650 | Page title (`h1`) |
-| `text-heading` | 18 / 26 | 600 | Section and dialog titles |
-| `text-body` | 15 / 24 | 400 | Default |
-| `text-body-strong` | 15 / 24 | 600 | Labels, button text |
-| `text-supporting` | 14 / 20 | 400 | Descriptions, hints |
-| `text-caption` | 13 / 18 | 500 | Badges, meta. Never the only place an instruction appears |
+| Family | Token | For |
+|---|---|---|
+| Newsreader (variable, with optical sizes) | `--ad-font-serif` | What is read: titles, lesson text, questions |
+| Inter (variable) | `--ad-font-sans` | What is operated: labels, controls, data, descriptions |
+| JetBrains Mono (variable) | `--ad-font-mono` | What is typed or copied exactly: an address, a model's name, a key on the keyboard |
 
-Sizes are in `rem`, so text scales with the user's zoom. Use the `ad-tabular` class for numbers
-that change (timers, counts). Mathematics is never set in UI text styles.
+| Token | Family | Size / line | Weight | Use |
+|---|---|---|---|---|
+| `text-display` | serif | 44 / 48 | 500 | Welcome headline only |
+| `text-title` | serif | 30 / 36 | 500 | Page title (`h1`) |
+| `text-subtitle` | serif | 22 / 28 | 500 | A part of a lesson, a dialog's title, an empty state |
+| `text-reading-large` | serif | 21 / 30 | 400 | A question, a point written on the board |
+| `text-reading` | serif | 18 / 28 | 400 | A lesson's narration as text |
+| `text-heading` | sans | 16 / 24 | 600 | Section titles |
+| `text-body` | sans | 15 / 24 | 400 | Default |
+| `text-body-strong` | sans | 15 / 24 | 550 | The name of a thing in a row |
+| `text-control` | sans | 14 / 20 | 550 | Buttons, tabs, the rail, field labels |
+| `text-supporting` | sans | 13.5 / 20 | 400 | Descriptions, hints |
+| `text-caption` | sans | 12 / 16 | 500 | Badges, meta. Never the only place an instruction appears |
+| `text-eyebrow` | sans | 11 / 16 | 600 | A label above a group, in capitals with `tracking-eyebrow` (`.ad-eyebrow`) |
+| `text-mono` | mono | 13 / 20 | 400 | Addresses, identifiers |
+
+Sizes are in `rem`, so text scales with the user's zoom. Titles take `tracking-display`; names
+and labels take `tracking-tight`. Use the `ad-tabular` class for numbers that change (timers,
+counts). Headings balance their lines and paragraphs avoid a stray last word
+(`text-wrap`). Mathematics is set by KaTeX at the size of the words around it, never in a UI
+text style.
+
+**Do** set a lesson's own words in the serif, wherever they appear.
+**Don't** set a button, a field, or a number in the serif, or a paragraph of interface copy in
+capitals. An eyebrow is two or three words.
 
 ### Space, shape, elevation, motion
 
 - **Space:** `--ad-space-1…9` = 4, 8, 12, 16, 24, 32, 40, 48, 64 px. An 8 px grid with a 4 px half step.
-- **Radius:** `small` 8 (compact controls), `control` 12, `card` 18, `pill`.
-- **Elevation:** `shadow-1` for resting cards, `shadow-2` for dialogs, toasts, and hover lift.
-  In the dark theme borders carry separation.
-- **Motion:** `duration-fast` 120 ms, `duration-base` 200 ms, one easing curve. Both durations
-  collapse under `prefers-reduced-motion`. Motion confirms an action or shows where something
-  went; it never decorates.
+- **Radius:** `small` 6 (badges, compact controls), `control` 8, `card` 12, `large` 16 (dialogs,
+  the main suggestion), `pill` (tracks and dots only: a badge is not a pill).
+- **Elevation:** three heights, and most things have none. `shadow-1`: a card resting on the
+  page. `shadow-2`: a card under the pointer, the lesson's bar. `shadow-3`: a dialog, a toast.
+  `shadow-control` and `shadow-action` give a button its edge. In the dark theme borders
+  carry separation.
+- **Motion:** `duration-fast` 120 ms, `duration-base` 200 ms, `duration-slow` 320 ms, one
+  easing curve. All collapse under `prefers-reduced-motion`. Motion confirms an action or
+  shows where something went (a page settling, a dialog arriving, a line of the board being
+  written); it never decorates.
 - **Focus:** one ring everywhere: `2px solid var(--ad-color-focus)`, 2 px offset.
 
 ### Theme
@@ -111,7 +154,7 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 | `ToastProvider` / `useToast` | Confirm something just done | `success`, `info` auto-dismiss (pause on hover/focus); `danger` stays until dismissed |
 | `EmptyState`, `LoadingState`, `ErrorState` | The three non-content states | Title, description, actions; correct live-region role each |
 | `Spinner` | Indeterminate activity | Sizes; slows instead of stopping under reduced motion |
-| `AppShell`, `NavItem`, `Page`, `Section`, `Stack` | Layout | Rail collapses to icons below 960 px; `Page` width `wide`/`reading` |
+| `AppShell`, `NavItem`, `NavSection`, `Page`, `Section`, `Stack` | Layout | The rail lies on the canvas and the main region is a panel set into it; `focus` leaves the rail out and gives one thing the whole window (a lesson, a round of questions); `NavSection` is a labelled group in the rail (the learner's courses). Rail collapses to icons below 960 px; `Page` width `wide`/`reading`; a page's actions sit on the line of its title |
 | `Logo` | The mark and wordmark | `medium`/`large`; mark only |
 
 App-level components that are not in the package (they depend on app state):
@@ -160,10 +203,11 @@ answer is "Not quite", never "Wrong".
 ### What next
 
 A suggestion is shown the same way everywhere (`NextSteps`, in the app): the Learn tab, the end
-of a lesson, the end of a set of questions. One card with "Suggested next step", the step as a
-heading, **Why:** and the reason, and one primary button. Under it, "Or instead": the
-alternatives as a quiet list, each with its own reason and a secondary button. A suggestion is
-never the only way forward and never a blocker.
+of a lesson, the end of a set of questions. One card with "Suggested next step" as an eyebrow,
+the step as a heading in the serif, **Why:** and the reason, and one primary button. It is the
+only card with a wash of the brand colour. Under it, "Or instead": the alternatives as a quiet
+list, each with its own reason and a secondary button. A suggestion is never the only way
+forward and never a blocker.
 
 - The button says what it does ("Start lesson", "Start review", "Answer a few questions"); the
   heading says what with. The button is described by the heading, so two "Start lesson" buttons
@@ -183,11 +227,21 @@ button; then either the result where it belongs, or a `Callout` that says what h
 offers the one useful next step ("Try again", "Open AI settings"), or nothing but "Dismiss"
 when waiting is the only remedy. Before the request: say what will be sent and to whom.
 
-### A lesson's controls stay within reach
+### A lesson has the whole window
 
-The lesson's bar (Previous, Start / Pause / Play again, Continue) sticks to the bottom edge of the
-page while a long part scrolls behind it. The primary button is whatever moves the learner on:
-Start before anything has played, Continue once the part has come to rest.
+A lesson, and a round of questions, are one thing to attend to: the rail is left out
+(`AppShell focus`) and the way back is the first thing on the page.
+
+- **Where the learner is** is a strip cut into as many pieces as the lesson has parts: done in
+  teal, the present one in ink, the rest sunken. Each piece is a button with a name ("Part 3:
+  The bias"); it shows no number.
+- **The lesson's own words** are in the serif: the title of the part, the transcript, the
+  board, a question. The current sentence of the transcript is in ink with a rule beside it;
+  what has been said is muted; what is to come is faint.
+- **The controls stay within reach.** One bar (Previous, Start / Pause / Play again, Continue)
+  floats at the bottom edge while a long part scrolls behind it. The primary button is
+  whatever moves the learner on: Start before anything has played, Continue once the part
+  has come to rest.
 
 ### Messages
 
@@ -212,7 +266,11 @@ Start before anything has played, Continue once the part has come to rest.
 - One `h1` per page (`Page`), `h2` per `Section`.
 - Prefer sections and spacing to nested cards. A card inside a card needs a reason.
 - Reading text stays under about 44 rem wide (`width="reading"` or `--ad-layout-reading-max`).
-- Target sizes: controls are 40 px tall (32 px for `small`, used only in dense toolbars).
+- Target sizes: controls are 36 px tall (30 px for `small`, used in rows and toolbars; 44 px
+  for `large`, used for the one way forward on a screen such as the welcome). Nothing that can
+  be pressed is smaller than 24 px in either direction.
+- A page's title and what can be done to the whole page share one line; a way back sits above
+  them.
 
 ## Accessibility baseline
 
@@ -246,8 +304,13 @@ The Adle mark is the letters "a" and "d" as two interlocking rings, the "d" in f
 
 Wanim scenes have a small palette of their own (`src/scene-palette.ts`, mirrored from the tokens
 and listed in `skills/wanim-scene-authoring/SKILL.md`). Its `green` is the `success` green, not
-the brand teal: inside a picture colours tell things apart, they do not carry the brand. The
-stage background is the `surface` token, supplied by the player.
+the brand teal: inside a picture colours tell things apart, they do not carry the brand.
+
+The stage, its ink, and its muted text are the `scene-*` tokens, supplied by the player. They
+are **frozen**: their values are written into every scene file there is (the sample course, the
+skill's examples, and lessons already generated on people's computers), so they did not move
+when the interface around the stage was redesigned, and must not move without rewriting those
+files. The interface's own `surface`, `ink`, and `muted` are free to change.
 
 ## Seeing it
 
@@ -257,6 +320,10 @@ to `apps/desktop/test-results/screens/`. That set is the current visual referenc
 ## Changing the system
 
 1. Change tokens or components here first, never in a screen.
-2. Add contrast pairs for new colours; keep the dark theme complete.
-3. Update this document and, for palette changes, the scene skill.
-4. Run `npm run check` and `npm run e2e`; look at the screenshots.
+2. Add contrast pairs for new colours, on every ground they are used on; keep the dark theme
+   complete.
+3. Update this document and, for the accents scenes share, the scene skill. Leave the
+   `scene-*` tokens alone.
+4. Run `npm run check` and `npm run e2e`; look at the screenshots. A check for contrast waits
+   for motion to finish (`settled` in `e2e/support/courses.ts`): something fading in has, for a
+   moment, a colour nobody is meant to read.

@@ -15,21 +15,23 @@
 .label {
   font: var(--ad-text-supporting);
   font-weight: 500;
+  color: var(--ad-color-ink);
 }
 
 .value {
   font: var(--ad-text-caption);
-  color: var(--ad-color-muted);
+  font-variant-numeric: tabular-nums;
+  color: var(--ad-color-faint);
 }
 
 .track {
   --ad-progress-color: var(--ad-color-primary);
 
   position: relative;
-  height: 0.5rem;
+  height: 0.375rem;
   overflow: hidden;
   border-radius: var(--ad-radius-pill);
-  background: var(--ad-color-surface-subtle);
+  background: var(--ad-color-surface-sunken);
 }
 
 .info {
@@ -43,7 +45,7 @@
   height: 100%;
   border-radius: inherit;
   background: var(--ad-progress-color);
-  transition: width var(--ad-duration-base) var(--ad-ease-out);
+  transition: width var(--ad-duration-slow) var(--ad-ease-out);
 }
 
 .indeterminate {

@@ -9,12 +9,13 @@
 .switchText {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-1);
+  gap: 0.125rem;
   min-width: 0;
 }
 
 .switchLabel {
   font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
 .switchDescription {
@@ -25,12 +26,12 @@
 .switch {
   position: relative;
   flex: none;
-  width: 2.75rem;
-  height: 1.5rem;
+  width: 2.25rem;
+  height: 1.25rem;
   padding: 0;
   border: var(--ad-border-width) solid var(--ad-color-border-strong);
   border-radius: var(--ad-radius-pill);
-  background: var(--ad-color-surface-subtle);
+  background: var(--ad-color-surface-sunken);
   cursor: pointer;
   transition:
     background-color var(--ad-duration-base) var(--ad-ease-out),
@@ -50,9 +51,9 @@
 .thumb {
   position: absolute;
   top: 50%;
-  left: 0.1875rem;
-  width: 1rem;
-  height: 1rem;
+  left: 0.125rem;
+  width: 0.875rem;
+  height: 0.875rem;
   border-radius: var(--ad-radius-pill);
   background: var(--ad-color-border-strong);
   transform: translateY(-50%);
@@ -62,15 +63,16 @@
 }
 
 .switch[aria-checked='true'] .thumb {
-  left: calc(100% - 1.1875rem);
+  left: calc(100% - 1rem);
   background: var(--ad-color-on-action);
+  box-shadow: var(--ad-shadow-control);
 }
 
 /* ---- Checkbox ----------------------------------------------------------- */
 .checkboxRow {
   display: flex;
   align-items: flex-start;
-  gap: var(--ad-space-3);
+  gap: 0.625rem;
 }
 
 .checkbox {
@@ -78,13 +80,14 @@
   display: grid;
   place-content: center;
   flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.125rem;
+  height: 1.125rem;
   /* Centres the box on the first line of the label. */
-  margin: 0.125rem 0 0;
+  margin: 0.1875rem 0 0;
   border: var(--ad-border-width) solid var(--ad-color-border-strong);
-  border-radius: calc(var(--ad-radius-small) / 2);
+  border-radius: 0.3125rem;
   background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-control);
   cursor: pointer;
   transition:
     background-color var(--ad-duration-fast) var(--ad-ease-out),
@@ -94,8 +97,8 @@
 /* The tick: two sides of a small rotated box. */
 .checkbox::after {
   content: '';
-  width: 0.3125rem;
-  height: 0.625rem;
+  width: 0.28125rem;
+  height: 0.5625rem;
   margin-top: -0.125rem;
   border: solid var(--ad-color-on-action);
   border-width: 0 0.125rem 0.125rem 0;
@@ -120,7 +123,7 @@
 .checkboxText {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-1);
+  gap: 0.125rem;
   min-width: 0;
 }
 
@@ -153,34 +156,40 @@
   margin-bottom: var(--ad-space-2);
   padding: 0;
   font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
 .radioRow {
   display: flex;
   align-items: flex-start;
   gap: var(--ad-space-3);
-  padding: var(--ad-space-3) var(--ad-space-4);
-  border: var(--ad-border-width) solid var(--ad-color-border-strong);
-  border-radius: var(--ad-radius-control);
+  padding: 0.6875rem 0.875rem;
+  border: var(--ad-border-width) solid var(--ad-color-border-control);
+  border-radius: var(--ad-radius-card);
   background: var(--ad-color-surface);
   font: var(--ad-text-body);
+  box-shadow: var(--ad-shadow-control);
   cursor: pointer;
   transition:
     background-color var(--ad-duration-fast) var(--ad-ease-out),
-    border-color var(--ad-duration-fast) var(--ad-ease-out);
+    border-color var(--ad-duration-fast) var(--ad-ease-out),
+    box-shadow var(--ad-duration-fast) var(--ad-ease-out);
 }
 
 .radioRow:hover {
-  background: var(--ad-color-surface-subtle);
+  border-color: var(--ad-color-border-strong);
 }
 
+/* The chosen row is drawn with a second line inside its edge, in the colour of selection. */
 .radioRowSelected,
 .radioRowSelected:hover {
   background: var(--ad-color-primary-soft);
-  border-color: var(--ad-color-primary-text);
+  border-color: var(--ad-color-action);
+  box-shadow: inset 0 0 0 1px var(--ad-color-action);
 }
 
 .radioGroup:disabled .radioRow {
+  box-shadow: none;
   cursor: default;
 }
 
@@ -189,7 +198,7 @@
 }
 
 .radioGroup:disabled .radioRow:not(.radioRowSelected):hover {
-  background: var(--ad-color-surface);
+  border-color: var(--ad-color-border-control);
 }
 
 /* A settled choice is shown, not offered: nothing is dimmed, and the chosen row is
@@ -202,6 +211,7 @@
 .radioGroupReadOnly .radioRowSelected:hover {
   background: var(--ad-color-surface-subtle);
   border-color: var(--ad-color-border-strong);
+  box-shadow: inset 0 0 0 1px var(--ad-color-border-strong);
 }
 
 /* The row shows focus, so the ring surrounds the whole target, not just the dot. */
@@ -215,13 +225,14 @@
   display: grid;
   place-content: center;
   flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin: 0.125rem 0 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0.1875rem 0 0;
   border: var(--ad-border-width) solid var(--ad-color-border-strong);
   border-radius: var(--ad-radius-pill);
   background: var(--ad-color-surface);
   cursor: inherit;
+  transition: border-color var(--ad-duration-fast) var(--ad-ease-out);
 }
 
 .radio:focus-visible {
@@ -230,16 +241,17 @@
 
 .radio::after {
   content: '';
-  width: 0.625rem;
-  height: 0.625rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: var(--ad-radius-pill);
-  background: var(--ad-color-action);
+  background: var(--ad-color-on-action);
   transform: scale(0);
   transition: transform var(--ad-duration-fast) var(--ad-ease-out);
 }
 
 .radio:checked {
   border-color: var(--ad-color-action);
+  background: var(--ad-color-action);
 }
 
 .radio:checked::after {
@@ -249,27 +261,29 @@
 /* ---- Segmented control -------------------------------------------------- */
 .segmented {
   display: inline-flex;
-  gap: var(--ad-space-1);
-  padding: var(--ad-space-1);
+  gap: 0.125rem;
+  padding: 0.1875rem;
   border-radius: var(--ad-radius-control);
-  background: var(--ad-color-surface-subtle);
+  background: var(--ad-color-surface-sunken);
 }
 
 .segment {
   display: inline-flex;
   align-items: center;
-  gap: var(--ad-space-2);
-  height: var(--ad-control-height-small);
-  padding: 0 var(--ad-space-3);
-  border: var(--ad-border-width) solid transparent;
-  border-radius: var(--ad-radius-small);
+  gap: 0.375rem;
+  height: 1.75rem;
+  padding: 0 0.6875rem;
+  border: 0;
+  border-radius: 0.3125rem;
   background: transparent;
-  font: var(--ad-text-supporting);
+  font: var(--ad-text-control);
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--ad-color-muted);
   cursor: pointer;
   transition:
     background-color var(--ad-duration-fast) var(--ad-ease-out),
+    box-shadow var(--ad-duration-fast) var(--ad-ease-out),
     color var(--ad-duration-fast) var(--ad-ease-out);
 }
 
@@ -279,9 +293,9 @@
 
 .segmentSelected {
   background: var(--ad-color-surface);
-  border-color: var(--ad-color-border);
   color: var(--ad-color-ink);
-  box-shadow: var(--ad-shadow-1);
+  font-weight: 550;
+  box-shadow: var(--ad-shadow-1), var(--ad-shadow-control);
 }
 
 .segmentIcon {
@@ -289,8 +303,9 @@
 }
 
 .segmentIcon svg {
-  width: 1rem;
-  height: 1rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke-width: 1.75;
 }
 
 /* ---- Slider ------------------------------------------------------------- */
@@ -310,6 +325,7 @@
 
 .sliderLabel {
   font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
 .sliderValue {
@@ -334,22 +350,27 @@
 }
 
 .range::-webkit-slider-runnable-track {
-  height: 0.375rem;
+  height: 0.25rem;
   border-radius: var(--ad-radius-pill);
   background: linear-gradient(
     to right,
     var(--ad-color-action) var(--ad-slider-fill),
-    var(--ad-color-border) var(--ad-slider-fill)
+    var(--ad-color-border-control) var(--ad-slider-fill)
   );
 }
 
 .range::-webkit-slider-thumb {
   appearance: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1rem;
+  height: 1rem;
   margin-top: -0.375rem;
-  border: 2px solid var(--ad-color-surface);
+  border: var(--ad-border-width) solid var(--ad-color-border-strong);
   border-radius: var(--ad-radius-pill);
-  background: var(--ad-color-action);
-  box-shadow: var(--ad-shadow-1);
+  background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-2);
+  transition: transform var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.range:hover::-webkit-slider-thumb {
+  transform: scale(1.1);
 }

@@ -7,6 +7,7 @@ import type { Page } from '@playwright/test';
 
 import { expect, launchApp, test, waitForCore } from './support/app';
 import {
+  courseCard,
   createCourse,
   expectNoAccessibilityViolations,
   importAndWait,
@@ -230,7 +231,7 @@ test.describe('curriculum', () => {
     // ---- Everything is still there after a restart, in the other theme ----
     const second = await launchApp(profileDir, { onboarded: true, theme: 'dark' });
     await waitForCore(second.page);
-    await second.page.getByRole('button', { name: /Neural networks 101/ }).click();
+    await courseCard(second.page, /Neural networks 101/).click();
     // A course with concepts opens on what to do next; the curriculum is one tab away.
     await expect(second.page.getByRole('tab', { name: 'Learn', exact: true })).toHaveAttribute(
       'aria-selected',

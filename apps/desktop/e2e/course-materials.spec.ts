@@ -8,6 +8,7 @@ import type { Page } from '@playwright/test';
 import { expect, launchApp, test, waitForCore } from './support/app';
 import {
   chooseInFileDialog,
+  courseCard,
   createCourse,
   doc,
   expectNoAccessibilityViolations,
@@ -96,7 +97,7 @@ test.describe('course materials', () => {
     const second = await launchApp(profileDir);
     const { page } = second;
     // The library lists the course, with its real contents, without any import.
-    const card = page.getByRole('button', { name: /Persistent course/ });
+    const card = courseCard(page, /Persistent course/);
     await expect(card).toContainText('2 sources');
     await card.click();
     // A course that already has materials opens on its curriculum; they are one tab away.
@@ -206,9 +207,7 @@ test.describe('course materials', () => {
     // Back to the library with the page's own back control (the navigation rail has
     // a button of the same name); the course is listed.
     await page.getByRole('main').getByRole('button', { name: 'Library', exact: true }).click();
-    await expect(page.getByRole('button', { name: /Calculus refresher/ })).toContainText(
-      'No sources yet',
-    );
+    await expect(courseCard(page, /Calculus refresher/)).toContainText('No sources yet');
   });
 
   test('a course that no longer exists says so and offers a way back', async ({ adle }) => {

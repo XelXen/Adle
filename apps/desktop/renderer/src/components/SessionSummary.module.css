@@ -1,23 +1,28 @@
 .session {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-4);
+  gap: var(--ad-space-5);
   min-width: 0;
-  padding: var(--ad-space-5) var(--ad-space-6);
+  padding: var(--ad-space-5);
   border: var(--ad-border-width) solid var(--ad-color-border);
   border-radius: var(--ad-radius-card);
   background: var(--ad-color-surface);
+  box-shadow: var(--ad-shadow-1);
 }
 
 .counts {
   margin: 0;
+  font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
-/* Up to three groups side by side; one under another when there is no room. */
+/* Up to three groups side by side, ruled apart; one under another when there is no room. */
 .groups {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--ad-space-5) var(--ad-space-6);
+  padding-top: var(--ad-space-5);
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
 }
 
 .groups:empty {
@@ -27,14 +32,16 @@
 .group {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-2);
+  gap: var(--ad-space-3);
   min-width: 0;
 }
 
 .groupTitle {
   margin: 0;
-  font: var(--ad-text-caption);
-  color: var(--ad-color-muted);
+  font: var(--ad-text-eyebrow);
+  letter-spacing: var(--ad-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ad-color-faint);
 }
 
 .lines {
@@ -49,12 +56,13 @@
 .line {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-1);
+  gap: 0.125rem;
   min-width: 0;
 }
 
 .concept {
   font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
   overflow-wrap: anywhere;
 }
 

@@ -15,6 +15,7 @@ import type { Locator, Page } from '@playwright/test';
 
 import { expect, launchApp, test, waitForCore } from './support/app';
 import {
+  courseCard,
   expectNoAccessibilityViolations,
   screenshot,
   showNarrationAsText,
@@ -280,7 +281,7 @@ test.describe('learning', () => {
     const second = await launchApp(profileDir, { onboarded: true, theme: 'dark' });
     const later = second.page;
     await waitForCore(later);
-    await later.getByRole('button', { name: new RegExp(COURSE) }).click();
+    await courseCard(later, new RegExp(COURSE)).click();
     await expect(later.getByRole('tab', { name: 'Learn', exact: true })).toHaveAttribute(
       'aria-selected',
       'true',

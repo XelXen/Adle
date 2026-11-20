@@ -44,6 +44,8 @@ export {
   type AppShellProps,
   NavItem,
   type NavItemProps,
+  NavSection,
+  type NavSectionProps,
   Page,
   type PageProps,
   Section,

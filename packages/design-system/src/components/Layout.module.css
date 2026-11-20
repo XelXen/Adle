@@ -1,8 +1,16 @@
-/* ---- App shell ---------------------------------------------------------- */
+/* ---- App shell ----------------------------------------------------------
+ * The frame of the app is the canvas: the rail lies directly on it. What is being worked
+ * on is a panel set into that frame, with its own edge and its own, lighter ground. */
 .shell {
   display: grid;
   grid-template-columns: var(--ad-layout-nav-width) minmax(0, 1fr);
   height: 100vh;
+  background: var(--ad-color-canvas);
+}
+
+/* One thing at a time: a lesson has the whole window. */
+.focus {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .skipLink {
@@ -11,10 +19,11 @@
   left: var(--ad-space-2);
   z-index: 200;
   padding: var(--ad-space-2) var(--ad-space-3);
-  border-radius: var(--ad-radius-small);
+  border-radius: var(--ad-radius-control);
   background: var(--ad-color-surface);
   color: var(--ad-color-ink);
-  font: var(--ad-text-body-strong);
+  font: var(--ad-text-control);
+  box-shadow: var(--ad-shadow-2);
   transform: translateY(-200%);
 }
 
@@ -25,39 +34,62 @@
 .rail {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-5);
-  padding: var(--ad-space-5) var(--ad-space-3);
-  border-right: var(--ad-border-width) solid var(--ad-color-border);
-  background: var(--ad-color-surface);
+  gap: var(--ad-space-4);
+  padding: var(--ad-space-4) var(--ad-space-3) var(--ad-space-3);
   overflow-y: auto;
 }
 
 .brand {
-  padding: 0 var(--ad-space-3);
+  display: flex;
+  align-items: center;
+  height: 2rem;
+  padding: 0 var(--ad-space-2);
 }
 
 .nav {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--ad-space-1);
+  gap: 0.125rem;
+  min-height: 0;
+}
+
+.navSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin-top: var(--ad-space-5);
+}
+
+.navSectionLabel {
+  padding: 0 var(--ad-space-2);
+  margin-bottom: var(--ad-space-1);
+  font: var(--ad-text-eyebrow);
+  letter-spacing: var(--ad-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ad-color-faint);
 }
 
 .railFooter {
-  padding: 0 var(--ad-space-1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
 }
 
 .navItem {
   display: flex;
   align-items: center;
-  gap: var(--ad-space-3);
-  height: var(--ad-control-height);
-  padding: 0 var(--ad-space-3);
+  gap: 0.625rem;
+  flex: none;
+  width: 100%;
+  height: 2rem;
+  padding: 0 var(--ad-space-2);
   border: 0;
-  border-radius: var(--ad-radius-control);
+  border-radius: var(--ad-radius-small);
   background: transparent;
-  font: var(--ad-text-body);
+  font: var(--ad-text-control);
   font-weight: 500;
+  letter-spacing: var(--ad-tracking-tight);
   color: var(--ad-color-muted);
   text-align: left;
   cursor: pointer;
@@ -67,15 +99,19 @@
 }
 
 .navItem:hover {
-  background: var(--ad-color-surface-subtle);
+  background: var(--ad-color-surface-sunken);
   color: var(--ad-color-ink);
 }
 
+/* Where the learner is: the one item that is lifted off the canvas. */
 .navItemCurrent,
 .navItemCurrent:hover {
-  background: var(--ad-color-primary-soft);
-  color: var(--ad-color-primary-text);
-  font-weight: 600;
+  background: var(--ad-color-surface);
+  color: var(--ad-color-ink);
+  font-weight: 550;
+  box-shadow:
+    var(--ad-shadow-1),
+    0 0 0 1px var(--ad-color-border);
 }
 
 .navIcon {
@@ -84,14 +120,39 @@
 }
 
 .navIcon svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 1.75;
+}
+
+.navLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navTrailing {
+  flex: none;
+  font: var(--ad-text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--ad-color-faint);
 }
 
 .main {
   min-width: 0;
+  margin: var(--ad-space-2) var(--ad-space-2) var(--ad-space-2) 0;
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-page);
+  box-shadow: var(--ad-shadow-1);
   overflow-y: auto;
   scroll-behavior: smooth;
+}
+
+.focus .main {
+  margin-left: var(--ad-space-2);
 }
 
 .main:focus {
@@ -106,35 +167,48 @@
   width: 100%;
   max-width: var(--ad-layout-content-max);
   margin: 0 auto;
-  padding: var(--ad-space-7) var(--ad-space-6) var(--ad-space-8);
+  padding: var(--ad-space-7) var(--ad-space-7) var(--ad-space-9);
+  animation: arrive var(--ad-duration-slow) var(--ad-ease-out);
+}
+
+/* A new page settles into place: enough to say that something changed. */
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 .reading {
-  max-width: var(--ad-layout-reading-max);
+  max-width: calc(var(--ad-layout-reading-max) + 2 * var(--ad-space-7));
 }
 
 .pageHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--ad-space-4);
-}
-
-.pageHeading {
   display: flex;
   flex-direction: column;
   gap: var(--ad-space-2);
   min-width: 0;
 }
 
+/* A way back sits where the eye starts, pulled out to the edge of the text below it. */
 .eyebrow {
-  margin-bottom: var(--ad-space-1);
+  margin: 0 0 var(--ad-space-1) -0.625rem;
+}
+
+/* The title and what can be done to the whole page share one line. */
+.pageTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ad-space-3) var(--ad-space-5);
 }
 
 .pageTitle {
+  flex: 1 1 20rem;
+  min-width: 0;
   font: var(--ad-text-title);
-  letter-spacing: var(--ad-tracking-tight);
+  letter-spacing: var(--ad-tracking-display);
 }
 
 .pageDescription {
@@ -146,14 +220,15 @@
 .pageActions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--ad-space-3);
+  align-items: center;
+  gap: var(--ad-space-2);
 }
 
 /* ---- Section ------------------------------------------------------------ */
 .section {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-4);
+  gap: var(--ad-space-3);
   min-width: 0;
 }
 
@@ -168,15 +243,17 @@
 .sectionHeading {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-1);
+  gap: 0.125rem;
   min-width: 0;
 }
 
 .sectionTitle {
   font: var(--ad-text-heading);
+  letter-spacing: var(--ad-tracking-tight);
 }
 
 .sectionDescription {
+  max-width: var(--ad-layout-reading-max);
   font: var(--ad-text-supporting);
   color: var(--ad-color-muted);
 }
@@ -239,7 +316,11 @@
 /* ---- Narrow windows: the rail collapses to icons ------------------------- */
 @media (width <= 60rem) {
   .shell {
-    grid-template-columns: 4.5rem minmax(0, 1fr);
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+  }
+
+  .focus {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .rail {
@@ -251,12 +332,27 @@
     padding: 0;
   }
 
+  /* A list of names has nothing to show without the names. */
+  .navSection {
+    display: none;
+  }
+
   .navItem {
     justify-content: center;
-    width: var(--ad-control-height-large);
+    width: 2.25rem;
+    height: 2.25rem;
     padding: 0;
-    font-size: 0;
     gap: 0;
+  }
+
+  .navLabel,
+  .navTrailing {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .page {

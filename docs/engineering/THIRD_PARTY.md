@@ -22,6 +22,8 @@ what is never reached, so this is at most what ships.
 | Package | Version | Licence |
 |---|---|---|
 | `@fontsource-variable/inter` | 5.3.0 | OFL-1.1 |
+| `@fontsource-variable/jetbrains-mono` | 5.3.0 | OFL-1.1 |
+| `@fontsource-variable/newsreader` | 5.3.0 | OFL-1.1 |
 | `@fontsource/inter` | 5.3.0 | OFL-1.1 |
 | `@wanimjs/wanim` | 0.1.3 | MIT |
 | `@xmldom/xmldom` | 0.9.12 | MIT |
@@ -77,7 +79,7 @@ what is never reached, so this is at most what ships.
 
 None of this reaches a learner.
 
-### npm: 411 packages
+### npm: 413 packages
 
 | Licence | Packages |
 |---|---|
@@ -87,8 +89,8 @@ None of this reaches a learner.
 | BSD-2-Clause | 12 |
 | BlueOak-1.0.0 | 7 |
 | MPL-2.0 | 4 |
+| OFL-1.1 | 4 |
 | BSD-3-Clause | 3 |
-| OFL-1.1 | 2 |
 | CC-BY-4.0 | 1 |
 | CC0-1.0 | 1 |
 | PSF-2.0 | 1 |

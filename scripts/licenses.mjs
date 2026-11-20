@@ -44,6 +44,8 @@ const acceptable = (licence) =>
  */
 const SHIPPED_JS_ROOTS = [
   '@fontsource-variable/inter',
+  '@fontsource-variable/jetbrains-mono',
+  '@fontsource-variable/newsreader',
   '@fontsource/inter',
   '@wanimjs/wanim',
   'katex',

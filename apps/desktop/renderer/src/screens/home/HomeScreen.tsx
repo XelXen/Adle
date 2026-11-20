@@ -17,6 +17,7 @@ import {
 import { useApp } from '../../app/AppContext';
 import { useRouter } from '../../app/router';
 import { callCore, describeError } from '../../lib/core-client';
+import { courseRoute } from '../../lib/courses';
 import { formatRelativeDay, pluralise } from '../../lib/format';
 import { useResource } from '../../lib/use-resource';
 import styles from './HomeScreen.module.css';
@@ -52,20 +53,7 @@ export function HomeScreen() {
   );
   const aiMissing = provider.resource.status === 'ready' && !provider.resource.data.key_configured;
 
-  // A course with something to learn opens on what to do next. One that is still being set
-  // up opens where the setting up happens: its materials if it is waiting for them, else its
-  // curriculum.
-  const open = (course: Course): void =>
-    navigate({
-      name: 'course',
-      courseId: course.id,
-      tab:
-        course.concept_count > 0
-          ? 'learn'
-          : course.origin === 'materials' && course.source_count === 0
-            ? 'sources'
-            : 'curriculum',
-    });
+  const open = (course: Course): void => navigate(courseRoute(course));
 
   // The sample course is written by Adle and ships with the app: adding it needs no provider.
   const addSample = async (): Promise<void> => {

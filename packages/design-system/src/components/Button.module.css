@@ -4,27 +4,30 @@
   justify-content: center;
   gap: var(--ad-space-2);
   height: var(--ad-control-height);
-  padding: 0 var(--ad-space-4);
+  padding: 0 0.875rem;
   border: var(--ad-border-width) solid transparent;
   border-radius: var(--ad-radius-control);
-  font: var(--ad-text-body-strong);
+  font: var(--ad-text-control);
+  letter-spacing: var(--ad-tracking-tight);
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
   transition:
     background-color var(--ad-duration-fast) var(--ad-ease-out),
     border-color var(--ad-duration-fast) var(--ad-ease-out),
+    box-shadow var(--ad-duration-fast) var(--ad-ease-out),
     color var(--ad-duration-fast) var(--ad-ease-out),
     transform var(--ad-duration-fast) var(--ad-ease-out);
 }
 
 .button:active:not(:disabled, [aria-disabled='true']) {
-  transform: translateY(1px);
+  transform: translateY(0.5px) scale(0.985);
 }
 
 .button:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 .button[aria-disabled='true'] {
@@ -38,11 +41,14 @@
 .icon {
   display: inline-flex;
   flex: none;
+  /* Optically, an icon sits a little closer to the edge than a letter does. */
+  margin-inline-start: -0.125rem;
 }
 
 .icon svg {
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 1.75;
 }
 
 .label {
@@ -53,21 +59,35 @@
 /* ---- Sizes ------------------------------------------------------------- */
 .small {
   height: var(--ad-control-height-small);
-  padding: 0 var(--ad-space-3);
+  padding: 0 0.625rem;
+  gap: 0.375rem;
   border-radius: var(--ad-radius-small);
-  font: var(--ad-text-caption);
-  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.small .icon svg {
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .large {
   height: var(--ad-control-height-large);
-  padding: 0 var(--ad-space-5);
-  font-size: 1rem;
+  padding: 0 1.125rem;
+  font-size: 0.9375rem;
+}
+
+.large .icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .iconOnly {
   width: var(--ad-control-height);
   padding: 0;
+}
+
+.iconOnly .icon {
+  margin: 0;
 }
 
 .iconOnly.small {
@@ -82,6 +102,7 @@
 .primary {
   background: var(--ad-color-action);
   color: var(--ad-color-on-action);
+  box-shadow: var(--ad-shadow-action);
 }
 
 .primary:hover:not(:disabled, [aria-disabled='true']) {
@@ -94,12 +115,14 @@
 
 .secondary {
   background: var(--ad-color-surface);
-  border-color: var(--ad-color-border-strong);
+  border-color: var(--ad-color-border-control);
   color: var(--ad-color-ink);
+  box-shadow: var(--ad-shadow-control);
 }
 
 .secondary:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--ad-color-surface-subtle);
+  border-color: var(--ad-color-border-strong);
 }
 
 /* A toggle that is on (`aria-pressed`): selected, without competing with the primary action. */
@@ -108,6 +131,7 @@
   background: var(--ad-color-primary-soft);
   border-color: var(--ad-color-primary-text);
   color: var(--ad-color-primary-text);
+  box-shadow: none;
 }
 
 .tertiary {
@@ -131,6 +155,7 @@
 .destructive {
   background: var(--ad-color-danger);
   color: var(--ad-color-on-danger);
+  box-shadow: var(--ad-shadow-danger);
 }
 
 .destructive:hover:not(:disabled, [aria-disabled='true']) {
