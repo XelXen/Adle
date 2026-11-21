@@ -344,8 +344,10 @@ request in any case. See ADR-013.
   is under one that would bind the whole of Adle, or if something that ships is missing from
   `docs/engineering/THIRD_PARTY.md`.
 - npm install scripts are denied by default (`allowScripts` in `package.json`).
-- Licences of what ships: MIT, ISC, BSD-3-Clause, Apache-2.0, OFL-1.1, PSF-2.0. No GPL,
-  AGPL, or LGPL anywhere, shipped or not.
+- Adle itself is under the GNU GPL, version 3 (ADR-033). Licences of what ships with it:
+  MIT, ISC, BSD-3-Clause, Apache-2.0, MPL-2.0, OFL-1.1, PSF-2.0, all of which can be
+  combined with it. Nothing under a copyleft or source-available licence is built from,
+  shipped or not, until someone decides about it.
 - FastAPI depends on the interface package of a telemetry library. Without that library's
   other half it records and sends nothing; the package build fails if the other half is ever
   present (`scripts/package.mjs`).
@@ -363,17 +365,39 @@ Reasoning: `docs/decisions/ADR-019-packaging.md`.
 | No package tree to audit at run time | Everything the app needs is bundled into `dist/`; the archive has no `node_modules` | `scripts/package.mjs` stages only `package.json`, `dist/`, and the icons |
 | Every boundary in this document holds in the packaged app | The whole end-to-end suite runs against it unchanged | `npm run e2e:packaged`: every journey there is, including `security.spec.ts` and `scene-player.spec.ts` |
 
+## Releases
+
+Details and reasoning: `docs/decisions/ADR-034-installers-and-releases.md`.
+
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| What is published is what the repository builds, from a commit anyone can read | A release is made by a workflow, from a tag; nobody uploads a file. The tag must be the version in `package.json` | `release.yml`; `scripts/release-notes.mjs --tag` |
+| The workflows can change nothing they do not need to | Every job has read access only, except the one that makes the release; no job is given a secret; a checkout leaves no credential behind | `permissions` and `persist-credentials: false` in `.github/workflows/` |
+| An action cannot be swapped under a workflow | Each is named by the commit it was reviewed at, with its version beside it | `.github/workflows/` |
+| A download can be checked | Every release lists a SHA-256 for each file | `SHA256SUMS.txt`, written by `release.yml` |
+| An installer never weakens the app it installs | No launcher passes `--no-sandbox`. On Linux the package installs Chromium's sandbox helper so that the sandbox can be built; where it cannot be, the app does not start | `scripts/installer.mjs --check` on every push: the installed app is started on a system as Ubuntu ships it |
+| Installing or removing Adle does not touch a learner's data | The installers write only the program's own folder, a menu entry, and what the system needs to remove them again | The Windows try-out installs, starts and uninstalls with a profile of its own |
+| Nothing looks for updates | No updater is installed and the app makes no request about versions | ADR-019; `e2e/security.spec.ts` (the session refuses everything) |
+
+**Residual risks, accepted**
+
+- **Nothing is signed.** Windows and macOS cannot tell a real Adle from a changed copy, and
+  say so. The checksums help someone who checks them and nobody else. This is the owner's
+  decision for now (ADR-034).
+- **A release trusts GitHub's build machines** and the tools on them (Inno Setup, `hdiutil`,
+  `dpkg-deb`, uv's Python builds, Electron's binaries).
+
 ## Not yet done
 
 | Item | Milestone |
 |---|---|
-| Code signing, and an installer | Needs the owner's certificates (ADR-019). Until then Windows warns about the program and macOS refuses it |
+| Code signing and notarisation | The owner's decision for now (ADR-034). Windows warns about the program and macOS asks before opening it |
 | Checking the archive's integrity at start-up (the fuse for it) | With signing; without a signature it adds little |
 | OS-level sandbox for the parser worker (job object / seccomp / App Sandbox) | Not built. The worker is a separate, short-lived, isolated process that returns only checked JSON; see "Residual risks" under "Imported documents" |
-| A build and a test run on macOS and Linux | NOT RUN |
-| The CI workflow | Written, never run: the repository has no remote |
+| The end-to-end suite on macOS | NOT RUN. The app is built, installed and started there by every push; the journeys run on Windows and Linux |
 
 ## Reporting a problem
 
-This project is not yet published. Until it is, report security concerns privately to the
-repository owner rather than in a public issue.
+Report a security problem privately, not in a public issue: on
+[the repository](https://github.com/XelXen/Adle) use **Security → Report a vulnerability**
+where GitHub offers it, or contact the owner through their GitHub profile.

@@ -23,6 +23,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import {
+  copyFileSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -44,6 +45,9 @@ const desktopDir = path.join(repoRoot, 'apps', 'desktop');
 const coreDir = path.join(repoRoot, 'services', 'core');
 const outDir = path.join(desktopDir, 'out');
 const stageDir = path.join(outDir, 'stage');
+
+/** The app's identity on macOS, and the name its settings are kept under there. */
+const APP_ID = 'io.github.xelxen.adle';
 
 const flags = new Set(process.argv.slice(2));
 const forTests = flags.has('--for-tests');
@@ -150,7 +154,25 @@ function basePython() {
   const home = /^home\s*=\s*(.+)$/m.exec(readFileSync(config, 'utf8'))?.[1]?.trim();
   if (!home) throw new Error(`No "home" in ${config}.`);
   // On Windows "home" is the installation; elsewhere it is its bin/ folder.
-  return realpathSync(isWindows ? home : path.dirname(home));
+  const installation = realpathSync(isWindows ? home : path.dirname(home));
+  // It must be a Python that uv itself manages: a build that can be moved, in a folder of
+  // its own. An environment made from the computer's Python would have "/usr" here, and
+  // what would be copied into the app is the computer. Seen coming on Linux, where the
+  // system has a Python of the right version; CI asks uv for its own every time.
+  const looksManaged =
+    /cpython-3\.12[^/\\]*$/.test(installation) &&
+    existsSync(
+      isWindows
+        ? path.join(installation, 'python.exe')
+        : path.join(installation, 'bin', 'python3.12'),
+    );
+  if (!looksManaged) {
+    throw new Error(
+      `The core environment uses the Python at ${installation}, which is not one uv manages. ` +
+        'Make it again with "uv sync --project services/core --python-preference only-managed".',
+    );
+  }
+  return installation;
 }
 
 function stageCore() {
@@ -252,8 +274,12 @@ async function packageApp({ appDir, productName, version }, coreStage) {
     overwrite: true,
     icon: path.join(desktopDir, 'assets', 'icons', 'icon'),
     extraResource: [coreStage],
-    appCopyright: 'Adle',
+    appCopyright: 'Copyright © 2026 XelXen. GNU General Public License, version 3.',
     win32metadata: { CompanyName: 'Adle', FileDescription: 'Adle', ProductName: 'Adle' },
+    // macOS: who the app is to the system (its settings, its keychain items), and where it
+    // is listed.
+    appBundleId: APP_ID,
+    appCategoryType: 'public.app-category.education',
     quiet: true,
   });
   if (!built) throw new Error('Nothing was packaged.');
@@ -285,6 +311,19 @@ async function hardenBinary(executable) {
     [FuseV1Options.OnlyLoadAppFromAsar]: true,
     [FuseV1Options.GrantFileProtocolExtraPrivileges]: false,
   });
+}
+
+/**
+ * macOS, and Apple's own processors above all, will not start a program whose signature
+ * does not match its files, and the fuses and the notices have just changed them. This is
+ * the signature anyone can make ("ad hoc"): it names no one and vouches for nothing, and it
+ * is not the signature of a developer Apple knows. A Mac still asks before it opens an app
+ * signed this way that came from the internet; the readme says what to do then.
+ */
+function signForThisComputerOnly(appFolder, productName) {
+  const bundle = path.join(appFolder, `${productName}.app`);
+  run('codesign', ['--force', '--deep', '--sign', '-', bundle]);
+  run('codesign', ['--verify', '--deep', '--strict', bundle]);
 }
 
 async function main() {
@@ -319,11 +358,19 @@ async function main() {
   if (notices.status !== 0) {
     throw new Error(`The third-party notices could not be collected: ${notices.stderr}`);
   }
-  for (const needed of ['app.asar', 'core', path.join('licenses', 'THIRD-PARTY.md')]) {
+  // And the licence Adle itself is under: whoever is given the app is given its terms.
+  copyFileSync(path.join(repoRoot, 'LICENSE'), path.join(resources, 'licenses', 'LICENSE.txt'));
+  for (const needed of [
+    'app.asar',
+    'core',
+    path.join('licenses', 'THIRD-PARTY.md'),
+    path.join('licenses', 'LICENSE.txt'),
+  ]) {
     if (!existsSync(path.join(resources, needed))) {
       throw new Error(`The packaged app has no resources/${needed}.`);
     }
   }
+  if (process.platform === 'darwin') signForThisComputerOnly(appFolder, app.productName);
   console.log(`\nPackaged ${forTests ? '(for tests) ' : ''}into ${appFolder}`);
   console.log(`  app.asar  ${megabytes(sizeOf(path.join(resources, 'app.asar')))}`);
   console.log(`  core      ${megabytes(sizeOf(path.join(resources, 'core')))}`);

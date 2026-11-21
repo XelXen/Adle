@@ -186,7 +186,32 @@ it can be.
 A first start straight after packaging is slow while the operating system looks at the new
 files, so `e2e:packaged` runs the start-up check first as a warm-up.
 
-### 5. Fixtures
+### 5. Installers, and what GitHub runs
+
+An installer is tested by using it. `node scripts/installer.mjs --check` makes the
+installer of the system it runs on, installs it, starts the installed app from outside with
+`scripts/smoke-packaged.mjs --at=<the installed executable>` (the same check as for the
+release folder), and removes it again. It changes the computer it runs on, so outside CI it
+asks to be told `--on-this-computer`.
+
+| Workflow | When | What it runs |
+|---|---|---|
+| `ci.yml` | every push to `dev` or `main`, every pull request | `node scripts/check.mjs` and both audits, on Linux. Then, side by side: the end-to-end suite on Windows and on Linux; and `build.yml` |
+| `build.yml` | called by the other two | On Windows, macOS (Apple and Intel processors) and Linux: the release build, its installer, the installer tried out as above, and the start-up check of the release folder |
+| `release.yml` | a tag `v<version>` | Checks that the tag is the version and that the changelog has it; runs `build.yml`; publishes what it made, with checksums |
+
+What each system's try-out covers that the others do not:
+
+- **Windows:** a silent install into a folder of its own, the Start menu shortcut, and an
+  uninstall that leaves neither behind.
+- **macOS:** the app copied out of the disk image still has the signature it was built
+  with, file for file (`codesign --verify --deep --strict`).
+- **Linux:** the package holds the sandbox helper as root's and marked to run as root; the
+  app starts once installed, on a system as Ubuntu ships it; removing the package removes
+  the app. The tarball is unpacked, and started where the system lets an unpacked app
+  build a sandbox.
+
+### 6. Fixtures
 
 | Location | Contents |
 |---|---|
@@ -217,8 +242,8 @@ Recorded in `docs/engineering/PROJECT_STATE.md` with the date and commit they ap
 |---|---|
 | **The release build** is checked from outside only; the journeys run against a twin of it with the debugger reachable | By design (ADR-019). The two differ in one fuse. |
 | **A computer that never had the project on it** | NOT RUN. The start-up check strips the environment, which is not the same thing. |
-| **CI** workflow exists but has never run (no remote) | Run on first push; treat as NOT RUN until then. |
-| **macOS and Linux** not exercised, in development or packaged | The CI matrix would cover Linux on first push; macOS has no runner set up. |
+| **macOS**: the end-to-end suite does not run there | The release build and its installer are built and started on macOS by every push; the journeys run on Windows and Linux only. Nobody has looked at Adle on a Mac. |
+| **Installers** cannot be tried on the computer Adle is developed on | By decision (ADR-034): they are made and tried on GitHub's machines, which have the tools and can be thrown away. |
 | **Visual regression** is manual (screenshots captured, not diffed) | Left open. Baselines differ between machines and fonts; a person looks at `test-results/screens`. |
 | **Screen reader** behaviour is inferred from roles and axe, not tested with a real reader | NOT RUN. Needs a person. |
 | **Performance** is measured on one machine | `docs/engineering/PERFORMANCE.md`, by `scripts/measure.mjs`. Large courses, large documents, and memory are not measured. |

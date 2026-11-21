@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Adle
+GenericName=Adaptive learning
+Comment=Learn at your own pace. Understand for real.
+Exec=/opt/Adle/Adle %U
+Icon=adle
+Terminal=false
+Categories=Education;
+StartupWMClass=Adle

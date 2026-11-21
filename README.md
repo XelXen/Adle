@@ -14,8 +14,8 @@ understanding with short questions, and adapts the next step to what you have ac
 > with its reason, practice, and reviews that come due. Your data can be copied to a file,
 > restored, and deleted. With a key for an AI provider (AIHubMix, NVIDIA NIM, or both
 > together) it writes curricula and lessons for your own topics and answers questions in the
-> middle of a lesson; a real model has done all three. It can be built into a folder that
-> runs by itself; an installer is still to come. See
+> middle of a lesson; a real model has done all three. There are installers for
+> Windows, macOS and Linux on the [releases page](https://github.com/XelXen/Adle/releases); this is an alpha. See
 > [`docs/engineering/PROJECT_STATE.md`](docs/engineering/PROJECT_STATE.md) for exactly what works.
 
 ## What works today
@@ -86,6 +86,32 @@ understanding with short questions, and adapts the next step to what you have ac
 
 Details: [SECURITY.md](SECURITY.md).
 
+## Install
+
+Download the file for your system from the [releases page](https://github.com/XelXen/Adle/releases).
+
+| System | File | Then |
+|---|---|---|
+| Windows 10 or 11 (64-bit) | `Adle-…-windows-x64-setup.exe` | Run it. It installs for you alone and asks for no administrator. |
+| macOS, Apple processor | `Adle-…-macos-arm64.dmg` | Open it and drag Adle onto Applications. |
+| macOS, Intel processor | `Adle-…-macos-x64.dmg` | The same. |
+| Debian, Ubuntu and their kin | `Adle-…-linux-x64.deb` | `sudo apt install ./Adle-…-linux-x64.deb` |
+| Any other Linux | `Adle-…-linux-x64.tar.gz` | Unpack it and run `Adle` inside. |
+
+Nobody has signed these builds, and each system says so in its own way:
+
+- **Windows** shows "Windows protected your PC". Choose **More info**, then **Run anyway**.
+- **macOS** says Adle could not be checked. Try to open it once, then go to **System
+  Settings → Privacy & Security** and choose **Open Anyway**. Or, in Terminal:
+  `xattr -dr com.apple.quarantine /Applications/Adle.app`
+- **Linux**, from the tarball only: on Ubuntu 24.04 and later an unpacked app may refuse to
+  start, because the system does not let it build its sandbox, and Adle will not run without
+  one. Use the `.deb`, which sets that up.
+
+Each release lists a checksum for every file in `SHA256SUMS.txt`. Adle does not update
+itself and never looks for a newer version: to update, install the newer one over the old.
+Your courses and settings are kept apart from the program and stay where they are.
+
 ## Run from source
 
 Requirements: [Node.js](https://nodejs.org/) 22.12 or newer (24.3.0 is pinned), and
@@ -116,6 +142,7 @@ Other commands:
 | `npm run e2e` | Build and run the end-to-end tests in the real app |
 | `npm run package` | Build Adle as a folder that runs by itself, in `apps/desktop/out/release/` |
 | `npm run package:check` | Start that build on an empty profile and check that it comes up whole |
+| `npm run installer` | Wrap that build into the installer for this system, in `apps/desktop/out/installers/` |
 
 ## A build that runs by itself
 
@@ -123,9 +150,12 @@ Other commands:
 Nothing else needs to be installed on the computer, and a Python that is already there is
 never used. Zip the folder to move it; run `Adle` inside it to start.
 
-It is a folder, not an installer, and it is not signed: Windows will warn before running it
-and macOS will refuse. It has been built and tested on Windows only. Details and what is
-still missing: [`docs/engineering/RELEASE_CHECKLIST.md`](docs/engineering/RELEASE_CHECKLIST.md).
+`npm run installer` wraps that folder into what a person downloads: a setup program on
+Windows (it needs [Inno Setup](https://jrsoftware.org/isinfo.php)), a disk image on macOS,
+a `.deb` and a tarball on Linux. Nothing is signed. The installers of a release are not
+made by hand: GitHub builds them on each system, tries each one out there, and publishes
+them when a version is tagged. How, and what is still missing:
+[`docs/engineering/RELEASE_CHECKLIST.md`](docs/engineering/RELEASE_CHECKLIST.md).
 
 ## Configuration
 
@@ -171,6 +201,14 @@ Start with [AGENTS.md](AGENTS.md), then [CONTRIBUTING.md](CONTRIBUTING.md) and
 
 ## Licence
 
-Not yet licensed for redistribution (`UNLICENSED`). Third-party components keep their own
-licences: `docs/engineering/THIRD_PARTY.md` lists every one, and the packaged app carries
-that list and the licence texts in `resources/licenses`.
+Copyright © 2026 XelXen.
+
+Adle is free software: you can redistribute it and modify it under the terms of the
+[GNU General Public License, version 3](LICENSE), as published by the Free Software
+Foundation. It is distributed in the hope that it will be useful, but **without any
+warranty**; without even the implied warranty of merchantability or fitness for a particular
+purpose. See the licence for details.
+
+Third-party components keep their own licences: `docs/engineering/THIRD_PARTY.md` lists every
+one, and the packaged app carries that list, the licence texts, and Adle's own licence in
+`resources/licenses`.

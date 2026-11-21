@@ -2,7 +2,7 @@
  * Unit tests for the main-process security boundaries: what may be loaded,
  * who may call the bridge, and which core operations the renderer can reach.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
@@ -108,11 +108,23 @@ describe('main window', () => {
     const options = createdWindows.at(-1) as { icon: string };
     expect(options.icon).toMatch(/assets[\\/]icons[\\/]icon\.(ico|png)$/);
     expect(existsSync(options.icon)).toBe(true);
-    // Both forms are committed, whichever platform the test runs on.
+    // Every form is committed, whichever platform the test runs on: the packaging of each
+    // system looks for its own (.ico, .icns, a PNG for each size).
     const icons = path.dirname(options.icon);
-    for (const file of ['icon.ico', 'icon.png', 'icon-1024.png']) {
+    for (const file of [
+      'icon.ico',
+      'icon.png',
+      'icon-1024.png',
+      'icon.icns',
+      path.join('linux', '16x16.png'),
+      path.join('linux', '512x512.png'),
+    ]) {
       expect(existsSync(path.join(icons, file)), file).toBe(true);
     }
+    // An .icns says what it is and how long it is in its first eight bytes.
+    const mac = readFileSync(path.join(icons, 'icon.icns'));
+    expect(mac.subarray(0, 4).toString('ascii')).toBe('icns');
+    expect(mac.readUInt32BE(4)).toBe(mac.length);
   });
 });
 

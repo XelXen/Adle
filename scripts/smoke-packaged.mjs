@@ -4,6 +4,9 @@
  *
  *   node scripts/smoke-packaged.mjs            the release build (apps/desktop/out/release)
  *   node scripts/smoke-packaged.mjs --test     the build made for the end-to-end suite
+ *   node scripts/smoke-packaged.mjs --at=<executable>
+ *                                              a copy somewhere else: one that an installer
+ *                                              has just put on the computer
  *
  * The release build cannot be driven by a test tool: the switches such a tool needs are
  * turned off in it, on purpose. So this looks from outside, at what a working start leaves
@@ -29,6 +32,9 @@ import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const forTests = process.argv.includes('--test');
+/** An executable named by whoever runs this, in place of the one in the build folder. */
+const elsewhere =
+  process.argv.find((argument) => argument.startsWith('--at='))?.slice('--at='.length) ?? null;
 const buildDir = path.join(repoRoot, 'apps', 'desktop', 'out', forTests ? 'test' : 'release');
 const START_TIMEOUT_MS = 120_000;
 
@@ -159,15 +165,31 @@ function isWindows() {
   return process.platform === 'win32';
 }
 
+/** Where a packaged app keeps what is not the program itself. */
+function resourcesOf(executable) {
+  return process.platform === 'darwin'
+    ? path.resolve(path.dirname(executable), '..', 'Resources')
+    : path.join(path.dirname(executable), 'resources');
+}
+
+/** The processes running a program from inside a folder, as the system lists them. */
+function processesFrom(folder) {
+  const listing = spawnSync('ps', ['-A', '-ww', '-o', 'pid=', '-o', 'args='], {
+    encoding: 'utf8',
+  });
+  return (listing.stdout ?? '').split('\n').filter((line) => line.includes(folder));
+}
+
 /** Whose work the app is built from, and their licences, travel with it. */
 function checkNotices(executable) {
-  const resources =
-    process.platform === 'darwin'
-      ? path.resolve(path.dirname(executable), '..', 'Resources')
-      : path.join(path.dirname(executable), 'resources');
-  const folder = path.join(resources, 'licenses');
+  const folder = path.join(resourcesOf(executable), 'licenses');
   const inventory = path.join(folder, 'THIRD-PARTY.md');
   if (!existsSync(inventory)) throw new Error('The package has no licenses/THIRD-PARTY.md.');
+  // Adle's own licence: the terms the app is given under go wherever the app goes.
+  const own = path.join(folder, 'LICENSE.txt');
+  if (!existsSync(own) || !readFileSync(own, 'utf8').includes('GNU GENERAL PUBLIC LICENSE')) {
+    throw new Error('The package has no licenses/LICENSE.txt with the GNU GPL in it.');
+  }
   const texts = existsSync(path.join(folder, 'texts'))
     ? readdirSync(path.join(folder, 'texts'))
     : [];
@@ -176,7 +198,10 @@ function checkNotices(executable) {
 }
 
 async function main() {
-  const executable = findExecutable();
+  const executable = elsewhere ? path.resolve(elsewhere) : findExecutable();
+  if (elsewhere && !existsSync(executable)) {
+    throw new Error(`There is no app at ${executable}.`);
+  }
   if (!executable) {
     throw new Error(
       `No packaged app in ${buildDir}. Run "node scripts/package.mjs${forTests ? ' --for-tests' : ''}" first.`,
@@ -186,7 +211,7 @@ async function main() {
   await checkFuses(executable);
   console.log('  PASS  fuses are set as intended');
   checkNotices(executable);
-  console.log('  PASS  the third-party notices are in the package');
+  console.log('  PASS  the licence and the third-party notices are in the package');
   if (!forTests) {
     checkWillNotRunAsNode(executable);
     console.log('  PASS  will not run as plain Node');
@@ -202,6 +227,16 @@ async function main() {
   // The core holds its database open. If it stayed behind, the profile could not be removed.
   rmSync(profile, { recursive: true, force: true, maxRetries: 60, retryDelay: 250 });
   if (existsSync(profile)) throw new Error('The core stayed behind after the app was closed.');
+  // That is true on Windows only. Elsewhere a folder can be removed from under a process
+  // that has it open, so there the processes themselves are looked at.
+  if (!isWindows()) {
+    const core = path.join(resourcesOf(executable), 'core');
+    await until(
+      () => processesFrom(core).length === 0,
+      20_000,
+      'the core to stop after the app was closed (it stayed behind)',
+    );
+  }
   console.log('  PASS  the core does not stay behind when the app is ended');
 }
 

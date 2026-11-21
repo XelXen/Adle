@@ -1,9 +1,9 @@
 {
   "name": "@adle/event-protocol",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "description": "Versioned, validated message protocol between the Adle host and the isolated scene player.",
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-only",
   "type": "module",
   "sideEffects": false,
   "exports": {

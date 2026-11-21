@@ -44,7 +44,12 @@ const collectInto =
   process.argv.find((argument) => argument.startsWith('--collect='))?.slice('--collect='.length) ??
   null;
 
-/** Licences that may not be used at all: they would bind the whole of Adle. */
+/**
+ * Licences nothing Adle is built from may be under without a decision of its own. Adle is
+ * under the GNU GPL, version 3 only (ADR-033). Some of these cannot be combined with that
+ * at all (GPL-2.0-only, SSPL, a non-commercial or "source available" licence); the others
+ * can, and would still change what Adle owes to whoever receives it.
+ */
 const REFUSED = /\b(A?GPL|LGPL|SSPL|EUPL|OSL|CC-BY-NC|CC-BY-SA|BUSL|Commons Clause)\b/i;
 /** A dual licence is fine if one side of an "OR" is acceptable. */
 const acceptable = (licence) =>

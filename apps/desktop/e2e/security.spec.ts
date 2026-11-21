@@ -218,6 +218,36 @@ test.describe('renderer boundary', () => {
     expect(results.saveCopy).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
   });
 
+  test('About says whose Adle is and under what licence, and opens only the two pages it names', async ({
+    adle,
+  }) => {
+    const { app, page } = adle;
+    // Nothing is really opened: what the main process would have handed to the browser of
+    // the computer is written down instead.
+    await app.evaluate(({ shell }) => {
+      const opened: string[] = [];
+      (globalThis as unknown as { __opened: string[] }).__opened = opened;
+      shell.openExternal = (url: string) => {
+        opened.push(url);
+        return Promise.resolve();
+      };
+    });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('tab', { name: 'About' }).click();
+
+    // What the GNU GPL asks an app to tell whoever uses it (ADR-033).
+    await expect(
+      page.getByText('Adle is free software under the GNU General Public License, version 3.'),
+    ).toBeVisible();
+    await expect(page.getByText(/It comes with no warranty\./)).toBeVisible();
+    await page.getByRole('button', { name: 'Source code' }).click();
+    await page.getByRole('button', { name: 'Read the licence' }).click();
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as unknown as { __opened: string[] }).__opened))
+      .toEqual(['https://github.com/XelXen/Adle', 'https://www.gnu.org/licenses/gpl-3.0.html']);
+    expect(adle.problems).toEqual([]);
+  });
+
   test('the page cannot say where a copy goes, which file is restored, or that it is sure', async ({
     adle,
     profileDir,

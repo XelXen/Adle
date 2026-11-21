@@ -5,8 +5,25 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.1] - 2026-11-21
+
+The first alpha of Adle, for Windows, macOS and Linux. Adle turns a topic or your own
+materials into a curriculum you can inspect, teaches each concept with narrated pictures you
+can try out, asks short questions, and chooses what comes next from what your answers show.
+Everything stays on your computer. It comes with a sample course, "Introduction to neural
+networks", that needs no key and no account.
+
+This is a preview. It has been tested thoroughly on Windows and by automation on macOS and
+Linux; nobody has yet learnt a subject with it.
+
 ### Added
 
+- **Installers for Windows, macOS and Linux**, built and published by GitHub: a setup
+  program for Windows, a disk image for macOS (Apple and Intel processors), and a `.deb`
+  package and a tarball for Linux. Nothing is signed yet, so each system will ask before it
+  opens one; the release page says what to choose.
+- Adle is free software under the GNU General Public License, version 3. Settings → About
+  says so, and leads to the source and the licence.
 - Desktop app that opens without an account or an AI key.
 - First-run welcome that explains what stays on your computer and what is sent to an AI provider.
 - Library screen and navigation, with light and dark themes and a "follow system" option.

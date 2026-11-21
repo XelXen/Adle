@@ -162,6 +162,23 @@ most, a file's name.
 - The release build cannot be driven by a test tool, on purpose. Test the build from
   `npm run package:test` with `npm run e2e:packaged`; check the release build from outside
   with `npm run package:check`. A new fuse goes into both `package.mjs` and the check.
+- **Installers** (ADR-034) are made by `scripts/installer.mjs` from the release folder as it
+  is, with the system's own tool: Inno Setup (`installer/windows.iss`), `hdiutil`,
+  `dpkg-deb` (`installer/linux.desktop`). No tool is added to the project for this. With
+  `--check` the script installs what it made, starts it with
+  `smoke-packaged.mjs --at=<installed executable>`, and removes it: that is how an installer
+  is tested, on GitHub's machines, for every push.
+- **The private Python must be one uv manages.** `package.mjs` refuses any other: an
+  environment made from a computer's own Python would have the computer copied into the
+  app. The workflows set `UV_PYTHON_PREFERENCE=only-managed`.
+- **macOS:** after the fuses and the notices have changed the bundle it is signed "ad hoc",
+  or a Mac with Apple's processor will not start it. That is not a developer's signature.
+  Anything added to the bundle goes in before that step.
+- **Linux:** the `.deb` installs Chromium's sandbox helper as root's, marked to run as
+  root. Never give a launcher `--no-sandbox`, and never make a kind of package that can
+  only run that way.
+- The identifier in `installer/windows.iss` (`AppId`) is how Windows knows a newer Adle
+  from a second program. It never changes.
 
 ## Tests
 

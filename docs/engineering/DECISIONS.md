@@ -40,6 +40,8 @@ supersedes the old one and update this index.
 | [030](../decisions/ADR-030-own-title-bar.md) | The window has a title bar of the app's own on Windows and macOS: the system's buttons laid over the page in the app's colours, a strip to move the window by, and nothing new across the bridge |
 | [031](../decisions/ADR-031-a-lesson-opens-when-its-words-are-ready.md) | A lesson is stored, listed and can be started as soon as its text is written; its pictures are added as they are drawn, and settled in words if they are not; stopping keeps the lesson, removing it stops the work; the learner is told once; who wrote a lesson is kept with the lesson |
 | [032](../decisions/ADR-032-a-picture-drawn-to-suit-its-frame.md) | The player asks for a scene to be drawn at the size that suits its frame (854, 1280 or 1920 wide), so that the browser never shrinks a picture by more than two: shrunk further, a thin stroke such as a minus sign is dropped |
+| [033](../decisions/ADR-033-gnu-gpl-version-3.md) | Adle is free software under the GNU GPL, version 3 only; the packaged app carries the licence, and Settings → About says so and leads to the licence and the source |
+| [034](../decisions/ADR-034-installers-and-releases.md) | Installers for Windows, macOS and Linux made with each system's own tool (Inno Setup, hdiutil, dpkg-deb) and no new dependency; unsigned by the owner's decision; each one installed, started and removed on GitHub's machines for every push; a tag publishes a release |
 
 ## Smaller standing choices (no ADR)
 
@@ -50,4 +52,4 @@ supersedes the old one and update this index.
 - **Fonts:** Geist Sans, Geist Mono, and Geist Serif, all OFL-1.1 and bundled: the first two
   from `@fontsource-variable/*`, the serif as a file kept in the design system (ADR-025).
   Scenes are drawn with Inter (`@fontsource/inter`), which is theirs alone.
-- **Licence field:** `UNLICENSED` (private) until the owner chooses a licence.
+- **Licence field:** `GPL-3.0-only` (ADR-033).

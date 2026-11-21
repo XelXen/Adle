@@ -1,4 +1,4 @@
-import { CircleCheck, FolderOpen, RotateCw } from 'lucide-react';
+import { CircleCheck, ExternalLink, FolderOpen, RotateCw } from 'lucide-react';
 import { useState } from 'react';
 
 import { Badge, Button, Card, Section, Stack } from '@adle/design-system';
@@ -165,6 +165,35 @@ export function AboutSettings() {
               <dd>{info.platform}</dd>
             </div>
           </dl>
+        </Card>
+        {/* What the licence asks an app to say: whose it is, that it comes with no warranty,
+            that it may be shared, and where the licence and the source are. */}
+        <Card>
+          <div className={styles.statusRow}>
+            <div className={styles.statusText}>
+              <p>Adle is free software under the GNU General Public License, version 3.</p>
+              <p className={styles.muted}>
+                © 2026 XelXen. It comes with no warranty. You may share it and change it under that
+                licence.
+              </p>
+            </div>
+            <Stack direction="row" gap={2} wrap>
+              <Button
+                variant="tertiary"
+                icon={<ExternalLink />}
+                onClick={() => void getBridge().app.openExternal('source')}
+              >
+                Source code
+              </Button>
+              <Button
+                variant="tertiary"
+                icon={<ExternalLink />}
+                onClick={() => void getBridge().app.openExternal('licence')}
+              >
+                Read the licence
+              </Button>
+            </Stack>
+          </div>
         </Card>
       </Section>
 

@@ -145,6 +145,10 @@ export const EXTERNAL_LINKS = {
   aihubmixModel: 'https://aihubmix.com/model/coding-kimi-k3-free',
   nvidiaKeys: 'https://build.nvidia.com/settings/api-keys',
   wanim: 'https://wanim.org/',
+  /** Where Adle's own source is: what its licence says a learner is owed. */
+  source: 'https://github.com/XelXen/Adle',
+  /** The licence Adle is under, as its authors publish it. A copy also ships with the app. */
+  licence: 'https://www.gnu.org/licenses/gpl-3.0.html',
 } as const;
 
 export type ExternalLinkId = keyof typeof EXTERNAL_LINKS;

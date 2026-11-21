@@ -1,9 +1,9 @@
 {
   "name": "adle",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "description": "Adle — Adaptive Learning Environment. A local-first desktop app that learns what you understand and teaches what you need next.",
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-only",
   "type": "module",
   "engines": {
     "node": ">=22.12.0",
@@ -28,6 +28,9 @@
     "package:check": "node scripts/smoke-packaged.mjs",
     "package:test": "node scripts/package.mjs --for-tests",
     "e2e:packaged": "node scripts/e2e-packaged.mjs",
+    "installer": "node scripts/installer.mjs",
+    "installer:check": "node scripts/installer.mjs --check",
+    "release:notes": "node scripts/release-notes.mjs",
     "core:sync": "uv sync --project services/core",
     "core:lint": "uv run --directory services/core ruff check . && uv run --directory services/core ruff format --check .",
     "core:typecheck": "uv run --directory services/core mypy",

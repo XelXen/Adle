@@ -8,8 +8,11 @@
  * Output: the mark on a rounded tile of the artwork's own backdrop colour, as
  *
  *   icon.ico        16 to 256 px, for Windows (window, taskbar, installer)
- *   icon.png        512 px, for Linux and as the source for other formats
- *   icon-1024.png   for macOS .icns generation at packaging time
+ *   icon.png        512 px, for the window on Linux and as the source for other formats
+ *   icon-1024.png   the largest size, as a picture
+ *   icon.icns       for macOS: the same tile drawn smaller, with the margin a Mac leaves
+ *                   around every icon, at the sizes the Dock and the Finder ask for
+ *   linux/NxN.png   16 to 512 px, for a desktop's menus (the sizes of the "hicolor" theme)
  *
  * The outputs are committed. Re-run this only when the mark changes.
  */
@@ -27,6 +30,23 @@ const BACKDROP = '#eeeeee';
 /** Corner radius of the tile, on the 1280 grid. */
 const TILE_RADIUS = 288;
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
+const LINUX_SIZES = [16, 24, 32, 48, 64, 128, 256, 512];
+/**
+ * A Mac's icon is a tile of 824 on a canvas of 1024: every icon keeps the same margin, and
+ * one drawn to its edges looks a size too large beside the others.
+ */
+const MAC_TILE_SHARE = 824 / 1024;
+/** The kinds an .icns file holds as PNG, by the size of the picture in each. */
+const ICNS_KINDS = [
+  ['ic11', 32],
+  ['ic12', 64],
+  ['ic07', 128],
+  ['ic13', 256],
+  ['ic08', 256],
+  ['ic14', 512],
+  ['ic09', 512],
+  ['ic10', 1024],
+];
 
 // One device pixel per CSS pixel, whatever display this runs on.
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
@@ -42,8 +62,8 @@ function page() {
   return (
     '<!doctype html><html><body style="margin:0;background:transparent;overflow:hidden">' +
     `<svg id="icon" xmlns="http://www.w3.org/2000/svg" width="${GRID}" height="${GRID}" ` +
-    `viewBox="0 0 ${GRID} ${GRID}" style="display:block">` +
-    `<rect id="tile" width="${GRID}" height="${GRID}" fill="${BACKDROP}"/>${markBody()}</svg>` +
+    `viewBox="0 0 ${GRID} ${GRID}" style="display:block"><g id="art">` +
+    `<rect id="tile" width="${GRID}" height="${GRID}" fill="${BACKDROP}"/>${markBody()}</g></svg>` +
     '</body></html>'
   );
 }
@@ -63,13 +83,18 @@ async function openStage() {
   await stage.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page())}`);
 }
 
-async function render(size, { radius }) {
+/** `share` is how much of the canvas the tile takes: 1 for a tile drawn to the edges. */
+async function render(size, { radius, share = 1 }) {
+  const margin = (GRID * (1 - share)) / 2;
   await stage.webContents.executeJavaScript(
     `(() => {
       const icon = document.getElementById('icon');
       icon.setAttribute('width', '${size}');
       icon.setAttribute('height', '${size}');
       document.getElementById('tile').setAttribute('rx', '${radius}');
+      document
+        .getElementById('art')
+        .setAttribute('transform', 'translate(${margin} ${margin}) scale(${share})');
       return new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
     })()`,
   );
@@ -103,6 +128,24 @@ function ico(entries) {
     offset += png.length;
   });
   return Buffer.concat([header, directory, ...entries.map((entry) => entry.png)]);
+}
+
+/**
+ * An .icns is the word "icns", the length of the whole file, and then each picture behind
+ * its kind and its own length. Since OS X 10.7 a picture may be a PNG file as it is.
+ */
+function icns(entries) {
+  const parts = entries.map(({ kind, png }) => {
+    const header = Buffer.alloc(8);
+    header.write(kind, 0, 'ascii');
+    header.writeUInt32BE(png.length + 8, 4);
+    return Buffer.concat([header, png]);
+  });
+  const body = Buffer.concat(parts);
+  const header = Buffer.alloc(8);
+  header.write('icns', 0, 'ascii');
+  header.writeUInt32BE(body.length + 8, 4);
+  return Buffer.concat([header, body]);
 }
 
 /** How far the vector mark is from the artwork it was drawn from. */
@@ -148,7 +191,33 @@ async function build() {
     path.join(iconsDir, 'icon-1024.png'),
     (await render(1024, { radius: TILE_RADIUS })).toPNG(),
   );
-  console.log(`Wrote icon.ico (${ICO_SIZES.join(', ')} px), icon.png, icon-1024.png`);
+
+  const macPictures = new Map();
+  for (const [, size] of ICNS_KINDS) {
+    if (!macPictures.has(size)) {
+      macPictures.set(
+        size,
+        (await render(size, { radius: TILE_RADIUS, share: MAC_TILE_SHARE })).toPNG(),
+      );
+    }
+  }
+  fs.writeFileSync(
+    path.join(iconsDir, 'icon.icns'),
+    icns(ICNS_KINDS.map(([kind, size]) => ({ kind, png: macPictures.get(size) }))),
+  );
+
+  const linuxDir = path.join(iconsDir, 'linux');
+  fs.mkdirSync(linuxDir, { recursive: true });
+  for (const size of LINUX_SIZES) {
+    fs.writeFileSync(
+      path.join(linuxDir, `${size}x${size}.png`),
+      (await render(size, { radius: TILE_RADIUS })).toPNG(),
+    );
+  }
+  console.log(
+    `Wrote icon.ico (${ICO_SIZES.join(', ')} px), icon.png, icon-1024.png, icon.icns, ` +
+      `linux/ (${LINUX_SIZES.join(', ')} px)`,
+  );
 }
 
 app.whenReady().then(async () => {

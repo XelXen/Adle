@@ -1,0 +1,100 @@
+name: Build installers
+
+# Makes what a person downloads, on each system it is for, and tries it out there: the
+# installer puts the app on the machine, the app is started from outside, and it is taken
+# away again. Called by CI, so that packaging stays honest on every system with every
+# push, and by Release, which publishes what this makes.
+
+on:
+  workflow_call:
+    inputs:
+      keep-days:
+        description: How many days the installers are kept with the run.
+        type: number
+        default: 3
+
+permissions:
+  contents: read
+
+env:
+  # The Python that goes into the app is one uv manages, never the build machine's own.
+  # scripts/package.mjs refuses any other.
+  UV_PYTHON_PREFERENCE: only-managed
+
+jobs:
+  installers:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows-x64, os: windows-latest }
+          - { name: macos-arm64, os: macos-latest }
+          - { name: macos-x64, os: macos-15-intel }
+          - { name: linux-x64, os: ubuntu-latest }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          enable-cache: true
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Download the pinned Electron binary
+        run: npx install-electron --no
+      - name: Install Python dependencies
+        run: npm run core:sync
+      - name: Build the release app
+        run: npm run package
+
+      - name: Find Inno Setup (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) { choco install innosetup --no-progress --yes }
+          if (-not (Test-Path $compiler)) { throw "Inno Setup is not installed." }
+
+      - name: Make the installer and try it out (Windows, macOS)
+        if: runner.os != 'Linux'
+        run: node scripts/installer.mjs --check
+      - name: Check the release app from outside (Windows, macOS)
+        if: runner.os != 'Linux'
+        run: npm run package:check
+
+      - name: Make the packages and try them out (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum node scripts/installer.mjs --check
+      - name: Check the release app from outside (Linux)
+        if: runner.os == 'Linux'
+        # The folder as it is, which is what the tarball holds. Unpacked by hand, its sandbox
+        # helper is nobody's, so it starts only where programs may make namespaces: allowed
+        # here, on this build machine, for this one check. The app's own sandbox stays on.
+        run: |
+          sudo sysctl --write kernel.apparmor_restrict_unprivileged_userns=0 || true
+          xvfb-run --auto-servernum npm run package:check
+
+      - name: Keep the installers
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-${{ matrix.name }}
+          path: apps/desktop/out/installers/Adle-*
+          if-no-files-found: error
+          retention-days: ${{ inputs.keep-days }}
+          # They are compressed already.
+          compression-level: 0
+      - name: Keep the installer's own log if something went wrong (Windows)
+        if: failure() && runner.os == 'Windows'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: install-log-${{ matrix.name }}
+          path: apps/desktop/out/installers/install.log
+          if-no-files-found: ignore
+          retention-days: 7

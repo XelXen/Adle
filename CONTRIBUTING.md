@@ -25,7 +25,7 @@ Installs JavaScript dependencies (`npm ci`), the pinned Electron binary, and the
 ## Branches and commits
 
 - Work on `dev` in small commits, or on a short-lived branch `type/short-description` off it.
-  `main` is what the owner has merged.
+  `main` is what was last released: it only ever moves forward to a commit of `dev`.
 - [Conventional Commits](https://www.conventionalcommits.org/):
   `feat(scope): …`, `fix(scope): …`, `test(scope): …`, `docs(scope): …`, `refactor(scope): …`,
   `chore(scope): …`. Scopes in use: `desktop`, `renderer`, `player`, `core`, `generation`,
@@ -40,6 +40,27 @@ Installs JavaScript dependencies (`npm ci`), the pinned Electron binary, and the
 **Never commit:** secrets or `.env` files, API keys (even fake-looking real ones), databases, user
 documents, learner data, voice models, caches, or build output. `.gitignore` covers the usual
 places; review `git status` and `git diff --staged` anyway.
+
+## Releasing
+
+A version is published by GitHub, from a tag (ADR-034). By hand you only say which commit.
+
+1. On `dev`, with everything green: set the version.
+   `npm version <version> --workspaces --include-workspace-root --no-git-tag-version`, the
+   same in `services/core/pyproject.toml` (as Python writes it: `0.2.0a1` for
+   `0.2.0-alpha.1`) followed by `uv lock --project services/core`, and in
+   `services/core/adle_core/__init__.py`.
+2. In `CHANGELOG.md`, give the version its own heading with the date, and under it a few
+   lines that open the release: they become the top of the release's notes.
+   `npm run release:notes` shows what will be published.
+3. `node scripts/check.mjs --e2e`, commit, push `dev`, and wait for CI: it builds the
+   installers on every system and tries each one out.
+4. Move `main` forward to that commit and push it, then tag and push the tag:
+   `git tag v<version>` and `git push origin v<version>`.
+5. The Release workflow builds the installers again from the tag and publishes them with
+   their checksums. A version with a hyphen in it is published as a pre-release. If the tag
+   is not the version in `package.json`, or the changelog does not have it, nothing is
+   published.
 
 ## Code standards
 
