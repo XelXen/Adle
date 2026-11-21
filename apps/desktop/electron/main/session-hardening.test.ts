@@ -39,7 +39,8 @@ vi.mock('electron', () => ({
   shell: { openExternal: vi.fn() },
 }));
 
-const { hardenSession, hardenWebContents, refuseNameLookups } = await import('./security');
+const { hardenSession, hardenWebContents, mayFillTheScreen, refuseNameLookups } =
+  await import('./security');
 
 /** A page as the main process sees it, with what was done to it written down. */
 function fakeContents() {
@@ -107,14 +108,31 @@ describe('hardenSession', () => {
     expect(prevented(sessionListeners.get('will-download'))).toBe(true);
   });
 
-  it('grants no permission, of any kind, to anyone', async () => {
+  it('grants no permission to anyone, but for the app’s own page filling the screen', async () => {
     await hardenSession();
     const ask = defaultSession.setPermissionRequestHandler.mock.calls.at(-1)?.[0];
     const answers: unknown[] = [];
+    const reply = (granted: boolean): number => answers.push(granted);
     for (const permission of ['media', 'geolocation', 'notifications', 'clipboard-read']) {
-      ask?.({}, permission, (granted: boolean) => answers.push(granted));
+      ask?.({}, permission, reply);
+      // Not even to the app's own page.
+      ask?.({}, permission, reply, { isMainFrame: true, requestingUrl: 'adle://app/' });
     }
-    expect(answers).toEqual([false, false, false, false]);
+    expect(answers).toEqual(Array.from({ length: 8 }, () => false));
+
+    const page = { isMainFrame: true, requestingUrl: 'adle://app/index.html' };
+    expect(mayFillTheScreen('fullscreen', page.isMainFrame, page.requestingUrl)).toBe(true);
+    answers.length = 0;
+    ask?.({}, 'fullscreen', reply, page);
+    // A scene's frame, a frame of the app inside the window, a page from anywhere else,
+    // and a request that does not say who is asking: none of them.
+    ask?.({}, 'fullscreen', reply, { isMainFrame: false, requestingUrl: 'adle://a1.player/' });
+    ask?.({}, 'fullscreen', reply, { isMainFrame: false, requestingUrl: 'adle://app/' });
+    ask?.({}, 'fullscreen', reply, { isMainFrame: true, requestingUrl: 'adle://a1.player/' });
+    ask?.({}, 'fullscreen', reply, { isMainFrame: true, requestingUrl: 'https://example.com/' });
+    ask?.({}, 'fullscreen', reply, { isMainFrame: true });
+    ask?.({}, 'fullscreen', reply);
+    expect(answers).toEqual([true, false, false, false, false, false, false]);
     expect(defaultSession.setPermissionCheckHandler.mock.calls.at(-1)?.[0]?.()).toBe(false);
     expect(defaultSession.setDevicePermissionHandler.mock.calls.at(-1)?.[0]?.()).toBe(false);
   });

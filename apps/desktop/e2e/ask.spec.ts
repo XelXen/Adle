@@ -19,6 +19,8 @@ import {
   saveProviderKey,
   screenshot,
   showNarrationAsText,
+  openWhatIsSent,
+  closeWhatIsSent,
 } from './support/courses';
 import { type FakeProvider, HANG, startFakeProvider } from './support/fake-provider';
 
@@ -101,12 +103,15 @@ test.describe('asking a question during a lesson', () => {
     const dialog = askDialog(page);
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText('Part 1: Not every input counts the same');
-    // What will be sent, and where, is said before anything is.
-    await expect(dialog).toContainText(
+    // What will be sent, and where, is one press away before anything is.
+    const note = await openWhatIsSent(page, dialog);
+    await expect(note).toContainText(
       'Sends your question, this part of the lesson, the lesson outline, the course name, ' +
         `this concept, and any related passages from your materials to ${PROVIDER}.`,
     );
-    await expect(dialog).toContainText('AI answers can be wrong.');
+    await expect(note).toContainText('AI can make mistakes.');
+    await closeWhatIsSent(page, dialog);
+    await expect(dialog).toBeVisible();
     expect(provider.requests).toHaveLength(0);
     // The lesson waits while the learner asks.
     await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();

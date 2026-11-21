@@ -232,6 +232,18 @@ most, a file's name.
   its place by itself only in a part that has not begun (`status === 'ready'`); otherwise
   it is offered. Ask the picture, not the part, whether there is anything to operate
   (`scene.interactive`): the two can disagree in a lesson opened early.
+- **A lesson is watched on a screen** (`StageFrame`, ADR-035): dark in either theme, with
+  the words being said along its foot. Whatever a part shows goes on it (`ScenePlayer
+  onStage`, or the board), except a question, which is a card of the page. On the screen
+  use the `--ad-color-stage*` tokens and `IconButton variant="stage"`; the page's own
+  tokens there are dark on dark in the light theme. The transcript's lines are all in the
+  page whether one is shown or all: hide the others from the eye, never from the tree.
+- **Full screen** is the player element itself (`useFullscreen`), by the browser's own
+  means; the main process grants it to the app's own page and to nothing else. In a
+  journey, give the screen back with the button that took it: a test's Escape does not
+  reach the browser. What is not on the lesson's screen needs a surface of the page's
+  under it there. The filled player says `app-region: no-drag`, because it covers the
+  strip the window is moved by.
 - Assets are files. Both Vite configs set `assetsInlineLimit: 0`; a `data:` URI would be
   refused by the Content Security Policy.
 - React's lint rules forbid writing to a ref passed in as a prop or during render. State that
@@ -284,8 +296,11 @@ most, a file's name.
   `useLessonNotices`; everywhere else `WritingProvider` does, and it keeps the one record
   of who was told (`wasTold`, `markTold`), so a lesson is announced once however the
   learner moves about. Removing a lesson forgets its job on the screen; the core stops it.
-- Say what will be sent before it is sent, beside the control that sends it, and name the
-  provider by the name the core gives (`provider.status`), never a hard-coded one.
+- What will be sent, and where, is one press away from every control that sends it:
+  put `<WhatIsSent what to wait />` beside the button (ADR-036), with the phrase from
+  `lib/generation.ts` and the destination the core plans (`destination(status, work)`),
+  never a hard-coded name. Do not write the sentence beside the button again, and do not
+  add a control that sends without the note. A journey reads it with `openWhatIsSent`.
 - Speech uses **local voices only** (`loadLocalVoices`). Do not list or use a voice whose
   `localService` is false.
 - End-to-end journeys that are not about speech call `showNarrationAsText(page)` first.

@@ -498,3 +498,10 @@
   font: var(--ad-text-supporting);
   color: var(--ad-color-muted);
 }
+
+/* A button that sends something, and beside it what it sends (ADR-036). */
+.sending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ad-space-1);
+}

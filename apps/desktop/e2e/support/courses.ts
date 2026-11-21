@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import AxeBuilder from '@axe-core/playwright';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 import { desktopDir, expect, repoRoot } from './app';
 
@@ -132,6 +132,26 @@ export async function settled(page: Page): Promise<void> {
       new Promise((resolve) => setTimeout(resolve, 1500)),
     ]);
   });
+}
+
+/**
+ * Open the note beside a control that sends something to an AI provider, and hand the
+ * note back (ADR-036). What is sent and where it goes is one press away and not on the
+ * page: a journey that checks what a learner can read before anything is sent opens it
+ * as a learner would. `within` narrows it to one part of the page, where a page has
+ * more than one such control.
+ */
+export async function openWhatIsSent(page: Page, within: Locator | Page = page): Promise<Locator> {
+  await within.getByRole('button', { name: 'What is sent' }).click();
+  const note = page.locator('[popover]').filter({ visible: true });
+  await expect(note).toHaveCount(1);
+  return note;
+}
+
+/** Put that note away again, with the button that opened it. */
+export async function closeWhatIsSent(page: Page, within: Locator | Page = page): Promise<void> {
+  await within.getByRole('button', { name: 'What is sent' }).click();
+  await expect(page.locator('[popover]').filter({ visible: true })).toHaveCount(0);
 }
 
 /**

@@ -10,13 +10,9 @@ import { NextSteps } from '../../components/NextSteps';
 import { SessionSummary } from '../../components/SessionSummary';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
+import { WhatIsSent } from '../../components/WhatIsSent';
 import { destination, usualWait } from '../../lib/provider';
-import {
-  isDrawingPictures,
-  KIND_LESSON,
-  lessonDisclosure,
-  lessonWaitNote,
-} from '../../lib/generation';
+import { isDrawingPictures, KIND_LESSON, lessonDisclosure } from '../../lib/generation';
 import {
   formatWait,
   hypothesisLabel,
@@ -120,22 +116,22 @@ export function LearnPanel({ course }: { course: Course }) {
           onDismiss={() => generation.putAway(conceptId, job)}
         />
         {settled ? (
-          <>
-            <div>
-              <Button
-                variant={primary ? 'primary' : 'secondary'}
-                size={primary ? 'medium' : 'small'}
-                icon={<Sparkles />}
-                onClick={() => void createLesson(conceptId)}
-              >
-                Create lesson
-              </Button>
-            </div>
-            <p className={styles.aiNote}>
-              Sends {lessonDisclosure(course.source_count > 0 ? 'some' : 'none')} to{' '}
-              {destination(providerStatus, 'lesson')}.{lessonWaitNote(lessonWait)}
-            </p>
-          </>
+          <div className={styles.sending}>
+            <Button
+              variant={primary ? 'primary' : 'secondary'}
+              size={primary ? 'medium' : 'small'}
+              icon={<Sparkles />}
+              onClick={() => void createLesson(conceptId)}
+            >
+              Create lesson
+            </Button>
+            <WhatIsSent
+              what={lessonDisclosure(course.source_count > 0 ? 'some' : 'none')}
+              to={destination(providerStatus, 'lesson')}
+              wait={lessonWait}
+              after="Its pictures follow while you start."
+            />
+          </div>
         ) : null}
       </>
     );

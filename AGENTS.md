@@ -98,8 +98,9 @@ last released.
   given a key to, each for what it is good at (ADR-021, ADR-023). Nothing else changes that
   choice. With one provider chosen, no failure, missing key, or used-up quota moves a request
   to another. With automatic, a request may go on to the next provider in the plan, and only
-  ever to one with a key of its own; where it may go is said before it is sent, and who
-  wrote the answer afterwards. A key is sent only to the provider, and the address, it was
+  ever to one with a key of its own; where it may go can be read before it is sent (in
+  Settings, and one press away from the control that sends: ADR-036), and who wrote the
+  answer afterwards. A key is sent only to the provider, and the address, it was
   given for. A provider's next model (same address, same key) may stand in for its first,
   and that is always said.
 - A notification of the operating system is asked for by its kind and nothing else
@@ -145,8 +146,11 @@ last released.
   gets the answer to a question the lesson is asking.
 - Every animation has a text equivalent; every scene control has a keyboard-operable mirror.
 - No placeholder buttons, fake data paths, or "coming soon" in anything marked done.
-- Words are short, plain, and about the learner's task (ADR-028). Nothing about the app's
-  own workings unless the learner has to act on it.
+- Words are short, plain, and about the learner's task (ADR-028), and few (ADR-036): a
+  sentence stays where the learner has to act on it or decide by it. Nothing about the
+  app's own workings; what a request sends is one press away, not beside every button.
+- A lesson is watched (ADR-035): its pictures on one dark screen in either theme, the
+  words being said along its foot with the spoken word marked, the whole screen if wanted.
 
 **Design** (details: `DESIGN_SYSTEM.md`)
 

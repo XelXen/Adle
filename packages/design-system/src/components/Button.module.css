@@ -81,6 +81,19 @@
   height: 1.125rem;
 }
 
+/* On the lesson's screen, which is dark in either theme. */
+.stage {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ad-color-stage-muted);
+  box-shadow: none;
+}
+
+.stage:hover:not(:disabled) {
+  background: var(--ad-color-stage-rule);
+  color: var(--ad-color-stage-ink);
+}
+
 .iconOnly {
   width: var(--ad-control-height);
   padding: 0;

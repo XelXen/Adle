@@ -123,6 +123,11 @@ export interface PageProps {
   eyebrow?: ReactNode;
   /** `reading` narrows the column for long-form text. */
   width?: 'wide' | 'reading';
+  /**
+   * `compact`: a smaller title and less air around it, for a page that gives its room to
+   * one thing, such as a lesson's screen.
+   */
+  density?: 'regular' | 'compact';
   children: ReactNode;
 }
 
@@ -133,10 +138,11 @@ export function Page({
   actions,
   eyebrow,
   width = 'wide',
+  density = 'regular',
   children,
 }: PageProps) {
   return (
-    <div className={cx(styles.page, styles[width])}>
+    <div className={cx(styles.page, styles[width], density === 'compact' && styles.compact)}>
       <header className={styles.pageHeader}>
         {eyebrow ? <div className={styles.eyebrow}>{eyebrow}</div> : null}
         <div className={styles.pageTitleRow}>

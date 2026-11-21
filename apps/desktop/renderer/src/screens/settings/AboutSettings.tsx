@@ -51,10 +51,7 @@ export function AboutSettings() {
 
   return (
     <Stack gap={6}>
-      <Section
-        title="Status"
-        description="Adle’s background service stores your courses and prepares lessons. Restart it if something seems stuck."
-      >
+      <Section title="Status" description="Restart it if something seems stuck.">
         <Card>
           <div className={styles.statusRow}>
             <div className={styles.statusText}>
@@ -87,7 +84,7 @@ export function AboutSettings() {
 
       <Section
         title="Animation check"
-        description="Runs a small interactive scene to confirm that animations work on this computer."
+        description="Runs a small scene to see that animations work here."
       >
         {checking ? (
           <Stack gap={4} className={styles.checkStage}>

@@ -211,6 +211,23 @@
   max-width: calc(var(--ad-layout-reading-max) + 2 * var(--ad-space-7));
 }
 
+/* A page that gives its room to one thing (a lesson's screen): a smaller title, and less
+   air above and between. */
+.compact {
+  gap: var(--ad-space-4);
+  padding-top: var(--ad-space-5);
+  padding-bottom: var(--ad-space-6);
+}
+
+.compact .pageHeader {
+  gap: var(--ad-space-1);
+}
+
+.compact .pageTitle {
+  font: var(--ad-text-subtitle);
+  letter-spacing: var(--ad-tracking-tight);
+}
+
 .pageHeader {
   display: flex;
   flex-direction: column;

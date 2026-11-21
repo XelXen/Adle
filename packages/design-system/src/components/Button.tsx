@@ -74,7 +74,8 @@ export interface IconButtonProps extends Omit<ComponentProps<'button'>, 'childre
   label: string;
   icon: ReactNode;
   size?: ButtonSize;
-  variant?: 'secondary' | 'tertiary';
+  /** `stage`: on the lesson's screen, which is dark in either theme. */
+  variant?: 'secondary' | 'tertiary' | 'stage';
 }
 
 export function IconButton({

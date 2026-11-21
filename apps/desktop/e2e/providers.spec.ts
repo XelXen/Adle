@@ -29,6 +29,8 @@ import {
   saveProviderKey,
   screenshot,
   showNarrationAsText,
+  openWhatIsSent,
+  closeWhatIsSent,
 } from './support/courses';
 import { type FakeProvider, HANG, startFakeProvider } from './support/fake-provider';
 
@@ -165,12 +167,13 @@ test.describe('the AI providers', () => {
     await page.getByRole('button', { name: 'Library', exact: true }).click();
     await createCourse(page, 'Calculus refresher', { topic: 'Limits and derivatives.' });
     servers.nvidia.queue({ status: 404 }, HANG);
+    // Where it will go can be read before anything is sent: one provider, and no "or".
+    const sent = await openWhatIsSent(page);
+    await expect(sent).toContainText(`to ${NVIDIA}.`);
+    await expect(sent).not.toContainText(AIHUBMIX);
+    await closeWhatIsSent(page);
+    expect(servers.nvidia.requests).toHaveLength(0);
     await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
-    const ask = page.getByRole('dialog', { name: 'Suggest concepts with AI?' });
-    // Where it will go is said before anything is sent: one provider, and no "or".
-    await expect(ask).toContainText(`to ${NVIDIA}.`);
-    await expect(ask).not.toContainText(AIHUBMIX);
-    await ask.getByRole('button', { name: 'Suggest concepts' }).click();
 
     // Said while it happens, not only afterwards.
     await expect(
@@ -343,13 +346,13 @@ test.describe('the AI providers', () => {
     // ---- Suggestions: the first provider fails; the other writes, and that is said ----
     await page.getByRole('button', { name: 'Library', exact: true }).click();
     await createCourse(page, 'Calculus refresher', { topic: 'Limits and derivatives.' });
-    await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
-    const ask = page.getByRole('dialog', { name: 'Suggest concepts with AI?' });
     // Both are named before anything is sent: it never goes anywhere that was not said.
-    await expect(ask).toContainText(`to ${afterwards}.`);
+    const both = await openWhatIsSent(page);
+    await expect(both).toContainText(`to ${afterwards}.`);
+    await closeWhatIsSent(page);
     // None of NVIDIA's three models answers.
     servers.nvidia.queue({ status: 500 }, { status: 500 }, { status: 500 });
-    await ask.getByRole('button', { name: 'Suggest concepts' }).click();
+    await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
 
     // The learner stayed where they were, so the suggestions open by themselves when they
     // arrive, and say who wrote them and for whom.

@@ -16,6 +16,8 @@ import {
   saveProviderKey,
   screenshot,
   showNarrationAsText,
+  openWhatIsSent,
+  closeWhatIsSent,
 } from './support/courses';
 import { type FakeProvider, HANG, startFakeProvider } from './support/fake-provider';
 
@@ -86,14 +88,16 @@ test.describe('generation with the AI provider', () => {
 
     await createCourse(page, 'Calculus refresher', { topic: 'Limits and derivatives.' });
 
-    // ---- Suggestions: what will be sent is said before anything is sent ----
-    await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
-    const ask = page.getByRole('dialog', { name: 'Suggest concepts with AI?' });
-    await expect(ask).toContainText('the course name, topic, and description');
-    await expect(ask).toContainText('Custom endpoint (127.0.0.1)');
-    await expect(ask).toContainText('Nothing is added until you review the suggestions');
+    // ---- Suggestions: what will be sent is one press away, before anything is sent ----
+    const sent = await openWhatIsSent(page);
+    await expect(sent).toContainText('the course name, topic, and description');
+    await expect(sent).toContainText('Custom endpoint (127.0.0.1)');
+    await expect(sent).toContainText('Nothing is added until you review the suggestions');
+    await closeWhatIsSent(page);
     expect(provider.requests).toHaveLength(0);
-    await ask.getByRole('button', { name: 'Suggest concepts' }).click();
+    // Asked for at once: there is nothing to confirm about something that is reviewed
+    // before any of it is kept.
+    await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
 
     // ---- The suggestions open for review; nothing is in the course yet ----
     const review = page.getByRole('dialog', { name: 'Suggested concepts' });
@@ -128,10 +132,13 @@ test.describe('generation with the AI provider', () => {
     // ---- A lesson: what is sent is beside the button; progress can be watched ----
     const limits = detail(page, 'Limits');
     await expect(limits).toContainText('No lessons yet.');
-    await expect(limits).toContainText(
+    const lessonNote = await openWhatIsSent(page, limits);
+    await expect(lessonNote).toContainText(
       'Sends the course name, this concept and its objectives, and your level, ' +
         'preferences, and goal to Custom endpoint (127.0.0.1).',
     );
+    await closeWhatIsSent(page, limits);
+    expect(provider.requests).toHaveLength(1);
     await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
     await expect(limits.getByRole('progressbar')).toBeVisible();
     await expect(limits.getByRole('button', { name: 'Cancel' })).toBeVisible();
@@ -160,7 +167,10 @@ test.describe('generation with the AI provider', () => {
     await expect(
       page.getByRole('heading', { name: 'How a neuron weighs its inputs' }),
     ).toBeVisible();
+    await page.getByRole('button', { name: 'About this lesson' }).click();
     await expect(page.getByText('From general knowledge')).toBeVisible();
+    await page.getByRole('button', { name: 'About this lesson' }).click();
+    await expect(page.getByText('From general knowledge')).toBeHidden();
     await expect(page.getByText('Part 1 of 8')).toBeVisible();
     const next = page.getByRole('button', { name: 'Continue', exact: true });
     await next.click();
@@ -234,7 +244,11 @@ test.describe('generation with the AI provider', () => {
     const now = page.getByRole('navigation').getByRole('group', { name: 'Now' });
 
     // What is said beside the button is the wait until the lesson can be started.
-    await expect(limits).toContainText('Ready to start in about a minute. Its pictures follow.');
+    const wait = await openWhatIsSent(page, limits);
+    await expect(wait).toContainText(
+      'Usually takes about a minute. Its pictures follow while you start.',
+    );
+    await closeWhatIsSent(page, limits);
 
     // ---- The pictures take their time: each one waits until this test lets it go ----
     provider.hold('scene');
@@ -282,12 +296,14 @@ test.describe('generation with the AI provider', () => {
     await expect(
       page.getByRole('heading', { name: 'How a neuron weighs its inputs', level: 1 }),
     ).toBeVisible();
-    // Who wrote it is said in the lesson, in one line.
+    // Who wrote it is said in the lesson, one press away.
+    await page.getByRole('button', { name: 'About this lesson' }).click();
     await expect(
       page.getByText(
         'Written by Coding Kimi K3 (free) on Custom endpoint (127.0.0.1). AI can make mistakes.',
       ),
     ).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect(page.getByText('Part 1 of 8')).toBeVisible();
     const next = page.getByRole('button', { name: 'Continue', exact: true });
     await next.click();
@@ -567,7 +583,6 @@ test.describe('generation with the AI provider', () => {
 
     provider.queue(HANG);
     await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
-    await page.getByRole('button', { name: 'Suggest concepts', exact: true }).click();
     await expect(page.getByRole('progressbar')).toBeVisible();
     await expect.poll(() => provider.requests.length).toBe(1);
     // Asking again while it runs is not possible, so the same work cannot be started twice.

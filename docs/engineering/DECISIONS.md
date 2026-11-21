@@ -42,6 +42,8 @@ supersedes the old one and update this index.
 | [032](../decisions/ADR-032-a-picture-drawn-to-suit-its-frame.md) | The player asks for a scene to be drawn at the size that suits its frame (854, 1280 or 1920 wide), so that the browser never shrinks a picture by more than two: shrunk further, a thin stroke such as a minus sign is dropped |
 | [033](../decisions/ADR-033-gnu-gpl-version-3.md) | Adle is free software under the GNU GPL, version 3 only; the packaged app carries the licence, and Settings → About says so and leads to the licence and the source |
 | [034](../decisions/ADR-034-installers-and-releases.md) | Installers for Windows, macOS and Linux made with each system's own tool (Inno Setup, hdiutil, dpkg-deb) and no new dependency; unsigned by the owner's decision; each one installed, started and removed on GitHub's machines for every push; a tag publishes a release |
+| [035](../decisions/ADR-035-a-lesson-is-watched.md) | A lesson has a screen: one dark surface in either theme, pictures always drawn with the dark palette, the words being said along its foot one line at a time with the spoken word marked, and the whole screen if wanted (the one permission the app's own page is granted) |
+| [036](../decisions/ADR-036-say-less.md) | Say less: what a request sends and where it goes is said where the key is given and kept one press away from every control that sends, not written beside it; what a lesson is made from and who wrote it is one press away beside its title; a request that only fetches something to review is not asked about twice |
 
 ## Smaller standing choices (no ADR)
 

@@ -108,7 +108,7 @@ export function ProviderSettings() {
       {providers.length > 1 ? (
         <Section
           title="Provider"
-          description="Adle contacts a provider only when you ask it to create something, and says where it goes first. What is sent is listed under Privacy & data."
+          description="Adle contacts a provider only when you ask it to create something. What is sent is listed under Privacy & data, and beside every button that sends."
         >
           <Stack gap={4}>
             {couldUseBoth(status) ? (
@@ -149,7 +149,7 @@ export function ProviderSettings() {
 
       <Section
         title={providers.length > 1 ? 'Keys' : 'Key'}
-        description="A key is encrypted on this computer and sent only to its own provider. Everything except AI generation works without one."
+        description="A key is encrypted on this computer and sent only to its own provider."
       >
         <ul className={styles.choices} aria-label="AI providers">
           {providers.map((choice) => (

@@ -34,7 +34,7 @@ Full diagram: `docs/architecture/overview.md`.
 | Nothing is downloaded | `will-download` is refused | `security.ts` |
 | No inline or evaluated script | CSP `script-src 'self'` sent as a response header | `e2e/security.spec.ts` (inline script does not run) |
 | Cannot navigate away or open windows | `will-navigate`, `will-frame-navigate`, `setWindowOpenHandler` in `security.ts`. A frame inside the window may be a scene player or nothing, never the app | `e2e/security.spec.ts`; `security-boundaries.test.ts` |
-| No device permissions | Permission request, check, and device handlers all deny | `security.ts` |
+| No device permissions | Permission request, check, and device handlers all deny. One thing is granted, to one asker: the app's own page, as the window's own document, may fill the screen (a lesson watched full screen, ADR-035). A scene's frame, a frame inside the window, and a page from anywhere else are refused that too | `security.ts` (`mayFillTheScreen`); `session-hardening.test.ts` |
 | Only fixed external links can be opened | `EXTERNAL_LINKS` allowlist; ids, not URLs, cross the bridge | `e2e/security.spec.ts` |
 | Cannot name a file | Paths come from a dialog of the operating system, or from files the learner dropped. The preload calls no method of what the page hands it: a real list, each entry a real `File`, the path asked of the browser (`preload/dropped.ts`) | `dropped.test.ts`; `e2e/security.spec.ts` (a script-made file, a list of strings, and something list-like with methods of its own are all refused) |
 

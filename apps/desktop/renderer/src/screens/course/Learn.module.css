@@ -133,3 +133,10 @@
   min-width: 0;
   font: var(--ad-text-supporting);
 }
+
+/* A button that sends something, and beside it what it sends (ADR-036). */
+.sending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ad-space-1);
+}

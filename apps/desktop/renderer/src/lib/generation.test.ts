@@ -12,7 +12,6 @@ import {
   KIND_PROPOSAL,
   lessonDisclosure,
   lessonNotice,
-  lessonWaitNote,
   readLessonOutcome,
   titled,
   readProposal,
@@ -286,16 +285,6 @@ describe('titled', () => {
     // A title that ends a sentence already is left as it is.
     expect(titled('What is a weight?', ['One note.'])).toBe('What is a weight? One note.');
     expect(titled('', ['One note.', ''])).toBe('One note.');
-  });
-});
-
-describe('lessonWaitNote', () => {
-  it('says when the lesson can be started, and that its pictures follow', () => {
-    expect(lessonWaitNote('about 6 minutes')).toBe(
-      ' Ready to start in about 6 minutes. Its pictures follow.',
-    );
-    expect(lessonWaitNote(null)).toBe('');
-    expect(lessonWaitNote('')).toBe('');
   });
 });
 

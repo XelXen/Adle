@@ -34,7 +34,8 @@ import {
 import { GenerationStatus } from '../../components/GenerationStatus';
 import { callCore, describeError } from '../../lib/core-client';
 import { formatRelativeDay } from '../../lib/format';
-import { type JobFailure, lessonDisclosure, lessonWaitNote } from '../../lib/generation';
+import { WhatIsSent } from '../../components/WhatIsSent';
+import { type JobFailure, lessonDisclosure } from '../../lib/generation';
 import { isJobActive } from '../../lib/use-job';
 import styles from './Curriculum.module.css';
 import {
@@ -62,7 +63,7 @@ const SELF_REPORTS: readonly { value: SelfReport; label: string }[] = [
 
 const ORIGIN_NOTE: Partial<Record<Concept['origin'], string>> = {
   outline: 'From a heading in your materials.',
-  model: 'Suggested by AI. Check that it fits.',
+  model: 'Suggested by AI.',
   sample: 'Part of the sample course.',
 };
 
@@ -358,12 +359,11 @@ export function ConceptDetail({
                   label="Teaching style"
                   value={strategy}
                   options={STRATEGY_CHOICES}
-                  description="Automatic picks a style this concept hasn’t been taught in yet."
                   onValueChange={setStrategy}
                 />
               </div>
             ) : null}
-            <div>
+            <div className={styles.sending}>
               <Button
                 size="small"
                 icon={<Sparkles />}
@@ -374,14 +374,19 @@ export function ConceptDetail({
                   ? 'Create another lesson with AI'
                   : 'Create a lesson with AI'}
               </Button>
+              {concept.objectives.length === 0 ? null : (
+                <WhatIsSent
+                  what={lessonDisclosure(hasMaterials ? 'some' : 'none')}
+                  to={generation.destination}
+                  wait={generation.usualWait}
+                  after="Its pictures follow while you start."
+                />
+              )}
             </div>
-            <p className={styles.aiNote}>
-              {concept.objectives.length === 0
-                ? 'Add a learning objective first.'
-                : `Sends ${lessonDisclosure(hasMaterials ? 'some' : 'none')} to ${
-                    generation.destination
-                  }.${lessonWaitNote(generation.usualWait)}`}
-            </p>
+            {/* The one thing here the learner has to do something about. */}
+            {concept.objectives.length === 0 ? (
+              <p className={styles.aiNote}>Add a learning objective first.</p>
+            ) : null}
           </div>
         )}
       </div>
@@ -450,8 +455,7 @@ export function ConceptDetail({
           </div>
           <div className={styles.block}>
             <span className={styles.muted} id={`${historyId}-rate`}>
-              How well do you know this already? It sets where lessons start, and never counts as
-              proof.
+              How well do you know this already?
             </span>
             <div
               className={styles.knowledgeLine}

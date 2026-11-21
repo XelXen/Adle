@@ -157,14 +157,6 @@ export function isDrawingPictures(job: Job | null): boolean {
   return job !== null && job.status === 'running' && readLessonOutcome(job) !== null;
 }
 
-/**
- * How long until a lesson can be started, to put after what is sent. The wait is for its
- * text: the pictures are drawn while the learner is already in it.
- */
-export function lessonWaitNote(wait: string | null): string {
-  return wait ? ` Ready to start in ${wait}. Its pictures follow.` : '';
-}
-
 export interface JobProgress {
   /** Between 0 and 1, or undefined while there is nothing to measure yet. */
   value: number | undefined;

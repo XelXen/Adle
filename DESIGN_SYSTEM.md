@@ -149,7 +149,7 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 | Component | Purpose | Variants and states |
 |---|---|---|
 | `Button` | An action | `primary`, `secondary` (default), `tertiary`, `destructive`; `small`/`medium`/`large`; hover, pressed, focus, disabled, **loading** (stays focusable, ignores clicks, `aria-busy`); optional leading icon. A `secondary` button with `aria-pressed` is a toggle and shows when it is on |
-| `IconButton` | An icon-only action | `label` is required |
+| `IconButton` | An icon-only action | `label` is required. `variant="stage"` on the lesson's screen, which is dark in either theme |
 | `TextField`, `TextArea`, `Select` | Form input | Label (hideable, never absent), description, **error** (sets `aria-invalid`, announced), disabled, trailing slot. A `Select`'s list is drawn by the page in the theme's colours (`appearance: base-select`), never by the system, whose list takes its colours from the computer and not from the theme; it keeps a native select's keys (arrows, typing, Escape) and its meaning for assistive technology |
 | `InfoPopover` | Something worth knowing that nobody needs to read every time (what a request sends and where, who wrote a lesson) | An icon button and a note that opens beside it, above everything else; Escape or a press elsewhere closes it; the button says whether it is open. Never the only place for something the learner must act on |
 | `Switch` | An immediate on/off setting | `role="switch"`, optional description |
@@ -168,13 +168,16 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 | `ToastProvider` / `useToast` | Confirm something just done | `success`, `info` auto-dismiss (pause on hover/focus); `danger` stays until dismissed |
 | `EmptyState`, `LoadingState`, `ErrorState` | The three non-content states | Title, description, actions; correct live-region role each |
 | `Spinner` | Indeterminate activity | Sizes; slows instead of stopping under reduced motion |
-| `AppShell`, `WindowStrip`, `NavItem`, `NavSection`, `Page`, `Section`, `Stack` | Layout | `WindowStrip` is what the window is moved by where it has no title bar of the system's (see "The window"). The rail lies on the canvas and the main region is a panel set into it; `focus` leaves the rail out and gives one thing the whole window (a lesson, a round of questions); `NavSection` is a labelled group in the rail (the learner's courses). Rail collapses to icons below 960 px; `Page` width `wide`/`reading`; a page's actions sit on the line of its title |
+| `AppShell`, `WindowStrip`, `NavItem`, `NavSection`, `Page`, `Section`, `Stack` | Layout | `WindowStrip` is what the window is moved by where it has no title bar of the system's (see "The window"). The rail lies on the canvas and the main region is a panel set into it; `focus` leaves the rail out and gives one thing the whole window (a lesson, a round of questions); `NavSection` is a labelled group in the rail (the learner's courses). Rail collapses to icons below 960 px; `Page` width `wide`/`reading`, and `density="compact"` (a smaller title and less air) for a page that gives its room to one thing, such as a lesson's screen; a page's actions sit on the line of its title |
 | `Logo` | The mark and wordmark | `medium`/`large`; mark only |
 
 App-level components that are not in the package (they depend on app state):
 
 - `ScenePlayer` (`apps/desktop/renderer/src/components`): a Wanim scene with a loading state,
-  mirrored accessible controls, and a text fallback.
+  mirrored accessible controls, and a text fallback. `onStage` puts it on the lesson's
+  screen and draws it with the dark palette whatever the theme.
+- `StageFrame` (`renderer/src/components`): the lesson's screen. A header line, the screen
+  at 16 to 9, and the words being said along its foot.
 - `MathText` (`renderer/src/components`): text with inline `$…$` mathematics, typeset by KaTeX
   into DOM nodes with MathML for assistive technology. Text that does not parse is shown as
   written. Use it for anything that comes from a lesson.
@@ -282,13 +285,29 @@ A lesson, and a round of questions, are one thing to attend to: the rail is left
 - **Where the learner is** is a strip cut into as many pieces as the lesson has parts: done in
   teal, the present one in ink, the rest sunken. Each piece is a button with a name ("Part 3:
   The bias"); it shows no number.
-- **The lesson's own words** are in the serif: the title of the part, the transcript, the
-  board, a question. The current sentence of the transcript is in ink with a rule beside it;
-  what has been said is muted; what is to come is faint.
+- **A lesson is watched on a screen** (`StageFrame`, ADR-035): one dark surface in either
+  theme (`--ad-color-stage*`), as wide as the page allows and no taller than leaves the
+  title above it and the controls below it in view. A picture is on it at 16 to 9, always
+  drawn with the dark scene palette. A part without a picture puts its board on it; a
+  board with nothing on it yet shows the part's title. Along its top, one quiet line:
+  what the part is, the picture in words if asked for, and "Part 3 of 10". A question is
+  not on the screen: it is a card of the page.
+- **The words being said run along the foot of the screen**, one line at a time, the word
+  the voice has reached marked (`--ad-color-stage-mark`). They are the transcript: every
+  line is in the page, and one press unfolds them into a list, the line being said in ink
+  with a rule beside it. With nothing spoken the list starts unfolded.
+- **The lesson's own words** are in the serif: the board, the words being said, a question.
 - **The controls stay within reach.** One bar (Previous, Start / Pause / Play again, Continue)
   floats at the bottom edge while a long part scrolls behind it. The primary button is
   whatever moves the learner on: Start before anything has played, Continue once the part
   has come to rest.
+- **The lesson can fill the screen** ("Full screen", Escape gives it back). The ground is
+  then the screen's own dark; the bar of controls keeps its place and fades while the
+  lesson plays and nothing is being done. What is not on the lesson's screen keeps the
+  page's colours, on a card of the page's. On that dark ground use `IconButton
+  variant="stage"`; a control in the page's colours goes on a surface of the page's.
+- **What a lesson is, where it draws from and who wrote it** is one press away, beside its
+  title (`InfoPopover`, "About this lesson"), not under it.
 
 ### Messages
 
@@ -309,9 +328,15 @@ The rule is ADR-028: short, plain, and about the learner's task.
   the action by its name: "Remove the AIHubMix key?" / "Remove key". Not "Are you sure?"
 - Errors: what happened, then what to do. Never blame.
 - Nothing about how the app works unless the learner has to act on it. No "local service",
-  no request counts beside a button.
-- What must be said is said in one line: before sending, "Sends *what* to *where*. Takes
-  about *n* minutes."; afterwards, "Answered by *model* on *provider*. AI can make mistakes."
+  no request counts beside a button, no sentence about what a setting does inside.
+- **Say less** (ADR-036). A sentence stays where the learner has to act on it or decide by
+  it: why the next step was chosen, what a destructive action removes, what went wrong
+  and what to do, that importing uploads nothing. What a request to an AI provider sends,
+  where it goes and how long it takes is one press away from the control that sends it
+  (`WhatIsSent`, an `InfoPopover`), in the words "Sends *what* to *where*."; what a lesson
+  is made from and who wrote it is one press away beside its title. Under an answer the
+  learner asked for, "Answered by *model* on *provider*. AI can make mistakes." is part of
+  what is read, and stays. Settings is where explanations live, kept short.
 - Learning state: *Not started*, *Learning*, *Nearly there*, *Understood*. Never a bare score,
   never from one answer. A right answer that counts for less is "with help".
 - Typographic quotation marks and apostrophes; a title is quoted “like this”.
@@ -381,6 +406,11 @@ The Adle mark is the letters "a" and "d" as two interlocking rings, the "d" in f
 Wanim scenes have a small palette of their own (`src/scene-palette.ts`, mirrored from the tokens
 and listed in `skills/wanim-scene-authoring/SKILL.md`). Its `green` is the `success` green, not
 the brand teal: inside a picture colours tell things apart, they do not carry the brand.
+
+A lesson shows its pictures on a screen of its own, dark in either theme (`stage*`
+tokens, which a test holds equal to the dark scene palette), and draws them with the dark
+palette (ADR-035). The check in Settings still follows the theme, and every scene is run
+in both, so both palettes stay true.
 
 The stage, its ink, and its muted text are the `scene-*` tokens. The ink and the muted text
 are **frozen**: their values are written into every scene file there is (the sample course, the

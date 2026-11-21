@@ -20,6 +20,8 @@ import {
   saveProviderKey,
   screenshot,
   showNarrationAsText,
+  openWhatIsSent,
+  closeWhatIsSent,
 } from './support/courses';
 import { startFakeProvider } from './support/fake-provider';
 
@@ -430,11 +432,13 @@ test.describe('learning', () => {
       // The lesson they are in is a visual one, so that is not offered again.
       await expect(how.getByRole('option', { name: 'Visual first' })).toHaveCount(0);
       await how.selectOption({ label: 'Everyday analogy' });
-      await expect(dialog).toContainText(
+      const sent = await openWhatIsSent(page, dialog);
+      await expect(sent).toContainText(
         'Sends the course name, this concept and its objectives, and your level, ' +
           'preferences, and goal, plus any related passages from your materials to ' +
           'Custom endpoint (127.0.0.1).',
       );
+      await closeWhatIsSent(page, dialog);
       expect(provider.requests).toHaveLength(0);
       await dialog.getByRole('button', { name: 'Create lesson' }).click();
 

@@ -123,7 +123,7 @@ export function HomeScreen() {
           <EmptyState
             visual={<Library />}
             title="No courses yet"
-            description="Create a course from a topic or your own notes, or try the sample course to see how lessons work."
+            description="Create a course from a topic or your own notes, or try the sample."
             actions={
               <>
                 <Button variant="primary" icon={<Plus />} onClick={() => setCreating(true)}>
@@ -168,7 +168,7 @@ export function HomeScreen() {
           <ActionCard
             media={<GraduationCap />}
             title="Introduction to neural networks"
-            description="A short sample course. Try a narrated lesson with interactive visuals and a few questions."
+            description="A short course to see how lessons work."
             meta={
               <>
                 <Badge tone="accent">Sample course</Badge>
@@ -186,7 +186,7 @@ export function HomeScreen() {
           <ActionCard
             media={<KeyRound />}
             title="AI provider"
-            description="Add a provider key to generate courses and lessons. Everything else works without one."
+            description="Add a key to create courses and lessons with AI."
             meta={
               <>
                 <Badge>Not set up</Badge>

@@ -92,6 +92,17 @@
   --ad-color-scene-ink: #17251e;
   --ad-color-scene-muted: #5f6e65;
 
+  /* ---- Colour: the lesson's screen -------------------------------------------
+   * A lesson is watched on one dark surface in either theme, as a film is, and its
+   * pictures are drawn for that surface with the dark scene palette. These are that
+   * palette's stage, ink and muted text, with a rule and the mark under a spoken word.
+   * They are the same in both themes, so they are set here once and not again below. */
+  --ad-color-stage: #141414;
+  --ad-color-stage-ink: #e7efe9;
+  --ad-color-stage-muted: #9db0a5;
+  --ad-color-stage-rule: #2e2e2e;
+  --ad-color-stage-mark: #1d4a52;
+
   /* ---- Typography ------------------------------------------------------- */
   /* One family, three voices: Geist Sans, Geist Serif, and Geist Mono (ADR-025). */
   --ad-font-sans:

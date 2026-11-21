@@ -74,6 +74,9 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ['action', 'page', GRAPHIC],
   ['scene-ink', 'scene-background', 7],
   ['scene-muted', 'scene-background', TEXT],
+  ['stage-ink', 'stage', 7],
+  ['stage-muted', 'stage', TEXT],
+  ['stage-ink', 'stage-mark', 7],
   ['on-action', 'action', TEXT],
   ['on-action', 'action-hover', TEXT],
   ['on-action', 'action-pressed', TEXT],
@@ -131,9 +134,26 @@ describe('dark theme', () => {
   it('redefines every colour rather than inheriting a light value', () => {
     const darkOnly = declarations(tokensCss.slice(darkStart, darkEnd));
     const missing = [...light.keys()].filter(
-      (name) => name.startsWith('--ad-color-') && !darkOnly.has(name),
+      (name) =>
+        name.startsWith('--ad-color-') &&
+        // The lesson's screen is one dark surface in either theme, on purpose.
+        !name.startsWith('--ad-color-stage') &&
+        !darkOnly.has(name),
     );
     expect(missing).toEqual([]);
+    expect([...darkOnly.keys()].filter((name) => name.startsWith('--ad-color-stage'))).toEqual([]);
+  });
+});
+
+describe('the lesson’s screen', () => {
+  it('is the dark scene palette’s stage, in both themes', () => {
+    // A lesson's pictures are always drawn with the dark palette (ADR-035): the surface
+    // around them has to be the one they were drawn for, whatever the theme.
+    for (const theme of [light, dark]) {
+      expect(theme.get('--ad-color-stage')?.toUpperCase()).toBe(SCENE_PALETTE.dark.background);
+      expect(theme.get('--ad-color-stage-ink')?.toUpperCase()).toBe(SCENE_PALETTE.dark.ink);
+      expect(theme.get('--ad-color-stage-muted')?.toUpperCase()).toBe(SCENE_PALETTE.dark.muted);
+    }
   });
 });
 

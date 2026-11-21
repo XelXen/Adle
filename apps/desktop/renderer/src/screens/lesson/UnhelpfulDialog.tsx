@@ -6,7 +6,8 @@ import { Button, Callout, Dialog, Select, useToast } from '@adle/design-system';
 
 import { useRouter } from '../../app/router';
 import { callCore } from '../../lib/core-client';
-import { type JobFailure, lessonDisclosure, lessonWaitNote, refusalOf } from '../../lib/generation';
+import { WhatIsSent } from '../../components/WhatIsSent';
+import { type JobFailure, lessonDisclosure, refusalOf } from '../../lib/generation';
 import { destination, usualWait } from '../../lib/provider';
 import { useResource } from '../../lib/use-resource';
 import { STRATEGY_CHOICES, type TeachingStrategy } from '../course/ConceptDetail';
@@ -116,7 +117,7 @@ export function UnhelpfulDialog({
                   onValueChange={setStrategy}
                 />
               </div>
-              <div>
+              <div className={styles.sending}>
                 <Button
                   variant="primary"
                   icon={<Sparkles />}
@@ -125,11 +126,13 @@ export function UnhelpfulDialog({
                 >
                   Create lesson
                 </Button>
+                <WhatIsSent
+                  what={lessonDisclosure('unknown')}
+                  to={destination(status, 'lesson')}
+                  wait={usualWait(status, 'lesson')}
+                  after="Its pictures follow while you start."
+                />
               </div>
-              <p className={styles.note}>
-                Sends {lessonDisclosure('unknown')} to {destination(status, 'lesson')}.
-                {lessonWaitNote(usualWait(status, 'lesson'))}
-              </p>
             </>
           ) : provider.resource.status === 'loading' ? (
             <p className={styles.note} role="status">

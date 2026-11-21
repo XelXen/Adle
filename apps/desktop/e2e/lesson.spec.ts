@@ -197,7 +197,11 @@ test.describe('lesson', () => {
 
     // ---- Nothing plays until the learner asks ----
     await expect(page.getByRole('heading', { name: LESSON, level: 1 })).toBeVisible();
-    await expect(page.getByText('Sample lesson')).toBeVisible();
+    // What the lesson is and how long it takes is one press away, not under its title.
+    await page.getByRole('button', { name: 'About this lesson' }).click();
+    await expect(page.getByText('Sample lesson. About 8 minutes.')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByText('Sample lesson. About 8 minutes.')).toBeHidden();
     await expect(parts(page).getByRole('button')).toHaveCount(10);
     await expectPart(page, 1, 'Not every input counts the same');
     await expect(transcript(page).getByRole('listitem')).toHaveCount(3);
@@ -241,6 +245,64 @@ test.describe('lesson', () => {
     await expect(page.getByText(/A diagram shows two inputs on the left/)).toBeVisible();
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'lesson-scene');
+    await page.getByRole('button', { name: 'Hide description' }).click();
+    await expect(page.getByText(/A diagram shows two inputs on the left/)).toHaveCount(0);
+
+    // ---- The words being said, along the foot of the screen ----
+    // Nothing is spoken in this journey, so the words are what the lesson says: every
+    // line stays where it can be read again. One line at a time, as under a film, is one
+    // press away; the others are then still there for whoever reads the page another way.
+    const lines = transcript(page).getByRole('listitem');
+    const linesWithRoom = async (): Promise<number> =>
+      (
+        await lines.evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width))
+      ).filter((width) => width > 1).length;
+    await expect(lines).toHaveCount(3);
+    expect(await linesWithRoom()).toBe(3);
+    await page.getByRole('button', { name: 'Show one line at a time' }).click();
+    await expect(page.getByRole('button', { name: 'Show every line' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    await expect(lines).toHaveCount(3);
+    expect(await linesWithRoom()).toBe(1);
+    await page.getByRole('button', { name: 'Show every line' }).click();
+    expect(await linesWithRoom()).toBe(3);
+
+    // ---- The lesson can fill the screen, and gives it back ----
+    const fill = page.getByRole('button', { name: 'Full screen' });
+    await expect(fill).toHaveAttribute('aria-pressed', 'false');
+    const pictureWide = (await stageFrame.boundingBox())?.width ?? 0;
+    await fill.click();
+    const filled = await expect
+      .poll(() => page.evaluate(() => document.fullscreenElement !== null), { timeout: 8000 })
+      .toBe(true)
+      .then(
+        () => true,
+        () => false,
+      );
+    if (filled) {
+      await expect(fill).toHaveAttribute('aria-pressed', 'true');
+      // The picture has the room now, and everything that was beside it is still there.
+      await expect
+        .poll(async () => (await stageFrame.boundingBox())?.width ?? 0)
+        .toBeGreaterThan(pictureWide);
+      await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+      await expect(lines).toHaveCount(3);
+      await expectNoAccessibilityViolations(page);
+      await screenshot(page, 'lesson-full-screen');
+      await fill.click();
+      await expect(fill).toHaveAttribute('aria-pressed', 'false');
+      expect(await page.evaluate(() => document.fullscreenElement)).toBeNull();
+    } else {
+      // A display with nothing on it that manages windows (a build machine's) may never
+      // grant it. The lesson then stays as it was, which is the behaviour to keep.
+      test.info().annotations.push({
+        type: 'full screen',
+        description: 'not granted by this display: the lesson stayed in its window',
+      });
+      await expect(fill).toHaveAttribute('aria-pressed', 'false');
+    }
 
     // ---- Something to try, operable from the keyboard ----
     await continueButton(page).click();
@@ -373,7 +435,7 @@ test.describe('lesson', () => {
     await expectPart(first.page, 2, 'The weighted sum');
     const picture = first.page.getByRole('figure', { name: 'The weighted sum' });
     await sceneSettled(picture);
-    await expect(first.page.getByText('Press Start to play.')).toBeVisible();
+    await expect(first.page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
     // What the scene itself has drawn, not a picture of the page where it is.
     const stage = picture.locator('iframe');
     await stage.scrollIntoViewIfNeeded();

@@ -2,7 +2,7 @@ import { type ReactNode, type Ref, useEffect, useImperativeHandle, useRef, useSt
 
 import { Play } from 'lucide-react';
 
-import { Button, Slider, Spinner, Switch } from '@adle/design-system';
+import { Button, cx, Slider, Spinner, Switch } from '@adle/design-system';
 import type { ControlDescriptor } from '@adle/event-protocol';
 
 import {
@@ -13,6 +13,7 @@ import {
 } from '../../../player/host/WanimPlayerAdapter';
 import { useResolvedTheme } from '../lib/theme';
 import styles from './ScenePlayer.module.css';
+import { StageFrame } from './StageFrame';
 
 export interface ScenePlayerHandle {
   play: () => void;
@@ -45,6 +46,15 @@ export interface ScenePlayerProps {
    * convenience for the pointer; the screen keeps a named, keyboard-operable control.
    */
   onStart?: () => void;
+  /**
+   * Show the picture on the lesson's screen (`StageFrame`): one dark surface in either
+   * theme, for which the picture is drawn with the dark palette whatever the theme is.
+   */
+  onStage?: boolean;
+  /** With `onStage`: the words being said, along the foot of the screen. */
+  caption?: ReactNode;
+  /** With `onStage`: the line along the top of the screen. */
+  header?: ReactNode;
   ref?: Ref<ScenePlayerHandle>;
 }
 
@@ -74,13 +84,17 @@ export function ScenePlayer({
   onSceneEvent,
   onFailure,
   onStart,
+  onStage = false,
+  caption,
+  header,
   ref,
 }: ScenePlayerProps) {
   const host = useRef<HTMLDivElement>(null);
   const adapter = useRef<WanimPlayerAdapter | null>(null);
   const [status, setStatus] = useState<PlayerStatus>('loading');
   const [controls, setControls] = useState<ControlDescriptor[]>([]);
-  const theme = useResolvedTheme();
+  const appTheme = useResolvedTheme();
+  const theme = onStage ? 'dark' : appTheme;
 
   // Keep the latest callbacks without re-creating the adapter when they change.
   const callbacks = useRef({ onStatusChange, onSceneEvent, onFailure });
@@ -129,46 +143,56 @@ export function ScenePlayer({
   // Loaded, and waiting to be started: the picture has nothing in it yet.
   const poster = onStart !== undefined && !failed && status !== 'loading';
 
+  const picture = (
+    <div className={cx(styles.stage, onStage && styles.onScreen)}>
+      <div ref={host} className={styles.frameHost} hidden={failed} />
+      {status === 'loading' ? (
+        <div className={styles.overlay} role="status">
+          <Spinner size="large" />
+          <span>Loading animation…</span>
+        </div>
+      ) : null}
+      {poster ? (
+        // For the pointer only: the control that starts a lesson, with its name and its
+        // place in the keyboard's order, is the Start button beside the picture.
+        <button
+          type="button"
+          className={styles.poster}
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={onStart}
+        >
+          <span className={styles.posterMark}>
+            <Play />
+          </span>
+          <span className={styles.posterTitle}>{title}</span>
+        </button>
+      ) : null}
+      {failed ? (
+        <div className={styles.fallback}>
+          <div className={styles.fallbackBody}>{fallback}</div>
+          <div className={styles.fallbackActions}>
+            <p className={styles.fallbackNote}>
+              Couldn’t show the animation. Here’s the same idea in words.
+            </p>
+            <Button size="small" onClick={() => adapter.current?.reset()}>
+              Retry animation
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
     <figure className={styles.player} aria-label={title}>
-      <div className={styles.stage}>
-        <div ref={host} className={styles.frameHost} hidden={failed} />
-        {status === 'loading' ? (
-          <div className={styles.overlay} role="status">
-            <Spinner size="large" />
-            <span>Loading animation…</span>
-          </div>
-        ) : null}
-        {poster ? (
-          // For the pointer only: the control that starts a lesson, with its name and its
-          // place in the keyboard's order, is the Start button beside the picture.
-          <button
-            type="button"
-            className={styles.poster}
-            tabIndex={-1}
-            aria-hidden="true"
-            onClick={onStart}
-          >
-            <span className={styles.posterMark}>
-              <Play />
-            </span>
-            <span className={styles.posterTitle}>{title}</span>
-          </button>
-        ) : null}
-        {failed ? (
-          <div className={styles.fallback}>
-            <div className={styles.fallbackBody}>{fallback}</div>
-            <div className={styles.fallbackActions}>
-              <p className={styles.fallbackNote}>
-                Couldn’t show the animation. Here’s the same idea in words.
-              </p>
-              <Button size="small" onClick={() => adapter.current?.reset()}>
-                Retry animation
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      {onStage ? (
+        <StageFrame header={header} caption={caption}>
+          {picture}
+        </StageFrame>
+      ) : (
+        picture
+      )}
 
       {interactive ? (
         <figcaption className={styles.controls}>

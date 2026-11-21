@@ -22,8 +22,10 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   showed a formula without its minus sign, and so: a picture is drawn at a size that suits
   the frame it is shown in (ADR-032). And on the same day, at the owner's word: Adle is under
   the GNU GPL, version 3 (ADR-033); it has installers for Windows, macOS and Linux, built,
-  tried out and published by GitHub (ADR-034); and its first version, 0.1.0-alpha.1, is the
-  tag `v0.1.0-alpha.1`. What is left needs the owner; see "Next actions"
+  tried out and published by GitHub (ADR-034); and its first version, 0.1.0-alpha.1, was
+  published from the tag `v0.1.0-alpha.1` the same evening:
+  `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.1`. What the owner asked for after
+  looking at it, and what is left to them, is under "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -237,6 +239,7 @@ machines ran is in the rows that name them.
 | Packaged build: release start-up check (`npm run package:check`) | PASS | 2026-11-21: fuses set, will not run as Node, starts on an empty profile with the core up after 3.6 s, nothing in the log of failures, no service left behind |
 | Packaged build on a computer that never had the project | PASS | On GitHub's machines, `a812d34`: each installer was handed to a second machine of its system that has Node, the scripts that do the trying and nothing else of the project, and was installed, started (the core up within 1.7 to 3.0 s) and removed there. Such a machine still carries more than a new computer does, so on Windows the package's 73 programs and libraries were also read for a runtime library they ask for and do not bring (none). A person installing a release on their own computer: NOT RUN |
 | Installers | PASS | Made, installed, started and removed on GitHub's machines (`a812d34`): `…-windows-x64-setup.exe`, 133 MB; `…-macos-arm64.dmg`, 151 MB, and `…-macos-x64.dmg`, 156 MB; `…-linux-x64.deb`, 126 MB, and `…-linux-x64.tar.gz`, 171 MB. Not on this computer, which has no Inno Setup. On Ubuntu the tarball is unpacked and not started, because Ubuntu keeps an unpacked app from building its sandbox; the folder it holds is started there by the check of the release build |
+| The release itself | PASS | `release.yml` on the tag `v0.1.0-alpha.1` (`c320bd7`), 2026-11-21: the tag is the version and the changelog has it; the four builds made again from the tag, each installer installed, started and removed where it was built and on a machine that did not build it; published as a pre-release with five installers and `SHA256SUMS.txt`, whose sums are the ones GitHub computed for the files. Nobody has installed one by hand yet |
 | Code signing | NOT RUN | Not done, by the owner's decision (ADR-034). Windows and macOS say so to whoever opens a build |
 | macOS / Linux | PASS (machines); NOT RUN (a person) | Linux: every journey passes on GitHub's Ubuntu machine, and the `.deb` installs and starts on Ubuntu as it ships. macOS: built, signed ad hoc, installed from its disk image and started, on Apple's and on Intel's processors; no journey runs there. Nobody has looked at Adle on either. The window's own title bar (ADR-030) has been seen on Windows 11 only |
 | Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: lessons, curricula and answers were written through Adle's own services on 2026-11-20; tried again after the way an answer is read was changed (ADR-029): a key check in 26 seconds and an answer to a question in 88, two requests. See "The real providers" |

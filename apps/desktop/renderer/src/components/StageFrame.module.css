@@ -1,0 +1,45 @@
+/* The screen a lesson is watched on. One dark surface in either theme; the rule around it
+   is what sets it off from a dark page. */
+.frame {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: var(--ad-border-width) solid var(--ad-color-stage-rule);
+  border-radius: var(--ad-radius-large);
+  background: var(--ad-color-stage);
+  color: var(--ad-color-stage-ink);
+  box-shadow: var(--ad-shadow-2);
+}
+
+/* What this is, and what can be done with it: one quiet line along the top. */
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 var(--ad-space-3) 0 var(--ad-space-5);
+  border-bottom: var(--ad-border-width) solid var(--ad-color-stage-rule);
+}
+
+/* At 16 to 9, like every picture drawn for it; taller only if words on a board need it. */
+.screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+}
+
+/* The words being said. Room for two lines, so the screen above does not move as the
+   lines change. */
+.caption {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  min-height: 4.75rem;
+  padding: var(--ad-space-3) var(--ad-space-3) var(--ad-space-3) var(--ad-space-5);
+  border-top: var(--ad-border-width) solid var(--ad-color-stage-rule);
+}

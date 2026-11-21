@@ -5,6 +5,18 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **A lesson is something to watch.** Its pictures are on a wide, dark screen in either
+  theme, with the words being said along the foot of it, one line at a time, the word being
+  spoken marked. One press shows every line. "Full screen" gives the lesson the whole
+  screen; Escape gives it back.
+- **Far fewer sentences.** What a request to an AI provider sends, and where it goes, is one
+  press away from the button that sends it (the small "i" beside it) instead of written out
+  beside every button; it is still said in full in Settings. What a lesson is made from and
+  who wrote it is behind "About this lesson". Suggested concepts are asked for with one
+  press: nothing is added until you have reviewed them, as before.
+
 ### Fixed
 
 - A list of choices now follows the theme. In the dark theme it showed light words on a

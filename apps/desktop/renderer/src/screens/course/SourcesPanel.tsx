@@ -147,10 +147,7 @@ export function SourcesPanel({ courseId }: { courseId: string }) {
 
   return (
     <>
-      <Section
-        title="Course materials"
-        description="Files are read on this computer to build your curriculum and ground your lessons. Importing uploads nothing."
-      >
+      <Section title="Course materials" description="Importing uploads nothing.">
         <div
           className={cx(styles.dropzone, dragging && styles.dropzoneActive)}
           onDragEnter={(event) => {
@@ -219,7 +216,7 @@ export function SourcesPanel({ courseId }: { courseId: string }) {
           <EmptyState
             visual={<FileText />}
             title="No materials yet"
-            description="Add a syllabus, lecture notes, or readings. Or continue without: lessons will draw on general knowledge."
+            description="Add a syllabus, notes, or readings."
           />
         ) : (
           <ul className={styles.sources} aria-label="Materials in this course">
@@ -379,7 +376,7 @@ function SourceSearch({ courseId }: { courseId: string }) {
   else state = { status: 'done', query: answer.query, hits: answer.hits };
 
   return (
-    <Section title="Search your materials" description="Find where your sources discuss a topic.">
+    <Section title="Search your materials">
       <TextField
         label="Search your materials"
         hideLabel

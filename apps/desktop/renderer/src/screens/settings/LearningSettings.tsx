@@ -108,10 +108,7 @@ export function LearningSettings() {
 
   return (
     <Stack gap={6}>
-      <Section
-        title="Pace and depth"
-        description="Used when preparing lessons. Your answers still decide when to slow down or move on."
-      >
+      <Section title="Pace and depth" description="Used when preparing lessons.">
         <Card>
           <Stack gap={5}>
             <Stack gap={2}>
@@ -157,7 +154,7 @@ export function LearningSettings() {
             />
             <Switch
               label="Captions"
-              description="Show words as they’re spoken. The transcript is always available."
+              description="Show the words as they’re spoken."
               checked={current.captions}
               onCheckedChange={(captions) => void change({ captions })}
             />
@@ -168,10 +165,7 @@ export function LearningSettings() {
         </Card>
       </Section>
 
-      <Section
-        title="Your goal"
-        description="Optional. What do you want to be able to do? Adle uses it when choosing examples."
-      >
+      <Section title="Your goal" description="Optional. What do you want to be able to do?">
         <Card>
           <Stack gap={3}>
             <TextArea

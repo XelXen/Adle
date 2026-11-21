@@ -6,6 +6,7 @@ import { Button, Callout, Dialog, ProgressBar, TextArea } from '@adle/design-sys
 
 import { useRouter } from '../../app/router';
 import { MathText } from '../../components/MathText';
+import { WhatIsSent } from '../../components/WhatIsSent';
 import {
   answeredBy,
   askDisclosure,
@@ -174,6 +175,7 @@ export function AskDialog({
     title = 'Ask about this part';
     actions = (
       <>
+        <WhatIsSent what={askDisclosure()} to={destination(status, 'ask')} wait={wait} />
         <Button onClick={onClose}>Cancel</Button>
         <Button type="submit" form="ask-form" variant="primary" icon={<Hand />}>
           Ask
@@ -231,10 +233,6 @@ export function AskDialog({
             ))}
           </ul>
         </div>
-        <p className={styles.note}>
-          Sends {askDisclosure()} to {destination(status, 'ask')}.{wait ? ` Takes ${wait}.` : ''} AI
-          answers can be wrong.
-        </p>
       </form>
     );
   }

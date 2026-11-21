@@ -33,6 +33,26 @@ export function isAllowedFrameNavigation(rawUrl: string, isMainFrame = false): b
   return origin !== null && isPlayerOrigin(origin);
 }
 
+/**
+ * The one permission anything is given: the app's own page may fill the screen, which is
+ * how a lesson is watched full screen. Nothing is read, recorded or sent by it, Escape
+ * always gives the screen back, and the system says so when it begins. A scene's frame
+ * cannot ask: it is not the window's own document, and its frame is given no such right.
+ * Exported for unit tests.
+ */
+export function mayFillTheScreen(
+  permission: string,
+  isMainFrame: boolean | undefined,
+  requestingUrl: string | undefined,
+): boolean {
+  return (
+    permission === 'fullscreen' &&
+    isMainFrame === true &&
+    typeof requestingUrl === 'string' &&
+    adleOriginOf(requestingUrl) === APP_ORIGIN
+  );
+}
+
 /** An address on this computer where nothing listens. */
 const NOWHERE = 'http://127.0.0.1:1';
 
@@ -74,9 +94,10 @@ export async function hardenSession(): Promise<void> {
     event.preventDefault();
   });
 
-  // No camera, microphone, geolocation, notifications, clipboard-read, etc.
-  defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-    callback(false);
+  // No camera, microphone, geolocation, notifications, clipboard-read, etc. One thing is
+  // granted, to one asker: see `mayFillTheScreen`.
+  defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    callback(mayFillTheScreen(permission, details?.isMainFrame, details?.requestingUrl));
   });
   defaultSession.setPermissionCheckHandler(() => false);
   defaultSession.setDevicePermissionHandler(() => false);

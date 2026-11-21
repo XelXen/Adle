@@ -108,7 +108,22 @@ async function whenShown(app: ElectronApplication): Promise<void> {
 
 /** How long two frames may take, and how often that is asked before a launch is given up. */
 const PAINTING_PATIENCE_MS = 5_000;
-const PAINTING_ATTEMPTS = 6;
+const PAINTING_ATTEMPTS = 3;
+/**
+ * How many times the app is started before a window that does not paint is called a
+ * failure. On a build machine drawing without a graphics card about one start in fifty
+ * shows a window and never draws in it, however long it is given, and the next start is
+ * fine (GitHub's Windows machine, three runs on 2026-11-21). That is the machine's, not
+ * the app's: a start that does not paint is closed and made again. One that still does
+ * not paint the third time fails, with the same clear reason as before.
+ */
+const LAUNCH_ATTEMPTS = 3;
+
+class NotPaintingError extends Error {
+  constructor() {
+    super('The app window is visible but is not painting frames.');
+  }
+}
 
 /**
  * Give the window keyboard focus and confirm it is painting.
@@ -143,7 +158,7 @@ async function focusAndConfirmPainting(app: ElectronApplication, page: Page): Pr
     );
     if (painting) return;
   }
-  throw new Error('The app window is visible but is not painting frames.');
+  throw new NotPaintingError();
 }
 
 /**
@@ -185,35 +200,57 @@ export async function launchApp(
     ...ALWAYS_PAINT_SWITCHES,
     ...(options.displayScale ? [`--force-device-scale-factor=${options.displayScale}`] : []),
   ];
-  const app = await electron.launch({
-    ...(packagedExecutable
-      ? { executablePath: packagedExecutable, args: switches }
-      : // Run from its folder, the app is started by the test tool's loader, which tells it
-        // to keep secrets as plain text. `keep-secrets.cjs` is loaded after that loader
-        // and takes the switch away again; it says why.
-        { args: ['-r', KEEP_SECRETS, desktopDir, ...switches] }),
-    env: { ...process.env, ...options.env, ADLE_USER_DATA_DIR: profileDir },
-    // Playwright forces a light colour scheme by default, which would mask the
-    // app's own theme handling. `null` leaves the media query to the app.
-    colorScheme: null,
-  });
-  const running = openApps.get(profileDir) ?? new Set<ElectronApplication>();
-  openApps.set(profileDir, running);
-  running.add(app);
-  app.on('close', () => running.delete(app));
-  await recordNotices(app);
-  const page = await app.firstWindow();
-  const problems: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') problems.push(`console: ${message.text()}`);
-  });
-  page.on('pageerror', (error) => problems.push(`exception: ${error.message}`));
+  const start = async (): Promise<{
+    app: ElectronApplication;
+    page: Page;
+    problems: string[];
+  }> => {
+    const app = await electron.launch({
+      ...(packagedExecutable
+        ? { executablePath: packagedExecutable, args: switches }
+        : // Run from its folder, the app is started by the test tool's loader, which tells
+          // it to keep secrets as plain text. `keep-secrets.cjs` is loaded after that
+          // loader and takes the switch away again; it says why.
+          { args: ['-r', KEEP_SECRETS, desktopDir, ...switches] }),
+      env: { ...process.env, ...options.env, ADLE_USER_DATA_DIR: profileDir },
+      // Playwright forces a light colour scheme by default, which would mask the
+      // app's own theme handling. `null` leaves the media query to the app.
+      colorScheme: null,
+    });
+    const running = openApps.get(profileDir) ?? new Set<ElectronApplication>();
+    openApps.set(profileDir, running);
+    running.add(app);
+    app.on('close', () => running.delete(app));
+    await recordNotices(app);
+    const page = await app.firstWindow();
+    const problems: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') problems.push(`console: ${message.text()}`);
+    });
+    page.on('pageerror', (error) => problems.push(`exception: ${error.message}`));
 
-  await whenShown(app);
-  await page.setViewportSize(options.viewport ?? { width: 1280, height: 832 });
-  await page.waitForLoadState('domcontentloaded');
-  await page.getByRole('heading', { level: 1 }).first().waitFor();
-  await focusAndConfirmPainting(app, page);
+    await whenShown(app);
+    await page.setViewportSize(options.viewport ?? { width: 1280, height: 832 });
+    await page.waitForLoadState('domcontentloaded');
+    await page.getByRole('heading', { level: 1 }).first().waitFor();
+    try {
+      await focusAndConfirmPainting(app, page);
+    } catch (error) {
+      // Nothing has been done in this window yet: closing it loses nothing.
+      await app.close().catch(() => undefined);
+      throw error;
+    }
+    return { app, page, problems };
+  };
+  let started: Awaited<ReturnType<typeof start>> | null = null;
+  for (let attempt = 1; started === null; attempt += 1) {
+    try {
+      started = await start();
+    } catch (error) {
+      if (!(error instanceof NotPaintingError) || attempt >= LAUNCH_ATTEMPTS) throw error;
+    }
+  }
+  const { app, page, problems } = started;
 
   if (options.onboarded) {
     const start = page.getByRole('button', { name: 'Get started' });

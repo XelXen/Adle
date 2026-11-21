@@ -1,13 +1,19 @@
 import {
+  AlignLeft,
   ArrowLeft,
   ArrowRight,
   Captions,
   Check,
   ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   ChevronUp,
   Coffee,
   Hand,
+  Info,
+  Maximize,
   MessageCircleQuestion,
+  Minimize,
   Pause,
   Play,
   RotateCcw,
@@ -25,6 +31,7 @@ import {
   cx,
   ErrorState,
   IconButton,
+  InfoPopover,
   LoadingState,
   Page,
   Spinner,
@@ -37,6 +44,7 @@ import { useRouter } from '../../app/router';
 import { MathText } from '../../components/MathText';
 import { NextSteps } from '../../components/NextSteps';
 import { ScenePlayer, type ScenePlayerHandle } from '../../components/ScenePlayer';
+import { StageFrame } from '../../components/StageFrame';
 import {
   canContinue,
   LessonController,
@@ -58,6 +66,7 @@ import { USUAL_BREAK_MINUTES } from '../../lib/breaks';
 import { getBridge } from '../../lib/bridge';
 import { callCore, CoreRequestError, describeError } from '../../lib/core-client';
 import { authorName, type JobFailure, jobFailure, refusalOf } from '../../lib/generation';
+import { useFullscreen, useStillness } from '../../lib/use-fullscreen';
 import { isJobActive, useJob } from '../../lib/use-job';
 import { useLessonPictures } from '../../lib/use-lesson-pictures';
 import { useResource } from '../../lib/use-resource';
@@ -246,6 +255,27 @@ function LessonPlayer({
   const state = useSyncExternalStore(controller.subscribe, controller.getState);
   const [aloud, setAloud] = useState(preferences.narration && spoken !== null);
   const [wordsShown, setWordsShown] = useState(preferences.captions);
+  // Listening, the words run along the foot of the screen one line at a time, as under
+  // a film. Reading, with nothing spoken, they are what the lesson says, and every line
+  // stays where it can be read again.
+  const [everyLine, setEveryLine] = useState(!(preferences.narration && spoken !== null));
+  // The whole player can fill the screen. While it does and the lesson is playing, the
+  // bar of controls gets out of the picture's way once nothing is being done with it.
+  const theatre = useRef<HTMLDivElement>(null);
+  const screen = useFullscreen(theatre);
+  useStillness(theatre, screen.active && state.status === 'playing');
+  // With every line shown, the line being said is kept in view inside the list. Only the
+  // list moves: the page stays where the learner put it.
+  const lines = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const list = lines.current;
+    const line = list?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!list || !line || list.scrollHeight <= list.clientHeight) return;
+    const top = line.offsetTop - list.offsetTop;
+    const hidden =
+      top < list.scrollTop || top + line.offsetHeight > list.scrollTop + list.clientHeight;
+    if (hidden) list.scrollTop = Math.max(0, top - list.clientHeight / 3);
+  }, [state.beatIndex, state.segmentIndex, everyLine]);
   /** Set while the learner is choosing what to do after saying a part did not help. */
   const [unhelpful, setUnhelpful] = useState<ReportState | null>(null);
 
@@ -425,35 +455,90 @@ function LessonPlayer({
   const notesShown = notesOpen.has(segment.id);
   const askedPart = askingAbout === null ? null : (lesson.segments[askingAbout] ?? null);
 
+  // The line the foot of the screen shows: the one being said; the first before anything
+  // has been, and the last once everything has, so that the band is never empty.
+  const lineShown = settled ? beats.length - 1 : Math.max(0, state.beatIndex);
+  const caption =
+    beats.length > 0 && transcriptShown ? (
+      <aside
+        className={cx(styles.captions, everyLine && styles.captionsOpen)}
+        aria-label="Transcript"
+      >
+        <h3 className="ad-visually-hidden">Transcript</h3>
+        {/* With every line shown the list can be longer than its room and scrolls: a
+            region that scrolls has to be reachable from the keyboard to be scrolled. */}
+        <ol
+          ref={lines}
+          className={styles.transcript}
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+          tabIndex={everyLine ? 0 : undefined}
+          aria-label={everyLine ? 'Every line of this part' : undefined}
+        >
+          {beats.map((beat, index) => {
+            const current = index === state.beatIndex && !settled;
+            const said = settled || index < state.beatsStarted;
+            return (
+              <li
+                key={index}
+                className={cx(
+                  styles.beat,
+                  said && styles.beatSpoken,
+                  current && styles.beatCurrent,
+                  index === lineShown && styles.beatShown,
+                )}
+                aria-current={current ? 'true' : undefined}
+              >
+                {current && state.word ? (
+                  <SpokenText text={beat.text} word={state.word} />
+                ) : (
+                  beat.text
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        {beats.length > 1 ? (
+          <IconButton
+            variant="stage"
+            size="small"
+            label={everyLine ? 'Show one line at a time' : 'Show every line'}
+            icon={everyLine ? <ChevronsDownUp /> : <ChevronsUpDown />}
+            aria-expanded={everyLine}
+            onClick={() => setEveryLine((open) => !open)}
+          />
+        ) : null}
+      </aside>
+    ) : null;
+
   return (
     <Page
       title={lesson.title}
       eyebrow={eyebrow}
-      description={
-        <>
-          <span className={styles.finishedLine}>
-            <Badge tone={lesson.grounding === 'sample' ? 'accent' : 'neutral'}>
-              {GROUNDING_NOTE[lesson.grounding]}
-            </Badge>
-            <span>About {lesson.estimated_minutes} minutes</span>
-          </span>
+      density="compact"
+      actions={
+        // What a lesson is made from and who wrote it is one press away, and out of the
+        // way of the lesson itself (ADR-036).
+        <InfoPopover label="About this lesson" icon={<Info />} title="About this lesson">
+          <p>
+            {GROUNDING_NOTE[lesson.grounding]}. About {lesson.estimated_minutes} minutes.
+          </p>
           {/* Where in the learner's own materials the lesson draws from: named, never invented. */}
           {lesson.source_refs.length > 0 ? (
-            <span className={styles.sources}>
+            <p>
               Sources:{' '}
               {lesson.source_refs
                 .map((source) => source.source_name + ', ' + source.locator)
                 .join('; ')}
-            </span>
+            </p>
           ) : null}
-          {/* Who wrote it, where a model did: one line, as under an answer (ADR-028). */}
+          {/* Who wrote it, where a model did. */}
           {data.written_by ? (
-            <span className={styles.sources}>
+            <p>
               Written by {authorName(data.written_by, 'AI')}. AI can make mistakes.
               {data.written_by.note ? ` ${data.written_by.note}` : ''}
-            </span>
+            </p>
           ) : null}
-        </>
+        </InfoPopover>
       }
     >
       {state.finished ? (
@@ -464,7 +549,7 @@ function LessonPlayer({
           onReview={() => controller.restart()}
         />
       ) : (
-        <div className={styles.player}>
+        <div ref={theatre} className={styles.player}>
           <ol className={styles.parts} aria-label="Parts of this lesson">
             {lesson.segments.map((item, index) => {
               const current = index === state.segmentIndex;
@@ -490,14 +575,7 @@ function LessonPlayer({
             })}
           </ol>
 
-          <div className={styles.where}>
-            <h2 className={styles.segmentTitle}>{segment.title}</h2>
-            <span className={styles.position} role="status">
-              Part {state.segmentIndex + 1} of {total}
-            </span>
-          </div>
-
-          <div className={cx(styles.body, beats.length > 0 && transcriptShown && styles.withSide)}>
+          <div className={styles.body}>
             <SegmentStage
               key={segment.id}
               lessonId={lesson.lesson_id}
@@ -507,35 +585,13 @@ function LessonPlayer({
               state={state}
               controller={controller}
               cues={cues}
+              caption={caption}
+              position={
+                <span className={styles.position} role="status">
+                  Part {state.segmentIndex + 1} of {total}
+                </span>
+              }
             />
-            {beats.length > 0 && transcriptShown ? (
-              <aside className={styles.side} aria-label="Transcript">
-                <h3 className={styles.sideTitle}>Transcript</h3>
-                <ol className={styles.transcript}>
-                  {beats.map((beat, index) => {
-                    const current = index === state.beatIndex && !settled;
-                    const spoken = settled || index < state.beatsStarted;
-                    return (
-                      <li
-                        key={index}
-                        className={cx(
-                          styles.beat,
-                          spoken && styles.beatSpoken,
-                          current && styles.beatCurrent,
-                        )}
-                        aria-current={current ? 'true' : undefined}
-                      >
-                        {current && state.word ? (
-                          <SpokenText text={beat.text} word={state.word} />
-                        ) : (
-                          beat.text
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
-              </aside>
-            ) : null}
           </div>
 
           {asks.resource.status === 'error' ? (
@@ -655,6 +711,12 @@ function LessonPlayer({
               >
                 {last ? 'Finish lesson' : 'Continue'}
               </Button>
+              <IconButton
+                label="Full screen"
+                icon={screen.active ? <Minimize /> : <Maximize />}
+                aria-pressed={screen.active}
+                onClick={screen.toggle}
+              />
             </div>
           </div>
         </div>
@@ -741,6 +803,8 @@ function SegmentStage({
   state,
   controller,
   cues,
+  caption,
+  position,
 }: {
   lessonId: string;
   segment: LessonSegment;
@@ -751,6 +815,10 @@ function SegmentStage({
   state: PlaybackState;
   controller: LessonController;
   cues: SceneCues;
+  /** The words being said, for the foot of whatever this part puts on the screen. */
+  caption: ReactNode;
+  /** Where in the lesson this part comes ("Part 2 of 10"). */
+  position: ReactNode;
 }) {
   const player = useRef<ScenePlayerHandle>(null);
   const [sceneStatus, setSceneStatus] = useState<PlayerStatus | null>(null);
@@ -798,10 +866,37 @@ function SegmentStage({
     (beat) => (beat.show ? [beat.show] : []),
   );
   const reference = 'scene' in segment ? (segment.scene ?? null) : null;
+  const describable = picture !== null && reference !== null && sceneStatus !== 'failed';
+
+  // What the part is and where in the lesson it comes, along the top of whatever it shows.
+  const where = (
+    <div className={styles.where}>
+      <h2 className={styles.segmentTitle}>{segment.title}</h2>
+      <span className={styles.whereTools}>
+        {describable ? (
+          <IconButton
+            variant="stage"
+            size="small"
+            label={describing ? 'Hide description' : 'Describe this picture'}
+            icon={<AlignLeft />}
+            aria-expanded={describing}
+            onClick={() => setDescribing((open) => !open)}
+          />
+        ) : null}
+        {position}
+      </span>
+    </div>
+  );
+  // A part puts one thing on the screen, now and then two: a picture, or the words that
+  // stand in for it, and under that a board. The line along the top and the words along
+  // the foot go to the first.
+  const framed = { header: where, caption };
+  const below = reference ? { header: undefined, caption: undefined } : framed;
 
   if (segment.type === 'checkpoint') {
     return (
-      <div className={styles.stage}>
+      <div className={cx(styles.stage, styles.stageQuestion)}>
+        {where}
         <CheckpointPanel
           lessonId={lessonId}
           question={segment.question}
@@ -829,6 +924,8 @@ function SegmentStage({
             sceneName={picture.scene_class}
             title={segment.title}
             autoplay={live}
+            onStage
+            {...framed}
             fallback={
               <p>
                 <MathText text={reference.fallback_text} />
@@ -843,27 +940,13 @@ function SegmentStage({
               if (event.name === 'explored' || event.name === 'passed') controller.markExplored();
             }}
           />
-          {/* A scene that failed is already showing its description in its place. */}
-          {sceneStatus !== 'failed' ? (
-            <div className={styles.alternative}>
-              <div>
-                <Button
-                  size="small"
-                  variant="tertiary"
-                  aria-expanded={describing}
-                  onClick={() => setDescribing((open) => !open)}
-                >
-                  {describing ? 'Hide description' : 'Describe this picture'}
-                </Button>
-              </div>
-              {describing ? (
-                <p className={styles.alternativeText}>
-                  <MathText text={reference.fallback_text} />
-                </p>
-              ) : null}
-            </div>
+          {/* The picture in words, for whoever asks. A scene that failed is already
+              showing them in its place. */}
+          {describing && describable ? (
+            <p className={styles.alternativeText}>
+              <MathText text={reference.fallback_text} />
+            </p>
           ) : null}
-          {waitingToStart && !live ? <p className={styles.note}>Press Start to play.</p> : null}
           {state.explored ? (
             <p className={styles.note} role="status">
               Keep exploring, or continue when you’re ready.
@@ -874,53 +957,64 @@ function SegmentStage({
         // No picture to show here: it is still being drawn, it arrived after this part had
         // begun, or the core withheld it (it is not something Adle will run). Either way
         // the same idea is said in words.
-        <div className={styles.board}>
-          <p>
-            <MathText text={reference.fallback_text} />
-          </p>
-          {arrived ? (
-            <div className={styles.pictureReady} role="status">
-              <span>The picture is ready.</span>
-              <Button size="small" icon={<Play />} onClick={() => setPicture(scene)}>
-                Show picture
-              </Button>
-            </div>
-          ) : (
-            <p className={styles.boardEmpty} role={pending ? 'status' : undefined}>
-              {pending
-                ? 'This picture is still being drawn. It’ll appear here when it’s ready.'
-                : 'The picture isn’t available. Here’s the same idea in words.'}
+        <StageFrame {...framed}>
+          <div className={styles.board}>
+            <p>
+              <MathText text={reference.fallback_text} />
             </p>
-          )}
-        </div>
+            {arrived ? (
+              <div className={styles.pictureReady} role="status">
+                <span>The picture is ready.</span>
+                <Button size="small" icon={<Play />} onClick={() => setPicture(scene)}>
+                  Show picture
+                </Button>
+              </div>
+            ) : (
+              <p className={styles.boardEmpty} role={pending ? 'status' : undefined}>
+                {pending
+                  ? 'This picture is still being drawn. It’ll appear here when it’s ready.'
+                  : 'The picture isn’t available. Here’s the same idea in words.'}
+              </p>
+            )}
+          </div>
+        </StageFrame>
       ) : null}
 
       {segment.type === 'reflection' ? (
-        <div className={styles.board}>
-          <p className={styles.prompt}>
-            <MathText text={segment.prompt} />
-          </p>
-          <p className={styles.boardEmpty}>Nothing to submit. Take your time, then continue.</p>
-        </div>
+        <StageFrame {...below}>
+          <div className={styles.board}>
+            <p className={styles.prompt}>
+              <MathText text={segment.prompt} />
+            </p>
+            <p className={styles.boardEmpty}>Nothing to submit. Take your time, then continue.</p>
+          </div>
+        </StageFrame>
       ) : null}
 
       {segment.type === 'worked_example' || (!reference && segment.type !== 'reflection') ? (
-        <div className={styles.board}>
-          {segment.type === 'worked_example' ? (
-            <p className={styles.problemStatement}>
-              <MathText text={segment.problem} />
-            </p>
-          ) : null}
-          {shown.length > 0 ? (
-            <Points ordered={segment.type === 'worked_example'} items={shown} />
-          ) : (
-            <p className={styles.boardEmpty}>
-              {state.status === 'ready'
-                ? 'Press Start when you’re ready.'
-                : 'Listen, or read along in the transcript.'}
-            </p>
-          )}
-        </div>
+        <StageFrame {...below}>
+          <div className={styles.board}>
+            {segment.type === 'worked_example' ? (
+              <p className={styles.problemStatement}>
+                <MathText text={segment.problem} />
+              </p>
+            ) : null}
+            {shown.length > 0 ? (
+              <Points ordered={segment.type === 'worked_example'} items={shown} />
+            ) : (
+              // Nothing has been put on the board yet: it says what this part is about,
+              // as the first slide of a talk does.
+              <div className={styles.titleCard}>
+                <p className={styles.titleCardTitle} aria-hidden="true">
+                  {segment.title}
+                </p>
+                {state.status === 'ready' ? (
+                  <p className={styles.boardEmpty}>Press Start when you’re ready.</p>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </StageFrame>
       ) : shown.length > 0 ? (
         <Points ordered={false} items={shown} />
       ) : null}

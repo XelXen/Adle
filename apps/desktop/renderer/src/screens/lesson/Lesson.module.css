@@ -2,62 +2,81 @@
 .player {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-5);
-  min-width: 0;
-}
-
-.where {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--ad-space-2) var(--ad-space-4);
-}
-
-.segmentTitle {
-  margin: 0;
-  font: var(--ad-text-subtitle);
-  letter-spacing: var(--ad-tracking-tight);
-}
-
-.position {
-  font: var(--ad-text-caption);
-  font-variant-numeric: tabular-nums;
-  color: var(--ad-color-faint);
-}
-
-.body {
-  display: grid;
-  gap: var(--ad-space-6);
-  align-items: start;
-}
-
-@media (min-width: 68rem) {
-  .body.withSide {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  }
-}
-
-.stage {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ad-space-4);
-  min-width: 0;
-}
-
-.side {
-  display: flex;
-  flex-direction: column;
   gap: var(--ad-space-3);
   min-width: 0;
 }
 
-.sideTitle {
+/* What the part is and where in the lesson it comes: one line, along the top of the
+   screen it is shown on (or above a question, which has no screen). */
+.where {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ad-space-4);
+  min-width: 0;
+}
+
+.segmentTitle {
+  min-width: 0;
   margin: 0;
-  font: var(--ad-text-eyebrow);
-  letter-spacing: var(--ad-tracking-eyebrow);
-  text-transform: uppercase;
-  color: var(--ad-color-faint);
+  overflow: hidden;
+  font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.whereTools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--ad-space-2);
+}
+
+.position {
+  padding-right: var(--ad-space-2);
+  font: var(--ad-text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--ad-color-muted);
+}
+
+.stage :global([data-stage-frame]) .position {
+  color: var(--ad-color-stage-muted);
+}
+
+.body {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* The screen is as wide as the page, and no taller than leaves the title above it and
+   the controls below it in view: what is watched is watched whole. */
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+  width: min(100%, max(30rem, calc((100vh - 26.5rem) * 16 / 9)));
+  min-width: 0;
+}
+
+/* A board with nothing on it yet says what the part is about, as the first slide of a
+   talk does. */
+.titleCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ad-space-4);
+  text-align: center;
+}
+
+.titleCardTitle {
+  max-width: 40rem;
+  margin: 0;
+  font: var(--ad-text-title);
+  letter-spacing: var(--ad-tracking-display);
+  text-wrap: balance;
 }
 
 /* ---- Parts of the lesson -----------------------------------------------------
@@ -127,28 +146,30 @@
   background: var(--ad-color-ink);
 }
 
-/* ---- The board: what the narration has put on screen so far ------------------ */
+/* ---- The board: what the narration has put on screen so far ------------------
+ * It lies on the lesson's screen (`StageFrame`), which is dark in either theme, so it
+ * takes its colours from the screen and not from the page. */
 .board {
   display: flex;
+  flex: 1;
   flex-direction: column;
+  justify-content: center;
   gap: var(--ad-space-4);
-  padding: var(--ad-space-6);
-  border: var(--ad-border-width) solid var(--ad-color-border);
-  border-radius: var(--ad-radius-card);
-  background: var(--ad-color-surface);
-  box-shadow: var(--ad-shadow-1);
+  min-height: 0;
+  padding: var(--ad-space-7) var(--ad-space-8);
+  color: var(--ad-color-stage-ink);
 }
 
 .boardEmpty {
   font: var(--ad-text-supporting);
-  color: var(--ad-color-faint);
+  color: var(--ad-color-stage-muted);
 }
 
 .problemStatement {
   padding-bottom: var(--ad-space-4);
-  border-bottom: var(--ad-border-width) solid var(--ad-color-border);
+  border-bottom: var(--ad-border-width) solid var(--ad-color-stage-rule);
   font: var(--ad-text-reading);
-  color: var(--ad-color-muted);
+  color: var(--ad-color-stage-muted);
 }
 
 .points {
@@ -164,6 +185,10 @@
   font: var(--ad-text-supporting);
   font-variant-numeric: tabular-nums;
   color: var(--ad-color-faint);
+}
+
+.board .points li::marker {
+  color: var(--ad-color-stage-muted);
 }
 
 /* Each line arrives as it is said. */
@@ -197,7 +222,7 @@
   align-items: center;
   gap: var(--ad-space-3);
   font: var(--ad-text-supporting);
-  color: var(--ad-color-muted);
+  color: var(--ad-color-stage-muted);
 }
 
 .alternativeText {
@@ -209,41 +234,77 @@
   line-height: 1.375rem;
 }
 
-/* ---- Transcript ---------------------------------------------------------------- */
+/* ---- The words being said -----------------------------------------------------
+ * Along the foot of the screen, one line at a time, as under a film: the line being said,
+ * with the word the voice has reached marked. Every line is there for whoever reads the
+ * page another way, and can be unfolded to be read at leisure. */
+.captions {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--ad-space-3);
+  min-width: 0;
+}
+
 .transcript {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: var(--ad-space-3);
+  min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
   font: var(--ad-text-reading);
+  text-align: center;
+  text-wrap: balance;
 }
 
 .beat {
+  color: var(--ad-color-stage-muted);
+  transition: color var(--ad-duration-slow) var(--ad-ease-out);
+}
+
+/* One line at a time: the others are there to be read out, and take no room. */
+.captions:not(.captionsOpen) .beat:not(.beatShown) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.beatCurrent,
+.captions:not(.captionsOpen) .beatShown {
+  color: var(--ad-color-stage-ink);
+}
+
+/* Every line: a list to read, the line being said marked at its edge. */
+.captionsOpen .transcript {
+  max-height: 12rem;
+  padding-right: var(--ad-space-2);
+  overflow-y: auto;
+  text-align: left;
+  text-wrap: pretty;
+}
+
+.captionsOpen .beat {
   padding-left: var(--ad-space-4);
   border-left: 2px solid transparent;
-  color: var(--ad-color-faint);
-  transition:
-    color var(--ad-duration-slow) var(--ad-ease-out),
-    border-color var(--ad-duration-slow) var(--ad-ease-out);
 }
 
-.beatSpoken {
-  color: var(--ad-color-muted);
-}
-
-.beatCurrent {
+.captionsOpen .beatCurrent {
   border-left-color: var(--ad-color-primary);
-  color: var(--ad-color-ink);
 }
 
 .word {
   border-radius: 0.1875rem;
-  background: var(--ad-color-primary-soft);
-  color: var(--ad-color-ink);
+  background: var(--ad-color-stage-mark);
+  color: var(--ad-color-stage-ink);
   /* The mark is wider than the word by a hair, so it does not clip the letters. */
-  box-shadow: 0 0 0 0.125rem var(--ad-color-primary-soft);
+  box-shadow: 0 0 0 0.125rem var(--ad-color-stage-mark);
 }
 
 /* ---- Controls --------------------------------------------------------------------
@@ -283,6 +344,149 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--ad-space-2);
+}
+
+/* ---- Filling the screen ----------------------------------------------------------
+ * The player itself is what fills it, on the dark ground of the lesson's screen: the
+ * screen takes all the room there is, and the bar of controls keeps its place under it
+ * and fades while the lesson plays and nothing is being done (`data-still`). Its place
+ * is kept: a picture that changed size whenever the pointer moved would be worse than a
+ * dark strip. What is not on the lesson's screen (a question, a note) keeps the colours
+ * of the page it is a card of. */
+.player:fullscreen {
+  /* It covers the strip the window is moved by, and everything on it is for pressing:
+     a window that fills the screen is not going anywhere. */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-4) var(--ad-space-5) var(--ad-space-4);
+  overflow: hidden auto;
+  background: var(--ad-color-stage);
+}
+
+/* A question has no screen of its own: its title stands on the dark ground, and the
+   question stays the card it is, at a width that reads well. */
+.player:fullscreen .stage > .where {
+  flex: none;
+  color: var(--ad-color-stage-ink);
+}
+
+.player:fullscreen .stage > .where .position,
+.player:fullscreen .stage > .note {
+  color: var(--ad-color-stage-muted);
+}
+
+.player:fullscreen .stageQuestion {
+  justify-content: center;
+  width: min(100%, 60rem);
+  margin: 0 auto;
+}
+
+/* The learner's own notes on a part are for reading, not for watching. */
+.player:fullscreen .asked {
+  display: none;
+}
+
+.player:fullscreen .part::before {
+  background: var(--ad-color-stage-muted);
+}
+
+.player:fullscreen .part:disabled::before {
+  background: var(--ad-color-stage-rule);
+}
+
+.player:fullscreen .partCurrent::before,
+.player:fullscreen .partCurrent:disabled::before {
+  background: var(--ad-color-stage-ink);
+}
+
+.player:fullscreen .partDone::before {
+  background: var(--ad-color-primary);
+}
+
+.player:fullscreen .body {
+  flex: 1;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.player:fullscreen .stage {
+  width: 100%;
+  min-height: 0;
+}
+
+/* The screen takes what room is left, down through whatever holds it: a picture's
+   figure, the frame, the screen inside the frame. */
+.player:fullscreen .stage > figure,
+.player:fullscreen .stage :global([data-stage-frame]),
+.player:fullscreen .stage :global([data-stage-screen]) {
+  flex: 1;
+  min-height: 0;
+}
+
+.player:fullscreen .stage :global([data-stage-frame]) {
+  box-shadow: none;
+}
+
+.player:fullscreen .stage :global([data-stage-screen]) {
+  aspect-ratio: auto;
+}
+
+/* Points under a picture stand on the dark ground. */
+.player:fullscreen .stage > .points {
+  flex: none;
+  color: var(--ad-color-stage-ink);
+}
+
+.player:fullscreen .stage > .points li::marker {
+  color: var(--ad-color-stage-muted);
+}
+
+.player:fullscreen .controls {
+  position: static;
+  align-self: center;
+  width: min(100%, 64rem);
+  margin: 0;
+  transition: opacity var(--ad-duration-base) var(--ad-ease-out);
+}
+
+/* One line at a time while the screen is filled: the room is the picture's. */
+.player:fullscreen .captions .beat:not(.beatShown) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.player:fullscreen .captions .transcript {
+  max-height: none;
+  overflow: visible;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.player:fullscreen .captions .beat {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.player:fullscreen .captions button {
+  display: none;
+}
+
+.player:fullscreen .controls::before {
+  display: none;
+}
+
+.player[data-still]:fullscreen {
+  cursor: none;
+}
+
+.player[data-still]:fullscreen .controls {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .note {
@@ -565,4 +769,11 @@
   gap: var(--ad-space-1);
   margin: var(--ad-space-2) 0 0;
   padding-left: var(--ad-space-5);
+}
+
+/* A button that sends something, and beside it what it sends (ADR-036). */
+.sending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ad-space-1);
 }

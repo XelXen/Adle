@@ -28,6 +28,7 @@ import {
 
 import { useRouter } from '../../app/router';
 import { GenerationStatus } from '../../components/GenerationStatus';
+import { WhatIsSent } from '../../components/WhatIsSent';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
 import { destination, usualWait } from '../../lib/provider';
@@ -81,7 +82,6 @@ type OpenDialog =
   | { kind: 'remove'; concept: Concept }
   | { kind: 'remove-lesson'; lesson: LessonSummary }
   | { kind: 'outline' }
-  | { kind: 'suggest' }
   | { kind: 'proposal'; job: Job }
   | null;
 
@@ -341,13 +341,19 @@ export function CurriculumPanel({ course }: { course: Course }) {
           Start from your materials
         </Button>
       ) : null}
-      <Button
-        icon={<Sparkles />}
-        disabled={suggesting}
-        onClick={() => setDialog({ kind: 'suggest' })}
-      >
-        Suggest concepts with AI
-      </Button>
+      <span className={styles.sending}>
+        <Button icon={<Sparkles />} disabled={suggesting} onClick={() => void suggest()}>
+          Suggest concepts with AI
+        </Button>
+        <WhatIsSent
+          what={`the course name, topic, and description, your goal, and existing concept names${
+            hasMaterials ? ', plus headings and short excerpts from your materials' : ''
+          }`}
+          to={destination(providerStatus, 'curriculum')}
+          wait={usualWait(providerStatus, 'curriculum')}
+          after="Nothing is added until you review the suggestions."
+        />
+      </span>
       <Button
         variant={path.length === 0 && candidates.length > 0 ? 'secondary' : 'primary'}
         icon={<Plus />}
@@ -505,9 +511,6 @@ export function CurriculumPanel({ course }: { course: Course }) {
                         );
                       })}
                     </ol>
-                    <p className={styles.mapCaption}>
-                      Taught top to bottom. Each concept comes after its prerequisites.
-                    </p>
                   </>
                 ) : (
                   <ConceptMap
@@ -610,33 +613,6 @@ export function CurriculumPanel({ course }: { course: Course }) {
           }}
         />
       ) : null}
-      <Dialog
-        open={dialog?.kind === 'suggest'}
-        onClose={() => setDialog(null)}
-        title="Suggest concepts with AI?"
-        description={`Sends the course name, topic, and description, your goal, and existing concept names${
-          hasMaterials ? ', plus headings and short excerpts from your materials,' : ''
-        } to ${destination(providerStatus, 'curriculum')}.${
-          usualWait(providerStatus, 'curriculum')
-            ? ` Takes ${usualWait(providerStatus, 'curriculum')}.`
-            : ''
-        } Nothing is added until you review the suggestions.`}
-        actions={
-          <>
-            <Button onClick={() => setDialog(null)}>Cancel</Button>
-            <Button
-              variant="primary"
-              icon={<Sparkles />}
-              onClick={() => {
-                setDialog(null);
-                void suggest();
-              }}
-            >
-              Suggest concepts
-            </Button>
-          </>
-        }
-      />
       <Dialog
         open={dialog?.kind === 'remove-lesson'}
         onClose={() => setDialog(null)}

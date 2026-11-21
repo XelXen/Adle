@@ -18,6 +18,36 @@
   box-shadow: var(--ad-shadow-1);
 }
 
+/* On the lesson's screen the frame around it is the screen's, and so is the ground. */
+.onScreen {
+  flex: 1;
+  aspect-ratio: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--ad-color-stage);
+  box-shadow: none;
+}
+
+.onScreen .overlay,
+.onScreen .poster {
+  background: var(--ad-color-stage);
+  color: var(--ad-color-stage-muted);
+}
+
+.onScreen .fallback {
+  background: var(--ad-color-stage);
+  color: var(--ad-color-stage-ink);
+}
+
+.onScreen .fallbackBody {
+  font: var(--ad-text-reading-large);
+}
+
+.onScreen .fallbackNote {
+  color: var(--ad-color-stage-muted);
+}
+
 .frameHost {
   position: absolute;
   inset: 0;
@@ -132,6 +162,15 @@
 .controlsHint {
   font: var(--ad-text-supporting);
   color: var(--ad-color-muted);
+}
+
+/* Where the lesson fills the screen, the ground is dark in either theme: the controls
+   keep the colours of the page, on a card of the page's own. */
+:global(:fullscreen) .controls {
+  flex: none;
+  padding: var(--ad-space-4) var(--ad-space-5);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
 }
 
 .controlGrid {
