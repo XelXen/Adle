@@ -65,6 +65,7 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Third-party licences: list / check | `npm run licenses` / `npm run licenses:check` (part of `check`) |
 | Nothing secret is about to be committed | `npm run secrets:check` (part of `check`) |
 | Try the real providers by hand (spends allowance; never in a test) | `uv run --directory services/core python ../../scripts/dev/real_provider_check.py --help` |
+| Time every model on Adle's own prompts, by hand (spends allowance) | `uv run --directory services/core python ../../scripts/dev/benchmark_models.py --help` |
 | Measure what a learner waits for | `node scripts/measure.mjs` (`--packaged` for the packaged build) |
 
 The packaged app is `apps/desktop/out/release/Adle-<platform>-<arch>/`, and its installers
@@ -95,7 +96,8 @@ last released.
 - A provider key lives in OS secure storage and core memory. It must never appear in the
   renderer, argv, the environment, a log, the database, or a fixture.
 - There are two providers. The learner chooses one, or "automatic": every provider they have
-  given a key to, each for what it is good at (ADR-021, ADR-023). Nothing else changes that
+  given a key to, each for what it is good at (ADR-021, ADR-023, ADR-039). Within a provider
+  each kind of request has its own order of models, measured, not guessed. Nothing else changes that
   choice. With one provider chosen, no failure, missing key, or used-up quota moves a request
   to another. With automatic, a request may go on to the next provider in the plan, and only
   ever to one with a key of its own; where it may go can be read before it is sent (in

@@ -744,12 +744,12 @@ export interface ProviderCheck {
 export interface ProviderChoice {
   base_url: string;
   display_name: string;
+  first_for: ('ask' | 'curriculum' | 'lesson' | 'scene' | 'check')[];
   in_use: boolean;
   key_configured: boolean;
   limits_published: boolean;
   models: ProviderModel[];
   provider_id: string;
-  quick: boolean;
   selected: boolean;
   usage: ProviderUsage;
 }
@@ -783,6 +783,7 @@ export interface ProviderCredential {
  *
  */
 export interface ProviderRoute {
+  model_name: string;
   names: string[];
   provider_ids: string[];
   reason: string;
@@ -798,6 +799,7 @@ export interface ProviderRoutes {
   ask: ProviderRoute;
   curriculum: ProviderRoute;
   lesson: ProviderRoute;
+  scene: ProviderRoute;
 }
 export interface ProviderSelection {
   selection: string;

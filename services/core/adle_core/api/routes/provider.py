@@ -10,6 +10,7 @@ also keeps. They are excluded from the renderer's operation allowlist
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -87,8 +88,8 @@ class ProviderChoice(BaseModel):
     selected: bool
     #: By the learner's choice, a request could go here now.
     in_use: bool
-    #: It answers in seconds rather than minutes.
-    quick: bool
+    #: What it is asked first for when the learner lets Adle choose (ADR-039).
+    first_for: list[Literal["ask", "curriculum", "lesson", "scene", "check"]]
     #: False when the limits Adle keeps to are its own caution and not the provider's.
     limits_published: bool
     usage: ProviderUsage
@@ -103,6 +104,8 @@ class ProviderRoute(BaseModel):
     sentence: str
     #: Why the first is first, when there was something to decide. Otherwise empty.
     reason: str
+    #: The model at the first provider that writes this kind of request (ADR-039).
+    model_name: str
     #: About how long the whole thing takes at the first provider. Said as "about".
     wait_seconds: int
     #: Whether that comes from answers that arrived on this computer.
@@ -116,8 +119,10 @@ class ProviderRoutes(BaseModel):
     ask: ProviderRoute
     #: A list of suggested concepts.
     curriculum: ProviderRoute
-    #: A lesson and its pictures.
+    #: A lesson's words.
     lesson: ProviderRoute
+    #: A picture in a lesson (ADR-039).
+    scene: ProviderRoute
 
 
 class ProviderStatus(BaseModel):
@@ -154,11 +159,15 @@ def _usage(services: Services, config: ProviderConfig) -> ProviderUsage:
 
 def _route(services: Services, work: str, found: Plan) -> ProviderRoute:
     wait = services.generation.expected_wait(work)
+    first = next(
+        item for item in services.gateway.providers if item.provider_id == found.provider_ids[0]
+    )
     return ProviderRoute(
         provider_ids=list(found.provider_ids),
         names=list(found.names),
         sentence=found.sentence,
         reason=found.reason,
+        model_name=first.models_for(work)[0].name,
         wait_seconds=wait.seconds,
         wait_measured=wait.measured,
     )
@@ -166,7 +175,7 @@ def _route(services: Services, work: str, found: Plan) -> ProviderRoute:
 
 def _status(services: Services) -> ProviderStatus:
     gateway = services.gateway
-    plans = {work: gateway.plan(work) for work in ("ask", "curriculum", "lesson")}
+    plans = {work: gateway.plan(work) for work in ("ask", "curriculum", "lesson", "scene")}
     config = gateway.config
     selection = gateway.selection
     # A provider is in use if a request could go to it: it is in some plan, with a key.
@@ -188,7 +197,7 @@ def _status(services: Services) -> ProviderStatus:
                 key_configured=gateway.has_key_for(item.provider_id),
                 selected=selection == item.provider_id,
                 in_use=item.provider_id in planned and gateway.has_key_for(item.provider_id),
-                quick=item.quick,
+                first_for=sorted(item.first_for),
                 limits_published=item.limits_published,
                 usage=_usage(services, item),
             )
@@ -198,6 +207,7 @@ def _status(services: Services) -> ProviderStatus:
             ask=_route(services, "ask", plans["ask"]),
             curriculum=_route(services, "curriculum", plans["curriculum"]),
             lesson=_route(services, "lesson", plans["lesson"]),
+            scene=_route(services, "scene", plans["scene"]),
         ),
     )
 

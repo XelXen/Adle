@@ -1489,6 +1489,14 @@
         "properties": {
           "base_url": { "title": "Base Url", "type": "string" },
           "display_name": { "title": "Display Name", "type": "string" },
+          "first_for": {
+            "items": {
+              "enum": ["ask", "curriculum", "lesson", "scene", "check"],
+              "type": "string"
+            },
+            "title": "First For",
+            "type": "array"
+          },
           "in_use": { "title": "In Use", "type": "boolean" },
           "key_configured": { "title": "Key Configured", "type": "boolean" },
           "limits_published": { "title": "Limits Published", "type": "boolean" },
@@ -1498,7 +1506,6 @@
             "type": "array"
           },
           "provider_id": { "title": "Provider Id", "type": "string" },
-          "quick": { "title": "Quick", "type": "boolean" },
           "selected": { "title": "Selected", "type": "boolean" },
           "usage": { "$ref": "#/components/schemas/ProviderUsage" }
         },
@@ -1510,7 +1517,7 @@
           "key_configured",
           "selected",
           "in_use",
-          "quick",
+          "first_for",
           "limits_published",
           "usage"
         ],
@@ -1551,6 +1558,7 @@
       "ProviderRoute": {
         "description": "Where one kind of request would go at this moment, and how long it may take.",
         "properties": {
+          "model_name": { "title": "Model Name", "type": "string" },
           "names": { "items": { "type": "string" }, "title": "Names", "type": "array" },
           "provider_ids": {
             "items": { "type": "string" },
@@ -1567,6 +1575,7 @@
           "names",
           "sentence",
           "reason",
+          "model_name",
           "wait_seconds",
           "wait_measured"
         ],
@@ -1578,9 +1587,10 @@
         "properties": {
           "ask": { "$ref": "#/components/schemas/ProviderRoute" },
           "curriculum": { "$ref": "#/components/schemas/ProviderRoute" },
-          "lesson": { "$ref": "#/components/schemas/ProviderRoute" }
+          "lesson": { "$ref": "#/components/schemas/ProviderRoute" },
+          "scene": { "$ref": "#/components/schemas/ProviderRoute" }
         },
-        "required": ["ask", "curriculum", "lesson"],
+        "required": ["ask", "curriculum", "lesson", "scene"],
         "title": "ProviderRoutes",
         "type": "object"
       },

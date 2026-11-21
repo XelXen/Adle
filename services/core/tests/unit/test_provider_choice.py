@@ -50,8 +50,9 @@ from tests.support.model import CURRICULUM, FakeProvider
 
 AIHUBMIX_KEY = "sk-test-aihubmix-0123456789abcdef"
 NVIDIA_KEY = "nvapi-test-0123456789abcdefghijkl"
-KIMI, MISTRAL, GLM = (model.id for model in NVIDIA.models)
-KIMI_NAME, MISTRAL_NAME, GLM_NAME = (model.name for model in NVIDIA.models)
+#: NVIDIA's models for a lesson (``REQUEST``), in the order they are asked (ADR-039).
+FIRST, SECOND, THIRD = (model.id for model in NVIDIA.models_for("lesson"))
+FIRST_NAME, SECOND_NAME, THIRD_NAME = (model.name for model in NVIDIA.models_for("lesson"))
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 AIHUBMIX_URL = "https://aihubmix.com/v1/chat/completions"
 START = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
@@ -80,7 +81,7 @@ class Endpoint:
     """A provider scripted model by model: each answers, or is in the trouble it was given."""
 
     def __init__(self, **trouble: int | Exception) -> None:
-        names = {"kimi": KIMI, "mistral": MISTRAL, "glm": GLM}
+        names = {"first": FIRST, "second": SECOND, "third": THIRD}
         self.trouble: dict[str, int | Exception] = {
             names[name]: what for name, what in trouble.items()
         }
@@ -162,14 +163,30 @@ def test_two_providers_are_offered_and_the_first_is_used_until_another_is_chosen
     assert catalogue.get("somewhere-else") is None
 
 
-def test_nvidias_models_are_in_the_order_that_was_asked_for() -> None:
+def test_each_kind_of_request_goes_to_the_nvidia_model_measured_to_do_it_best() -> None:
     assert NVIDIA.base_url == "https://integrate.api.nvidia.com/v1"
-    assert [model.id for model in NVIDIA.models] == [
+    ultra, super_, kimi, mistral = (
+        "nvidia/nemotron-3-ultra-550b-a55b",
+        "nvidia/nemotron-3.5-super-vl-120b-a12b",
         "moonshotai/kimi-k3.1-pro",
         "mistralai/mistral-large-4-1t-a52b",
-        "z-ai/glm-5.3-flash",
-    ]
-    assert NVIDIA.model == "moonshotai/kimi-k3.1-pro"
+    )
+    assert [model.id for model in NVIDIA.models] == [ultra, super_, kimi, mistral]
+    orders = {
+        purpose: [model.id for model in NVIDIA.models_for(purpose)]
+        for purpose in ("ask", "check", "curriculum", "lesson", "scene")
+    }
+    # What the learner waits for goes to the quickest; Kimi, a model for code, draws the
+    # pictures; a lesson goes to the model that wrote a usable one soonest (2026-11-21).
+    assert orders == {
+        "ask": [super_, ultra, kimi],
+        "check": [super_, ultra],
+        "curriculum": [ultra, super_, kimi, mistral],
+        "lesson": [ultra, kimi, mistral],
+        "scene": [kimi, ultra],
+    }
+    # AIHubMix's one model is asked for everything when it is the provider chosen.
+    assert [model.id for model in AIHUBMIX.models_for("lesson")] == ["coding-kimi-k3-free"]
     # Limits NVIDIA does not publish are Adle's own, and are said to be.
     assert NVIDIA.limits is NVIDIA_LIMITS
     assert NVIDIA.limits_published is False
@@ -236,6 +253,25 @@ MESSAGES = [
     [
         (
             0,
+            # Measured with nothing but the fields every request has, and sent just those.
+            {
+                "model": "nvidia/nemotron-3-ultra-550b-a55b",
+                "messages": MESSAGES,
+                "max_tokens": 500,
+                "stream": True,
+            },
+        ),
+        (
+            1,
+            {
+                "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+                "messages": MESSAGES,
+                "max_tokens": 500,
+                "stream": True,
+            },
+        ),
+        (
+            2,
             {
                 "model": "moonshotai/kimi-k3.1-pro",
                 "messages": MESSAGES,
@@ -249,7 +285,7 @@ MESSAGES = [
             },
         ),
         (
-            1,
+            3,
             {
                 "model": "mistralai/mistral-large-4-1t-a52b",
                 "messages": MESSAGES,
@@ -260,17 +296,8 @@ MESSAGES = [
                 "reasoning_effort": "low",
             },
         ),
-        (
-            2,
-            {
-                "model": "z-ai/glm-5.3-flash",
-                "messages": MESSAGES,
-                "max_tokens": 500,
-                "stream": True,
-            },
-        ),
     ],
-    ids=["kimi", "mistral", "glm"],
+    ids=["ultra", "super", "kimi", "mistral"],
 )
 def test_each_model_is_sent_exactly_the_fields_its_reference_lists(
     position: int, expected: dict[str, Any]
@@ -390,7 +417,7 @@ def test_a_model_that_is_gone_failing_or_silent_is_unavailable(
     trouble: int | Exception, kind: str
 ) -> None:
     with pytest.raises(ProviderModelUnavailableError) as raised:
-        client_for(NVIDIA, Endpoint(kimi=trouble)).complete(REQUEST)
+        client_for(NVIDIA, Endpoint(first=trouble)).complete(REQUEST)
     assert raised.value.trouble == kind
     # One code for the interface, whatever the reason: nothing arrived, try again later.
     assert raised.value.code == "provider_unavailable"
@@ -416,7 +443,7 @@ def test_an_error_in_the_middle_of_an_answer_is_the_model_failing() -> None:
 )
 def test_not_reaching_the_provider_is_not_blamed_on_a_model(failure: Exception) -> None:
     with pytest.raises(ProviderUnavailableError) as raised:
-        client_for(NVIDIA, Endpoint(kimi=failure)).complete(REQUEST)
+        client_for(NVIDIA, Endpoint(first=failure)).complete(REQUEST)
     # Another model of the same provider is behind the same connection.
     assert not isinstance(raised.value, ProviderModelUnavailableError)
     assert "Couldn’t reach the AI provider" in str(raised.value)
@@ -427,7 +454,7 @@ def test_a_models_thinking_is_counted_and_never_taken_for_its_answer() -> None:
     result = client_for(NVIDIA, lambda request: response).complete(REQUEST)
     assert result.text == '{"ready": true}'
     assert result.thinking_characters == 210
-    assert result.model_name == KIMI_NAME
+    assert result.model_name == FIRST_NAME
 
 
 def test_what_the_model_is_doing_is_reported_once_each_as_it_begins() -> None:
@@ -549,24 +576,24 @@ def test_the_time_limit_runs_while_the_model_is_only_thinking() -> None:
 def test_when_the_first_model_is_away_the_next_is_asked_and_it_is_said(
     services: Services,
 ) -> None:
-    endpoint = Endpoint(kimi=404)
+    endpoint = Endpoint(first=404)
     gateway, _, _ = both_providers(services, endpoint)
     told: list[tuple[str, ...]] = []
 
     result = gateway.complete(REQUEST, on_fallback=lambda *said: told.append(said))
 
-    assert endpoint.asked == [KIMI, MISTRAL]
-    assert result.text == f"written by {MISTRAL}"
+    assert endpoint.asked == [FIRST, SECOND]
+    assert result.text == f"written by {SECOND}"
     # Who answered, and for whom: never left unsaid.
-    assert (result.model_name, result.instead_of) == (MISTRAL_NAME, KIMI_NAME)
-    assert told == [(KIMI_NAME, MISTRAL_NAME, "gone")]
+    assert (result.model_name, result.instead_of) == (SECOND_NAME, FIRST_NAME)
+    assert told == [(FIRST_NAME, SECOND_NAME, "gone")]
     # The same provider, the same address, the same key: only the model changed.
     assert set(endpoint.urls) == {NVIDIA_URL}
     assert set(endpoint.keys) == {f"Bearer {NVIDIA_KEY}"}
     # Both attempts were requests, and both are written down.
     assert [(row.provider, row.model, row.outcome) for row in rows(services)] == [
-        ("nvidia", KIMI, "unavailable"),
-        ("nvidia", MISTRAL, "ok"),
+        ("nvidia", FIRST, "unavailable"),
+        ("nvidia", SECOND, "ok"),
     ]
 
 
@@ -575,41 +602,41 @@ def test_the_first_model_answering_is_not_reported_as_a_stand_in(services: Servi
     gateway, _, _ = both_providers(services, endpoint)
     told: list[tuple[str, ...]] = []
     result = gateway.complete(REQUEST, on_fallback=lambda *said: told.append(said))
-    assert endpoint.asked == [KIMI]
-    assert (result.model_name, result.instead_of) == (KIMI_NAME, "")
+    assert endpoint.asked == [FIRST]
+    assert (result.model_name, result.instead_of) == (FIRST_NAME, "")
     assert told == []
 
 
 def test_a_model_that_was_away_is_left_alone_for_a_while_and_then_asked_first_again(
     services: Services,
 ) -> None:
-    endpoint = Endpoint(kimi=503)
+    endpoint = Endpoint(first=503)
     gateway, fake, _ = both_providers(services, endpoint)
     gateway.complete(REQUEST)
-    assert endpoint.asked == [KIMI, MISTRAL]
+    assert endpoint.asked == [FIRST, SECOND]
 
     # The rest of the same lesson does not find out the same thing again.
     fake.now += timedelta(minutes=5)
     again = gateway.complete(REQUEST)
-    assert endpoint.asked == [KIMI, MISTRAL, MISTRAL]
-    assert again.instead_of == KIMI_NAME
+    assert endpoint.asked == [FIRST, SECOND, SECOND]
+    assert again.instead_of == FIRST_NAME
 
     # Later, the model the learner was promised is the first one asked again.
-    endpoint.recover(KIMI)
+    endpoint.recover(FIRST)
     fake.now += MODEL_REST
     later = gateway.complete(REQUEST)
-    assert endpoint.asked[-1] == KIMI
-    assert (later.model_name, later.instead_of) == (KIMI_NAME, "")
+    assert endpoint.asked[-1] == FIRST
+    assert (later.model_name, later.instead_of) == (FIRST_NAME, "")
 
 
 def test_when_the_first_two_are_away_the_third_is_asked(services: Services) -> None:
-    endpoint = Endpoint(kimi=404, mistral=httpx.ReadTimeout("silent"))
+    endpoint = Endpoint(first=404, second=httpx.ReadTimeout("silent"))
     gateway, _, _ = both_providers(services, endpoint)
     told: list[tuple[str, ...]] = []
     result = gateway.complete(REQUEST, on_fallback=lambda *said: told.append(said))
-    assert endpoint.asked == [KIMI, MISTRAL, GLM]
-    assert (result.model_name, result.instead_of) == (GLM_NAME, KIMI_NAME)
-    assert told == [(KIMI_NAME, MISTRAL_NAME, "gone"), (MISTRAL_NAME, GLM_NAME, "silent")]
+    assert endpoint.asked == [FIRST, SECOND, THIRD]
+    assert (result.model_name, result.instead_of) == (THIRD_NAME, FIRST_NAME)
+    assert told == [(FIRST_NAME, SECOND_NAME, "gone"), (SECOND_NAME, THIRD_NAME, "silent")]
 
 
 @pytest.mark.parametrize("status", [400, 422])
@@ -620,16 +647,16 @@ def test_a_model_that_will_not_take_its_request_is_passed_over_and_it_is_said_wh
 
     Mistral Large 4 was seen to refuse a value its own reference lists (2026-11-20).
     """
-    endpoint = Endpoint(kimi=status)
+    endpoint = Endpoint(first=status)
     gateway, _, _ = both_providers(services, endpoint)
     told: list[tuple[str, ...]] = []
     result = gateway.complete(REQUEST, on_fallback=lambda *said: told.append(said))
-    assert endpoint.asked == [KIMI, MISTRAL]
-    assert (result.model_name, result.instead_of) == (MISTRAL_NAME, KIMI_NAME)
-    assert told == [(KIMI_NAME, MISTRAL_NAME, "refused")]
+    assert endpoint.asked == [FIRST, SECOND]
+    assert (result.model_name, result.instead_of) == (SECOND_NAME, FIRST_NAME)
+    assert told == [(FIRST_NAME, SECOND_NAME, "refused")]
     assert [(row.model, row.outcome) for row in rows(services)] == [
-        (KIMI, "refused"),
-        (MISTRAL, "ok"),
+        (FIRST, "refused"),
+        (SECOND, "ok"),
     ]
 
 
@@ -650,15 +677,15 @@ def test_a_provider_with_one_model_still_reports_a_refused_request_as_refused(
 def test_when_no_model_answers_the_error_names_them_and_the_next_request_costs_one_attempt(
     services: Services,
 ) -> None:
-    endpoint = Endpoint(kimi=404, mistral=500, glm=httpx.ReadTimeout("silent"))
+    endpoint = Endpoint(first=404, second=500, third=httpx.ReadTimeout("silent"))
     gateway, fake, _ = both_providers(services, endpoint)
 
     with pytest.raises(NoModelAnsweredError) as raised:
         gateway.complete(REQUEST)
-    assert endpoint.asked == [KIMI, MISTRAL, GLM]
+    assert endpoint.asked == [FIRST, SECOND, THIRD]
     message = str(raised.value)
     assert "None of NVIDIA NIM’s models answered" in message
-    assert all(name in message for name in (KIMI_NAME, MISTRAL_NAME, GLM_NAME))
+    assert all(name in message for name in (FIRST_NAME, SECOND_NAME, THIRD_NAME))
     assert raised.value.code == "provider_unavailable"
 
     # Nothing is known to work. Trying again asks one model, not three: the one that
@@ -666,13 +693,13 @@ def test_when_no_model_answers_the_error_names_them_and_the_next_request_costs_o
     fake.now += timedelta(seconds=30)
     with pytest.raises(ProviderUnavailableError):
         gateway.complete(REQUEST)
-    assert endpoint.asked == [KIMI, MISTRAL, GLM, KIMI]
+    assert endpoint.asked == [FIRST, SECOND, THIRD, FIRST]
 
     # And a different one each time, so the first to come back is found.
-    endpoint.recover(MISTRAL)
+    endpoint.recover(SECOND)
     fake.now += timedelta(seconds=30)
-    assert gateway.complete(REQUEST).model_name == MISTRAL_NAME
-    assert endpoint.asked == [KIMI, MISTRAL, GLM, KIMI, MISTRAL]
+    assert gateway.complete(REQUEST).model_name == SECOND_NAME
+    assert endpoint.asked == [FIRST, SECOND, THIRD, FIRST, SECOND]
 
 
 @pytest.mark.parametrize(
@@ -687,22 +714,22 @@ def test_when_no_model_answers_the_error_names_them_and_the_next_request_costs_o
 def test_a_refusal_that_is_about_the_account_is_not_taken_to_another_model(
     services: Services, status: int, error: type[ProviderError], asked: int
 ) -> None:
-    endpoint = Endpoint(kimi=status)
+    endpoint = Endpoint(first=status)
     gateway, _, _ = both_providers(services, endpoint)
     told: list[tuple[str, ...]] = []
     with pytest.raises(error):
         gateway.complete(REQUEST, on_fallback=lambda *said: told.append(said))
     # The next model is behind the same key and the same account: it would say the same.
-    assert endpoint.asked == [KIMI] * asked
+    assert endpoint.asked == [FIRST] * asked
     assert told == []
 
 
 def test_not_reaching_the_provider_is_not_tried_on_another_model(services: Services) -> None:
-    endpoint = Endpoint(kimi=httpx.ConnectError("offline"))
+    endpoint = Endpoint(first=httpx.ConnectError("offline"))
     gateway, _, _ = both_providers(services, endpoint)
     with pytest.raises(ProviderUnavailableError):
         gateway.complete(REQUEST)
-    assert endpoint.asked == [KIMI]
+    assert endpoint.asked == [FIRST]
 
 
 def test_a_provider_with_one_model_fails_as_it_always_did(services: Services) -> None:
@@ -818,8 +845,13 @@ def test_the_interface_is_told_every_provider_and_what_was_chosen(client: TestCl
     nvidia = status["providers"][1]
     assert nvidia["display_name"] == "NVIDIA NIM"
     assert nvidia["base_url"] == "https://integrate.api.nvidia.com/v1"
-    assert [model["name"] for model in nvidia["models"]] == [KIMI_NAME, MISTRAL_NAME, GLM_NAME]
-    assert [model["id"] for model in nvidia["models"]] == [KIMI, MISTRAL, GLM]
+    assert [model["id"] for model in nvidia["models"]] == [model.id for model in NVIDIA.models]
+    assert [model["name"] for model in nvidia["models"]] == [
+        "Nemotron 3 Ultra",
+        "Nemotron 3.5 Super",
+        "Kimi K3.1 Pro",
+        "Mistral Large 4",
+    ]
     assert nvidia["limits_published"] is False
 
 
@@ -829,7 +861,7 @@ def test_choosing_a_provider_changes_what_is_in_use_and_nothing_else(client: Tes
 
     status = client.get("/v1/provider").json()
     assert (status["provider_id"], status["display_name"]) == ("nvidia", "NVIDIA NIM")
-    assert (status["selection"], status["model"]) == ("nvidia", KIMI)
+    assert (status["selection"], status["model"]) == ("nvidia", FIRST)
     # The key that was there belongs to the other provider. This one has none yet.
     assert status["key_configured"] is False
     assert [
@@ -958,15 +990,15 @@ def test_a_lesson_through_nvidia_goes_only_there_and_says_which_model_wrote_it(
     assert job.status == "succeeded", job.error_message
 
     # Asked once of the model that was away, then everything of the next one.
-    assert [body["model"] for body in provider.requests] == [KIMI, MISTRAL, MISTRAL, MISTRAL]
+    assert [body["model"] for body in provider.requests] == [FIRST, SECOND, SECOND, SECOND]
     assert set(provider.urls) == {NVIDIA_URL}
     assert set(provider.authorizations) == {f"Bearer {NVIDIA_KEY}"}
-    note = f"{KIMI_NAME} wasn’t available, so {MISTRAL_NAME} wrote this instead."
+    note = f"{FIRST_NAME} wasn’t available, so {SECOND_NAME} wrote this instead."
     assert job.result["written_by"] == {
         "provider": "NVIDIA NIM",
-        "models": [MISTRAL_NAME],
-        "authors": [{"provider": "NVIDIA NIM", "model": MISTRAL_NAME}],
-        "instead_of": KIMI_NAME,
+        "models": [SECOND_NAME],
+        "authors": [{"provider": "NVIDIA NIM", "model": SECOND_NAME}],
+        "instead_of": FIRST_NAME,
         "note": note,
     }
     # And the learner is told, where the other things that did not go to plan are told.
@@ -984,6 +1016,8 @@ def test_a_long_wait_says_what_the_model_is_doing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A model that thinks for minutes must not look like a job that has stalled."""
+    # Suggested concepts have an order of their own (ADR-039).
+    first, second = (model.name for model in NVIDIA.models_for("curriculum")[:2])
     said: list[str] = []
     details: list[dict[str, Any] | None] = []
     update = services.jobs._update
@@ -1013,9 +1047,9 @@ def test_a_long_wait_says_what_the_model_is_doing(
 
     assert said == [
         "Suggesting concepts",
-        f"{KIMI_NAME} isn’t available right now. Asking {MISTRAL_NAME} instead",
-        f"Suggesting concepts: {MISTRAL_NAME} is thinking",
-        f"Suggesting concepts: {MISTRAL_NAME} is writing",
+        f"{first} isn’t available right now. Asking {second} instead",
+        f"Suggesting concepts: {second} is thinking",
+        f"Suggesting concepts: {second} is writing",
         "Done",
     ]
     # Beside the sentences, what stage the work is at and which concepts have been

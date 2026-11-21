@@ -41,6 +41,7 @@ import httpx2 as httpx
 from adle_core.errors import AdleError
 from adle_core.generation.credentials import DEFAULT_PROVIDER_ID, CredentialVault
 from adle_core.generation.quota import DEFAULT_LIMITS, QuotaLimits
+from adle_core.generation.routing import PURPOSES
 
 logger = logging.getLogger(__name__)
 
@@ -102,11 +103,16 @@ AIHUBMIX_MODEL = ModelSpec(
     id=DEFAULT_MODEL, name="Coding Kimi K3 (free)", usage_option=True, json_mode=True
 )
 
-#: NVIDIA's models, in the order the owner asked for them (ADR-021). Each entry follows
-#: that model's page under https://build.nvidia.com/, read on 2026-11-20, and then what
-#: the endpoint was seen to do that day, which is not always what the page says. GLM 5.3
-#: Flash never answered: no line in three minutes, three times.
+#: NVIDIA's models (ADR-021, ADR-039). Each entry follows that model's page under
+#: https://build.nvidia.com/, and then what the endpoint was seen to do, which is not
+#: always what the page says. Which of them is asked for what is ``NVIDIA_ORDERS``, from
+#: one run of each kind of request on 2026-11-21 (PERFORMANCE.md). The two Nemotron models
+#: are sent nothing but the fields every request has: that is how they were measured.
+NEMOTRON_ULTRA = ModelSpec(id="nvidia/nemotron-3-ultra-550b-a55b", name="Nemotron 3 Ultra")
+NEMOTRON_SUPER = ModelSpec(id="nvidia/nemotron-3.5-super-vl-120b-a12b", name="Nemotron 3.5 Super")
 NVIDIA_MODELS = (
+    NEMOTRON_ULTRA,
+    NEMOTRON_SUPER,
     ModelSpec(
         id="moonshotai/kimi-k3.1-pro",
         name="Kimi K3.1 Pro",
@@ -130,7 +136,22 @@ NVIDIA_MODELS = (
         # refuses "low" too, the gateway moves on to the next model and says so.
         reasoning_effort="low",
     ),
-    ModelSpec(id="z-ai/glm-5.3-flash", name="GLM 5.3 Flash"),
+)
+
+_ULTRA, _SUPER, _KIMI, _MISTRAL = (spec.id for spec in NVIDIA_MODELS)
+#: For each kind of request, NVIDIA's models in the order they are asked (ADR-039): the one
+#: measured to do it well and soonest first, then those that stand in. Measured on
+#: 2026-11-21: a question in 7 s (Super) and 8 s (Ultra) against 66 s (Kimi); suggested
+#: concepts in 30 s (Ultra), 39 s (Super), 123 s (Kimi); a lesson in 113 s (Ultra) against
+#: 254 s (Kimi), Super's twice not usable; a scene file in 20 s (Ultra) and 134 s (Kimi),
+#: Super's empty. Kimi, a model for code, draws the pictures; everything else is written by
+#: a model that does not keep the learner waiting.
+NVIDIA_ORDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("ask", (_SUPER, _ULTRA, _KIMI)),
+    ("check", (_SUPER, _ULTRA)),
+    ("curriculum", (_ULTRA, _SUPER, _KIMI, _MISTRAL)),
+    ("lesson", (_ULTRA, _KIMI, _MISTRAL)),
+    ("scene", (_KIMI, _ULTRA)),
 )
 
 #: Adle's own caution for a provider that publishes no daily limit for these models.
@@ -166,14 +187,17 @@ class ProviderConfig:
     #: In the order they are tried. The first is the one used; a later one is asked only
     #: when the ones before it are not available (see ``ModelGateway``).
     models: tuple[ModelSpec, ...] = (AIHUBMIX_MODEL,)
+    #: For a kind of request, the ids of the models to ask instead, in order (ADR-039).
+    #: A kind not listed asks ``models`` in their order.
+    orders: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    #: What this provider is asked first for when the learner lets Adle use every provider
+    #: they have a key for (``generation.routing``, ADR-039). Anything else goes first to
+    #: another provider, and here after it.
+    first_for: frozenset[str] = frozenset(PURPOSES)
     limits: QuotaLimits = DEFAULT_LIMITS
     #: True when ``limits`` sit just under limits the provider publishes; False when they
     #: are only Adle's own caution. The interface says which.
     limits_published: bool = True
-    #: It answers in seconds rather than minutes. With ``limits_published`` this is what
-    #: ``generation.routing`` goes by when the learner lets Adle use more than one
-    #: provider: what is waited for goes to a quick one, long work to a roomy one.
-    quick: bool = True
     #: What to expect of it before anything has been measured here.
     typical: TypicalSeconds = TypicalSeconds()
     connect_timeout_seconds: float = 15.0
@@ -185,11 +209,27 @@ class ProviderConfig:
     def __post_init__(self) -> None:
         if not self.models:
             raise ProviderConfigError("A provider needs at least one model.")
+        known = {spec.id for spec in self.models}
+        for purpose, ids in self.orders:
+            if purpose not in PURPOSES or not ids or not set(ids) <= known:
+                raise ProviderConfigError(
+                    f"The order of models for {purpose!r} must name this provider's models."
+                )
+        if not self.first_for <= set(PURPOSES):
+            raise ProviderConfigError("A provider can be asked first only for known requests.")
 
     @property
     def model(self) -> str:
         """The model used unless it is unavailable."""
         return self.models[0].id
+
+    def models_for(self, purpose: str) -> tuple[ModelSpec, ...]:
+        """The models to ask for a kind of request, in order: its own order, or all of them."""
+        for listed, ids in self.orders:
+            if listed == purpose:
+                by_id = {spec.id: spec for spec in self.models}
+                return tuple(by_id[model_id] for model_id in ids)
+        return self.models
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str]) -> ProviderConfig:
@@ -218,19 +258,22 @@ class ProviderConfig:
         )
 
 
-AIHUBMIX = ProviderConfig()
+#: AIHubMix's one model is made for code. With another provider to write the rest, it
+#: draws the pictures, and its small daily allowance goes on them alone (ADR-039).
+AIHUBMIX = ProviderConfig(first_for=frozenset({"scene"}))
 NVIDIA = ProviderConfig(
     provider_id="nvidia",
     display_name="NVIDIA NIM",
     base_url=NVIDIA_BASE_URL,
     models=NVIDIA_MODELS,
+    orders=NVIDIA_ORDERS,
+    first_for=frozenset(PURPOSES) - {"scene"},
     limits=NVIDIA_LIMITS,
     limits_published=False,
-    # Its models think for a minute or more before the first word (ADR-021). Measured on
-    # 2026-11-20: a lesson's text in about five minutes, a picture in about three, a list
-    # of concepts in about two.
-    quick=False,
-    typical=TypicalSeconds(lesson=300, scene=200, curriculum=130, ask=60, check=45),
+    # With each kind of request at the model that does it soonest (ADR-039), as measured
+    # on 2026-11-21: a lesson's text in about two minutes, a picture in two to three, a
+    # list of concepts in half a minute, an answer in ten seconds.
+    typical=TypicalSeconds(lesson=120, scene=150, curriculum=35, ask=10, check=10),
     # These models think before they answer, and the shared endpoints queue: a small
     # question took forty seconds to begin to be answered when this was written.
     read_timeout_seconds=180.0,

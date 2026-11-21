@@ -1,4 +1,5 @@
-"""Every provider the learner has a key for, each used for what it is good at (ADR-023).
+"""Every provider the learner has a key for, each used for what it is good at (ADR-023,
+ADR-039).
 
 The rules are pure (``generation.routing``); the gateway applies them to real counts and
 real failures. No request in this file leaves the process.
@@ -36,7 +37,7 @@ from adle_core.generation.provider import (
     RequestCancelledError,
 )
 from adle_core.generation.quota import QuotaLimits
-from adle_core.generation.routing import AUTOMATIC, HEAVY_WORK_SHARE, WAITED_FOR, Standing, plan
+from adle_core.generation.routing import AUTOMATIC, PURPOSES, Standing, plan
 from adle_core.infrastructure.orm import ModelUsage
 from tests.support.model import FakeProvider
 
@@ -48,26 +49,24 @@ START = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
 BOTH = "AIHubMix, then NVIDIA NIM if needed"
 
 
-def quick(**changes: Any) -> Standing:
-    """A provider like AIHubMix: quick, with a small daily allowance."""
+def coder(**changes: Any) -> Standing:
+    """A provider like AIHubMix: its model is made for code, so it draws the pictures."""
     values: dict[str, Any] = {
         "provider_id": "aihubmix",
         "name": "AIHubMix",
         "has_key": True,
-        "quick": True,
-        "limited": True,
+        "first_for": frozenset({"scene"}),
     }
     return Standing(**{**values, **changes})
 
 
-def roomy(**changes: Any) -> Standing:
-    """A provider like NVIDIA NIM: slow, with room for a great deal."""
+def writer(**changes: Any) -> Standing:
+    """A provider like NVIDIA NIM: it writes everything but the pictures."""
     values: dict[str, Any] = {
         "provider_id": "nvidia",
         "name": "NVIDIA NIM",
         "has_key": True,
-        "quick": False,
-        "limited": False,
+        "first_for": frozenset(PURPOSES) - {"scene"},
     }
     return Standing(**{**values, **changes})
 
@@ -77,70 +76,71 @@ def roomy(**changes: Any) -> Standing:
 
 @pytest.mark.parametrize("purpose", ["ask", "curriculum", "lesson", "scene", "check"])
 def test_one_provider_chosen_is_the_whole_plan_whatever_has_happened_to_it(purpose: str) -> None:
-    standings = [quick(), roomy(has_key=False, spent=True, resting=True)]
+    standings = [coder(), writer(has_key=False, spent=True, resting=True)]
     found = plan(purpose, "nvidia", standings)
     assert found.provider_ids == ("nvidia",)
     assert (found.automatic, found.reason, found.sentence) == (False, "", "NVIDIA NIM")
 
 
-@pytest.mark.parametrize("purpose", sorted(WAITED_FOR))
-def test_what_the_learner_waits_for_goes_to_the_quick_provider_first(purpose: str) -> None:
-    # However much of its day is gone, as long as something is left.
-    found = plan(purpose, AUTOMATIC, [quick(used=0.97), roomy()])
+def test_pictures_go_first_to_the_provider_whose_model_is_made_for_code() -> None:
+    # However much of its day is gone, as long as something is left: it is kept for these.
+    found = plan("scene", AUTOMATIC, [coder(used=0.97), writer()])
     assert found.provider_ids == ("aihubmix", "nvidia")
     assert found.automatic is True
     assert found.sentence == BOTH
-    assert found.reason == "AIHubMix is faster, and you’re waiting on this."
+    assert found.reason == "AIHubMix draws the pictures: its model is made for code."
 
 
-@pytest.mark.parametrize("purpose", ["lesson", "scene"])
-def test_long_work_goes_to_the_quick_provider_only_while_most_of_its_day_is_unused(
+@pytest.mark.parametrize("purpose", ["ask", "curriculum", "lesson", "check"])
+def test_everything_else_goes_first_to_the_other_and_the_coder_is_kept_for_pictures(
     purpose: str,
 ) -> None:
-    early = plan(purpose, AUTOMATIC, [quick(used=HEAVY_WORK_SHARE - 0.01), roomy()])
-    assert early.provider_ids == ("aihubmix", "nvidia")
-    assert "plenty of allowance left today" in early.reason
+    found = plan(purpose, AUTOMATIC, [coder(), writer()])
+    # The one kept for pictures is still there to fall back on.
+    assert found.provider_ids == ("nvidia", "aihubmix")
+    assert found.sentence == "NVIDIA NIM, then AIHubMix if needed"
+    assert found.reason == "NVIDIA NIM writes this, and AIHubMix is kept for the pictures."
 
-    later = plan(purpose, AUTOMATIC, [quick(used=HEAVY_WORK_SHARE), roomy()])
-    # The quick one is still there to fall back on: finishing matters more than saving.
-    assert later.provider_ids == ("nvidia", "aihubmix")
-    assert later.sentence == "NVIDIA NIM, then AIHubMix if needed"
-    assert "saved for what you wait on" in later.reason
+
+def test_with_no_preference_between_them_the_first_listed_is_first() -> None:
+    every = frozenset(PURPOSES)
+    found = plan("lesson", AUTOMATIC, [coder(first_for=every), writer(first_for=every)])
+    assert found.provider_ids == ("aihubmix", "nvidia")
+    assert found.reason == ""
 
 
 def test_a_provider_with_nothing_left_today_is_not_in_the_plan_while_another_is() -> None:
-    for purpose in ("ask", "lesson"):
-        found = plan(purpose, AUTOMATIC, [quick(spent=True, used=1.0), roomy()])
-        assert found.provider_ids == ("nvidia",)
-        assert found.sentence == "NVIDIA NIM"
-        assert found.reason == "AIHubMix has no allowance left today."
+    found = plan("scene", AUTOMATIC, [coder(spent=True, used=1.0), writer()])
+    assert found.provider_ids == ("nvidia",)
+    assert found.sentence == "NVIDIA NIM"
+    assert found.reason == "AIHubMix has no allowance left today."
 
 
 def test_a_provider_that_just_failed_is_asked_second_not_dropped() -> None:
-    found = plan("ask", AUTOMATIC, [quick(resting=True), roomy()])
+    found = plan("scene", AUTOMATIC, [coder(resting=True), writer()])
     assert found.provider_ids == ("nvidia", "aihubmix")
     assert found.reason == "AIHubMix couldn’t answer earlier, so it’s paused for now."
     # And when both failed a moment ago there is still a plan.
-    assert plan("ask", AUTOMATIC, [quick(resting=True), roomy(resting=True)]).provider_ids
+    assert plan("ask", AUTOMATIC, [coder(resting=True), writer(resting=True)]).provider_ids
 
 
 def test_when_every_provider_is_spent_the_first_says_so() -> None:
-    found = plan("lesson", AUTOMATIC, [quick(spent=True), roomy(spent=True)])
+    found = plan("lesson", AUTOMATIC, [coder(spent=True), writer(spent=True)])
     assert found.provider_ids == ("aihubmix",)
     assert found.reason == ""
 
 
 def test_only_providers_with_a_key_are_ever_planned() -> None:
-    assert plan("ask", AUTOMATIC, [quick(has_key=False), roomy()]).provider_ids == ("nvidia",)
-    assert plan("lesson", AUTOMATIC, [quick(), roomy(has_key=False)]).provider_ids == ("aihubmix",)
+    assert plan("ask", AUTOMATIC, [coder(has_key=False), writer()]).provider_ids == ("nvidia",)
+    assert plan("lesson", AUTOMATIC, [coder(), writer(has_key=False)]).provider_ids == ("aihubmix",)
     # With no key anywhere the first provider is named, so the refusal can say whose key.
-    nobody = plan("lesson", AUTOMATIC, [quick(has_key=False), roomy(has_key=False)])
+    nobody = plan("lesson", AUTOMATIC, [coder(has_key=False), writer(has_key=False)])
     assert nobody.provider_ids == ("aihubmix",)
     assert nobody.automatic is True
 
 
 def test_a_choice_adle_does_not_know_is_treated_as_automatic() -> None:
-    assert plan("ask", "somewhere-else", [quick(), roomy()]).automatic is True
+    assert plan("ask", "somewhere-else", [coder(), writer()]).automatic is True
 
 
 _standing = st.builds(
@@ -148,8 +148,7 @@ _standing = st.builds(
     provider_id=st.sampled_from(["a", "b", "c", "d"]),
     name=st.sampled_from(["A", "B", "C", "D"]),
     has_key=st.booleans(),
-    quick=st.booleans(),
-    limited=st.booleans(),
+    first_for=st.frozensets(st.sampled_from(PURPOSES)),
     used=st.floats(min_value=0, max_value=1.5),
     spent=st.booleans(),
     resting=st.booleans(),
@@ -286,24 +285,24 @@ def test_with_both_keys_each_kind_of_request_goes_where_it_is_best_served(
     assert gateway.has_key is True
 
     answer = gateway.complete(request("ask"))
-    assert (answer.provider_name, answer.instead_of_provider) == ("AIHubMix", "")
+    assert (answer.provider_name, answer.instead_of_provider) == ("NVIDIA NIM", "")
+    gateway.complete(request("curriculum"))
     gateway.complete(request("lesson"))
-    assert fleet.urls == [AIHUBMIX_URL, AIHUBMIX_URL]
+    assert gateway.complete(request("scene")).provider_name == "AIHubMix"
+    assert fleet.urls == [NVIDIA_URL, NVIDIA_URL, NVIDIA_URL, AIHUBMIX_URL]
 
-    # Half of the quick provider's day is gone: long work moves, questions stay.
+    # However much of its day is gone, the pictures stay with the model made for code.
     limits = gateway.limits_for(AIHUBMIX)
     spend(services, "aihubmix", limits.requests_per_day // 2)
+    assert gateway.complete(request("scene")).provider_name == "AIHubMix"
     assert gateway.complete(request("lesson")).provider_name == "NVIDIA NIM"
-    assert gateway.complete(request("scene")).provider_name == "NVIDIA NIM"
-    assert gateway.complete(request("ask")).provider_name == "AIHubMix"
-    assert fleet.urls[2:] == [NVIDIA_URL, NVIDIA_URL, AIHUBMIX_URL]
 
 
 def test_a_key_still_only_ever_goes_to_the_provider_it_was_given_for(services: Services) -> None:
     fleet = Fleet()
     fleet.failing[AIHUBMIX_URL] = 500
     gateway, _, _ = automatic(services, fleet)
-    gateway.complete(request("ask"))
+    gateway.complete(request("scene"))
     gateway.complete(request("lesson"))
     assert dict(fleet.calls) == {
         AIHUBMIX_URL: f"Bearer {AIHUBMIX_KEY}",
@@ -320,7 +319,7 @@ def test_when_the_first_provider_cannot_answer_the_next_is_asked_and_it_is_said(
     said: list[tuple[str, str, str]] = []
 
     answer = gateway.complete(
-        request("ask"), on_fallback=lambda *told: said.append((told[0], told[1], told[2]))
+        request("scene"), on_fallback=lambda *told: said.append((told[0], told[1], told[2]))
     )
     assert said == [("AIHubMix", "NVIDIA NIM", "unreachable")]
     assert (answer.provider_name, answer.instead_of_provider) == ("NVIDIA NIM", "AIHubMix")
@@ -328,13 +327,15 @@ def test_when_the_first_provider_cannot_answer_the_next_is_asked_and_it_is_said(
 
     # For a while the one that failed is asked second, so a lesson does not keep finding
     # out the same thing; then it is first again.
-    assert gateway.plan("ask").provider_ids == ("nvidia", "aihubmix")
-    assert gateway.plan("ask").reason == "AIHubMix couldn’t answer earlier, so it’s paused for now."
+    assert gateway.plan("scene").provider_ids == ("nvidia", "aihubmix")
+    assert (
+        gateway.plan("scene").reason == "AIHubMix couldn’t answer earlier, so it’s paused for now."
+    )
     fleet.failing.clear()
-    assert gateway.complete(request("ask")).provider_name == "NVIDIA NIM"
+    assert gateway.complete(request("scene")).provider_name == "NVIDIA NIM"
     clock.now += PROVIDER_REST + timedelta(seconds=1)
-    assert gateway.plan("ask").provider_ids == ("aihubmix", "nvidia")
-    assert gateway.complete(request("ask")).instead_of_provider == ""
+    assert gateway.plan("scene").provider_ids == ("aihubmix", "nvidia")
+    assert gateway.complete(request("scene")).instead_of_provider == ""
 
 
 @pytest.mark.parametrize(
@@ -348,7 +349,7 @@ def test_whatever_stops_the_first_provider_the_reason_has_words(
     fleet.failing[AIHUBMIX_URL] = status
     gateway, _, _ = automatic(services, fleet)
     said: list[str] = []
-    answer = gateway.complete(request("ask"), on_fallback=lambda *told: said.append(told[2]))
+    answer = gateway.complete(request("scene"), on_fallback=lambda *told: said.append(told[2]))
     assert said == [why]
     assert answer.provider_name == "NVIDIA NIM"
 
@@ -361,25 +362,25 @@ def test_an_account_that_is_refusing_is_left_alone_until_its_key_changes(
     fleet.failing[AIHUBMIX_URL] = 401
     gateway, clock, vault = automatic(services, fleet)
 
-    assert gateway.complete(request("ask")).instead_of_provider == "AIHubMix"
+    assert gateway.complete(request("scene")).instead_of_provider == "AIHubMix"
     # Ten minutes is how long a provider that stumbled is asked second. Not this one.
     clock.now += PROVIDER_REST + timedelta(minutes=1)
-    assert gateway.plan("ask").provider_ids == ("nvidia", "aihubmix")
-    gateway.complete(request("ask"))
+    assert gateway.plan("scene").provider_ids == ("nvidia", "aihubmix")
+    gateway.complete(request("scene"))
     assert fleet.urls.count(AIHUBMIX_URL) == 1
 
     # A new key is a new start, straight away.
     fleet.failing.clear()
     vault.set_api_key("sk-test-another-0123456789abcdef", "aihubmix")
     gateway.forget_trouble("aihubmix")
-    assert gateway.plan("ask").provider_ids == ("aihubmix", "nvidia")
-    assert gateway.complete(request("ask")).provider_name == "AIHubMix"
+    assert gateway.plan("scene").provider_ids == ("aihubmix", "nvidia")
+    assert gateway.complete(request("scene")).provider_name == "AIHubMix"
 
     # And without one, it is asked first again after some hours.
     fleet.failing[AIHUBMIX_URL] = 401
-    gateway.complete(request("ask"))
+    gateway.complete(request("scene"))
     clock.now += ACCOUNT_REST + timedelta(minutes=1)
-    assert gateway.plan("ask").provider_ids == ("aihubmix", "nvidia")
+    assert gateway.plan("scene").provider_ids == ("aihubmix", "nvidia")
 
 
 def test_a_check_that_fails_is_remembered_by_what_is_asked_next(services: Services) -> None:
@@ -389,8 +390,8 @@ def test_a_check_that_fails_is_remembered_by_what_is_asked_next(services: Servic
     with pytest.raises(ProviderKeyRejectedError):
         gateway.complete(request("check"), provider_id="aihubmix")
     # The question that follows does not spend another try finding out the same thing.
-    assert gateway.plan("ask").provider_ids == ("nvidia", "aihubmix")
-    assert gateway.complete(request("ask")).instead_of_provider == ""
+    assert gateway.plan("scene").provider_ids == ("nvidia", "aihubmix")
+    assert gateway.complete(request("scene")).instead_of_provider == ""
     assert fleet.urls == [AIHUBMIX_URL, NVIDIA_URL]
 
 
@@ -402,8 +403,8 @@ def test_an_allowance_that_is_used_up_moves_the_request_on_without_a_rest(
     limits = gateway.limits_for(AIHUBMIX)
     spend(services, "aihubmix", limits.requests_per_day)
     # It is not even in the plan: nothing is sent to it, and nothing has to fail first.
-    assert gateway.plan("ask").provider_ids == ("nvidia",)
-    answer = gateway.complete(request("ask"))
+    assert gateway.plan("scene").provider_ids == ("nvidia",)
+    answer = gateway.complete(request("scene"))
     assert (answer.provider_name, answer.instead_of_provider) == ("NVIDIA NIM", "")
     assert fleet.urls == [NVIDIA_URL]
 
@@ -416,7 +417,7 @@ def test_when_the_last_provider_in_the_plan_fails_too_its_failure_is_the_answer(
     fleet.failing[NVIDIA_URL] = 401
     gateway, _, _ = automatic(services, fleet)
     with pytest.raises(ProviderKeyRejectedError):
-        gateway.complete(request("ask"))
+        gateway.complete(request("scene"))
     assert fleet.urls[0] == AIHUBMIX_URL
     assert fleet.urls[-1] == NVIDIA_URL
 
@@ -480,7 +481,7 @@ def test_one_request_at_a_time_at_each_provider_and_the_other_is_not_held_up(
     gateway, _, _ = automatic(services, fleet)
     first: list[str] = []
     worker = threading.Thread(
-        target=lambda: first.append(gateway.complete(request("ask")).provider_name)
+        target=lambda: first.append(gateway.complete(request("scene")).provider_name)
     )
     worker.start()
     try:
@@ -498,7 +499,7 @@ def test_one_request_at_a_time_at_each_provider_and_the_other_is_not_held_up(
             stop.set()
 
         with pytest.raises(RequestCancelledError):
-            gateway.complete(request("ask"), cancelled=cancelled, on_busy=busy)
+            gateway.complete(request("scene"), cancelled=cancelled, on_busy=busy)
         assert waited_for == ["AIHubMix"]
         assert fleet.urls == [AIHUBMIX_URL]
     finally:
@@ -507,7 +508,7 @@ def test_one_request_at_a_time_at_each_provider_and_the_other_is_not_held_up(
         worker.join(20)
     assert first == ["AIHubMix"]
     # Nothing was left locked behind the request that was given up.
-    assert gateway.complete(request("ask")).provider_name == "AIHubMix"
+    assert gateway.complete(request("scene")).provider_name == "AIHubMix"
 
 
 def test_what_to_expect_is_what_is_usual_until_it_has_been_measured_here(
@@ -595,15 +596,19 @@ def test_the_interface_is_told_where_each_kind_of_request_would_go(client: TestC
     assert both["selection"] == "auto"
     for work in ("ask", "curriculum", "lesson"):
         route = both["routes"][work]
-        assert route["provider_ids"] == ["aihubmix", "nvidia"]
-        assert route["sentence"] == BOTH
+        assert route["provider_ids"] == ["nvidia", "aihubmix"]
+        assert route["sentence"] == "NVIDIA NIM, then AIHubMix if needed"
         assert route["reason"]
+        assert route["model_name"] == NVIDIA.models_for(work)[0].name
         assert (route["wait_seconds"] > 0, route["wait_measured"]) == (True, False)
-    # A lesson is its text and its pictures; a question is one short answer.
+    pictures = both["routes"]["scene"]
+    assert pictures["provider_ids"] == ["aihubmix", "nvidia"]
+    assert (pictures["sentence"], pictures["model_name"]) == (BOTH, "Coding Kimi K3 (free)")
+    # A lesson is long to write; a question is one short answer.
     assert both["routes"]["lesson"]["wait_seconds"] > both["routes"]["ask"]["wait_seconds"]
-    assert [(choice["in_use"], choice["quick"]) for choice in both["providers"]] == [
-        (True, True),
-        (True, False),
+    assert [(choice["in_use"], choice["first_for"]) for choice in both["providers"]] == [
+        (True, ["scene"]),
+        (True, ["ask", "check", "curriculum", "lesson"]),
     ]
     assert [choice["usage"]["provider_id"] for choice in both["providers"]] == [
         "aihubmix",
@@ -615,8 +620,9 @@ def test_the_interface_is_told_where_each_kind_of_request_would_go(client: TestC
     assert alone["routes"]["ask"]["sentence"] == "NVIDIA NIM"
     assert alone["routes"]["ask"]["reason"] == ""
     assert [choice["in_use"] for choice in alone["providers"]] == [False, True]
-    # A slow provider is expected to be slow, and says so before the learner waits.
-    assert alone["routes"]["lesson"]["wait_seconds"] > both["routes"]["lesson"]["wait_seconds"]
+    # With NVIDIA alone it draws the pictures too, with its model for code.
+    assert alone["routes"]["scene"]["sentence"] == "NVIDIA NIM"
+    assert alone["routes"]["scene"]["model_name"] == "Kimi K3.1 Pro"
 
     assert choose(client, "auto") == 204
     assert client.get("/v1/provider").json()["selection"] == "auto"
@@ -636,7 +642,7 @@ def test_a_key_can_be_checked_and_the_check_goes_to_that_provider_alone(
     assert job.status == "succeeded", job.error_message
     assert job.result["kind"] == "provider_check"
     assert (job.result["provider_id"], job.result["provider"]) == ("nvidia", "NVIDIA NIM")
-    assert job.result["model"] == NVIDIA.models[0].name
+    assert job.result["model"] == NVIDIA.models_for("check")[0].name
     assert job.result["seconds"] >= 0
     assert provider.urls == [NVIDIA_URL]
     assert provider.authorizations == [f"Bearer {NVIDIA_KEY}"]
@@ -705,14 +711,14 @@ def test_long_work_under_way_can_be_seen_from_anywhere(
 
 
 def test_the_reason_is_about_the_provider_that_is_away_not_the_one_that_is_used() -> None:
-    """Long work, the quick one more than half used, and the one with room unable to answer."""
-    resting = plan("lesson", AUTOMATIC, [quick(used=0.8), roomy(resting=True)])
+    """A lesson, and the provider meant for it unable to answer."""
+    resting = plan("lesson", AUTOMATIC, [coder(used=0.8), writer(resting=True)])
     assert resting.provider_ids == ("aihubmix", "nvidia")
     assert resting.reason == "NVIDIA NIM couldn’t answer earlier, so it’s paused for now."
-    spent = plan("lesson", AUTOMATIC, [quick(used=0.8), roomy(spent=True)])
+    spent = plan("lesson", AUTOMATIC, [coder(used=0.8), writer(spent=True)])
     assert spent.provider_ids == ("aihubmix",)
     assert spent.reason == "NVIDIA NIM has no allowance left today."
-    # Nothing untrue is said of the quick one while it can answer.
+    # Nothing untrue is said of the one that is asked instead.
     assert "AIHubMix couldn’t" not in resting.reason + spent.reason
 
 
@@ -750,7 +756,7 @@ def test_what_a_request_finds_out_with_the_old_key_is_not_held_against_the_new_o
     thread.join(10)
     assert [type(error) for error in raised] == [ProviderKeyRejectedError]
     # The old key was refused. That says nothing about the new one: it is asked first.
-    assert gateway.plan("ask").provider_ids == ("aihubmix", "nvidia")
+    assert gateway.plan("scene").provider_ids == ("aihubmix", "nvidia")
 
 
 def test_changing_or_removing_a_key_stops_a_check_of_the_key_before_it(

@@ -56,12 +56,14 @@
 }
 
 /* A provider's models, in the order they are asked. */
+/* Which of them writes what is under "Current routing": here they are just named. */
 .models {
   display: flex;
   flex-direction: column;
   gap: var(--ad-space-1);
   margin: 0;
-  padding-left: var(--ad-space-5);
+  padding: 0;
+  list-style: none;
 }
 
 /* A model as its provider names it, beside the name a person would use. */
@@ -177,6 +179,12 @@
 .routes dd {
   margin: 0;
   font: var(--ad-text-body);
+}
+
+.routeModel {
+  display: block;
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-ink);
 }
 
 .routeReason {

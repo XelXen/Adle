@@ -277,8 +277,7 @@ class ModelGateway:
                     provider_id=config.provider_id,
                     name=config.display_name,
                     has_key=client.has_key,
-                    quick=config.quick,
-                    limited=config.limits_published,
+                    first_for=config.first_for,
                     used=max(
                         used.requests_today / limits.requests_per_day,
                         used.tokens_today / limits.tokens_per_day,
@@ -434,18 +433,20 @@ class ModelGateway:
         on_stage: Callable[[str, Stage], None] | None,
         on_piece: Callable[[str], None] | None = None,
     ) -> ChatResult:
-        """One provider: its first model, or the next when that one is away (ADR-021)."""
+        """One provider: its first model for this kind of request, or the next when that one
+        is away (ADR-021, ADR-039)."""
         if not client.has_key:
             raise ProviderKeyMissingError
         config = client.config
-        models = self._models_to_ask(config)
+        order = config.models_for(request.purpose)
+        models = self._models_to_ask(config, order)
         for position, spec in enumerate(models):
             try:
                 result = self._ask(
                     client, spec, request, prompt_tokens, cancelled, on_wait, on_stage, on_piece
                 )
             except (ProviderModelUnavailableError, ProviderRequestRefusedError) as error:
-                if len(config.models) == 1:
+                if len(order) == 1:
                     # Nothing to move on to: the provider's own failure, as it always was.
                     raise
                 # A request is made for one model (``ModelSpec``). One that refuses it
@@ -460,28 +461,26 @@ class ModelGateway:
                         on_fallback(spec.name, models[position + 1].name, why)
                     continue
                 raise NoModelAnsweredError(
-                    config.display_name, [model.name for model in config.models]
+                    config.display_name, [model.name for model in order]
                 ) from error
             self._resting.pop((config.provider_id, spec.id), None)
-            first = config.models[0]
+            first = order[0]
             return result if spec == first else replace(result, instead_of=first.name)
         raise AssertionError("a provider always has a model to ask")  # pragma: no cover
 
-    def _models_to_ask(self, config: ProviderConfig) -> list[ModelSpec]:
-        """The provider's models in order, without those that lately did not answer.
+    def _models_to_ask(self, config: ProviderConfig, order: Sequence[ModelSpec]) -> list[ModelSpec]:
+        """The models in ``order``, without those that lately did not answer.
 
         When every one of them is resting, the one that has rested longest is asked,
         alone: a request should cost one attempt when nothing is known to work, and
         asking a different one each time finds the first to come back.
         """
         now = self._clock()
-        until = {
-            spec.id: self._resting.get((config.provider_id, spec.id)) for spec in config.models
-        }
-        rested = [spec for spec in config.models if (until[spec.id] or now) <= now]
+        until = {spec.id: self._resting.get((config.provider_id, spec.id)) for spec in order}
+        rested = [spec for spec in order if (until[spec.id] or now) <= now]
         if rested:
             return rested
-        return [min(config.models, key=lambda spec: until[spec.id] or now)]
+        return [min(order, key=lambda spec: until[spec.id] or now)]
 
     def _ask(
         self,

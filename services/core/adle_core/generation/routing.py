@@ -4,17 +4,11 @@ Pure rules: no clock, no database, no network. The caller says what the request 
 what the learner chose, and how each provider stands; the answer is the providers to ask,
 in order, and the reason for the order in words a learner can read.
 
-Two providers can differ in exactly the way that matters here. One answers quickly and
-allows little in a day; the other is slow and allows a great deal. Used together, each
-does what it is good at (ADR-023):
-
-* what the learner is sitting and waiting for (a question asked in the middle of a
-  lesson, a list of suggested concepts, a check that a key works) goes to the quick one,
-  for as long as it has any allowance left;
-* long work (a lesson, a picture) goes to the quick one too while most of its day is
-  still unspent, and to the roomy one once it is not, so that the quick one always has
-  something left for what is waited for;
-* if the provider asked cannot answer, the other is asked, and that is said.
+Used together, each provider does what it was measured to do well (ADR-023, ADR-039):
+each says what it is asked first for (``Standing.first_for``). AIHubMix's model is made
+for code, so it draws the pictures, and its small daily allowance goes on them alone;
+NVIDIA writes everything else, with the model that does each soonest. If the provider
+asked cannot answer, the other is asked, and that is said.
 
 None of this happens unless the learner chose it: with one provider selected, that
 provider is the whole plan, whatever happens to it.
@@ -32,14 +26,7 @@ AUTOMATIC = "auto"
 #: What a request is for, as far as choosing a provider goes. ``ask`` is a question the
 #: learner puts to Adle in the middle of a lesson; ``check`` finds out whether a key works.
 Purpose = Literal["ask", "curriculum", "lesson", "scene", "check"]
-
-#: Requests the learner sits and waits for. They go to the quick provider first, always.
-WAITED_FOR: frozenset[str] = frozenset({"ask", "curriculum", "check"})
-
-#: Long work stops going to a provider with a small daily allowance once this share of
-#: either its requests or its tokens is spent, so that what is left is there for the
-#: requests the learner waits for.
-HEAVY_WORK_SHARE = 0.5
+PURPOSES: tuple[Purpose, ...] = ("ask", "curriculum", "lesson", "scene", "check")
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,10 +36,8 @@ class Standing:
     provider_id: str
     name: str
     has_key: bool
-    #: It answers in seconds rather than minutes.
-    quick: bool
-    #: Its daily allowance is small enough to plan around.
-    limited: bool
+    #: What it is asked first for, when the learner lets Adle choose.
+    first_for: frozenset[str] = frozenset(PURPOSES)
     #: The larger of the shares of today's requests and of today's tokens already used.
     used: float = 0.0
     #: Nothing more can be sent to it today.
@@ -93,45 +78,39 @@ def _why_not(standing: Standing) -> str:
     return f"{standing.name} couldn’t answer earlier, so it’s paused for now."
 
 
+def _why_first(purpose: str, first: Standing, others: Sequence[Standing]) -> str:
+    if purpose == "scene":
+        return f"{first.name} draws the pictures: its model is made for code."
+    # Kept for the pictures: asked first for them, and not for this.
+    kept = next(
+        (
+            other
+            for other in others
+            if "scene" in other.first_for and purpose not in other.first_for
+        ),
+        None,
+    )
+    if kept is not None:
+        return f"{first.name} writes this, and {kept.name} is kept for the pictures."
+    return ""
+
+
 def _order(purpose: str, standings: Sequence[Standing]) -> tuple[list[Standing], str]:
     """Usable providers, best first, for this purpose; and why the first is first."""
     usable = [standing for standing in standings if standing.has_key]
     if len(usable) < 2:
         return usable, ""
 
-    quick = [standing for standing in usable if standing.quick]
-    roomy = [standing for standing in usable if not standing.limited]
-    reason = ""
-
-    if purpose in WAITED_FOR:
-        # Quick first, whatever is left of its day.
-        first = [standing for standing in quick if standing.ready]
-        if first:
-            reason = f"{first[0].name} is faster, and you’re waiting on this."
-        elif quick:
-            reason = _why_not(quick[0])
+    meant = [standing for standing in usable if purpose in standing.first_for]
+    first = [standing for standing in meant if standing.ready]
+    if first:
+        others = [standing for standing in usable if standing is not first[0]]
+        reason = _why_first(purpose, first[0], others)
     else:
-        # Quick first only while most of its day is unspent; otherwise it is kept for
-        # the requests the learner waits for.
-        first = [
-            standing
-            for standing in quick
-            if standing.ready and (not standing.limited or standing.used < HEAVY_WORK_SHARE)
-        ]
-        if first:
-            reason = f"{first[0].name} is faster, and has plenty of allowance left today."
-        else:
-            first = [standing for standing in roomy if standing.ready]
-            kept = next((standing for standing in quick if standing.limited), None)
-            if kept is not None and not kept.ready:
-                reason = _why_not(kept)
-            elif first and kept is not None:
-                reason = f"{kept.name}’s remaining allowance is saved for what you wait on."
-            elif not first and roomy:
-                # The one with room cannot be asked just now, so the quick one is asked
-                # after all. The reason given is about the one that is away, not about
-                # the one that is being used.
-                reason = _why_not(roomy[0])
+        # The one meant for this cannot be asked just now: the next that can be is asked
+        # instead. The reason given is about the one that is away, not the one used.
+        first = [standing for standing in usable if standing.ready]
+        reason = _why_not(meant[0]) if meant else ""
 
     chosen = first[:1]
     # Then everything else that can still be asked today, with what is resting last: a

@@ -21,6 +21,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
   told what went wrong; if that one breaks too, the part is explained in words and you are
   told. No more "Couldn't show the animation" in the middle of a lesson for a picture that
   could have been caught.
+- **Each kind of request goes to the model that does it best.** Every model was timed
+  on Adle's own work. With NVIDIA, questions are answered by Nemotron 3.5 Super in about
+  ten seconds (was over a minute), lessons are written by Nemotron 3 Ultra in about two
+  minutes (was four to six), and pictures are drawn by Kimi K3.1 Pro, a model for code.
+  With "Automatic", AIHubMix's coding model draws the pictures and NVIDIA writes
+  everything else, so AIHubMix's small allowance goes on pictures alone. Settings shows
+  which model writes what.
 - **Far fewer sentences.** What a request to an AI provider sends, and where it goes, is one
   press away from the button that sends it (the small "i" beside it) instead of written out
   beside every button; it is still said in full in Settings. What a lesson is made from and

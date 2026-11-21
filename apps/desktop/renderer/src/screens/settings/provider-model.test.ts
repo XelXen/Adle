@@ -17,25 +17,18 @@ describe('modelOrder', () => {
     expect(modelOrder([{ name: 'Coding Kimi K3 (free)' }])).toBe('');
   });
 
-  it('names the stand-ins in order, and promises to say when one was used', () => {
+  it('names every model, says each has its kind of request, and promises to say a stand-in', () => {
     const said = modelOrder([
+      { name: 'Nemotron 3 Ultra' },
+      { name: 'Nemotron 3.5 Super' },
       { name: 'Kimi K3.1 Pro' },
-      { name: 'Mistral Large 4' },
-      { name: 'GLM 5.3 Flash' },
     ]);
     expect(said).toBe(
-      'Uses Kimi K3.1 Pro. If it is unavailable, Mistral Large 4 and GLM 5.3 Flash stand in, ' +
-        'and Adle says so.',
+      'Uses Nemotron 3 Ultra, Nemotron 3.5 Super, and Kimi K3.1 Pro, each for the kind of ' +
+        'request it was measured to do best. When one is unavailable another stands in, and ' +
+        'Adle says so.',
     );
-    // The first is never listed among its own stand-ins.
-    expect(said.indexOf('Kimi K3.1 Pro')).toBe(said.lastIndexOf('Kimi K3.1 Pro'));
-  });
-
-  it('agrees in number with a single stand-in', () => {
-    expect(modelOrder([{ name: 'A' }, { name: 'B' }])).toContain('B stands in');
-    expect(modelOrder([{ name: 'A' }, { name: 'B' }, { name: 'C' }, { name: 'D' }])).toContain(
-      'B, C, and D stand in',
-    );
+    expect(modelOrder([{ name: 'A' }, { name: 'B' }])).toContain('Uses A and B,');
   });
 
   it('says nothing about a provider with no model', () => {
@@ -78,15 +71,25 @@ describe('keyBadge', () => {
 });
 
 describe('providerCharacter', () => {
-  it('describes a provider by the two things automatic goes by', () => {
-    const quickAndSmall = providerCharacter({ quick: true, limits_published: true });
-    expect(quickAndSmall).toContain('Fast');
-    expect(quickAndSmall).toContain('small daily allowance');
-    const slowAndRoomy = providerCharacter({ quick: false, limits_published: false });
-    expect(slowAndRoomy).toContain('Slower');
-    expect(slowAndRoomy).toContain('room for many lessons');
+  it('says what a provider is asked first for with “Automatic”', () => {
+    const coder = providerCharacter({ first_for: ['scene'], limits_published: true });
+    expect(coder).toBe(
+      'With “Automatic”, draws the pictures: its model is made for code. A small daily allowance.',
+    );
+    const writer = providerCharacter({
+      first_for: ['ask', 'check', 'curriculum', 'lesson'],
+      limits_published: false,
+    });
+    expect(writer).toBe('With “Automatic”, writes lessons, suggested concepts and answers.');
+    // A provider asked first for everything has nothing to tell it apart.
+    expect(
+      providerCharacter({
+        first_for: ['ask', 'check', 'curriculum', 'lesson', 'scene'],
+        limits_published: false,
+      }),
+    ).toBe('');
     // It never promises a speed.
-    for (const text of [quickAndSmall, slowAndRoomy]) expect(text).not.toMatch(/\d/);
+    for (const text of [coder, writer]) expect(text).not.toMatch(/\d/);
   });
 });
 
@@ -143,9 +146,10 @@ describe('selectionOptions', () => {
 });
 
 describe('routeLines', () => {
-  const route = (sentence: string, reason = '') => ({
+  const route = (sentence: string, reason = '', model_name = 'A model') => ({
     sentence,
     reason,
+    model_name,
     names: [],
     provider_ids: [],
     wait_seconds: 60,
@@ -157,10 +161,12 @@ describe('routeLines', () => {
       routes: {
         ask: route('AIHubMix, or NVIDIA NIM if AIHubMix cannot answer', 'It answers quickly.'),
         curriculum: route('AIHubMix'),
-        lesson: route('NVIDIA NIM', 'This is long work.'),
+        lesson: route('NVIDIA NIM', 'This is long work.', 'Nemotron 3 Ultra'),
+        scene: route('AIHubMix', 'Its model is made for code.', 'Coding Kimi K3 (free)'),
       },
     });
-    expect(lines.map((line) => line.work)).toEqual(['ask', 'curriculum', 'lesson']);
+    expect(lines.map((line) => line.work)).toEqual(['ask', 'curriculum', 'lesson', 'scene']);
+    expect(lines[3]).toMatchObject({ label: 'Pictures', model: 'Coding Kimi K3 (free)' });
     expect(lines[0]).toMatchObject({
       label: 'Questions',
       destination: 'AIHubMix, or NVIDIA NIM if AIHubMix cannot answer',

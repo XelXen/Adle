@@ -41,8 +41,10 @@ const NVIDIA_KEY = 'nvapi-e2e-not-a-real-key-Qm81xTz5Lp2k';
 const AIHUBMIX = 'AIHubMix (custom endpoint 127.0.0.1)';
 const NVIDIA = 'NVIDIA NIM (custom endpoint 127.0.0.1)';
 const BOTH = `${AIHUBMIX}, then ${NVIDIA} if needed`;
-const KIMI = 'moonshotai/kimi-k3.1-pro';
-const MISTRAL = 'mistralai/mistral-large-4-1t-a52b';
+const ULTRA = 'nvidia/nemotron-3-ultra-550b-a55b';
+const SUPER = 'nvidia/nemotron-3.5-super-vl-120b-a12b';
+/** "Current routing" in Settings: each kind of request, where it goes and which model writes it. */
+const KINDS = ['Questions', 'Suggested concepts', 'Lessons', 'Pictures'];
 
 interface Servers {
   aihubmix: FakeProvider;
@@ -109,15 +111,17 @@ test.describe('the AI providers', () => {
     await expect(providerCard(page, AIHUBMIX)).not.toContainText('In use');
     await expect(providerCard(page, NVIDIA)).not.toContainText('In use');
     await expect(providerCard(page, NVIDIA)).toContainText(servers.nvidia.baseUrl);
-    // The models, in the order they are asked, and what that order means.
+    // The models, and how they are used: each for what it was measured to do best.
     await expect(providerCard(page, NVIDIA).getByRole('list').getByRole('listitem')).toHaveText([
+      /Nemotron 3 Ultra\s*nvidia\/nemotron-3-ultra-550b-a55b/,
+      /Nemotron 3\.5 Super\s*nvidia\/nemotron-3\.5-super-vl-120b-a12b/,
       /Kimi K3\.1 Pro\s*moonshotai\/kimi-k3\.1-pro/,
       /Mistral Large 4\s*mistralai\/mistral-large-4-1t-a52b/,
-      /GLM 5\.3 Flash\s*z-ai\/glm-5\.3-flash/,
     ]);
     await expect(providerCard(page, NVIDIA)).toContainText(
-      'Uses Kimi K3.1 Pro. If it is unavailable, Mistral Large 4 and GLM 5.3 Flash stand in, ' +
-        'and Adle says so.',
+      'Uses Nemotron 3 Ultra, Nemotron 3.5 Super, Kimi K3.1 Pro, and Mistral Large 4, each for ' +
+        'the kind of request it was measured to do best. When one is unavailable another stands ' +
+        'in, and Adle says so.',
     );
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'settings-provider-choice');
@@ -126,7 +130,10 @@ test.describe('the AI providers', () => {
     await saveProviderKey(page, AIHUBMIX, AIHUBMIX_KEY);
     await expect(providerCard(page, AIHUBMIX)).toContainText('In use');
     await expect(providerCard(page, NVIDIA)).toContainText('No key');
-    await expect(routes(page).getByRole('definition')).toHaveText([AIHUBMIX, AIHUBMIX, AIHUBMIX]);
+    await expect(routes(page).getByRole('term')).toHaveText(KINDS);
+    for (const line of await routes(page).getByRole('definition').all()) {
+      await expect(line).toHaveText(`${AIHUBMIX}Coding Kimi K3 (free)`);
+    }
 
     // ---- Choosing NVIDIA alone: everything goes there, and it has no key of its own yet ----
     await choice(page, `${NVIDIA} only`).click();
@@ -147,7 +154,13 @@ test.describe('the AI providers', () => {
 
     await saveProviderKey(page, NVIDIA, NVIDIA_KEY);
     await expect(providerCard(page, NVIDIA)).toContainText('In use');
-    await expect(routes(page).getByRole('definition')).toHaveText([NVIDIA, NVIDIA, NVIDIA]);
+    // One provider, and each kind of request at the model measured to do it best.
+    await expect(routes(page).getByRole('definition')).toHaveText([
+      `${NVIDIA}Nemotron 3.5 Super`,
+      `${NVIDIA}Nemotron 3 Ultra`,
+      `${NVIDIA}Nemotron 3 Ultra`,
+      `${NVIDIA}Kimi K3.1 Pro`,
+    ]);
     expect(await keyStates(page)).toEqual({
       aihubmix: { stored: true, hint: '4Wd1' },
       nvidia: { stored: true, hint: 'Lp2k' },
@@ -177,7 +190,9 @@ test.describe('the AI providers', () => {
 
     // Said while it happens, not only afterwards.
     await expect(
-      page.getByText('Kimi K3.1 Pro isn’t available right now. Asking Mistral Large 4 instead'),
+      page.getByText(
+        'Nemotron 3 Ultra isn’t available right now. Asking Nemotron 3.5 Super instead',
+      ),
     ).toBeVisible({ timeout: 30_000 });
 
     // ---- The choice cannot be changed under work that is under way ----
@@ -195,12 +210,12 @@ test.describe('the AI providers', () => {
     await openCourseTab(page, 'Curriculum');
     const waiting = page.getByText(/suggested 3 concepts\. Nothing is added until you choose/);
     await expect(waiting).toBeVisible({ timeout: 30_000 });
-    await expect(waiting).toContainText(`Mistral Large 4 on ${NVIDIA} suggested 3 concepts`);
+    await expect(waiting).toContainText(`Nemotron 3.5 Super on ${NVIDIA} suggested 3 concepts`);
     await page.getByRole('button', { name: 'Review suggestions' }).click();
     const review = page.getByRole('dialog', { name: 'Suggested concepts' });
-    await expect(review).toContainText(`Suggested by Mistral Large 4 on ${NVIDIA}`);
+    await expect(review).toContainText(`Suggested by Nemotron 3.5 Super on ${NVIDIA}`);
     await expect(review).toContainText(
-      'Kimi K3.1 Pro wasn’t available, so Mistral Large 4 wrote this instead.',
+      'Nemotron 3 Ultra wasn’t available, so Nemotron 3.5 Super wrote this instead.',
     );
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'providers-stand-in');
@@ -210,29 +225,15 @@ test.describe('the AI providers', () => {
     expect(servers.aihubmix.requests).toHaveLength(0);
     // NVIDIA was asked twice: the model that was away, then the next. Each time with
     // NVIDIA's key, and never with the other one.
-    expect(servers.nvidia.requests.map((request) => request.body.model)).toEqual([KIMI, MISTRAL]);
+    expect(servers.nvidia.requests.map((request) => request.body.model)).toEqual([ULTRA, SUPER]);
     expect(servers.nvidia.requests.map((request) => request.authorization)).toEqual([
       `Bearer ${NVIDIA_KEY}`,
       `Bearer ${NVIDIA_KEY}`,
     ]);
-    // Each model was sent only the fields its own reference lists.
-    const [toKimi, toMistral] = servers.nvidia.requests.map((request) => request.body);
-    expect(Object.keys(toKimi!).sort()).toEqual([
-      'max_tokens',
-      'messages',
-      'model',
-      'reasoning_effort',
-      'stream',
-      'stream_options',
-    ]);
-    expect(toKimi!.reasoning_effort).toBe('low');
-    expect(Object.keys(toMistral!).sort()).toEqual([
-      'max_tokens',
-      'messages',
-      'model',
-      'reasoning_effort',
-      'stream',
-    ]);
+    // Each model was sent only the fields it was measured with: the ones every request has.
+    for (const body of servers.nvidia.requests.map((request) => request.body)) {
+      expect(Object.keys(body).sort()).toEqual(['max_tokens', 'messages', 'model', 'stream']);
+    }
 
     await review.getByRole('button', { name: 'Add 3 concepts' }).click();
     await expect(review).toBeHidden();
@@ -292,19 +293,32 @@ test.describe('the AI providers', () => {
     await expect(choice(page, 'Automatic')).toHaveAttribute('aria-pressed', 'true');
     await expect(providerCard(page, AIHUBMIX)).toContainText('In use');
     await expect(providerCard(page, NVIDIA)).toContainText('In use');
-    // Said before anything is sent, with the reason: the quick one first, the other behind it.
-    await expect(routes(page).getByRole('term')).toHaveText([
-      'Questions',
-      'Suggested concepts',
-      'Lessons',
-    ]);
-    for (const line of await routes(page).getByRole('definition').all()) {
-      await expect(line).toContainText(BOTH);
+    // Said before anything is sent, with the reason: AIHubMix's model for code draws the
+    // pictures; NVIDIA writes everything else, each kind with its own model.
+    const writes = `${NVIDIA}, then ${AIHUBMIX} if needed`;
+    await expect(routes(page).getByRole('term')).toHaveText(KINDS);
+    const lines = routes(page).getByRole('definition');
+    for (const [index, model] of [
+      'Nemotron 3.5 Super',
+      'Nemotron 3 Ultra',
+      'Nemotron 3 Ultra',
+    ].entries()) {
+      await expect(lines.nth(index)).toContainText(writes);
+      await expect(lines.nth(index)).toContainText(model);
+      await expect(lines.nth(index)).toContainText(
+        `${NVIDIA} writes this, and ${AIHUBMIX} is kept for the pictures.`,
+      );
     }
-    await expect(routes(page)).toContainText(`${AIHUBMIX} is faster, and you’re waiting on this.`);
-    await expect(providerCard(page, AIHUBMIX)).toContainText('Fast, with a small daily allowance.');
+    await expect(lines.nth(3)).toContainText(BOTH);
+    await expect(lines.nth(3)).toContainText('Coding Kimi K3 (free)');
+    await expect(lines.nth(3)).toContainText(
+      `${AIHUBMIX} draws the pictures: its model is made for code.`,
+    );
+    await expect(providerCard(page, AIHUBMIX)).toContainText(
+      'With “Automatic”, draws the pictures: its model is made for code. A small daily allowance.',
+    );
     await expect(providerCard(page, NVIDIA)).toContainText(
-      'Slower, with room for many lessons a day.',
+      'With “Automatic”, writes lessons, suggested concepts and answers.',
     );
     // Already on automatic, so there is nothing to suggest.
     await expect(page.getByText('You have keys for both providers')).toHaveCount(0);
@@ -314,7 +328,7 @@ test.describe('the AI providers', () => {
     // ---- Checking a key: one word from that provider, and from no other ----
     await providerCard(page, NVIDIA).getByRole('button', { name: 'Test key' }).click();
     await expect(providerCard(page, NVIDIA).getByRole('status')).toContainText(
-      /The key works\. Kimi K3\.1 Pro answered in /,
+      /The key works\. Nemotron 3\.5 Super answered in /,
       { timeout: 30_000 },
     );
     expect(servers.nvidia.requests.map((request) => request.kind)).toEqual(['check']);
@@ -336,10 +350,11 @@ test.describe('the AI providers', () => {
     expect(servers.aihubmix.requests.map((request) => request.kind)).toEqual(['check']);
     expect(servers.nvidia.requests).toHaveLength(1);
     // What the check found is not found out again at the cost of another request: a
-    // provider whose key was refused is asked second from now on, and the settings say why.
+    // provider whose key was refused is asked second from now on, even for the pictures it
+    // would draw, and the settings say why.
     const afterwards = `${NVIDIA}, then ${AIHUBMIX} if needed`;
-    await expect(routes(page).getByRole('definition').first()).toContainText(afterwards);
-    await expect(routes(page)).toContainText(
+    await expect(lines.nth(3)).toContainText(afterwards);
+    await expect(lines.nth(3)).toContainText(
       `${AIHUBMIX} couldn’t answer earlier, so it’s paused for now.`,
     );
 
@@ -350,8 +365,8 @@ test.describe('the AI providers', () => {
     const both = await openWhatIsSent(page);
     await expect(both).toContainText(`to ${afterwards}.`);
     await closeWhatIsSent(page);
-    // None of NVIDIA's three models answers.
-    servers.nvidia.queue({ status: 500 }, { status: 500 }, { status: 500 });
+    // None of the four NVIDIA models that write suggestions answers.
+    servers.nvidia.queue({ status: 500 }, { status: 500 }, { status: 500 }, { status: 500 });
     await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
 
     // The learner stayed where they were, so the suggestions open by themselves when they
@@ -369,6 +384,7 @@ test.describe('the AI providers', () => {
     // NVIDIA: the check, then the suggestions, asked of each of its models in turn.
     expect(servers.nvidia.requests.map((request) => request.kind)).toEqual([
       'check',
+      'curriculum',
       'curriculum',
       'curriculum',
       'curriculum',

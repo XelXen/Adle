@@ -142,6 +142,7 @@ _REQUESTS_FOR = {
     "lesson": ("lesson",),
     "curriculum": ("curriculum",),
     "ask": ("ask",),
+    "scene": ("scene",),
 }
 #: What a model is seen to be doing while its answer is on the way, in the learner's words.
 _STAGES = {"thinking": "thinking", "writing": "writing"}

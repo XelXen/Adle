@@ -194,6 +194,7 @@ function RoutesCard({ status }: { status: ProviderStatus }) {
                   <dt>{line.label}</dt>
                   <dd>
                     {line.destination}
+                    {line.model ? <span className={styles.routeModel}>{line.model}</span> : null}
                     {line.reason ? <span className={styles.routeReason}>{line.reason}</span> : null}
                   </dd>
                 </div>
@@ -254,15 +255,15 @@ function ProviderCard({
               <dd className={styles.mono}>{choice.base_url}</dd>
             </div>
             <div>
-              <dt>{choice.models.length > 1 ? 'Models, in order' : 'Model'}</dt>
+              <dt>{choice.models.length > 1 ? 'Models' : 'Model'}</dt>
               <dd>
-                <ol className={styles.models}>
+                <ul className={styles.models}>
                   {choice.models.map((model) => (
                     <li key={model.id}>
                       {model.name} <span className={styles.modelId}>{model.id}</span>
                     </li>
                   ))}
-                </ol>
+                </ul>
               </dd>
             </div>
           </dl>

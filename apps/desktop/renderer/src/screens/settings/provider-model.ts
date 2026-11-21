@@ -10,19 +10,19 @@ function listed(names: readonly string[]): string {
 }
 
 /**
- * Which model a provider's requests go to, and which stand in for it, in a sentence.
+ * How a provider with several models uses them, in a sentence.
  *
- * This is said where the learner sees the provider, before anything is sent, because
- * a stand-in is still somewhere their text goes. Keep it true to `ModelGateway` in the core.
+ * This is said where the learner sees the provider, before anything is sent, because a
+ * stand-in is still somewhere their text goes. Which model writes each kind of request
+ * is in "Current routing". Keep it true to `ModelGateway` in the core (ADR-039).
  */
 export function modelOrder(models: readonly { name: string }[]): string {
   const names = models.map((model) => model.name);
-  const [first, ...others] = names;
-  if (first === undefined) return '';
-  if (others.length === 0) return '';
-  return `Uses ${first}. If it is unavailable, ${listed(others)} ${
-    others.length === 1 ? 'stands' : 'stand'
-  } in, and Adle says so.`;
+  if (names.length < 2) return '';
+  return (
+    `Uses ${listed(names)}, each for the kind of request it was measured to do best. ` +
+    'When one is unavailable another stands in, and Adle says so.'
+  );
 }
 
 /** The page where a key for a provider is made, where Adle knows one. */
@@ -50,16 +50,19 @@ export function keyBadge(state: ProviderKeyState | undefined): {
     : { text: 'No key', tone: undefined };
 }
 
-/** What kind of provider this is, in a sentence: what "automatic" goes by. */
+/** What a provider is for, in a sentence: what "Automatic" goes by (ADR-039). */
 export function providerCharacter(
-  choice: Pick<ProviderChoice, 'quick' | 'limits_published'>,
+  choice: Pick<ProviderChoice, 'first_for' | 'limits_published'>,
 ): string {
-  if (choice.quick) {
-    return choice.limits_published ? 'Fast, with a small daily allowance.' : 'Fast.';
+  const allowance = choice.limits_published ? ' A small daily allowance.' : '';
+  const first = new Set<string>(choice.first_for);
+  if (first.size === 1 && first.has('scene')) {
+    return `With “Automatic”, draws the pictures: its model is made for code.${allowance}`;
   }
-  return choice.limits_published
-    ? 'Slower: its models reason before they answer.'
-    : 'Slower, with room for many lessons a day.';
+  if (!first.has('scene') && first.has('lesson')) {
+    return `With “Automatic”, writes lessons, suggested concepts and answers.${allowance}`;
+  }
+  return allowance.trim();
 }
 
 /**
@@ -124,21 +127,25 @@ export interface RouteLine {
   destination: string;
   /** Why there, when there was something to decide. */
   reason: string;
+  /** The model that writes it there. */
+  model: string;
 }
 
 const WORK_LABELS: Record<Work, string> = {
   ask: 'Questions',
   curriculum: 'Suggested concepts',
   lesson: 'Lessons',
+  scene: 'Pictures',
 };
 
 /** Where each kind of request would go at this moment, as the core says. */
 export function routeLines(status: Pick<ProviderStatus, 'routes'>): RouteLine[] {
-  return (['ask', 'curriculum', 'lesson'] as const).map((work) => ({
+  return (['ask', 'curriculum', 'lesson', 'scene'] as const).map((work) => ({
     work,
     label: WORK_LABELS[work],
     destination: status.routes[work].sentence,
     reason: status.routes[work].reason,
+    model: status.routes[work].model_name,
   }));
 }
 

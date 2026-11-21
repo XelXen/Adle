@@ -91,8 +91,31 @@ real provider), one request at a time:
 | A curriculum of ten to twelve concepts | Kimi K3.1 Pro | 2.1 min | 1.2 min |
 | The same | Mistral Large 4 | 5 min | not timed |
 
+### Every model, every kind of request (2026-11-21)
+
+Each model NVIDIA lists for chat was asked once for each kind of request, through Adle's
+own prompts (`scripts/dev/benchmark_models.py`, by hand). "Usable" means Adle could take
+what came back as it was; a scene file passed the static rules (whether it runs is tried
+in the player since ADR-038). Times from the request to the end of the answer:
+
+| Model | A question | Suggested concepts | A lesson's words | A scene file | An interactive scene |
+|---|---|---|---|---|---|
+| Nemotron 3 Ultra (550B) | 8 s | 30 s, 8 concepts | 113 s, 10 parts, 2 pictures | 20 s | 10 s |
+| Nemotron 3.5 Super (120B) | 7 s | 39 s, 6 concepts | not usable (fields left out) | 93 s | empty |
+| Kimi K3.1 Pro | 66 s | 123 s | 254 s, 8 parts, 1 picture | 134 s | 151 s |
+| Laguna XS 2.1 | 2 s (one wrong statement) | 14 s, 10 concepts | not usable (titles left out) | 9 s | 12 s |
+| Mistral Large 4 | 144 s | not asked | not asked | not asked | not asked |
+| GLM 5.3 Flash | 151 s | not asked | not asked | not asked | not asked |
+
+Others were not usable for a question at all: Nemotron 3.5 Lightning spent its whole
+allowance thinking; Nemotron 3.5 Bolt answered in a sentence; Step 5 Preview took 33 s for
+a question and eight minutes for concepts; MiniMax M3.1 Flash (81 s), Muse Glimmer (205 s)
+and Gemma 4 (no answer) were slower still. Each kind of request now goes first to the model
+that did it well and soonest (ADR-039), so with NVIDIA a lesson's words take about two
+minutes, a question about ten seconds.
+
 A whole lesson is the text and one or two scenes: nine to twelve minutes when every answer
-is usable as first written. Adle cannot make a model quicker. **What the learner waits for
+was written by Kimi, about five with each request at its own model. Adle cannot make a model quicker. **What the learner waits for
 is the text only** (ADR-031): the lesson can be started when that is written, about five to
 six minutes in, and each picture appears in it when it is drawn. Besides: the work is a
 job that leaves the app usable, the job says what the model is doing ("thinking it
