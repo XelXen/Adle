@@ -240,6 +240,16 @@ A build machine is not a learner's computer, and has to be given a few things:
   itself is on in every case.
 - **Nothing, for sound.** GitHub's Windows machine lists voices and has nowhere to play
   them. The journey that reads aloud asks the machine what it can do and follows.
+- **Somebody to notify.** The Linux machine's session has no notification service, and the
+  app, asked whether a notification could be shown, rightly hears no and shows none. The
+  launch helper already stands in for the showing; it answers that question too, with yes.
+- **Time for its first frames.** Drawing without a graphics card on a busy machine, a
+  window was seen to take more than five seconds over its first two frames. The launch
+  helper asks up to six times before it calls a launch one that does not paint.
+
+A profile on Linux also holds links that lead nowhere (Chromium writes who holds the
+profile into the name a link points at), so the helper that searches a profile for a key
+reads a link as what it is and does not follow it.
 
 When the app does not come up, the start-up check says what the app wrote to its error
 output and how its two logs end, and stops as soon as the app has closed instead of waiting
