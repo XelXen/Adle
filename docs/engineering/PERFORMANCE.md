@@ -65,6 +65,18 @@ The largest parts of the core are SQLAlchemy (20 MB with bytecode), lxml (10 MB,
 files), and Pydantic's compiled core (6 MB). Tests, Tk, IDLE, pip, and headers are left out
 of the Python that ships.
 
+Those figures are this computer's, Windows. What GitHub's machines built for
+0.1.0-alpha.1, and what a person downloads (commit `a812d34`, 2026-11-21):
+
+| System | The folder | of which the core | Downloaded as |
+|---|---|---|---|
+| Windows (x64) | 463 MB | 96 MB | `setup.exe`, 133 MB |
+| macOS (Apple) | 386 MB | 119 MB | `.dmg`, 151 MB |
+| macOS (Intel) | 384 MB | 110 MB | `.dmg`, 156 MB |
+| Linux (x64) | 431 MB | 148 MB | `.deb`, 126 MB; `.tar.gz`, 171 MB |
+
+Installed on a machine that did not build it and started on an empty profile, the service was up after 1.7 s on Windows, 3.0 s and 2.1 s on macOS (Apple, Intel) and 3.0 s on Linux. The core is larger on macOS and Linux than on Windows because the Python there carries its library twice, once inside the program and once beside it (17 to 31 MB each).
+
 ## Waiting for a real model
 
 Everything above is Adle's own time. Once a learner asks for a lesson, almost all of the
@@ -100,7 +112,8 @@ that model is left alone for ten.
   (`ingestion/types.py`) and runs outside the service, so it cannot hold the interface up;
   how long a 300-page PDF takes was not timed.
 - **Memory.** Not profiled. Each scene runs in its own process, which ends with the frame.
-- **Other machines and other operating systems.** One laptop, one system.
+- **Other machines and other operating systems.** One laptop, one system, for every timing
+  in this document except the first starts on GitHub's machines above.
 
 ## The end-to-end suite as a timing check
 

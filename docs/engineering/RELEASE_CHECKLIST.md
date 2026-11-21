@@ -1,12 +1,24 @@
 # Release checklist
 
-Two parts: what to do each time a build is made for someone else, and where Adle stands
-against the acceptance list in `PLAN.md` section 17. A status is one of `PASS`, `FAIL`,
+Three parts: how a version is published, how a build is made by hand, and where Adle
+stands against the acceptance list in `PLAN.md` section 17. A status is one of `PASS`, `FAIL`,
 `NOT RUN`, or `BLOCKED`, and each has the evidence beside it. Nothing is inferred.
 
 - **Last filled in:** 2026-11-21, on Windows 11, for the tree described in `PROJECT_STATE.md`.
 
-## Making a build
+## Publishing a version
+
+GitHub does it, from a tag (ADR-034; the steps for a person are in `CONTRIBUTING.md` →
+Releasing). Nothing is built or uploaded by hand.
+
+| Step | Where | What it proves |
+|---|---|---|
+| 1. The version, its section in the changelog, and green CI on `dev` | `npm run release:notes`; the CI run of that commit | The notes exist; every journey passed on Windows and on Linux; every installer was built and tried out on its own system, where it was built and where it was not |
+| 2. `main` moved forward to that commit, and a tag `v<version>` pushed | `git push origin main`, `git push origin v<version>` | What is released is a commit anyone can read |
+| 3. The Release workflow | `.github/workflows/release.yml` | The tag is the version and the changelog has it; the installers are built again from the tag and tried out again; checksums are written; the release is published (as a pre-release when the version has a hyphen) |
+| 4. Download one and open it | The release page | A person has looked at what people will get |
+
+## Making a build by hand
 
 Run from the repository root, on the operating system the build is for.
 
@@ -21,23 +33,23 @@ Run from the repository root, on the operating system the build is for.
 | 7. The release build | `npm run package` | The same build, with the debugger switches off |
 | 8. The release build starts | `npm run package:check` | Fuses set; will not run as Node; starts on an empty profile with nothing borrowed from the computer; no orphaned service |
 | 9. Timings, if anything on the paths changed | `node scripts/measure.mjs --packaged` | The figures in `PERFORMANCE.md` still hold |
-| 10. Try it by hand | Open `apps/desktop/out/release/…/Adle`, add the sample course, take a lesson | A person has looked at it |
+| 10. The installer | `npm run installer` | The folder wrapped the way this system installs things (Windows needs Inno Setup) |
+| 11. Try it by hand | Open `apps/desktop/out/release/…/Adle`, add the sample course, take a lesson | A person has looked at it |
 
-The output is the folder `apps/desktop/out/release/Adle-<platform>-<arch>/`. It runs where
-it is put. Zip the folder to hand it over.
+The outputs are the folder `apps/desktop/out/release/Adle-<platform>-<arch>/`, which runs
+where it is put, and its installer in `apps/desktop/out/installers/`. Close Adle first if
+it is open from that folder: the folder cannot be rebuilt under it.
 
 ## Before giving it to people who are not developers
 
-None of these is done. Each needs something only the owner has.
-
-| Needed | Why |
-|---|---|
-| A code-signing certificate, and signing in the build | Windows warns about an unsigned program; macOS refuses to open one |
-| An installer (NSIS or MSI; DMG; AppImage) | A folder is not how most people install software |
-| A licence for the project | The repository is marked `UNLICENSED` |
-| A build and a test run on macOS and on Linux | The script has the paths for both and has run on neither |
-| A run on a computer that has never had the project on it | Step 8 strips the environment, which is not the same thing |
-| A generated lesson sat by a person, from start to finish, in the app | A real model has written lessons (Kimi K3.1 Pro through NVIDIA NIM, 2026-11-20), and one was gone through in the app from its first part to "Lesson complete" by a script, in both themes (2026-11-21), which found a picture that did not run and led to a rule that now catches it. A second was written the same day with the lesson opening as soon as its text was ready (ADR-031) and gone through the same way; its interactive picture ran, and it showed a formula without its minus sign at the size a lesson shows pictures, which is mended (ADR-032). Nobody has yet learnt from one. The owner's key has to be typed in by the owner |
+| Needed | Status | Why, and what there is |
+|---|---|---|
+| A licence for the project | PASS | GNU GPL, version 3 (ADR-033); the text travels with every build |
+| An installer for each system | PASS | Made, installed, started and removed on GitHub's machines (`a812d34`): `…-windows-x64-setup.exe`, 133 MB; `…-macos-arm64.dmg`, 151 MB, and `…-macos-x64.dmg`, 156 MB; `…-linux-x64.deb`, 126 MB, and `…-linux-x64.tar.gz`, 171 MB. Not on this computer, which has no Inno Setup. On Ubuntu the tarball is unpacked and not started, because Ubuntu keeps an unpacked app from building its sandbox; the folder it holds is started there by the check of the release build |
+| A build and a test run on macOS and on Linux | PASS (machines); NOT RUN (a person) | Linux: every journey passes on GitHub's Ubuntu machine, and the `.deb` installs and starts on Ubuntu as it ships. macOS: built, signed ad hoc, installed from its disk image and started, on Apple's and on Intel's processors; no journey runs there. Nobody has looked at Adle on either. The window's own title bar (ADR-030) has been seen on Windows 11 only |
+| A run on a computer that has never had the project on it | PASS | On GitHub's machines, `a812d34`: each installer was handed to a second machine of its system that has Node, the scripts that do the trying and nothing else of the project, and was installed, started (the core up within 1.7 to 3.0 s) and removed there. Such a machine still carries more than a new computer does, so on Windows the package's 73 programs and libraries were also read for a runtime library they ask for and do not bring (none). A person installing a release on their own computer: NOT RUN |
+| A code-signing certificate, and signing in the build | NOT RUN | Not done, by the owner's decision (ADR-034). Windows warns about an unsigned program and macOS asks before opening one; the release says what to choose |
+| A generated lesson sat by a person, from start to finish, in the app | NOT RUN | A real model has written lessons (Kimi K3.1 Pro through NVIDIA NIM, 2026-11-20), and one was gone through in the app from its first part to "Lesson complete" by a script, in both themes (2026-11-21), which found a picture that did not run and led to a rule that now catches it. A second was written the same day with the lesson opening as soon as its text was ready (ADR-031) and gone through the same way; its interactive picture ran, and it showed a formula without its minus sign at the size a lesson shows pictures, which is mended (ADR-032). Nobody has yet learnt from one. The owner's key has to be typed in by the owner |
 
 ## The acceptance list (PLAN.md section 17)
 
@@ -58,9 +70,9 @@ None of these is done. Each needs something only the owner has.
 | Quota exhaustion, network loss, TTS failure, Wanim failure, and malformed model output are recoverable | PASS | `e2e/generation` (no key, rate limit, used-up day, provider failure, cancel), `test_model_gateway`, `test_drafts`; `e2e/narration` (no voice); `e2e/lesson` and `e2e/scene-player` (scenes that break or are withheld) |
 | Data export, deletion, backup, and restore are tested | PASS | `e2e/data`, `test_data_copy`, `test_database`, `test_process_lifecycle`. "Export" is a copy of everything; one course alone cannot be exported (ADR-016) |
 | Light and dark themes, accessibility, and reduced motion are tested | PASS, with a gap | `e2e/appearance-a11y` (both themes, axe on every screen, reduced motion in the shell, the window's own title bar); axe on each state in the other specs, and with it that nothing pressable lies where the window is moved. Not tested with a screen reader by a person |
-| CI, unit, integration, E2E, security, and packaging checks pass | PASS locally; CI NOT RUN | The gates above on this machine. The workflow in `.github/` has never run: the repository has no remote |
-| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-032 |
-| Git history is coherent, atomic, and honest | PASS | One Conventional Commit per slice on `dev`, each with its gate results, all signed; nothing pushed |
+| CI, unit, integration, E2E, security, and packaging checks pass | PASS | The gates above on this machine, and on GitHub's: Run on `a812d34`, 2026-11-21, eleven jobs: the gates and unit tests on Linux; every journey on Linux (107 of 107 in 14 minutes) and on Windows (107 in 17 minutes, one of them at its second try: a window that did not paint, which the launch helper is there to catch); and the four installers, each built, installed, started and removed on the machine that built it and again on a machine that did not |
+| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-034 |
+| Git history is coherent, atomic, and honest | PASS | One Conventional Commit per slice on `dev`, each with its gate results, signed where the owner answered the prompt (`git log --format='%h %G? %s'`); on GitHub since 2026-11-21, with no key and nothing of the learner's or the owner's in any commit (the whole history was searched before the first push) |
 
 ## Known limitations
 
@@ -87,8 +99,13 @@ None of these is done. Each needs something only the owner has.
 - **One course cannot be exported alone**, and a saved copy is not encrypted.
 - **Open answers are marked by the learner** against a list of points, and count as lighter
   evidence. The model does not grade.
-- **No installer, no signature, no automatic update.**
-- **Windows only, so far.** Nothing has been run on macOS or Linux. The window's own title
-  bar (ADR-030) in particular has only been seen on Windows 11; Linux keeps its usual frame.
+- **No signature and no automatic update.** Windows and macOS ask before opening a build,
+  and the release says what to choose. To update, install the newer version over the old.
+- **Seen by a person on Windows only.** On Linux every journey passes on GitHub's machine;
+  on macOS the app is built, installed and started there and no journey runs. The window's
+  own title bar (ADR-030) in particular has only been seen on Windows 11; Linux keeps its
+  usual frame.
+- **On Linux a provider's key needs the desktop's keyring** (GNOME Keyring or KWallet).
+  Where there is none Adle says so and does not keep the key.
 - **Failures are not reported to anyone.** If something breaks on a learner's computer, the
   only record is the log on that computer.

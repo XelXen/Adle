@@ -4,7 +4,8 @@ The single place to find out where Adle stands and what to do next. Update it at
 work session (see `AGENTS.md` → "Keeping the next agent oriented").
 
 - **Last updated:** 2026-11-21
-- **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
+- **Branch:** `dev` (all work). `main` is what was last released and only ever moves forward
+  to a commit of `dev`. Both are on GitHub: `github.com/XelXen/Adle`, public, since 2026-11-21
 - **Last commit:** see `git log -1`
 - **Active milestone:** M8 — release hardening, done as far as this machine can take it:
   failure handling (ADR-018), packaging (ADR-019), the licence inventory, the audits, the
@@ -19,17 +20,22 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   that was left from the plan: **a lesson opens as soon as its words are written**, and its
   pictures arrive while the learner studies (ADR-031). Sitting a lesson written that way
   showed a formula without its minus sign, and so: a picture is drawn at a size that suits
-  the frame it is shown in (ADR-032). What is left needs the owner; see "Next actions"
+  the frame it is shown in (ADR-032). And on the same day, at the owner's word: Adle is under
+  the GNU GPL, version 3 (ADR-033); it has installers for Windows, macOS and Linux, built,
+  tried out and published by GitHub (ADR-034); and its first version, 0.1.0-alpha.1, is the
+  tag `v0.1.0-alpha.1`. What is left needs the owner; see "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
-  Nothing is ever pushed.
+- **Pushing and releasing:** push `dev` when a commit is ready; GitHub then runs everything
+  on its own machines (`TESTING.md`, section 5). A version is published by pushing a tag,
+  never by hand: `CONTRIBUTING.md` → Releasing.
 
 ## Milestone status
 
 | Milestone | Status | Evidence / what is missing |
 |---|---|---|
-| M0 — Foundation | **Done** | Workspace, pinned toolchain, lint/type/test gates, docs, ADR process, CI workflow written. CI itself is NOT RUN (no remote yet). |
+| M0 — Foundation | **Done** | Workspace, pinned toolchain, lint/type/test gates, docs, ADR process, CI workflow written. CI has run on GitHub with every push since 2026-11-21. |
 | M1 — Desktop shell and Sprout | **Done** | App launches without a key; welcome, library, settings; key add/remove without exposure; themes; a11y gates. |
 | M2 — Persistence and ingestion | **Done** | Database with safe migrations, backup and restore; import of PDF, DOCX, Markdown, text with provenance; duplicate detection; FTS5 search; course and materials screens. Vector search deliberately not built (ADR-007). |
 | M3 — Curriculum and learner model | **Done** | Concept graph validated on every write (loops, references, order, layers); curriculum screen (list and map; add, edit, reorder, remove; objectives; prerequisites with reasons; links to materials; outline from headings); learner preferences; knowledge as an append-only record folded through BKT into four states with reasons; review scheduling; retrieval with provenance (ADR-009). **Deferred to the lesson work:** working memory and the interaction event log. Answer evidence is exercised through the service in tests; in the app only self-rating can create evidence until questions exist. |
@@ -37,7 +43,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 | M5 — Generation, audio, timeline | **Done** | Provider client, quota, and gateway; curriculum proposals and lessons as cancellable jobs compiled into the Lesson IR (ADR-012); the interface for both with every failure state; narration aloud through the computer's own voices (ADR-013). Two providers, chosen by the learner, each with its own key and count; a provider's next model stands in when its first is not available, and that is always said (ADR-021). Every path is tested against stand-ins. **A real model has written lessons** (Kimi K3.1 Pro and Mistral Large 4 through NVIDIA NIM, 2026-11-20); see "The real providers". |
 | M6 — Assessment and adaptation | **Done** | Hypotheses about mistakes computed from the record (tentative, supported, rejected, resolved), checked with questions that would show them, and dismissible by the learner; slips counted as partly right; repeats counted in full only after a gap; questions kept for practice in the Lesson IR; a next-step policy with a reason for every step; the Learn tab, practice and review, "what next" after a lesson, "This did not help"; teaching strategy chosen or rotated (ADR-014). Not built by decision: model grading of open answers and model-proposed hypotheses. |
 | M7 — Complete UX and sample course | **Done** (two items left as known gaps) | Done: every one of the eight sample concepts has a lesson with scenes, questions tagged with the mistakes their wrong options point at, and practice questions; every lesson is played from start to finish and every scene is run in both themes by the E2E suite. Also done: Settings → Privacy & data can save a copy of everything as one file, restore from one (checked and upgraded before anything is replaced; what is replaced is kept; undoable), and delete everything (ADR-016). Also done: the session summary (ADR-017). Polish done: every outcome of the new screens checked with axe, focus kept after "That was a slip". Left as known gaps, by decision: narration and animation are synchronised per segment (Wanim's slides mode was not tried), and screenshots are saved for review rather than compared against baselines. |
-| M8 — Release hardening | **Done as far as this machine allows** | Done: a crashed or hung page, an uncaught error in the main process, and a core that dies are each handled, with a local log and no reporting (ADR-018). Packaging (ADR-019): a folder that runs by itself, with a private Python for the core, fuses set; the whole end-to-end suite passes against the packaged app, and the release build passes a start-up check from outside. Licence inventory generated and checked in every gate; `npm audit` and `pip-audit` clean; `PERFORMANCE.md` and `RELEASE_CHECKLIST.md` written. **Not done, and not doable here:** an installer and code signing (the owner's certificates), macOS and Linux (no machine), a clean computer, a generated lesson sat by a person (the owner's key is the owner's to type in). |
+| M8 — Release hardening | **Done** (unsigned, by decision), and released as 0.1.0-alpha.1 | Done: a crashed or hung page, an uncaught error in the main process, and a core that dies are each handled, with a local log and no reporting (ADR-018). Packaging (ADR-019): a folder that runs by itself, with a private Python for the core, fuses set; the whole end-to-end suite passes against the packaged app, and the release build passes a start-up check from outside. Licence inventory generated and checked in every gate; `npm audit` and `pip-audit` clean; `PERFORMANCE.md` and `RELEASE_CHECKLIST.md` written. Since 2026-11-21: a licence (ADR-033); installers for Windows, macOS and Linux, built by GitHub, tried out where they are built and again on machines that did not build them; a release published from a tag (ADR-034). **Not done:** signing (the owner's decision), anyone's eyes on it on macOS or Linux, a generated lesson sat by a person (the owner's key is the owner's to type in). |
 
 ## What works in the running app
 
@@ -188,16 +194,26 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   and a private Python for the core that takes nothing from the computer it is on. Everything
   above works in it; the end-to-end suite says so.
 
+- **Installed like any other program** (ADR-034): a setup program on Windows (for one person,
+  no administrator), a disk image on macOS for Apple's and for Intel's processors, a `.deb`
+  and a tarball on Linux. Installing and uninstalling leave the learner's courses and
+  settings alone. Settings → About says under what licence Adle is and leads to it and to
+  the source. Adle never looks for a newer version of itself.
+
 Not present yet (do not assume): a generated lesson sat by a person (one was gone through
 by a script; see "The real providers"), exporting a single course to share (not planned;
-ADR-016), an installer, a signed build.
+ADR-016), a signed build (the owner's decision, ADR-034), anyone's eyes on Adle on a Mac or
+on Linux (GitHub's machines build it, install it and start it there; nobody has looked).
 
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-032, on
-2026-11-21, followed from the same tree by both packaged builds, every journey against the
-packaged app, the start-up check of the release build, and the timings.
+`node scripts/check.mjs --e2e` on the tree that became the commit for the licence and the
+installers (`e9e5b81`), on 2026-11-21, and the fast gates again on every commit after it.
+The rows about the packaged app are from the tree of ADR-032 where they do not say
+otherwise: the release folder was not built again on this computer, because the owner had
+Adle open from it (the build for tests was, and passed its start-up check). What GitHub's
+machines ran is in the rows that name them.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -208,20 +224,21 @@ packaged app, the start-up check of the release build, and the timings.
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 671 tests, 33 files |
+| Vitest | PASS | 673 tests, 34 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 95 source files |
 | pytest | PASS | 1280 tests |
-| Playwright + Electron (E2E) | PASS | 106 tests in 15 minutes, in one run with no retry. 22 of them run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it now also checks that nothing pressable lies where the window is moved |
+| Playwright + Electron (E2E) | PASS | 107 tests in 15 minutes, in one run with no retry. 22 of them run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it now also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
-| GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
+| GitHub Actions CI | PASS | Run on `a812d34`, 2026-11-21, eleven jobs: the gates and unit tests on Linux; every journey on Linux (107 of 107 in 14 minutes) and on Windows (107 in 17 minutes, one of them at its second try: a window that did not paint, which the launch helper is there to catch); and the four installers, each built, installed, started and removed on the machine that built it and again on a machine that did not |
 | Packaged build: every journey (`npm run e2e:packaged`) | PASS | On this tree, 2026-11-21: 105 journeys in 13 minutes, of which 104 passed and 1 passed on its second try. That one told whether a scene was still from two pictures of the page (see Findings); it now compares the scene's own canvas. Its file and the player's, with one journey added, were then run again against the same build: 48 of 48 passed with no retry |
 | Packaged build: release start-up check (`npm run package:check`) | PASS | 2026-11-21: fuses set, will not run as Node, starts on an empty profile with the core up after 3.6 s, nothing in the log of failures, no service left behind |
-| Packaged build on a computer that never had the project | NOT RUN | Needs another machine |
-| Installer, code signing | BLOCKED | Need the owner's certificates |
-| macOS / Linux | NOT RUN | Developed on Windows only. The window's own title bar (ADR-030) has been seen on Windows 11 only |
+| Packaged build on a computer that never had the project | PASS | On GitHub's machines, `a812d34`: each installer was handed to a second machine of its system that has Node, the scripts that do the trying and nothing else of the project, and was installed, started (the core up within 1.7 to 3.0 s) and removed there. Such a machine still carries more than a new computer does, so on Windows the package's 73 programs and libraries were also read for a runtime library they ask for and do not bring (none). A person installing a release on their own computer: NOT RUN |
+| Installers | PASS | Made, installed, started and removed on GitHub's machines (`a812d34`): `…-windows-x64-setup.exe`, 133 MB; `…-macos-arm64.dmg`, 151 MB, and `…-macos-x64.dmg`, 156 MB; `…-linux-x64.deb`, 126 MB, and `…-linux-x64.tar.gz`, 171 MB. Not on this computer, which has no Inno Setup. On Ubuntu the tarball is unpacked and not started, because Ubuntu keeps an unpacked app from building its sandbox; the folder it holds is started there by the check of the release build |
+| Code signing | NOT RUN | Not done, by the owner's decision (ADR-034). Windows and macOS say so to whoever opens a build |
+| macOS / Linux | PASS (machines); NOT RUN (a person) | Linux: every journey passes on GitHub's Ubuntu machine, and the `.deb` installs and starts on Ubuntu as it ships. macOS: built, signed ad hoc, installed from its disk image and started, on Apple's and on Intel's processors; no journey runs there. Nobody has looked at Adle on either. The window's own title bar (ADR-030) has been seen on Windows 11 only |
 | Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: lessons, curricula and answers were written through Adle's own services on 2026-11-20; tried again after the way an answer is read was changed (ADR-029): a key check in 26 seconds and an answer to a question in 88, two requests. See "The real providers" |
 | A lesson a real model wrote, in the app | PASS | By a script, 2026-11-21, twice: a lesson written by Kimi K3.1 Pro, opened from its profile with no key, gone through in both themes from its first part to "Lesson complete", no error in the console. The second was written with the lesson opening when its text was ready (usable after 298 s, its one picture after 541 s); its interactive picture ran, and its formula is whole since ADR-032. Not a person |
 
@@ -302,6 +319,29 @@ investigated, not ignored.
   lies over the stage and answers to a pointer, the real one included when it rests on a
   test's window. The journey now compares the scene's own canvas, and keeps both pictures
   with the report if they ever differ.
+- **A build machine is not a learner's computer, in both directions.** It lacks things a
+  desktop has, and the first runs on GitHub's machines (2026-11-21) found three assumptions,
+  none of them in the app: a Linux machine with no keyring, where Adle rightly refuses to
+  keep a key and the journeys that save one stopped (the test session is now given one); a
+  Windows machine that lists voices and has nowhere to play sound, where the app stands in
+  for the voice as designed and the journey had taken a listed voice for one that can be
+  held; and a virtual display that asks for a right to draw on it, which the start-up check
+  had stripped from the environment along with everything else. And it has things a new
+  computer lacks: everything the app was built from, and the runtime libraries of the tools
+  that build software. So each installer is tried again on a machine that did not build it,
+  and on Windows the import table of every program in the package is read for a part of the
+  Visual C++ runtime the package does not bring (none: 71 programs, 2026-11-21).
+- **The usual tool is not always the small one.** electron-builder, wrapped around a folder
+  Adle already builds, was 290 packages, six advisories and an install script. Each
+  system's own tool (Inno Setup, hdiutil, dpkg-deb) is a few dozen lines (ADR-034).
+- **Copy only a Python you asked for, and copy it once.** The private Python is copied from
+  wherever the core's environment says its Python is. On a machine with a Python of the
+  right version that is `/usr`; the package script refuses anything uv does not manage.
+  And a name that is a link in that installation is copied as the whole program: on Linux
+  the interpreter went in three times and its library twice, until its other names were
+  left out. The build now lists the largest files of the core, so that is seen at once.
+- **A release folder cannot be rebuilt while the app is open from it** (Windows refuses,
+  with `EPERM`, and removes nothing). Close Adle, or use the build for tests.
 - **A screenshot of the page is not the window.** The system's buttons, and how a dimmed
   page looks around them, show only in a picture of the window itself (`PrintWindow`).
 - **A shell string is no place for a backslash.** A regular expression or `\n` passed
@@ -486,23 +526,43 @@ this, and it spends real allowance.
 
 ## Next actions
 
+**Asked for by the owner on 2026-11-21, after looking at this version, and not in it.** Work
+on these began the same day; look at `git log` and at the decisions after ADR-034 for how
+far each has come before starting one again.
+
+- A list of choices that follows the theme (the system's own list showed light words on a
+  light ground in the dark theme), and the same distance between a page's sections
+  everywhere (Materials had none).
+- Far fewer sentences on screen: what a request sends and where it goes said once, where a
+  key is given, and kept one press away, instead of beside every button.
+- Something to watch while a lesson is written, that shows it taking shape.
+- Pictures as the larger part of a lesson: a wide, dark screen, the words being said as
+  captions with the spoken word marked, and a way to fill the whole screen.
+- A picture tried out before a learner sees it, and sent back once with the error it gave
+  if it does not run.
+- Each kind of request sent to the model that is best at it, by measurement (Kimi for
+  pictures only), instead of one order of models for everything.
+- More taken from documents (tables, pictures, more kinds of file), and search by meaning.
+- A natural voice that still runs on this computer (Qwen3-TTS, a smaller and a larger
+  model), with the voice described by the lesson itself where the computer can run the
+  larger one.
+
 What remains needs the owner. In the order it matters:
 
 1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
-   They are in a transcript; treat them as used. Then type the new keys into Settings → AI
-   provider yourself, press "Test key" on each, leave the choice on Automatic, and **sit a
-   generated lesson from start to finish**, asking it a question on the way. Through NVIDIA,
-   expect about six minutes until the lesson can be started; the app offers a break and
-   tells you when. Its pictures follow over the next few minutes and appear in it as they
-   are drawn.
-2. **Top up the AIHubMix account** (its notice says ten tries without one), or remove its
-   key: until then Automatic finds out once that it refuses and uses NVIDIA.
-3. **Push the branch** so that CI runs for the first time, on Windows and Linux (it now runs
-   for `dev` too). Expect surprises on Linux: nothing has run there.
-4. **Choose a licence, get signing certificates, and add an installer** (ADR-019 says what
-   and why). `docs/engineering/RELEASE_CHECKLIST.md` is the list.
-5. **Try the packaged folder on a computer that never had the project**, and on macOS, where
-   the window's own title bar (ADR-030) has never been seen.
+   They are in a transcript; treat them as used. The owner will, later (said 2026-11-21).
+2. **Sit a generated lesson from start to finish**, asking it a question on the way. Install
+   Adle from the release (or `npm run dev`), type a key into Settings → AI provider, press
+   "Test key", leave the choice on Automatic. Through NVIDIA, expect about five minutes until
+   the lesson can be started; the app offers a break and tells you when. Its pictures follow
+   and appear in it as they are drawn.
+3. **AIHubMix** will be topped up by the owner (2026-11-22, they said). Until then Automatic
+   finds out once that it refuses and uses NVIDIA.
+4. **Look at Adle on a Mac.** GitHub's machines build it, install it from the disk image and
+   start it, on Apple's and on Intel's processors; nobody has seen it there. See "On a Mac"
+   below: it is written for whoever opens this repository on one.
+5. **Turn on private vulnerability reporting** for the repository (Settings → Security on
+   GitHub), which `SECURITY.md` points people to. Only the owner can.
 6. Decide whether GLM 5.3 Flash should stay NVIDIA's third model while it does not answer.
 7. Still not built from the plan's section 12.1: **writing a lesson part by part.** Its text
    is one request and arrives whole, about five minutes through NVIDIA (ADR-012, ADR-031).
@@ -513,6 +573,34 @@ What remains needs the owner. In the order it matters:
    build can still be started with Chromium's remote debugging switch; the page can ask for
    the data dialogs again and again; `provider.usage` is a route the interface does not
    call (five tests read it).
+
+## On a Mac (for whoever opens this repository on one)
+
+Nothing below has been done by a person or an agent with a Mac in front of them. What is
+known: on GitHub's Macs (Apple's processor and Intel's) the release build is made, signed
+"ad hoc", wrapped in a disk image, copied out of it, checked file for file against its
+signature, and started with an empty profile, on the machine that built it and on one that
+did not; its core comes up within a few seconds and goes away with it. The end-to-end
+journeys have never run on macOS.
+
+In this order:
+
+1. `npm run setup`, then `npm run check`. The unit tests pass on Linux; expect the same.
+2. `npm run dev` and look at the app. The window has a title bar of its own (ADR-030) that
+   has only ever been seen on Windows: check that the three buttons of the system sit on
+   the strip without covering anything, that the window drags by the strip, and that a
+   dialog can be pressed where it reaches the top. Light and dark.
+3. `npm run e2e`. This is its first run on macOS: read failures as findings about macOS,
+   as the first run on Linux was (it found that a build machine has no keyring). Journeys
+   that save a key use the Keychain, which may ask for permission.
+4. `npm run package`, `npm run package:check`, `npm run installer`, then open the disk image
+   as a person would. An app signed "ad hoc" that came from the internet is refused once;
+   `README.md` → Install says how to open it. One made on the same Mac opens.
+5. Reading aloud: macOS has voices of its own. `e2e/narration.spec.ts` asks the machine
+   what it can do and follows; listen to a lesson once with the sound on.
+6. Write down what was found, here and in `TESTING.md`, and give the rows about macOS in
+   the table of test results their real status. If the journeys pass, add `macos-latest`
+   to the end-to-end job in `.github/workflows/ci.yml`.
 
 ## Known gaps (tracked, not forgotten)
 
@@ -527,7 +615,10 @@ What remains needs the owner. In the order it matters:
 | AIHubMix being "the quick one" is the owner's report, not a measurement | Its model has never answered Adle; one word in its definition if it turns out otherwise |
 | GLM 5.3 Flash, NVIDIA's third model, has never answered | The owner's choice of order (ADR-021) |
 | The parser worker has no OS-level sandbox | Not built. It is a separate, short-lived, isolated process that returns only checked JSON (SECURITY.md) |
-| No installer, no signature, no automatic update; Windows only | Needs the owner (ADR-019, `RELEASE_CHECKLIST.md`) |
+| No signature, and no automatic update | The owner's decision, and Adle's rule about what it sends (ADR-034, ADR-019). Each system asks before opening a build |
+| The end-to-end journeys do not run on macOS | Not built: the app is built, installed and started there with every push. See "On a Mac" |
+| On Linux a key can be kept only where the desktop has a keyring (GNOME Keyring, KWallet) | By decision: Adle does not keep a key where the system would store it as plain text, and says so |
+| Windows on ARM and Linux on ARM have no build | Not asked for (ADR-034) |
 | A single course cannot be exported to share with someone else; a copy holds everything | By decision (ADR-016) |
 | A saved copy is not encrypted | By decision (ADR-016); the interface says so |
 | Narration and animation are synchronised per segment, not per sentence | M7, after testing Wanim's slides mode |
@@ -537,7 +628,6 @@ What remains needs the owner. In the order it matters:
 
 ## Open questions for the owner
 
-- **Licence.** The repository is marked `UNLICENSED`. Choose a licence before publishing.
 - **Commit signing.** Git is configured to GPG-sign commits. Signing needs the key's passphrase in
   the desktop session; agents cannot provide it. Settled on 2026-11-21: wait a few minutes for
   the prompt to be answered, then commit unsigned.

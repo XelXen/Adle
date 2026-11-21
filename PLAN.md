@@ -1013,8 +1013,20 @@ pixel to the point. The player now asks for a drawing to suit its frame (ADR-032
 `WanimPlayerAdapter.test.ts`, `e2e/scene-player` (26 small minus signs, read off the
 window), `e2e/lesson`.
 
+The same day the owner chose a licence and asked for installers and a release. Adle is
+under the GNU GPL, version 3 (ADR-033). It is on GitHub, where every push runs the gates,
+the journeys on Windows and on Linux, and builds the installer of each system on a machine
+of that system, then installs, starts and removes it there and again on a machine that did
+not build it; and where a tag publishes a version (ADR-034). **Version 0.1.0-alpha.1 is the
+first.** Evidence: the runs of `.github/workflows/` on `github.com/XelXen/Adle`, and the
+release itself.
+
 ### Deviations from this plan (each has an ADR)
 
+- **Installers are made with each system's own tool** (Inno Setup, hdiutil, dpkg-deb), not
+  with a packaging framework, and nothing is signed: the owner's decision (ADR-034). Section
+  17 asks for signed installers; these are unsigned, and say so.
+- **The licence is the GNU GPL, version 3** (ADR-033). The plan did not name one.
 - **Colours** (section 7): the palette is neutral greys with the mark's teal as the one
   colour, and a near-black dark theme, not the green-tinted values first listed (ADR-027).
 - **Wording**: mastery is said as Not started, Learning, Nearly there, Understood, and the
