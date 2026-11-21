@@ -71,6 +71,21 @@ function sizeOf(target) {
 
 const megabytes = (bytes) => `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
 
+/** The largest files under a folder: what a size is made of, said along with it. */
+function largestIn(folder, count) {
+  const found = [];
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const item = path.join(directory, entry.name);
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) walk(item);
+      else found.push([lstatSync(item).size, path.relative(folder, item)]);
+    }
+  };
+  walk(folder);
+  return found.sort((one, other) => other[0] - one[0]).slice(0, count);
+}
+
 // -- the app ------------------------------------------------------------------------------
 
 function stageApp() {
@@ -159,6 +174,11 @@ const UNUSED_ELSEWHERE_BY_PATTERN = [
   /^lib\/libpython[^/]*\.a$/,
   /^lib\/(lib)?(tcl|tk|itcl|thread)[^/]*$/,
   /^lib\/python3\.12\/lib-dynload\/_tkinter[^/]*$/,
+  // The interpreter's other names, and the tools for building against it. A name that is
+  // a link in the installation is copied as the whole program: on Linux that was the
+  // interpreter three times and its library twice. The core is started by one name.
+  /^bin\/(?!python3\.12$)[^/]+$/,
+  /^lib\/libpython3\.12\.so$/,
 ];
 
 /** Where the Python that uv manages for this project is installed. */
@@ -391,6 +411,9 @@ async function main() {
   console.log(`\nPackaged ${forTests ? '(for tests) ' : ''}into ${appFolder}`);
   console.log(`  app.asar  ${megabytes(sizeOf(path.join(resources, 'app.asar')))}`);
   console.log(`  core      ${megabytes(sizeOf(path.join(resources, 'core')))}`);
+  for (const [bytes, name] of largestIn(path.join(resources, 'core'), 4)) {
+    console.log(`            ${megabytes(bytes).padStart(6)}  ${name}`);
+  }
   console.log(`  in all    ${megabytes(sizeOf(appFolder))}`);
   console.log(`  run       ${executable}`);
 }

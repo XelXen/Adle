@@ -13,6 +13,12 @@
  *   node scripts/installer.mjs --check    then try each one out: put the app where the
  *                                         installer puts it, start it from outside as the
  *                                         start-up check does, and take it away again
+ *   node scripts/installer.mjs --check --made
+ *                                         try out the ones that are in that folder already,
+ *                                         made somewhere else. For a machine that has Node,
+ *                                         this folder of scripts and nothing else of the
+ *                                         project: what starts there starts on what the
+ *                                         installer brought
  *
  * Run "node scripts/package.mjs" first: this wraps apps/desktop/out/release exactly as it is.
  *
@@ -176,7 +182,10 @@ function makeMacImage(source) {
   symlinkSync('/Applications', path.join(stage, 'Applications'));
   const image = path.join(installersDir, `${baseName}.dmg`);
   rmSync(image, { force: true });
-  const create = ['create', '-volname', 'Adle', '-srcfolder', stage, '-ov', '-format', 'UDZO'];
+  // Packed as tightly as a Mac can open (every macOS since 10.15 reads this kind; Adle
+  // needs a later one anyway). It takes a minute longer to make and is a quarter smaller
+  // to fetch.
+  const create = ['create', '-volname', 'Adle', '-srcfolder', stage, '-ov', '-format', 'ULMO'];
   // On a build machine the first try now and then finds the new volume "busy".
   for (let attempt = 1; ; attempt += 1) {
     const result = spawnSync('hdiutil', [...create, image], { stdio: 'inherit' });
@@ -361,18 +370,38 @@ function startFromOutside(executable) {
   run(process.execPath, [
     path.join(repoRoot, 'scripts', 'smoke-packaged.mjs'),
     `--at=${executable}`,
+    // Where nothing was built there is no tool to read the binary's fuses with.
+    ...(flags.has('--made') ? ['--bare'] : []),
   ]);
 }
 
+/** This system's installers, as another machine made them and somebody brought them here. */
+function alreadyMade() {
+  const names = {
+    win32: [`${baseName}-setup.exe`],
+    darwin: [`${baseName}.dmg`],
+    linux: [`${baseName}.deb`, `${baseName}.tar.gz`],
+  }[process.platform];
+  const files = names.map((name) => path.join(installersDir, name));
+  for (const file of files) {
+    if (!existsSync(file)) throw new Error(`There is no ${file} to try out.`);
+  }
+  return files;
+}
+
 async function main() {
-  const source = releaseFolder();
   mkdirSync(installersDir, { recursive: true });
   const make = { win32: makeWindowsInstaller, darwin: makeMacImage, linux: makeLinuxPackages };
   const check = { win32: checkWindowsInstaller, darwin: checkMacImage, linux: checkLinuxPackages };
   if (!make[process.platform]) throw new Error(`No installer is made for ${process.platform}.`);
 
-  const made = make[process.platform](source);
-  console.log(`\nMade from ${source}`);
+  const elsewhere = flags.has('--made');
+  if (elsewhere && !flags.has('--check')) {
+    throw new Error('--made is for trying out installers that exist: give --check as well.');
+  }
+  const source = elsewhere ? null : releaseFolder();
+  const made = elsewhere ? alreadyMade() : make[process.platform](source);
+  console.log(elsewhere ? '\nMade elsewhere' : `\nMade from ${source}`);
   for (const file of made) console.log(`  ${megabytes(file).padStart(7)}  ${file}`);
 
   if (!flags.has('--check')) return;

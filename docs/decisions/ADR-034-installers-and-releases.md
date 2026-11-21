@@ -42,11 +42,15 @@ kinds of archive.
   later). Unpacked from the tarball on such a system, the app refuses to start rather than
   run without a sandbox. No AppImage is made: launched that way an app cannot have that
   helper, and the usual answer is to start it with the sandbox off.
-- **Every installer is tried out where it is built.** The installer puts the app on the
-  build machine, the app is started from outside with an empty profile as the start-up
-  check does, and it is taken away again. This runs for every push, on all three systems,
-  so packaging cannot rot unnoticed. A build machine is also the first computer that never
-  had the project on it.
+- **Every installer is tried out where it is built, and again where it was not.** The
+  installer puts the app on the build machine, the app is started from outside with an
+  empty profile as the start-up check does, and it is taken away again. That machine has
+  everything the app was built from, so an app that leaned on any of it would still start
+  there. The same files therefore go to a second machine of the same system, which has
+  Node, the scripts that do the trying and nothing else of the project, and are installed,
+  started and removed there. This runs for every push, on all three systems, so packaging
+  cannot rot unnoticed. That second machine is the nearest thing to a learner's computer
+  that can be had with every push.
 - **A tag publishes.** Pushing `v<version>` builds the installers again from that commit,
   writes their checksums, and attaches both to a release, marked as a pre-release when the
   version has a hyphen in it. The tag must be the version in `package.json`, and the

@@ -59,7 +59,9 @@ Nobody has signed these builds, and each system says so in its own way:
 \`SHA256SUMS.txt\` lists a checksum for every file here.
 
 Adle needs no account. Lessons written by an AI need a key of your own for AIHubMix or
-NVIDIA NIM; the sample course works without one.
+NVIDIA NIM; the sample course works without one. On Linux that key is kept in your
+desktop's keyring (GNOME Keyring or KWallet); where there is none, Adle says so and does
+not keep it.
 
 ## What is in it
 

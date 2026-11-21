@@ -7,6 +7,11 @@
  *   node scripts/smoke-packaged.mjs --at=<executable>
  *                                              a copy somewhere else: one that an installer
  *                                              has just put on the computer
+ *   node scripts/smoke-packaged.mjs --at=<executable> --bare
+ *                                              on a machine that has Node and this file and
+ *                                              nothing else of the project: the fuses are
+ *                                              not read (the tool that reads them is not
+ *                                              here), and that is said
  *
  * The release build cannot be driven by a test tool: the switches such a tool needs are
  * turned off in it, on purpose. So this looks from outside, at what a working start leaves
@@ -19,6 +24,10 @@
  *   3. nothing is written to the log of failures;
  *   4. when the app is closed abruptly, the core does not stay behind.
  *
+ * And one thing that starting it cannot show, on Windows: that no program in the package
+ * asks for a part of the Visual C++ runtime which the package does not bring. A computer
+ * that builds software has that runtime; a new one may not.
+ *
  * It prints how long the first start took. On a fresh build that includes the time the
  * operating system takes to look at files it has not seen before.
  */
@@ -28,13 +37,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses';
-
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const forTests = process.argv.includes('--test');
 /** An executable named by whoever runs this, in place of the one in the build folder. */
 const elsewhere =
   process.argv.find((argument) => argument.startsWith('--at='))?.slice('--at='.length) ?? null;
+/**
+ * Said by whoever runs this on a machine with none of the project's tools on it. Never
+ * decided here: a missing tool on a developer's computer must stop the check, not thin it.
+ */
+const bare = process.argv.includes('--bare');
 const buildDir = path.join(repoRoot, 'apps', 'desktop', 'out', forTests ? 'test' : 'release');
 const START_TIMEOUT_MS = 120_000;
 
@@ -67,6 +79,8 @@ const ENABLED = 0x31; // the character "1" in the fuse wire
 const fuseIsOn = (wire, option) => wire[option] === ENABLED;
 
 async function checkFuses(executable) {
+  // Read with the tool that set them, fetched only now: see --bare.
+  const { FuseV1Options, getCurrentFuseWire } = await import('@electron/fuses');
   const wire = await getCurrentFuseWire(executable);
   const expected = [
     [FuseV1Options.RunAsNode, false, 'runs as plain Node'],
@@ -208,6 +222,91 @@ function processesFrom(folder) {
   return (listing.stdout ?? '').split('\n').filter((line) => line.includes(folder));
 }
 
+/**
+ * The libraries a Windows program asks the system to find for it, read from its import
+ * table and from the table of those it loads only when first used. Lower case.
+ */
+export function importsOf(file) {
+  const data = readFileSync(file);
+  if (data.length < 0x40 || data.readUInt16LE(0) !== 0x5a4d) return [];
+  const header = data.readUInt32LE(0x3c);
+  if (header + 24 > data.length || data.readUInt32LE(header) !== 0x4550) return [];
+  const sectionCount = data.readUInt16LE(header + 6);
+  const optional = header + 24;
+  const sectionsAt = optional + data.readUInt16LE(header + 20);
+  // The optional header comes in two widths; the directories follow its fixed part.
+  const directories = optional + (data.readUInt16LE(optional) === 0x20b ? 112 : 96);
+  const directoryCount = data.readUInt32LE(directories - 4);
+  const sections = [];
+  for (let index = 0; index < sectionCount; index += 1) {
+    const at = sectionsAt + index * 40;
+    sections.push({
+      address: data.readUInt32LE(at + 12),
+      size: Math.max(data.readUInt32LE(at + 8), data.readUInt32LE(at + 16)),
+      stored: data.readUInt32LE(at + 20),
+    });
+  }
+  /** Where in the file something is that the program knows by its address in memory. */
+  const inFile = (address) => {
+    const section = sections.find(
+      (candidate) => address >= candidate.address && address < candidate.address + candidate.size,
+    );
+    return section ? address - section.address + section.stored : null;
+  };
+  const names = [];
+  const tables = [
+    { directory: 1, entrySize: 20, nameAt: 12 },
+    { directory: 13, entrySize: 32, nameAt: 4 },
+  ];
+  for (const { directory, entrySize, nameAt } of tables) {
+    if (directory >= directoryCount) continue;
+    const table = inFile(data.readUInt32LE(directories + directory * 8));
+    if (table === null) continue;
+    for (let at = table; at + entrySize <= data.length; at += entrySize) {
+      const entry = data.subarray(at, at + entrySize);
+      if (entry.every((byte) => byte === 0)) break;
+      const name = inFile(entry.readUInt32LE(nameAt));
+      if (name === null) break;
+      names.push(data.toString('latin1', name, data.indexOf(0, name)).toLowerCase());
+    }
+  }
+  return names;
+}
+
+/** Parts of the Visual C++ runtime, which is installed separately and not on every computer. */
+const VISUAL_CPP_RUNTIME =
+  /^(msvcp|vcruntime|concrt|vcomp|vccorlib|vcamp|mfc|ucrtbased)[0-9a-z_]*\.dll$/;
+
+/**
+ * Every part of that runtime a program in the app asks for is in the app: beside the
+ * program that asks, or beside the one that loaded it (Adle itself, or the core's Python).
+ * Returns the complaints, so that a caller can say them all at once.
+ */
+export function missingRuntime(appFolder) {
+  const core = path.join(appFolder, 'resources', 'core');
+  const programs = [];
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const item = path.join(directory, entry.name);
+      if (entry.isDirectory()) walk(item);
+      else if (/\.(exe|dll|pyd|node)$/i.test(entry.name)) programs.push(item);
+    }
+  };
+  walk(appFolder);
+  const missing = [];
+  for (const program of programs) {
+    const home = program.startsWith(core + path.sep) ? core : appFolder;
+    for (const library of importsOf(program)) {
+      if (!VISUAL_CPP_RUNTIME.test(library)) continue;
+      const brought = [path.dirname(program), home].some((folder) =>
+        existsSync(path.join(folder, library)),
+      );
+      if (!brought) missing.push(`${path.relative(appFolder, program)} asks for ${library}`);
+    }
+  }
+  return { programs: programs.length, missing };
+}
+
 /** Whose work the app is built from, and their licences, travel with it. */
 function checkNotices(executable) {
   const folder = path.join(resourcesOf(executable), 'licenses');
@@ -236,10 +335,26 @@ async function main() {
     );
   }
   console.log(`Checking ${executable}`);
-  await checkFuses(executable);
-  console.log('  PASS  fuses are set as intended');
+  if (bare) {
+    console.log('  NOT RUN  the fuses: they are read where the app is built');
+  } else {
+    await checkFuses(executable);
+    console.log('  PASS  fuses are set as intended');
+  }
   checkNotices(executable);
   console.log('  PASS  the licence and the third-party notices are in the package');
+  if (isWindows()) {
+    const { programs, missing } = missingRuntime(path.dirname(executable));
+    if (missing.length > 0) {
+      throw new Error(
+        'The package needs parts of the Visual C++ runtime that it does not bring, and a ' +
+          `new computer may not have:\n    ${missing.join('\n    ')}`,
+      );
+    }
+    console.log(
+      `  PASS  its ${programs} programs and libraries ask for no Visual C++ runtime it does not bring`,
+    );
+  }
   if (!forTests) {
     checkWillNotRunAsNode(executable);
     console.log('  PASS  will not run as plain Node');

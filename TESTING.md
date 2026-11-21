@@ -150,7 +150,7 @@ dialog, run axe, save a screenshot.
 | `lesson.spec.ts` | Add the sample course; **each of the other seven lessons gone through part by part**: every picture loads and has its description in words, every question can be skipped, the two interactions have a control, the lesson ends with a suggested next step; a whole lesson in detail: start, pause, resume, a narrated scene and its description in words, an interaction driven from the keyboard, wrong, hinted, and skipped answers, typeset mathematics, a part that ends by itself, the finish panel, the record in the course, review with every part open; resume at the saved part with the scene held until Start; **a scene that breaks while playing and a scene the core withholds** both fall back to words while the lesson goes on; axe on each state; a lesson's picture is drawn at the size that suits its frame (854 wide in a window of the usual size); a scene not yet started is still, and moves once started: told from its own canvas, not from a picture of the page, and both pictures are kept with the report if they differ |
 | `generation.spec.ts` | **A notice from the provider in the model's place**: shown in the provider's own words with no link in them, after one request, with the settings offered and "Try again" not. Against the local fake provider: what will be sent is said first; suggestions reviewed, some kept, a dropped dependency explained; a lesson written with progress and then played; **a lesson started while its pictures are held back** (said once; listed with "Pictures on their way"; no break and no second lesson offered; a part whose picture is not there yet is in words; the first picture takes its place in a part that has not begun, the second is offered in a part that has; who wrote it is under the title); **the pictures stopped, which keeps the lesson, and a lesson removed while they are drawn, which ends the work with nothing called cancelled and no further request**; usage counted in Settings; no key; a provider failure and one retry; the fifth request in a minute waits and can be cancelled; suggestions that arrive while the learner is elsewhere |
 | `learning.spec.ts` | **The session summary**: after a lesson and a check ("This session", counts, right answers, the planned review), as "Last time, 2 days ago" on returning, and replaced by a new sitting in which one answer is lighter evidence and that is explained. A course opens on its suggested step and the reason; a lesson in which two answers point the same way; the lesson ends with a check, the check asks the question that would show it; the hypothesis shown and set aside with "That was a slip"; **the database is moved two days into the past between launches** and a review is due, suggested, done, and rescheduled further away. "This did not help": skip to the next question, the suggestion changes and says why, no key means an honest pointer to the settings. With the fake provider: another explanation in a chosen way of teaching is written, followed on the Learn tab, and suggested ahead of the old lesson. axe on each state, both themes |
-| `narration.spec.ts` | With a voice on the machine: voice and volume settings, a sample, speech as the lesson's clock, pause and resume of the voice itself, transcript on and off, switching reading aloud off and on, no voice left talking after leaving. Without a voice: the lesson says so and reads as text |
+| `narration.spec.ts` | With a voice on the machine: voice and volume settings, a sample, speech as the lesson's clock, pause and resume of the voice itself, transcript on and off, switching reading aloud off and on, no voice left talking after leaving. Without a voice: the lesson says so and reads as text. With voices that are listed and cannot be held (a build machine with nowhere to play sound): the journey asks the machine, and follows the app where it stands in for the voice line by line; the report says which way it went |
 | `learning-preferences.spec.ts` | Pace, explanation depth, narration, captions, and goal: changed by mouse and keyboard, remembered across a restart |
 | `appearance-a11y.spec.ts` | Theme through the real mechanism and persisted; **axe (WCAG 2.2 AA) on every screen in both themes**; minimum window size; 200% text; reduced motion; **the window's own title bar**: the strip the window is moved by, nothing that can be pressed underneath it on any screen, and the system's buttons in the theme's colours |
 
@@ -180,7 +180,7 @@ it can be.
 | What | How | Covers |
 |---|---|---|
 | The build for tests (`out/test`) | `npm run e2e:packaged`: the whole suite of section 3, unchanged, with `ADLE_E2E_EXECUTABLE` pointing at the packaged executable | Everything the suite covers, in the form a learner would run: the app loaded from its archive, the core running in its private Python. In particular scene isolation, the bridge surface, and the network block |
-| The release build (`out/release`) | `npm run package:check`, from outside, because its debugger switches are off | Fuses as intended; will not run as plain Node; starts on an empty profile with a bare `PATH` and a hostile `PYTHONHOME` and `PYTHONPATH`; the core comes up; nothing in the log of failures; the core does not stay behind when the app is ended |
+| The release build (`out/release`) | `npm run package:check`, from outside, because its debugger switches are off | Fuses as intended; will not run as plain Node; starts on an empty profile with a bare `PATH` and a hostile `PYTHONHOME` and `PYTHONPATH`; the core comes up; nothing in the log of failures; the core does not stay behind when the app is ended. On Windows also what starting it cannot show: none of its programs asks for a part of the Visual C++ runtime that the package does not bring (read from their import tables; a computer that builds software has that runtime, a new one may not) |
 | The core as packaged | A step of `package.mjs` itself | The private Python imports the service and everything it needs, finds its migrations and the sample course as package data, and has no telemetry exporter in it |
 
 A first start straight after packaging is slow while the operating system looks at the new
@@ -194,10 +194,18 @@ installer of the system it runs on, installs it, starts the installed app from o
 release folder), and removes it again. It changes the computer it runs on, so outside CI it
 asks to be told `--on-this-computer`.
 
+The machine that built an installer has everything the app was built from, so an app that
+leaned on any of it would still start there. Each installer is therefore tried a second
+time, with `node scripts/installer.mjs --check --made`, on a machine of the same system
+that has Node, the `scripts` folder and nothing else of the project: no Python of Adle's,
+no uv, no Electron, nothing built. What starts there starts on what the installer brought.
+One thing is left out there, and said: reading the binary's fuses needs a tool that machine
+does not have, so they are read where the app is built.
+
 | Workflow | When | What it runs |
 |---|---|---|
 | `ci.yml` | every push to `dev` or `main`, every pull request | `node scripts/check.mjs` and both audits, on Linux. Then, side by side: the end-to-end suite on Windows and on Linux; and `build.yml` |
-| `build.yml` | called by the other two | On Windows, macOS (Apple and Intel processors) and Linux: the release build, its installer, the installer tried out as above, and the start-up check of the release folder |
+| `build.yml` | called by the other two | On Windows, macOS (Apple and Intel processors) and Linux: the release build, its installer, the installer tried out as above, and the start-up check of the release folder. Then, on a second machine of each kind: the installer tried out where it was not built |
 | `release.yml` | a tag `v<version>` | Checks that the tag is the version and that the changelog has it; runs `build.yml`; publishes what it made, with checksums |
 
 What each system's try-out covers that the others do not:
@@ -210,6 +218,32 @@ What each system's try-out covers that the others do not:
   app starts once installed, on a system as Ubuntu ships it; removing the package removes
   the app. The tarball is unpacked, and started where the system lets an unpacked app
   build a sandbox.
+
+A build machine is not a learner's computer, and has to be given a few things:
+
+- **A keyring, on Linux.** Adle keeps a provider's key only where the system can keep a
+  secret, and a build machine has no keyring. The Linux journeys run in a session with a
+  message bus and an unlocked GNOME keyring made for that run (`ci.yml`), which is asked to
+  keep something and give it back before any journey starts.
+- **The test tool's idea of where secrets go, undone.** Playwright starts every Chromium it
+  drives with `--password-store=basic`: on Linux, "keep secrets as plain text". Adle
+  refuses that however good the keyring is, so `e2e/support/keep-secrets.cjs` is loaded
+  into the app after the tool's own loader and takes the switch away, on every system. A
+  packaged app loads neither, and never has the switch.
+- **A display, on Linux**: a virtual one (`xvfb-run`). The start-up check starts the app
+  with almost nothing in its environment, and hands on where the display is and the right
+  to draw on it.
+- **Namespaces, on Linux, for an app run from its folder.** Installed from the `.deb`, the
+  app builds its sandbox with the helper the package installs, on the system as it ships.
+  Run from the build folder (the journeys, and the check of the release folder), the helper
+  is nobody's, so the build machine is told to let programs make namespaces. The sandbox
+  itself is on in every case.
+- **Nothing, for sound.** GitHub's Windows machine lists voices and has nowhere to play
+  them. The journey that reads aloud asks the machine what it can do and follows.
+
+When the app does not come up, the start-up check says what the app wrote to its error
+output and how its two logs end, and stops as soon as the app has closed instead of waiting
+for a core that is not coming.
 
 ### 6. Fixtures
 
@@ -241,7 +275,8 @@ Recorded in `docs/engineering/PROJECT_STATE.md` with the date and commit they ap
 | Gap | Plan |
 |---|---|
 | **The release build** is checked from outside only; the journeys run against a twin of it with the debugger reachable | By design (ADR-019). The two differ in one fuse. |
-| **A computer that never had the project on it** | NOT RUN. The start-up check strips the environment, which is not the same thing. |
+| **A learner's own computer** | The nearest thing that runs by itself is a build machine that did not build the installer it is given (section 5). It still has more on it than a new computer: GitHub's machines come with many libraries and tools. A person installing a release on their own computer: NOT RUN. |
+| **What the `.deb` says it needs** | Tried only on machines that had all of it already. A bare system would show a missing name; none is run. |
 | **macOS**: the end-to-end suite does not run there | The release build and its installer are built and started on macOS by every push; the journeys run on Windows and Linux only. Nobody has looked at Adle on a Mac. |
 | **Installers** cannot be tried on the computer Adle is developed on | By decision (ADR-034): they are made and tried on GitHub's machines, which have the tools and can be thrown away. |
 | **Visual regression** is manual (screenshots captured, not diffed) | Left open. Baselines differ between machines and fonts; a person looks at `test-results/screens`. |

@@ -20,6 +20,9 @@ export const repoRoot = path.resolve(desktopDir, '..', '..');
  */
 export const packagedExecutable = process.env.ADLE_E2E_EXECUTABLE || null;
 
+/** See the file: what the test tool does to where secrets are kept, undone. */
+const KEEP_SECRETS = path.join(import.meta.dirname, 'keep-secrets.cjs');
+
 export interface LaunchedApp {
   app: ElectronApplication;
   page: Page;
@@ -158,7 +161,10 @@ export async function launchApp(
   const app = await electron.launch({
     ...(packagedExecutable
       ? { executablePath: packagedExecutable, args: switches }
-      : { args: [desktopDir, ...switches] }),
+      : // Run from its folder, the app is started by the test tool's loader, which tells it
+        // to keep secrets as plain text. `keep-secrets.cjs` is loaded after that loader
+        // and takes the switch away again; it says why.
+        { args: ['-r', KEEP_SECRETS, desktopDir, ...switches] }),
     env: { ...process.env, ...options.env, ADLE_USER_DATA_DIR: profileDir },
     // Playwright forces a light colour scheme by default, which would mask the
     // app's own theme handling. `null` leaves the media query to the app.

@@ -54,7 +54,8 @@ A version is published by GitHub, from a tag (ADR-034). By hand you only say whi
    lines that open the release: they become the top of the release's notes.
    `npm run release:notes` shows what will be published.
 3. `node scripts/check.mjs --e2e`, commit, push `dev`, and wait for CI: it builds the
-   installers on every system and tries each one out.
+   installers on every system and tries each one out, there and on a machine that did not
+   build it.
 4. Move `main` forward to that commit and push it, then tag and push the tag:
    `git tag v<version>` and `git push origin v<version>`.
 5. The Release workflow builds the installers again from the tag and publishes them with
@@ -76,8 +77,10 @@ A version is published by GitHub, from a tag (ADR-034). By hand you only say whi
 - Comments explain decisions, invariants, and security boundaries. They do not narrate code.
 - No TODOs, placeholder controls, or mock data in a shipped path. Fixtures live in test or
   `fixtures/` directories and are labelled.
-- Add a dependency only when it earns its place: check maintenance, licence (no GPL/AGPL), size,
-  and native build cost. Pin it exactly. Record notable ones in an ADR.
+- Add a dependency only when it earns its place: check maintenance, licence (one that can be
+  combined with the GNU GPL, version 3, which Adle is under; `npm run licenses:check` refuses
+  what needs a decision first), size, and native build cost. Pin it exactly. Record notable
+  ones in an ADR.
 - Every fixed bug gets a regression test.
 
 ## Generated files

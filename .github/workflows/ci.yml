@@ -80,9 +80,11 @@ jobs:
         # Adle keeps a provider's key only where the system can keep a secret, and says so
         # where it cannot. A build machine has no keyring of its own, and twenty-three
         # journeys save a key: without one they stop at the first step, as they should.
+        # (They stopped with one, too, until e2e/support/keep-secrets.cjs: the test tool
+        # tells the app to keep secrets as plain text, which Adle refuses just the same.)
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends gnome-keyring libsecret-1-0 dbus-daemon
+          sudo apt-get install --yes --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus-daemon
       - name: Run end-to-end tests (Linux, virtual display)
         if: runner.os == 'Linux'
         # Run from its folder, Electron's sandbox helper is nobody's, so the sandbox is built
@@ -94,6 +96,10 @@ jobs:
           dbus-run-session -- bash -c '
             set -euo pipefail
             printf "%s" "a-keyring-for-tests-only" | gnome-keyring-daemon --daemonize --unlock --components=secrets > /dev/null
+            # Is the keyring there, open, and keeping what it is given? Said here, in one
+            # line, rather than by twenty-three journeys half an hour later.
+            printf "%s" "kept" | secret-tool store --label="Adle test session" adle-test-session check
+            test "$(secret-tool lookup adle-test-session check)" = "kept"
             export XDG_CURRENT_DESKTOP=GNOME
             xvfb-run --auto-servernum npm run e2e
           '

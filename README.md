@@ -108,6 +108,10 @@ Nobody has signed these builds, and each system says so in its own way:
   start, because the system does not let it build its sandbox, and Adle will not run without
   one. Use the `.deb`, which sets that up.
 
+On Linux, a key for an AI provider is kept in your desktop's keyring (GNOME Keyring or
+KWallet). Where there is none, Adle says so and does not keep the key: it will not store
+one as plain text. Everything that needs no key works regardless.
+
 Each release lists a checksum for every file in `SHA256SUMS.txt`. Adle does not update
 itself and never looks for a newer version: to update, install the newer one over the old.
 Your courses and settings are kept apart from the program and stay where they are.
