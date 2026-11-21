@@ -79,7 +79,9 @@ real provider), one request at a time:
 | The same | Mistral Large 4 | 5 min | not timed |
 
 A whole lesson is the text and one or two scenes: nine to twelve minutes when every answer
-is usable as first written. Adle cannot shorten this. What it does instead: the work is a
+is usable as first written. Adle cannot make a model quicker. **What the learner waits for
+is the text only** (ADR-031): the lesson can be started when that is written, about five to
+six minutes in, and each picture appears in it when it is drawn. Besides: the work is a
 job that leaves the app usable, the job says what the model is doing ("thinking it
 through", "writing"), and it can be stopped. Finding out that a model is not there takes a
 quarter of a second; finding out that it is silent takes three minutes, once, after which

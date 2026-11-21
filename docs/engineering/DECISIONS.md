@@ -38,6 +38,7 @@ supersedes the old one and update this index.
 | [028](../decisions/ADR-028-plain-words.md) | Words are short, plain, and about the learner's task, with typographic quotation marks; what must be said (what is sent and where, who answered, why a step is suggested) stays, in fewer words; progress is Not started, Learning, Nearly there, Understood |
 | [029](../decisions/ADR-029-boundaries-after-review.md) | After a review: the page cannot name a file by any hand-over; "no network" covers peer connections and name lookups; a request is not read before its token is checked; the provider choice reaches the core before the keys and before "ready"; ordering questions are shown under names that are not their answer; logs hold no error text |
 | [030](../decisions/ADR-030-own-title-bar.md) | The window has a title bar of the app's own on Windows and macOS: the system's buttons laid over the page in the app's colours, a strip to move the window by, and nothing new across the bridge |
+| [031](../decisions/ADR-031-a-lesson-opens-when-its-words-are-ready.md) | A lesson is stored, listed and can be started as soon as its text is written; its pictures are added as they are drawn, and settled in words if they are not; stopping keeps the lesson, removing it stops the work; the learner is told once; who wrote a lesson is kept with the lesson |
 
 ## Smaller standing choices (no ADR)
 

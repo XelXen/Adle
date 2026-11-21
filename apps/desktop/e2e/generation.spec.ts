@@ -221,6 +221,222 @@ test.describe('generation with the AI provider', () => {
     await close(session);
   });
 
+  test('a lesson can be started as soon as it is written, while its pictures are drawn', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await open(profileDir);
+    const { page, provider } = session;
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    const limits = detail(page, 'Limits');
+    const lessons = limits.getByRole('list', { name: 'Lessons for this concept' });
+    const now = page.getByRole('navigation').getByRole('group', { name: 'Now' });
+
+    // What is said beside the button is the wait until the lesson can be started.
+    await expect(limits).toContainText('Ready to start in about a minute. Its pictures follow.');
+
+    // ---- The pictures take their time: each one waits until this test lets it go ----
+    provider.hold('scene');
+    await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
+
+    // ---- Said once, as soon as the lesson is written ----
+    const ready = page.getByRole('status').filter({ hasText: 'Lesson ready' });
+    await expect(ready).toBeVisible({ timeout: 60_000 });
+    await expect(ready).toContainText(
+      'How a neuron weighs its inputs. Its pictures are still being drawn.',
+    );
+    await expect
+      .poll(() => provider.requests.map((request) => request.kind))
+      .toEqual(['lesson', 'scene']);
+
+    // It is in the list and can be started; the rest of the work goes on beside it.
+    await expect(lessons.getByRole('listitem')).toHaveCount(1);
+    await expect(lessons).toContainText('Not started · Pictures on their way');
+    await expect(limits.getByRole('progressbar')).toBeVisible();
+    await expect(limits).toContainText(
+      'You can start the lesson now. Its pictures appear in it as they’re drawn.',
+    );
+    await expect(limits.getByRole('button', { name: 'Stop drawing pictures' })).toBeVisible();
+    // There is nothing left to wait for, so no break is offered. And one lesson is written
+    // at a time: another is not offered until this one has its pictures.
+    await expect(limits.getByRole('button', { name: /break/i })).toHaveCount(0);
+    await expect(limits.getByRole('button', { name: /lesson with AI/ })).toHaveCount(0);
+    await expect(now.getByRole('button', { name: 'Drawing pictures' })).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'generation-lesson-before-its-pictures');
+
+    // The Learn tab says the same, once, and offers the lesson.
+    await openCourseTab(page, 'Learn');
+    const learn = page.getByRole('tabpanel', { name: 'Learn' });
+    await expect(learn).toContainText(
+      'You can start the lesson now. Its pictures appear in it as they’re drawn.',
+    );
+    await expect(learn.getByRole('button', { name: 'Stop drawing pictures' })).toHaveCount(1);
+    await expect(learn).toContainText('How a neuron weighs its inputs');
+    await expectNoAccessibilityViolations(page);
+    await openCourseTab(page, 'Curriculum');
+
+    // ---- In the lesson: a part whose picture is not there yet is said in words ----
+    await lessons.getByRole('button', { name: /^Start lesson/ }).click();
+    await expect(
+      page.getByRole('heading', { name: 'How a neuron weighs its inputs', level: 1 }),
+    ).toBeVisible();
+    // Who wrote it is said in the lesson, in one line.
+    await expect(
+      page.getByText(
+        'Written by Coding Kimi K3 (free) on Custom endpoint (127.0.0.1). AI can make mistakes.',
+      ),
+    ).toBeVisible();
+    await expect(page.getByText('Part 1 of 8')).toBeVisible();
+    const next = page.getByRole('button', { name: 'Continue', exact: true });
+    await next.click();
+    await expect(page.getByText('Part 2 of 8')).toBeVisible();
+    const first = page.getByRole('figure', { name: 'The weighted sum' });
+    const drawing = page.getByText(
+      'This picture is still being drawn. It’ll appear here when it’s ready.',
+    );
+    await expect(drawing).toBeVisible();
+    await expect(first).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'lesson-picture-being-drawn');
+
+    // ---- The first picture arrives. The part had not begun, so it takes its place ----
+    provider.pass();
+    await expect(first).toBeVisible({ timeout: 30_000 });
+    await expect(first.getByText('Loading animation…')).toBeHidden({ timeout: 30_000 });
+    await expect(first.getByText('Couldn’t show the animation')).toHaveCount(0);
+    await expect(drawing).toHaveCount(0);
+    await expect
+      .poll(() => provider.requests.map((request) => request.kind))
+      .toEqual(['lesson', 'scene', 'scene']);
+
+    // ---- The second arrives while its part is being read: offered, not sprung ----
+    await next.click();
+    await page.getByRole('radio', { name: 'The first input' }).check();
+    await page.getByRole('button', { name: 'Check answer' }).click();
+    await expect(page.getByText('Correct', { exact: true })).toBeVisible();
+    await next.click();
+    await expect(page.getByText('Part 4 of 8')).toBeVisible();
+    const second = page.getByRole('figure', { name: 'Change a weight' });
+    await expect(drawing).toBeVisible();
+    await expect(second).toHaveCount(0);
+    // Nothing is asked to be tried on a picture that is not there.
+    await expect(page.getByText('Try it', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    provider.release();
+    const offered = page.getByRole('status').filter({ hasText: 'The picture is ready.' });
+    await expect(offered).toBeVisible({ timeout: 30_000 });
+    await expect(second).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
+    await offered.getByRole('button', { name: 'Show picture' }).click();
+    await expect(second).toBeVisible();
+    await expect(second.getByText('Loading animation…')).toBeHidden({ timeout: 30_000 });
+    await expect(second.getByText('Couldn’t show the animation')).toHaveCount(0);
+    await expect(page.getByText('Try it', { exact: true })).toBeVisible();
+
+    // ---- Back in the course the work has ended, and nothing more is said about it ----
+    await page.getByRole('button', { name: 'Back to course' }).click();
+    await openCourseTab(page, 'Curriculum');
+    await pathList(page)
+      .getByRole('button', { name: /Limits/ })
+      .first()
+      .click();
+    await expect(limits.getByRole('button', { name: 'Create another lesson with AI' })).toBeVisible(
+      { timeout: 30_000 },
+    );
+    await expect(limits.getByRole('progressbar')).toHaveCount(0);
+    await expect(lessons.getByRole('listitem')).toHaveCount(1);
+    await expect(lessons).not.toContainText('Pictures on their way');
+    await expect(now).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toHaveCount(0);
+    // One request for the text and one for each picture: the same three as ever.
+    expect(provider.requests.map((request) => request.kind)).toEqual(['lesson', 'scene', 'scene']);
+
+    expect(session.adle.problems).toEqual([]);
+    await close(session);
+  });
+
+  test('stopping the pictures keeps the lesson, and removing the lesson stops the pictures', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await open(profileDir, { theme: 'dark' });
+    const { page, provider } = session;
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    const limits = detail(page, 'Limits');
+    const lessons = limits.getByRole('list', { name: 'Lessons for this concept' });
+    const now = page.getByRole('navigation').getByRole('group', { name: 'Now' });
+    const kinds = (): string[] => provider.requests.map((request) => request.kind);
+
+    // ---- Stop: the lesson is there already, so it stays, with those parts in words ----
+    provider.hold('scene');
+    await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect.poll(kinds).toEqual(['lesson', 'scene']);
+    await expectNoAccessibilityViolations(page);
+    await limits.getByRole('button', { name: 'Stop drawing pictures' }).click();
+    const about = page.getByRole('status').filter({ hasText: 'About its pictures' });
+    await expect(about).toBeVisible({ timeout: 30_000 });
+    await expect(about).toContainText(
+      'You stopped the pictures, so 2 parts are explained in words.',
+    );
+    await expect(limits.getByRole('progressbar')).toHaveCount(0);
+    await expect(limits.getByText('Cancelled')).toHaveCount(0);
+    await expect(lessons.getByRole('listitem')).toHaveCount(1);
+    await expect(lessons).not.toContainText('Pictures on their way');
+    await expect(now).toHaveCount(0);
+    // The picture that was being drawn was let go of, and no other was asked for.
+    expect(kinds()).toEqual(['lesson', 'scene']);
+
+    // It plays, with the parts that had a picture said in words.
+    await lessons.getByRole('button', { name: /^Start lesson/ }).click();
+    await expect(page.getByText('Part 1 of 8')).toBeVisible();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await expect(page.getByText('Part 2 of 8')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'The weighted sum', level: 2 })).toBeVisible();
+    await expect(page.getByRole('figure')).toHaveCount(0);
+    await expect(page.getByText(/still being drawn/)).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back to course' }).click();
+    await openCourseTab(page, 'Curriculum');
+    await pathList(page)
+      .getByRole('button', { name: /Limits/ })
+      .first()
+      .click();
+
+    // ---- Remove a lesson whose pictures are on their way: the work stops with it ----
+    await limits.getByRole('button', { name: 'Create another lesson with AI' }).click();
+    await expect(lessons.getByRole('listitem')).toHaveCount(2, { timeout: 60_000 });
+    await expect.poll(kinds).toEqual(['lesson', 'scene', 'lesson', 'scene']);
+    const unfinished = lessons.getByRole('listitem').filter({ hasText: 'Pictures on their way' });
+    await expect(unfinished).toHaveCount(1);
+    await unfinished.getByRole('button', { name: /^Remove lesson:/ }).click();
+    await page
+      .getByRole('dialog', { name: /^Remove “How a neuron weighs its inputs”/ })
+      .getByRole('button', { name: 'Remove lesson' })
+      .click();
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson removed' })).toBeVisible();
+    await expect(lessons.getByRole('listitem')).toHaveCount(1);
+    await expect(lessons).not.toContainText('Pictures on their way');
+    // Nothing is left under way, nothing is called cancelled, and another can be asked for.
+    await expect(limits.getByRole('progressbar')).toHaveCount(0);
+    await expect(limits.getByText('Cancelled')).toHaveCount(0);
+    await expect(now).toHaveCount(0, { timeout: 15_000 });
+    await expect(
+      limits.getByRole('button', { name: 'Create another lesson with AI' }),
+    ).toBeVisible();
+    // No picture was asked for after the lesson had gone.
+    provider.release();
+    await page.waitForTimeout(1500);
+    expect(kinds()).toEqual(['lesson', 'scene', 'lesson', 'scene']);
+
+    expect(session.adle.problems).toEqual([]);
+    await close(session);
+  });
+
   test('without a key nothing is sent, and the way to add one is offered', async ({
     profileDir,
   }) => {
@@ -314,10 +530,13 @@ test.describe('generation with the AI provider', () => {
       timeout: 60_000,
     });
     await expect(limits.getByRole('alert')).toHaveCount(0);
+    // The lesson is announced when it is written; its two pictures follow.
+    const another = limits.getByRole('button', { name: 'Create another lesson with AI' });
+    await expect(another).toBeVisible({ timeout: 60_000 });
     expect(provider.requests).toHaveLength(4);
 
     // ---- Four requests in a minute is the limit Adle keeps: the fifth waits, and says so ----
-    await limits.getByRole('button', { name: 'Create another lesson with AI' }).click();
+    await another.click();
     await expect(
       limits.getByText(/Waiting about \d+ seconds to stay under the rate limit/),
     ).toBeVisible({ timeout: 15_000 });

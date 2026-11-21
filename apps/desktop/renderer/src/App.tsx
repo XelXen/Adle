@@ -19,7 +19,7 @@ import { clockText } from './lib/breaks';
 import { callCore } from './lib/core-client';
 import { courseRoute, RAIL_COURSES } from './lib/courses';
 import { useResource } from './lib/use-resource';
-import { KIND_LESSON } from './lib/generation';
+import { isDrawingPictures, KIND_LESSON } from './lib/generation';
 import { BreakScreen } from './screens/break/BreakScreen';
 import { CourseScreen } from './screens/course/CourseScreen';
 import { HomeScreen } from './screens/home/HomeScreen';
@@ -75,7 +75,9 @@ function RailActivity() {
             jobs.length > 1
               ? `Writing ${jobs.length} things`
               : first.kind === KIND_LESSON
-                ? 'Writing a lesson'
+                ? isDrawingPictures(first)
+                  ? 'Drawing pictures'
+                  : 'Writing a lesson'
                 : 'Suggesting concepts'
           }
           icon={<PenLine />}

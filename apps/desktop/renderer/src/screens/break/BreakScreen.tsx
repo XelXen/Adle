@@ -16,6 +16,7 @@ import {
   USUAL_BREAK_MINUTES,
 } from '../../lib/breaks';
 import {
+  isDrawingPictures,
   jobFailure,
   jobProgress,
   KIND_LESSON,
@@ -211,17 +212,25 @@ function Waiting({
   onOpen: (job: Job) => void;
 }) {
   if (writing.length === 0 && !finished) return null;
+  // A lesson that can be started while its pictures are drawn (ADR-031) is said once, as
+  // something that has arrived, and not a second time as something under way.
+  const drawing = finished !== null && writing.some((job) => job.id === finished.id);
+  const others = writing.filter((job) => job.id !== finished?.id);
   return (
     <section className={styles.waiting} aria-label="In progress">
       <h2 className="ad-eyebrow">Meanwhile</h2>
-      {finished ? <Arrived job={finished} onOpen={onOpen} /> : null}
-      {writing.map((job) => {
+      {finished ? <Arrived job={finished} drawing={drawing} onOpen={onOpen} /> : null}
+      {others.map((job) => {
         const progress = jobProgress(job, 'Queued');
         return (
           <Card key={job.id} padding="compact">
             <Stack gap={2}>
               <p className={styles.what}>
-                {job.kind === KIND_LESSON ? 'Writing your lesson' : 'Suggesting concepts'}
+                {job.kind === KIND_LESSON
+                  ? isDrawingPictures(job)
+                    ? 'Drawing your lesson’s pictures'
+                    : 'Writing your lesson'
+                  : 'Suggesting concepts'}
               </p>
               <ProgressBar label={progress.message} showLabel value={progress.value} />
             </Stack>
@@ -233,7 +242,16 @@ function Waiting({
 }
 
 /** Something that finished while the learner was resting: there when they look up. */
-function Arrived({ job, onOpen }: { job: Job; onOpen: (job: Job) => void }) {
+function Arrived({
+  job,
+  drawing,
+  onOpen,
+}: {
+  job: Job;
+  /** It is a lesson whose pictures are still being drawn. */
+  drawing: boolean;
+  onOpen: (job: Job) => void;
+}) {
   const failure = jobFailure(job);
   if (failure) {
     return (
@@ -264,7 +282,9 @@ function Arrived({ job, onOpen }: { job: Job; onOpen: (job: Job) => void }) {
       }
     >
       {lesson?.title
-        ? `“${lesson.title}” is ready. Finish your break first if you like.`
+        ? `“${lesson.title}” is ready${
+            drawing ? ', and its pictures are on their way' : ''
+          }. Finish your break first if you like.`
         : 'Finish your break first if you like.'}
     </Callout>
   );

@@ -817,6 +817,12 @@
   "description": "A lesson and the scenes it plays: what is stored and what the player loads.",
   "properties": {
     "lesson": { "$ref": "#/$defs/Lesson" },
+    "pending_scene_ids": {
+      "items": { "pattern": "^scn_[a-z0-9_]{1,40}$", "type": "string" },
+      "maxItems": 14,
+      "title": "Pending Scene Ids",
+      "type": "array"
+    },
     "scenes": {
       "items": { "$ref": "#/$defs/SceneArtifact" },
       "maxItems": 14,

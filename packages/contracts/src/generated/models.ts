@@ -425,14 +425,25 @@ export interface ProgressSummary {
   reviews_due: number;
 }
 /**
+ * Who wrote a lesson, by the names they went by when it was written.
+ *
+ */
+export interface LessonAuthor {
+  models: string[];
+  note: string;
+  provider: string;
+}
+/**
  * Everything the player needs: the validated lesson and the scenes it plays.
  *
  */
 export interface LessonForPlayer {
   lesson: PlayerLesson;
   origin: 'sample' | 'generated';
+  pending_scene_ids?: string[];
   progress: LessonProgress;
   scenes: SceneArtifact[];
+  written_by?: LessonAuthor | null;
 }
 export interface PlayerLesson {
   concept_ids: string[];
@@ -606,6 +617,7 @@ export interface LessonSummary {
   estimated_minutes: number;
   id: string;
   origin: 'sample' | 'generated';
+  pictures_pending?: number;
   progress: LessonProgress;
   segment_count: number;
   title: string;

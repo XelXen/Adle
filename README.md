@@ -145,7 +145,8 @@ of its own (4 requests a minute, 200 a day, three million tokens a day) and says
 its own.
 
 NVIDIA's models think before they write. On 2026-11-20 a lesson's text took Kimi K3.1 Pro about
-six minutes, and a lesson with its pictures about twelve; Adle says what the model is doing
+six minutes, and its pictures about as long again. You can start a lesson as soon as its text
+is written: its pictures appear in it as they are drawn. Adle says what the model is doing
 meanwhile, and you can keep using the app or take the break it offers.
 
 ## Troubleshooting

@@ -59,7 +59,7 @@ None of these is done. Each needs something only the owner has.
 | Data export, deletion, backup, and restore are tested | PASS | `e2e/data`, `test_data_copy`, `test_database`, `test_process_lifecycle`. "Export" is a copy of everything; one course alone cannot be exported (ADR-016) |
 | Light and dark themes, accessibility, and reduced motion are tested | PASS, with a gap | `e2e/appearance-a11y` (both themes, axe on every screen, reduced motion in the shell, the window's own title bar); axe on each state in the other specs, and with it that nothing pressable lies where the window is moved. Not tested with a screen reader by a person |
 | CI, unit, integration, E2E, security, and packaging checks pass | PASS locally; CI NOT RUN | The gates above on this machine. The workflow in `.github/` has never run: the repository has no remote |
-| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-030 |
+| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-031 |
 | Git history is coherent, atomic, and honest | PASS | One Conventional Commit per slice on `dev`, each with its gate results, all signed; nothing pushed |
 
 ## Known limitations

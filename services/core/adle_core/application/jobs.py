@@ -117,6 +117,14 @@ class JobContext:
             self.job_id, progress={"done": done, "total": total, "message": message}
         )
 
+    def publish(self, result: Any) -> None:
+        """Make something usable known before the work has ended (ADR-031).
+
+        A lesson can be taken while its pictures are still being drawn: whoever follows
+        the job reads which lesson it is here. What the work returns in the end replaces it.
+        """
+        self._runner._update(self.job_id, result=result)
+
 
 Work = Callable[[JobContext], Any]
 

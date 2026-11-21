@@ -64,6 +64,11 @@ export interface LessonOutcome {
   title: string;
   /** Things that did not go as planned but did not stop the lesson, in sentences. */
   notes: string[];
+  /**
+   * Pictures still being drawn. A lesson can be started as soon as its text is written
+   * (ADR-031); this is 0 once the work has ended.
+   */
+  picturesPending: number;
 }
 
 function readWrittenBy(value: unknown): WrittenBy | null {
@@ -126,16 +131,38 @@ export function readProposal(job: Job | null): Proposal | null {
   };
 }
 
-/** What a finished lesson job produced, or null if it did not produce a lesson. */
+/**
+ * The lesson a job has produced, or null if it has not produced one.
+ *
+ * There is a lesson as soon as its text is written, while the job goes on to draw its
+ * pictures: a job that is still running can already have one. A job that failed or was
+ * cancelled is never read as having one, whatever it said on the way.
+ */
 export function readLessonOutcome(job: Job | null): LessonOutcome | null {
-  if (!job || job.kind !== KIND_LESSON || job.status !== 'succeeded') return null;
+  if (!job || job.kind !== KIND_LESSON) return null;
+  if (job.status !== 'succeeded' && job.status !== 'running') return null;
   const result = job.result;
   if (!isRecord(result) || typeof result.lesson_id !== 'string') return null;
+  const pending = typeof result.pictures_pending === 'number' ? result.pictures_pending : 0;
   return {
     lessonId: result.lesson_id,
     title: typeof result.title === 'string' ? result.title : '',
     notes: strings(result.notes),
+    picturesPending: job.status === 'running' ? Math.max(0, Math.round(pending)) : 0,
   };
+}
+
+/** Whether a job has a lesson to start already and is still drawing its pictures. */
+export function isDrawingPictures(job: Job | null): boolean {
+  return job !== null && job.status === 'running' && readLessonOutcome(job) !== null;
+}
+
+/**
+ * How long until a lesson can be started, to put after what is sent. The wait is for its
+ * text: the pictures are drawn while the learner is already in it.
+ */
+export function lessonWaitNote(wait: string | null): string {
+  return wait ? ` Ready to start in ${wait}. Its pictures follow.` : '';
 }
 
 export interface JobProgress {
@@ -199,4 +226,47 @@ export function refusalOf(error: unknown): JobFailure {
  */
 export function keptNeeds(proposal: Proposal, selected: ReadonlySet<number>, index: number) {
   return (proposal.concepts[index]?.needs ?? []).filter((need) => selected.has(need.index));
+}
+
+/** What to tell the learner about a lesson job, if anything. */
+export interface LessonNotice {
+  tone: 'success' | 'info';
+  title: string;
+  description: string;
+}
+
+/**
+ * A title and what there is to say about it, as one line. The title gets a full stop of
+ * its own when something follows, so that the two do not run together.
+ */
+export function titled(title: string, about: readonly string[]): string {
+  const said = about.filter(Boolean);
+  if (said.length === 0) return title;
+  if (!title) return said.join(' ');
+  return [/[.!?…]$/.test(title) ? title : `${title}.`, ...said].join(' ');
+}
+
+/**
+ * What to say when a lesson job has a lesson to start, and when it has ended.
+ *
+ * The lesson is announced once: when it can be started, which is before its pictures are
+ * drawn (ADR-031). The end of the work is only worth a second word if something about the
+ * pictures needs saying: one could not be made, or they were stopped.
+ */
+export function lessonNotice(job: Job, saidBefore: boolean): LessonNotice | null {
+  const outcome = readLessonOutcome(job);
+  if (!outcome) return null;
+  if (!saidBefore) {
+    const about =
+      outcome.picturesPending > 0 ? ['Its pictures are still being drawn.'] : outcome.notes;
+    return {
+      tone: 'success',
+      title: 'Lesson ready',
+      description: titled(outcome.title, about),
+    };
+  }
+  if (job.status === 'succeeded' && outcome.notes.length > 0) {
+    return { tone: 'info', title: 'About its pictures', description: outcome.notes.join(' ') };
+  }
+  return null;
 }

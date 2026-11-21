@@ -786,16 +786,35 @@
         "title": "LearningPlan",
         "type": "object"
       },
+      "LessonAuthor": {
+        "description": "Who wrote a lesson, by the names they went by when it was written.",
+        "properties": {
+          "models": { "items": { "type": "string" }, "title": "Models", "type": "array" },
+          "note": { "title": "Note", "type": "string" },
+          "provider": { "title": "Provider", "type": "string" }
+        },
+        "required": ["provider", "models", "note"],
+        "title": "LessonAuthor",
+        "type": "object"
+      },
       "LessonForPlayer": {
         "description": "Everything the player needs: the validated lesson and the scenes it plays.",
         "properties": {
           "lesson": { "$ref": "#/components/schemas/PlayerLesson" },
           "origin": { "enum": ["sample", "generated"], "title": "Origin", "type": "string" },
+          "pending_scene_ids": {
+            "items": { "type": "string" },
+            "title": "Pending Scene Ids",
+            "type": "array"
+          },
           "progress": { "$ref": "#/components/schemas/LessonProgress" },
           "scenes": {
             "items": { "$ref": "#/components/schemas/SceneArtifact" },
             "title": "Scenes",
             "type": "array"
+          },
+          "written_by": {
+            "anyOf": [{ "$ref": "#/components/schemas/LessonAuthor" }, { "type": "null" }]
           }
         },
         "required": ["lesson", "scenes", "origin", "progress"],
@@ -882,6 +901,7 @@
           "estimated_minutes": { "title": "Estimated Minutes", "type": "integer" },
           "id": { "title": "Id", "type": "string" },
           "origin": { "enum": ["sample", "generated"], "title": "Origin", "type": "string" },
+          "pictures_pending": { "default": 0, "title": "Pictures Pending", "type": "integer" },
           "progress": { "$ref": "#/components/schemas/LessonProgress" },
           "segment_count": { "title": "Segment Count", "type": "integer" },
           "title": { "title": "Title", "type": "string" }

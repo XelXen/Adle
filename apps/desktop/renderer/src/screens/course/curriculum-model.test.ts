@@ -310,4 +310,13 @@ describe('lessons of a concept', () => {
       }),
     ).toBe('About 1 minute · Completed');
   });
+
+  it('says so while a lesson’s pictures are still being drawn', () => {
+    expect(describeLesson({ ...lesson('a', 'weights'), pictures_pending: 2 })).toBe(
+      'About 8 minutes · Not started · Pictures on their way',
+    );
+    expect(describeLesson({ ...lesson('a', 'weights'), pictures_pending: 0 })).toBe(
+      'About 8 minutes · Not started',
+    );
+  });
 });

@@ -34,7 +34,7 @@ import {
 import { GenerationStatus } from '../../components/GenerationStatus';
 import { callCore, describeError } from '../../lib/core-client';
 import { formatRelativeDay } from '../../lib/format';
-import { type JobFailure, lessonDisclosure } from '../../lib/generation';
+import { type JobFailure, lessonDisclosure, lessonWaitNote } from '../../lib/generation';
 import { isJobActive } from '../../lib/use-job';
 import styles from './Curriculum.module.css';
 import {
@@ -101,6 +101,11 @@ export const STRATEGY_CHOICES: readonly { value: TeachingStrategy | ''; label: s
 export interface LessonGeneration {
   /** The job writing a lesson for this concept, if this screen knows of one. */
   job: Job | null;
+  /**
+   * The lesson that job is writing can be started already, and is in the list: what is
+   * still under way is its pictures (ADR-031).
+   */
+  lessonReady: boolean;
   /** The request to start one is on its way. */
   starting: boolean;
   /** Starting was refused before a job existed. */
@@ -329,13 +334,17 @@ export function ConceptDetail({
           subject="the lesson"
           waitingText="Queued"
           usualSeconds={generation.usualSeconds}
+          lessonReady={generation.lessonReady}
           onCancel={generation.onCancel}
           onRetry={() => generation.onCreate(strategy || null)}
           onDismiss={generation.onDismiss}
         />
         {/* While work is under way, or its failure is on screen with its own way forward,
-            a second button to start the same thing would only be noise. */}
-        {generation.starting ||
+            a second button to start the same thing would only be noise. Nor is one offered
+            before the lessons there already are known: it would say "a lesson" where it
+            means "another". */}
+        {lessons.status === 'loading' ||
+        generation.starting ||
         isJobActive(generation.job) ||
         generation.refusal !== null ||
         generation.job?.status === 'failed' ||
@@ -371,7 +380,7 @@ export function ConceptDetail({
                 ? 'Add a learning objective first.'
                 : `Sends ${lessonDisclosure(hasMaterials ? 'some' : 'none')} to ${
                     generation.destination
-                  }.${generation.usualWait ? ` Takes ${generation.usualWait}.` : ''}`}
+                  }.${lessonWaitNote(generation.usualWait)}`}
             </p>
           </div>
         )}

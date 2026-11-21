@@ -27,6 +27,11 @@ export interface GenerationStatusProps {
    * core could say (`provider.status`). Said as "about", and what a break is sized by.
    */
   usualSeconds?: number | null;
+  /**
+   * The lesson this job is writing can be started already: what is still under way is its
+   * pictures (ADR-031). Stopping then stops the pictures and keeps the lesson.
+   */
+  lessonReady?: boolean;
   onCancel: () => void;
   onRetry: () => void;
   /** Put a failure or cancellation away. */
@@ -45,6 +50,7 @@ export function GenerationStatus({
   subject,
   waitingText,
   usualSeconds = null,
+  lessonReady = false,
   onCancel,
   onRetry,
   onDismiss,
@@ -65,36 +71,55 @@ export function GenerationStatus({
               label={progress.message}
               showLabel
               value={progress.value}
+              // "Drawing picture 1 of 2" counts for itself: no "Step 2 of 3" beside it.
               valueText={
-                job && steps > 0
+                job && steps > 0 && !lessonReady
                   ? `Step ${Math.min(job.progress_done + 1, steps)} of ${steps}`
                   : undefined
               }
             />
             <p className={styles.note}>
-              {usualSeconds
-                ? `Usually takes ${aboutHowLong(usualSeconds)}. `
-                : 'This can take a few minutes. '}
-              You’ll be notified when it’s ready.
+              {lessonReady
+                ? 'You can start the lesson now. Its pictures appear in it as they’re drawn.'
+                : `${
+                    usualSeconds
+                      ? `Usually takes ${aboutHowLong(usualSeconds)}. `
+                      : 'This can take a few minutes. '
+                  }You’ll be notified when it’s ready.`}
             </p>
           </div>
           <div className={styles.actions}>
-            {/* Minutes of waiting are better spent away from the screen. */}
-            <Button
-              size="small"
-              icon={<Coffee />}
-              onClick={() => {
-                if (!rest.times) rest.start(suggestedBreakMinutes(usualSeconds));
-                // Back here afterwards: this is where what is being written will be.
-                rest.returnVia(null);
-                navigate({ name: 'break' });
-              }}
-            >
-              {rest.times ? 'Back to your break' : 'Take a break'}
-            </Button>
-            <Button size="small" variant="tertiary" disabled={!job} onClick={onCancel}>
-              Cancel
-            </Button>
+            {/* Minutes of waiting are better spent away from the screen. Once the lesson
+                can be started there is nothing left to wait for. */}
+            {lessonReady ? null : (
+              <Button
+                size="small"
+                icon={<Coffee />}
+                onClick={() => {
+                  if (!rest.times) rest.start(suggestedBreakMinutes(usualSeconds));
+                  // Back here afterwards: this is where what is being written will be.
+                  rest.returnVia(null);
+                  navigate({ name: 'break' });
+                }}
+              >
+                {rest.times ? 'Back to your break' : 'Take a break'}
+              </Button>
+            )}
+            {lessonReady ? (
+              <Button
+                size="small"
+                variant="tertiary"
+                disabled={!job}
+                aria-label="Stop drawing pictures"
+                onClick={onCancel}
+              >
+                Stop
+              </Button>
+            ) : (
+              <Button size="small" variant="tertiary" disabled={!job} onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
           </div>
         </Stack>
       </Card>

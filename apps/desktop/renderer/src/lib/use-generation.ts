@@ -26,9 +26,14 @@ export interface Generation {
  * something, follow it, stop it, and put away what has finished. One place for
  * every screen that starts such work, so each behaves the same way.
  */
-export function useGeneration(courseId: string, onFinished: (job: Job) => void): Generation {
+export function useGeneration(
+  courseId: string,
+  onFinished: (job: Job) => void,
+  /** Something can be used before the work has ended: a lesson whose pictures follow. */
+  onUsable?: (job: Job) => void,
+): Generation {
   const toast = useToast();
-  const jobs = useCourseJobs(courseId, onFinished);
+  const jobs = useCourseJobs(courseId, onFinished, onUsable);
   const { refresh } = useWriting();
   const [starting, setStarting] = useState<ReadonlySet<string>>(new Set());
   const [refusals, setRefusals] = useState<ReadonlyMap<string, JobFailure>>(new Map());

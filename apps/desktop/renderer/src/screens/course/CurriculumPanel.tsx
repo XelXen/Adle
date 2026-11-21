@@ -33,12 +33,14 @@ import { pluralise } from '../../lib/format';
 import { destination, usualWait } from '../../lib/provider';
 import {
   authorName,
+  isDrawingPictures,
   KIND_LESSON,
   KIND_PROPOSAL,
   readLessonOutcome,
   readProposal,
 } from '../../lib/generation';
 import { useGeneration } from '../../lib/use-generation';
+import { useLessonNotices } from '../../lib/use-lesson-notices';
 import { isJobActive } from '../../lib/use-job';
 import { useResource } from '../../lib/use-resource';
 import {
@@ -104,21 +106,24 @@ export function CurriculumPanel({ course }: { course: Course }) {
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [removing, setRemoving] = useState(false);
 
-  const generation = useGeneration(courseId, (job) => {
-    if (job.kind === KIND_LESSON) {
-      lessons.reload();
-      const outcome = readLessonOutcome(job);
-      if (outcome) {
-        toast.show({
-          tone: 'success',
-          title: 'Lesson ready',
-          description: [outcome.title, ...outcome.notes].join(' '),
-        });
+  const sayLesson = useLessonNotices();
+  const generation = useGeneration(
+    courseId,
+    (job) => {
+      if (job.kind === KIND_LESSON) {
+        lessons.reload();
+        sayLesson(job);
+      } else if (job.kind === KIND_PROPOSAL && readProposal(job)) {
+        setDialog((open) => open ?? { kind: 'proposal', job });
       }
-    } else if (job.kind === KIND_PROPOSAL && readProposal(job)) {
-      setDialog((open) => open ?? { kind: 'proposal', job });
-    }
-  });
+    },
+    (job) => {
+      // A lesson can be started as soon as its text is written: it is listed from then on.
+      if (job.kind !== KIND_LESSON) return;
+      lessons.reload();
+      sayLesson(job);
+    },
+  );
 
   const { jobs, starting, refusals, begin, putAway } = generation;
   const cancelJob = generation.cancel;
@@ -280,6 +285,11 @@ export function CurriculumPanel({ course }: { course: Course }) {
     setRemoving(true);
     try {
       await callCore('lessons.delete', { path: { lesson_id: lesson.id } });
+      // Its pictures may still have been on their way. That work stops with the lesson,
+      // and has nothing more to say.
+      for (const job of jobs.jobs) {
+        if (readLessonOutcome(job)?.lessonId === lesson.id) jobs.forget(job.id);
+      }
       // Which concepts have a lesson, and what is worth doing next, may both have changed.
       lessons.reload();
       curriculum.reload();
@@ -517,6 +527,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
                   lessons={lessonsFor(selected)}
                   generation={{
                     job: jobs.find(KIND_LESSON, selected.id),
+                    lessonReady: isDrawingPictures(jobs.find(KIND_LESSON, selected.id)),
                     starting: starting.has(selected.id),
                     refusal: refusals.get(selected.id) ?? null,
                     destination: destination(providerStatus, 'lesson'),

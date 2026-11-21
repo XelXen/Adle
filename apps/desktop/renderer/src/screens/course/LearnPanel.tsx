@@ -1,7 +1,7 @@
 import { CalendarClock, PencilLine, Sparkles } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 
-import type { ConceptProgress, Course, Hypothesis, NextStep } from '@adle/contracts';
+import type { ConceptProgress, Course, Hypothesis, Job, NextStep } from '@adle/contracts';
 import { Badge, Button, ErrorState, LoadingState, useToast } from '@adle/design-system';
 
 import { useRouter } from '../../app/router';
@@ -11,7 +11,12 @@ import { SessionSummary } from '../../components/SessionSummary';
 import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
 import { destination, usualWait } from '../../lib/provider';
-import { KIND_LESSON, lessonDisclosure, readLessonOutcome } from '../../lib/generation';
+import {
+  isDrawingPictures,
+  KIND_LESSON,
+  lessonDisclosure,
+  lessonWaitNote,
+} from '../../lib/generation';
 import {
   formatWait,
   hypothesisLabel,
@@ -22,6 +27,7 @@ import {
 } from '../../lib/learning';
 import { useGeneration } from '../../lib/use-generation';
 import { isJobActive } from '../../lib/use-job';
+import { useLessonNotices } from '../../lib/use-lesson-notices';
 import { useResource } from '../../lib/use-resource';
 import { KNOWLEDGE_TONE } from './ConceptDetail';
 import styles from './Learn.module.css';
@@ -46,19 +52,15 @@ export function LearnPanel({ course }: { course: Course }) {
   const provider = useResource('provider-status', () => callCore('provider.status'));
   const [dismissing, setDismissing] = useState<string | null>(null);
 
-  const generation = useGeneration(courseId, (job) => {
+  const sayLesson = useLessonNotices();
+  // A lesson changes what is worth doing next: when it can be started, which is before its
+  // pictures are drawn, and again when the work has ended.
+  const lessonChanged = (job: Job): void => {
     if (job.kind !== KIND_LESSON) return;
-    // A new lesson changes what is worth doing next.
     overview.reload();
-    const outcome = readLessonOutcome(job);
-    if (outcome) {
-      toast.show({
-        tone: 'success',
-        title: 'Lesson ready',
-        description: [outcome.title, ...outcome.notes].join(' '),
-      });
-    }
-  });
+    sayLesson(job);
+  };
+  const generation = useGeneration(courseId, lessonChanged, lessonChanged);
 
   if (overview.resource.status === 'loading') {
     return <LoadingState title="Planning your next step…" />;
@@ -86,6 +88,16 @@ export function LearnPanel({ course }: { course: Course }) {
   /** The control that asks for a lesson, with what it sends; or where that work stands. */
   const lessonControl = (_step: NextStep, conceptId: string, primary: boolean): ReactNode => {
     const job = generation.jobs.find(KIND_LESSON, conceptId);
+    if (isDrawingPictures(job)) {
+      // Said once, above. Another lesson on this concept can be asked for when this one
+      // has its pictures: one piece of long work at a time.
+      return (
+        <p className={styles.aiNote}>
+          A new lesson on this concept is getting its pictures. You can create another when they’re
+          done.
+        </p>
+      );
+    }
     const starting = generation.starting.has(conceptId);
     const refusal = generation.refusals.get(conceptId) ?? null;
     const settled =
@@ -121,7 +133,7 @@ export function LearnPanel({ course }: { course: Course }) {
             </div>
             <p className={styles.aiNote}>
               Sends {lessonDisclosure(course.source_count > 0 ? 'some' : 'none')} to{' '}
-              {destination(providerStatus, 'lesson')}.{lessonWait ? ` Takes ${lessonWait}.` : ''}
+              {destination(providerStatus, 'lesson')}.{lessonWaitNote(lessonWait)}
             </p>
           </>
         ) : null}
@@ -160,6 +172,21 @@ export function LearnPanel({ course }: { course: Course }) {
 
   return (
     <div className={styles.panel}>
+      {/* A lesson that can be started while its pictures are still being drawn. */}
+      {generation.jobs.jobs.filter(isDrawingPictures).map((job) => (
+        <GenerationStatus
+          key={job.id}
+          job={job}
+          starting={false}
+          refusal={null}
+          subject="the lesson"
+          waitingText="Queued"
+          lessonReady
+          onCancel={() => generation.cancel(job)}
+          onRetry={() => undefined}
+          onDismiss={() => undefined}
+        />
+      ))}
       <section className={styles.section} aria-labelledby={nextId}>
         <h2 id={nextId} className={styles.heading}>
           Up next

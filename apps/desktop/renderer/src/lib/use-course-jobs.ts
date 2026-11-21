@@ -24,14 +24,22 @@ export interface CourseJobs {
  * Work that was already under way when the screen opened is picked up, so
  * leaving a course and coming back does not lose sight of a lesson that is
  * being written. `onFinished` fires once for each job that ends while the
- * screen is open.
+ * screen is open. `onUsable` fires once for a job that has something to use before it
+ * ends: a lesson that can be started while its pictures are still being drawn.
  */
-export function useCourseJobs(courseId: string, onFinished: (job: Job) => void): CourseJobs {
+export function useCourseJobs(
+  courseId: string,
+  onFinished: (job: Job) => void,
+  onUsable?: (job: Job) => void,
+): CourseJobs {
   const [jobs, setJobs] = useState<ReadonlyMap<string, Job>>(new Map());
   const finishedCallback = useRef(onFinished);
+  const usableCallback = useRef(onUsable);
   const reported = useRef(new Set<string>());
+  const usable = useRef(new Set<string>());
   useEffect(() => {
     finishedCallback.current = onFinished;
+    usableCallback.current = onUsable;
   });
 
   useEffect(() => {
@@ -39,6 +47,9 @@ export function useCourseJobs(courseId: string, onFinished: (job: Job) => void):
     callCore('jobs.list_active', { path: { course_id: courseId } }).then(
       (found) => {
         if (cancelled) return;
+        // What was usable before this screen opened is on the screen already: it is not
+        // news here, and is not said again.
+        for (const job of found.jobs) if (job.result != null) usable.current.add(job.id);
         setJobs((current) => {
           const next = new Map(current);
           // What this screen already follows is at least as fresh as the list.
@@ -70,6 +81,10 @@ export function useCourseJobs(courseId: string, onFinished: (job: Job) => void):
           (next) => {
             if (cancelled) return;
             setJobs((current) => new Map(current).set(id, next));
+            if (isJobActive(next) && next.result != null && !usable.current.has(id)) {
+              usable.current.add(id);
+              usableCallback.current?.(next);
+            }
             if (!isJobActive(next) && !reported.current.has(id)) {
               reported.current.add(id);
               finishedCallback.current(next);

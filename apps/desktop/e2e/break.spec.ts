@@ -68,7 +68,7 @@ test.describe('waiting for something to be written', () => {
     await detail(page).getByRole('button', { name: 'Create another lesson with AI' }).click();
     await expect(detail(page).getByRole('progressbar')).toBeVisible();
     await expect(detail(page)).toContainText(
-      'Usually takes about 3 minutes. You’ll be notified when it’s ready.',
+      'Usually takes about a minute. You’ll be notified when it’s ready.',
     );
     // What is being written is in the rail, one click from anywhere.
     await expect(now(page).getByRole('button', { name: 'Writing a lesson' })).toBeVisible();
@@ -103,26 +103,42 @@ test.describe('waiting for something to be written', () => {
     await expect(detail(page).getByRole('button', { name: 'Back to your break' })).toBeVisible();
 
     // ---- It is ready while the learner is elsewhere, in another window ----
+    // Ready means it can be started: its text is written. Its pictures are still being
+    // drawn then (here, for as long as this test holds them back).
     await page.getByRole('navigation').getByRole('button', { name: 'Settings' }).click();
     await adle.setFocused(false);
-    provider.release();
+    provider.hold('scene');
+    provider.pass();
     const told = page.getByRole('status').filter({ hasText: 'Your lesson is ready' });
     await expect(told).toBeVisible({ timeout: 60_000 });
-    await expect(told).toContainText(WRITTEN);
+    await expect(told).toContainText(`${WRITTEN}. Its pictures are still being drawn.`);
     // The computer says so too. Its words are fixed: nothing of the lesson is in them.
     await expect
       .poll(() => adle.notices())
       .toEqual([{ title: 'Your lesson is ready', body: 'Open Adle to start it.' }]);
     await adle.setFocused(true);
     await expect(now(page).getByRole('button', { name: 'Writing a lesson' })).toHaveCount(0);
+    await expect(now(page).getByRole('button', { name: 'Drawing pictures' })).toBeVisible();
 
-    // ---- The break has it waiting, and opening it ends the break ----
+    // ---- The break has it waiting, said once, and opening it ends the break ----
     await now(page)
       .getByRole('button', { name: /^On a break/ })
       .click();
     await expect(meanwhile(page)).toContainText('Your lesson is ready');
-    await expect(meanwhile(page)).toContainText(`“${WRITTEN}” is ready.`);
+    await expect(meanwhile(page)).toContainText(
+      `“${WRITTEN}” is ready, and its pictures are on their way.`,
+    );
+    // Not a second time, as something still being written.
+    await expect(meanwhile(page).getByRole('progressbar')).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
     await screenshot(page, 'break-with-the-lesson-ready');
+
+    // The pictures arrive: nothing more is said, by the app or by the computer.
+    provider.release();
+    await expect(meanwhile(page)).toContainText(`“${WRITTEN}” is ready. Finish your break`, {
+      timeout: 30_000,
+    });
+    expect(await adle.notices()).toHaveLength(1);
     await meanwhile(page).getByRole('button', { name: 'Open lesson' }).click();
     await expect(page.getByRole('heading', { name: WRITTEN, level: 1 })).toBeVisible();
     await page.getByRole('button', { name: 'Back to course' }).click();

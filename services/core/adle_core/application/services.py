@@ -119,6 +119,9 @@ def build_services(
     courses = CourseService(database, source_files)
     curriculum = CurriculumService(database, retriever)
     lessons = LessonService(database)
+    # Nothing is being drawn while the core starts: a lesson still waiting for a picture
+    # was left by a run that ended, and that picture is not coming (ADR-031).
+    lessons.settle_unfinished()
     asks = AskService(database)
     learner = LearnerService(database)
     item_mask = ItemMask(_installation_secret(settings.item_key_path))

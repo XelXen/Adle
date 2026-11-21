@@ -171,6 +171,17 @@ everything and decides nothing.
 - **A model request goes through `ModelGateway.complete`**, from inside a job. Nothing else
   may call `ChatClient`. Do not add sampling parameters, retries, or a second request "to fix
   it": the number of requests per job is fixed in `application/generation.py` (ADR-012).
+- **A lesson is stored as soon as its text is written** (ADR-031), with the pictures it is
+  waiting for in `pending_scenes`. A picture reaches a stored lesson only through
+  `LessonService.settle_scene`, which puts the whole lesson through `parse_bundle` again:
+  with the picture, or with that part turned into words. Nothing may be left waiting once
+  the work has ended, however it ended (`settle_unfinished`, also run when the core
+  starts). A job says what can already be used with `JobContext.publish`; a lesson job's
+  result therefore exists while it is still running.
+- **Removing something stops the work for it** (`stop_for_lesson`, `stop_for_course`, called
+  by the routes that delete). Nothing more is asked of a provider for what the learner has
+  thrown away. A test of this must not wait longer than a stand-in for a slow answer
+  takes to let go by itself, or it passes without the stopping.
 - **Jobs run in two lanes** (`application/jobs.py`). Long work (an import, a lesson, a list
   of concepts) runs one at a time in the main lane. What the learner waits for (an ask, a
   check of a key) runs in the quick lane, so it never queues behind a lesson. One request

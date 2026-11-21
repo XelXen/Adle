@@ -52,6 +52,10 @@ def get_lesson(lesson_id: str, services: ServicesDep) -> schemas.LessonForPlayer
         scenes=loaded.scenes,
         origin=loaded.origin,
         progress=schemas.LessonProgress.model_validate(loaded.progress),
+        pending_scene_ids=loaded.pending_scene_ids,
+        written_by=(
+            schemas.LessonAuthor.model_validate(loaded.written_by) if loaded.written_by else None
+        ),
     )
 
 
@@ -137,4 +141,6 @@ def delete_ask(lesson_id: str, ask_id: str, services: ServicesDep) -> HttpRespon
 @router.delete("/lessons/{lesson_id}", operation_id="lessons.delete", status_code=204)
 def delete_lesson(lesson_id: str, services: ServicesDep) -> HttpResponse:
     services.lessons.delete(lesson_id)
+    # Its pictures may still have been on their way (ADR-031): that work stops with it.
+    services.generation.stop_for_lesson(lesson_id)
     return HttpResponse(status_code=204)

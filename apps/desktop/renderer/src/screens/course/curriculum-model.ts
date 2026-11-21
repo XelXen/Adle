@@ -294,5 +294,7 @@ export function describeLesson(lesson: LessonSummary): string {
     : progress.started
       ? `Part ${Math.min(progress.position + 1, parts)} of ${parts}`
       : 'Not started';
-  return `About ${pluralise(lesson.estimated_minutes, 'minute')} · ${place}`;
+  // A lesson can be started while its pictures are still being drawn (ADR-031).
+  const pictures = (lesson.pictures_pending ?? 0) > 0 ? ' · Pictures on their way' : '';
+  return `About ${pluralise(lesson.estimated_minutes, 'minute')} · ${place}${pictures}`;
 }

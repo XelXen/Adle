@@ -54,9 +54,12 @@ async function openSampleLesson(page: Page): Promise<void> {
     page.getByRole('heading', { name: 'Introduction to neural networks', level: 1 }),
   ).toBeVisible();
   await openCourseTab(page, 'Curriculum');
+  // The lesson's own button, by what it does. Not "anything that says lesson": the button
+  // that asks for a new one says that too.
   await page
     .getByRole('region', { name: 'Weights and bias' })
-    .getByRole('button', { name: /lesson|Continue|again/i })
+    .getByRole('list', { name: 'Lessons for this concept' })
+    .getByRole('button', { name: /^(Start lesson|Continue|Replay lesson):/ })
     .first()
     .click();
   await expect(page.getByText('Part 1 of 10')).toBeVisible();

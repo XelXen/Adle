@@ -110,8 +110,10 @@ end-to-end suite can drive it: never hand that one to anyone.
 - The data as a whole (save a copy, restore, delete everything) is touched only through
   `window.adle.data`, whose functions take no arguments: the path or the confirmation comes
   from a dialog the main process opens. Restoring happens only while the core starts (ADR-016).
-- A lesson enters the database only through `lessons.bundle.parse_bundle`. Answer keys stay in
-  the core: the renderer gets the player view and asks the core to score (ADR-010).
+- A lesson enters the database only through `lessons.bundle.parse_bundle`, and a picture
+  joins a stored lesson only through `LessonService.settle_scene`, which passes the whole
+  lesson through it again (ADR-031). Answer keys stay in the core: the renderer gets the
+  player view and asks the core to score (ADR-010).
 
 **Privacy**
 
@@ -125,6 +127,9 @@ end-to-end suite can drive it: never hand that one to anyone.
 - Never shame, never trap the learner in repetition, never show mastery as a precise percentage,
   never mark mastery from one answer. Always say why the next step was chosen.
 - A break is offered and never counted: no streak, total, or reminder (ADR-026).
+- A lesson is not kept back for its pictures (ADR-031): it can be started when its text is
+  written, the learner is told once, and a picture that arrives is never sprung on someone
+  in the middle of a part. Removing a lesson or a course stops the work for it.
 - A question asked during a lesson is a note beside one part, not a chat (ADR-024). It never
   gets the answer to a question the lesson is asking.
 - Every animation has a text equivalent; every scene control has a keyboard-operable mirror.

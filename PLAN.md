@@ -977,7 +977,7 @@ Status is updated as work proceeds. The detailed, current picture (test results,
 actions) is in `docs/engineering/PROJECT_STATE.md`. A milestone is "Done" only when its acceptance
 criteria were demonstrated by tests that were actually run.
 
-_Last updated: 2026-11-20._
+_Last updated: 2026-11-21._
 
 | Milestone | Status | Notes and acceptance evidence |
 |---|---|---|
@@ -998,6 +998,14 @@ review and a correctness review fixed with a test for each (ADR-029), and a titl
 app's own (ADR-030). Evidence: the gate in `PROJECT_STATE.md`, and in particular
 `test_api_boundary`, `test_prompt_quoting`, `session-hardening.test.ts`,
 `dropped.test.ts`, `e2e/security` and `e2e/appearance-a11y`.
+
+On 2026-11-21, the largest thing then left from section 12.1: **a lesson opens as soon as
+its words are written**, and its pictures arrive while the learner studies (ADR-031). The
+wait before a learner can begin went from about twelve minutes to about six through the
+provider that works today. Evidence: `test_lesson_before_pictures`, the renderer's
+`use-lesson-pictures.test.tsx`, `generation.test.ts` and `WritingContext.test.ts`, and two
+journeys in `e2e/generation` (a lesson taken while its pictures are held back, each arriving
+in its turn; the pictures stopped; the lesson removed while they are drawn).
 
 ### Deviations from this plan (each has an ADR)
 
@@ -1026,8 +1034,10 @@ app's own (ADR-030). Evidence: the gate in `PROJECT_STATE.md`, and in particular
 - **A learner can ask a question during a lesson** (section 3.3's "request a simpler
   explanation, derivation, example"), as a note beside the part and not as a chat (ADR-024).
 - **A break is offered while a lesson is written**, and the learner is told when it is ready
-  by a notification with fixed words. Section 12's "display the first ready segment while
-  later segments are generated" is still not done (ADR-026).
+  by a notification with fixed words (ADR-026). Section 12's "display the first ready segment
+  while later segments are generated" is done at the grain the requests allow: the lesson
+  opens when its text is written, and its pictures arrive while the learner studies
+  (ADR-031).
 - **The typefaces are Geist** (sans, mono, serif), at the owner's request (ADR-025).
 - **There are two AI providers, not one.** Section 6.1 names AIHubMix and one model. The
   owner asked for NVIDIA NIM beside it: Kimi K3.1 Pro, with Mistral Large 4 and then GLM 5.3
@@ -1050,8 +1060,10 @@ app's own (ADR-030). Evidence: the gate in `PROJECT_STATE.md`, and in particular
 - **"Export" is a copy of everything, not of one course.** A single file holds all courses and
   can be restored here or on another computer; a restore is done while the core starts and can
   be undone. Exporting one course to share with someone else is not built (ADR-016).
-- **A lesson is generated whole**, in one request plus one per scene, not progressively segment
-  by segment: there is nothing to stream in parts (ADR-012).
+- **A lesson's text is generated whole**, in one request, not progressively segment by segment:
+  there is nothing to stream in parts (ADR-012). The lesson is stored and can be started as
+  soon as that text is written; its pictures, one request each, are added as they are drawn
+  (ADR-031).
 - **Runtime quota defaults** are 4 requests a minute, 90 a day, and 900,000 tokens a day, as
   section 6.3 says; sampling parameters are never sent, as the provider advises for this model
   (ADR-012).

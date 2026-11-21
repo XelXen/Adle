@@ -190,6 +190,16 @@
   gap: var(--ad-space-2);
 }
 
+/* A picture that arrived after its part had begun: offered, not sprung. */
+.pictureReady {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-3);
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
 .alternativeText {
   align-self: stretch;
   padding: var(--ad-space-3) var(--ad-space-4);

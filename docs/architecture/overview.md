@@ -221,20 +221,30 @@ sequenceDiagram
   participant P as Provider
   UI->>G: generation.generate_lesson (concept)
   G-->>UI: job (queued)
-  loop the lesson, then each scene (fixed, small number)
-    G->>Q: complete(request)
-    Note over Q: allowed? wait? used up for today?<br/>write the request down, then send
-    Q->>P: POST /chat/completions (key in one header)
-    P-->>Q: streamed answer
+  G->>Q: complete(the lesson's text)
+  Note over Q: allowed? wait? used up for today?<br/>write the request down, then send
+  Q->>P: POST /chat/completions (key in one header)
+  P-->>Q: streamed answer
+  Q-->>G: text + usage
+  Note over G: draft -> Lesson IR (ids, citations,<br/>durations assigned here) -> validate
+  G->>G: parse_bundle, store (pictures still to come)
+  G-->>UI: jobs.get: running, with the lesson's id
+  Note over UI: the lesson is listed and can be started
+  loop each picture (at most two)
+    G->>Q: complete(one scene file)
     Q-->>G: text + usage
-    Note over G: draft -> Lesson IR (ids, citations,<br/>durations assigned here) -> validate
+    G->>G: settle_scene: parse_bundle again,<br/>the picture attached or said in words
   end
-  G->>G: parse_bundle, store
-  UI->>G: jobs.get (polling): progress, then result
+  UI->>G: jobs.get (polling): progress, then the final result
 ```
 
 - The model writes a forgiving draft. The core compiles it into the Lesson IR, so no identifier
   or citation comes from the model.
+- A lesson is stored when its text is written and checked, and can be started then; each
+  picture is added to it when it is drawn. A picture that does not arrive (it could not be
+  made, the learner stopped the work, the app was closed) is settled in words, so nothing
+  is left waiting. Removing the lesson or its course stops the work. The player is told
+  which pictures are still to come and looks for them while any are. See ADR-031.
 - The gateway keeps a local count for each provider, under that provider's limits (or under
   Adle's own, where the provider publishes none). The interface shows it as an estimate.
 - Requests go to a provider the learner gave a key to (AIHubMix or NVIDIA NIM), with that

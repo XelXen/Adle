@@ -15,8 +15,10 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   (ADR-024), and a break while a lesson is written (ADR-026). Then, after the owner looked
   at the app and asked for a review of it: neutral colours with a near-black dark theme
   (ADR-027), every sentence rewritten short and plain (ADR-028), the findings of two reviews
-  fixed (ADR-029), and a title bar of the app's own (ADR-030). What is left needs the owner;
-  see "Next actions"
+  fixed (ADR-029), and a title bar of the app's own (ADR-030). And then the largest thing
+  that was left from the plan: **a lesson opens as soon as its words are written**, and its
+  pictures arrive while the learner studies (ADR-031). What is left needs the owner; see
+  "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -103,8 +105,14 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   what to add. Suggestions that finish while the learner is elsewhere wait to be reviewed or
   discarded. Nothing is added without the learner choosing it.
 - **Generated lessons:** "Create a lesson with AI" on a concept (and "Create lesson" on
-  the Learn tab) says what is sent, where, and about how long it takes, shows progress and
-  Cancel, and adds a lesson that plays like any other. For another lesson on the same concept
+  the Learn tab) says what is sent, where, and about how long until the lesson can be
+  started, shows progress and Cancel, and adds a lesson that plays like any other.
+  **The lesson is there as soon as its text is written** (ADR-031): listed with "Pictures on
+  their way", announced once, and ready to start while its pictures are drawn. A part whose
+  picture has not arrived says so and gives the same idea in words; a picture that arrives
+  takes its place in a part that has not begun, and is offered ("The picture is ready. Show
+  picture") in one that has. "Stop" then stops the pictures and keeps the lesson; removing
+  the lesson, or its course, stops the work. For another lesson on the same concept
   the learner can choose how it should explain; left alone, Adle uses a way not used yet. A
   concept has at most four lessons. No key, a rate-limit wait, a used-up day, a provider failure, and a cancelled job each
   have their own words and their own way forward. While a model is at work the job says
@@ -114,7 +122,9 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   asked, and that is said while it happens ("Kimi K3.1 Pro is not available at the moment.
   Asking Mistral Large 4 instead") and afterwards: in the notice that a lesson is ready, and
   in the review of suggested concepts, which names its author ("Suggested by Mistral Large 4
-  on NVIDIA NIM").
+  on NVIDIA NIM"). A lesson a model wrote says so under its title, in one line ("Written by
+  Kimi K3.1 Pro on NVIDIA NIM. AI can make mistakes."): who wrote it is kept with the
+  lesson.
 - **Narration aloud:** the lesson is read by a voice installed on the computer (never an online
   one), with "Read aloud" and "Transcript" switches in the lesson. Without a voice, or if the
   voice fails, the narration is shown as text at the learner's reading pace.
@@ -138,9 +148,10 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Waiting:** where something is being written, the app says about how long it usually
   takes, that the learner need not watch, and offers **a break**: one clock sized to the
   wait, a small idea of what to do away from the screen, and what is being written
-  meanwhile. The rail shows "Now": what is being written and a running break. When it is
-  ready the app says so, and so does the operating system (fixed words, only while Adle is
-  in the background; can be turned off in Settings → Appearance). A break is also offered
+  meanwhile. The rail shows "Now": what is being written (or "Drawing pictures") and a
+  running break. When it is ready, which for a lesson is when it can be started, the app
+  says so once, and so does the operating system (fixed words, only while Adle is in the
+  background; can be turned off in Settings → Appearance). A break is also offered
   at the end of a lesson. Nothing about breaks is counted or kept.
 - "Cancel" and "Stop" take effect at once, however silent the provider is.
 - **Library:** opens with "Continue learning": the suggested next step of the
@@ -193,16 +204,16 @@ on 2026-11-21.
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 647 tests, 32 files |
+| Vitest | PASS | 666 tests, 33 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 94 source files |
-| pytest | PASS | 1268 tests |
-| Playwright + Electron (E2E) | PASS, after 4 journeys were corrected | 101 tests in 17 minutes. In the gate run 97 passed and 4 failed: they still expected two things changed on purpose ("Up next" said twice on the Learn tab; "Try it" said about a picture that is not there). Those journeys were corrected and their two files run again: 6 of 6 passed. 22 of them run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it now also checks that nothing pressable lies where the window is moved |
+| mypy (strict) | PASS | 95 source files |
+| pytest | PASS | 1280 tests |
+| Playwright + Electron (E2E) | PASS | 103 tests in 15 minutes, in one run of the gate for ADR-031 with no retry (two comments and the documents were edited after it). 22 of them run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it now also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
-| Packaged build: every journey (`npm run e2e:packaged`) | NOT RUN | for this tree. The last run was on the tree of `406a1b2` |
+| Packaged build: every journey (`npm run e2e:packaged`) | NOT RUN | for this tree (ADR-031). On the tree of `f68bdc8`, 2026-11-21: 100 passed and 1 passed on its second try, the race described under Findings |
 | Packaged build: release start-up check (`npm run package:check`) | NOT RUN | for this tree |
 | Packaged build on a computer that never had the project | NOT RUN | Needs another machine |
 | Installer, code signing | BLOCKED | Need the owner's certificates |
@@ -262,6 +273,13 @@ investigated, not ignored.
   (`unreliable_call`), which gives the model one more try with the reason; the guide says
   how to write them; `e2e/scene-player.spec.ts` reads the pixels. Found by sitting that
   lesson in the app, not by any test: the policy cannot see what a call does when it runs.
+- **A test that waits longer than its stand-in holds out proves nothing.** The tests for
+  "removing a lesson stops its pictures" passed with the stopping taken out: the held
+  answer lets go by itself after twenty seconds and the tests waited thirty. They wait five
+  and ten now. Take the fix out and watch the test fail before believing it.
+- **A journey that misses once in a hundred is a race in the app as often as in the test.**
+  One pressed "anything that says lesson" before a concept's lessons had loaded, and so
+  pressed "Create a lesson with AI". The button no longer shows until the list is known.
 - **A screenshot of the page is not the window.** The system's buttons, and how a dimmed
   page looks around them, show only in a picture of the window itself (`PrintWindow`).
 - **A shell string is no place for a backslash.** A regular expression or `\n` passed
@@ -446,20 +464,34 @@ this, and it spends real allowance.
 
 ## Next actions
 
-First, and not needing the owner: **the packaged builds have not been made from this tree**
-(ADR-027 to ADR-030 change the window, the session and the start of the core, all of which
-the packaged run exists to check). `npm run package:test`, `npm run e2e:packaged`,
-`npm run package`, `npm run package:check`, then `node scripts/measure.mjs --packaged` for
-the packaged column of `PERFORMANCE.md`. Then item 7 below.
+First, and not needing the owner:
+
+- **The packaged builds have not been made from this tree** (ADR-031). `npm run package:test`,
+  `npm run e2e:packaged`, `npm run package`, `npm run package:check`, then
+  `node scripts/measure.mjs --packaged` for `PERFORMANCE.md`. (On the tree of `f68bdc8` the
+  packaged build measured 0.37 s to the first screen, 1.15 s to the service, 0.31 s to open
+  a lesson and 0.84 s to a scene's first frame; `PERFORMANCE.md` still shows the older
+  figures.)
+- **A picture shown small loses thin strokes.** Found on 2026-11-21 in a lesson Kimi K3.1
+  Pro wrote (usable after 298 s, its one picture after 541 s; sat by a script in both themes
+  with no error): `MathTex(r"L(w)=(w-2)^2", font_size=32)` showed as "(w 2)". The runtime
+  draws every scene 1280 pixels wide and the browser shrinks the canvas to the 565 a lesson
+  shows; shrunk by more than two, a thin stroke is dropped, not thinned. The fix that was
+  begun and not finished or tested: `WanimPlayerAdapter` asks for a size to suit the frame
+  (`-ql` under 640 device pixels wide, `-qh` over 1408, else `-qm`), and the frame's canvas
+  fills the frame at any of them (`width: min(100vw, calc(100vh * 16 / 9))` in
+  `player.css`). It needs unit tests, a journey that reads the pixels of thin lines at 565
+  pixels, and a look at the sample scenes.
 
 What else remains needs the owner. In the order it matters:
 
 1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
    They are in a transcript; treat them as used. Then type the new keys into Settings → AI
    provider yourself, press "Test key" on each, leave the choice on Automatic, and **sit a
-   generated lesson from start to finish**, asking it a question on the way. Expect about
-   twelve minutes for a lesson to be written by NVIDIA; the app will offer a break and tell
-   you when it is ready.
+   generated lesson from start to finish**, asking it a question on the way. Through NVIDIA,
+   expect about six minutes until the lesson can be started; the app offers a break and
+   tells you when. Its pictures follow over the next few minutes and appear in it as they
+   are drawn.
 2. **Top up the AIHubMix account** (its notice says ten tries without one), or remove its
    key: until then Automatic finds out once that it refuses and uses NVIDIA.
 3. **Push the branch** so that CI runs for the first time, on Windows and Linux (it now runs
@@ -469,12 +501,11 @@ What else remains needs the owner. In the order it matters:
 5. **Try the packaged folder on a computer that never had the project**, and on macOS, where
    the window's own title bar (ADR-030) has never been seen.
 6. Decide whether GLM 5.3 Flash should stay NVIDIA's third model while it does not answer.
-7. The largest thing still not built from the plan: **opening a lesson as soon as its words
-   are ready**, with the pictures arriving while the learner studies (PROMPT.md 3, PLAN 12.1).
-   The break makes the wait easier; this would shorten it from about twelve minutes to five.
+7. Still not built from the plan's section 12.1: **writing a lesson part by part.** Its text
+   is one request and arrives whole, about five minutes through NVIDIA (ADR-012, ADR-031).
+   That would need the draft format and the request budget to change together.
 8. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
-   single course; a screen-reader pass by a person; showing on a lesson, not only on its
-   job, which model wrote it.
+   single course; a screen-reader pass by a person.
 9. From the review of 2026-11-20, left by decision (ADR-029, "Not done, and why"): a release
    build can still be started with Chromium's remote debugging switch; the page can ask for
    the data dialogs again and again; `provider.usage` is a route the interface does not
@@ -486,10 +517,10 @@ What else remains needs the owner. In the order it matters:
 |---|---|
 | A request the learner stopped is given up at once and hung up as well as that can be done from another thread; where it cannot, its connection is let go when the provider next says something (or its time runs out), so for a moment two may be open at one provider | By decision (ADR-023, ADR-029): the provider's turn is not kept waiting for a request nobody wants |
 | The window's own title bar has been seen on Windows 11 only | Needs a Mac (ADR-030); Linux keeps its usual frame |
-| A lesson appears only when all of it is written, pictures included | Not built (ADR-026, "Next actions" 7) |
+| A lesson's text is one request and arrives whole; the wait before a learner can begin is that request | By decision (ADR-012, ADR-031); "Next actions" 7 |
+| A picture that arrives while a lesson is open is found by looking every three seconds, not by being told | By decision (ADR-031): nothing new crosses the bridge for it |
 | A question asked during a lesson does not remember earlier questions | By decision (ADR-024): it is a note, not a chat |
 | AIHubMix being "the quick one" is the owner's report, not a measurement | Its model has never answered Adle; one word in its definition if it turns out otherwise |
-| Which model wrote a lesson is kept with the job that made it, not with the lesson | When someone wants to see it later than the notice |
 | GLM 5.3 Flash, NVIDIA's third model, has never answered | The owner's choice of order (ADR-021) |
 | The parser worker has no OS-level sandbox | Not built. It is a separate, short-lived, isolated process that returns only checked JSON (SECURITY.md) |
 | No installer, no signature, no automatic update; Windows only | Needs the owner (ADR-019, `RELEASE_CHECKLIST.md`) |

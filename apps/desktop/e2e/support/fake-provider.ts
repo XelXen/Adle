@@ -53,7 +53,14 @@ export interface FakeProvider {
   requests: RecordedRequest[];
   /** Answer the next requests with these before falling back to the defaults. */
   queue: (...next: Answer[]) => void;
-  /** Let every hanging request finish with an ordinary answer. */
+  /**
+   * From now on, every request of this kind hangs like `HANG`, whatever is queued: a
+   * picture that takes its time while the lesson it belongs to is already written.
+   */
+  hold: (kind: RequestKind) => void;
+  /** Let the requests hanging now finish with an ordinary answer. Kinds held stay held. */
+  pass: () => void;
+  /** Let every hanging request finish with an ordinary answer, and hold nothing any more. */
   release: () => void;
   close: () => Promise<void>;
 }
@@ -122,6 +129,7 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
   const delayMs = options.delayMs ?? 250;
   const requests: RecordedRequest[] = [];
   const queued: Answer[] = [];
+  const held = new Set<RequestKind>();
   const hanging = new Set<() => void>();
 
   const server = createServer((request, response) => {
@@ -143,7 +151,7 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
         body,
       });
 
-      const answer = queued.shift() ?? defaultAnswer(kind, user);
+      const answer = held.has(kind) ? HANG : (queued.shift() ?? defaultAnswer(kind, user));
       if (typeof answer === 'object' && 'hang' in answer) {
         await new Promise<void>((resolve) => {
           hanging.add(resolve);
@@ -183,7 +191,15 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
     queue: (...next) => {
       queued.push(...next);
     },
+    hold: (kind) => {
+      held.add(kind);
+    },
+    pass: () => {
+      for (const resolve of hanging) resolve();
+      hanging.clear();
+    },
     release: () => {
+      held.clear();
       for (const resolve of hanging) resolve();
       hanging.clear();
     },

@@ -119,7 +119,9 @@ def parse_bundle(data: object) -> LessonBundle:
 
     ``data`` is either a mapping with ``lesson`` and ``scenes``, where each
     scene needs only ``id``, ``purpose``, and ``source``, or the full stored
-    form. Raises ``LessonInvalidError`` or ``SceneRejectedError``.
+    form. ``pending_scene_ids`` lists scenes that parts refer to and that are
+    still being drawn (ADR-031). Raises ``LessonInvalidError`` or
+    ``SceneRejectedError``.
     """
     if not isinstance(data, dict):
         raise LessonInvalidError([Problem("lesson", "The lesson is not a JSON object.")])
@@ -150,6 +152,12 @@ def parse_bundle(data: object) -> LessonBundle:
             ) from error
 
     try:
-        return LessonBundle.model_validate({"lesson": data.get("lesson"), "scenes": scenes})
+        return LessonBundle.model_validate(
+            {
+                "lesson": data.get("lesson"),
+                "scenes": scenes,
+                "pending_scene_ids": data.get("pending_scene_ids", []),
+            }
+        )
     except ValidationError as error:
         raise LessonInvalidError(_problems(error)) from error

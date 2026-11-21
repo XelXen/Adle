@@ -530,15 +530,26 @@ class LessonBundle(_Strict):
 
     lesson: Lesson
     scenes: list[SceneArtifact] = Field(default_factory=list, max_length=MAX_SEGMENTS)
+    #: Scenes that parts refer to and that are still being drawn (ADR-031). The lesson is
+    #: whole without them: every part with a picture carries its description in words.
+    pending_scene_ids: list[SceneId] = Field(default_factory=list, max_length=MAX_SEGMENTS)
 
     @model_validator(mode="after")
     def _scenes_resolve(self) -> LessonBundle:
         available = {scene.id: scene for scene in self.scenes}
         if len(available) != len(self.scenes):
             raise ValueError("scene ids must be different")
+        coming = set(self.pending_scene_ids)
+        if len(coming) != len(self.pending_scene_ids):
+            raise ValueError("a scene still to come is listed more than once")
+        if coming & set(available):
+            raise ValueError("a scene is both included and still to come")
         for segment in self.lesson.segments:
             scene_ref = getattr(segment, "scene", None)
             if not isinstance(scene_ref, SceneRef):
+                continue
+            if scene_ref.scene_id in coming:
+                # Whether it turns out to have something to operate is known when it arrives.
                 continue
             scene = available.get(scene_ref.scene_id)
             if scene is None:
@@ -548,7 +559,9 @@ class LessonBundle(_Strict):
                     f"segment {segment.id} is an interaction "
                     "but its scene has nothing to interact with"
                 )
-        unused = set(available) - set(self.lesson.scene_ids())
-        if unused:
+        used = set(self.lesson.scene_ids())
+        if set(available) - used:
             raise ValueError("a scene is included that no segment uses")
+        if coming - used:
+            raise ValueError("a scene is awaited that no segment uses")
         return self

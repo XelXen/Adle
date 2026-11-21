@@ -197,9 +197,16 @@ most, a file's name.
 - The renderer has no answer keys. Anything that needs one (what was right, why) comes back from
   `lessons.answer`. Do not add a field to the player view to "save a round trip".
 - Lesson text is shown with `MathText`, never `dangerouslySetInnerHTML`.
-- A segment with a scene must render something useful in three cases: the scene runs, the scene
-  fails in the player (`ScenePlayer` shows the fallback), and the core withheld the scene
-  (no artifact for the reference).
+- A segment with a scene must render something useful in five cases: the scene runs, the scene
+  fails in the player (`ScenePlayer` shows the fallback), the core withheld the scene
+  (no artifact for the reference), the scene is still being drawn, and the scene arrived
+  after the part had begun (ADR-031).
+- A lesson can be open before all its pictures are drawn. `useLessonPictures` finds out
+  when one has arrived; it is not a clock of the lesson and decides nothing about what is
+  said or when. The lesson's words stay as they were when it was opened. A picture takes
+  its place by itself only in a part that has not begun (`status === 'ready'`); otherwise
+  it is offered. Ask the picture, not the part, whether there is anything to operate
+  (`scene.interactive`): the two can disagree in a lesson opened early.
 - Assets are files. Both Vite configs set `assetsInlineLimit: 0`; a `data:` URI would be
   refused by the Content Security Policy.
 - React's lint rules forbid writing to a ref passed in as a prop or during render. State that
@@ -245,6 +252,13 @@ most, a file's name.
   `adle.setFocused(false)` first (one is only asked for while Adle is in the background).
 - Read a job's `result` only through `lib/generation.ts`. It is free-form in the contract and is
   checked there.
+- **A lesson job has a lesson before it has ended** (ADR-031): `readLessonOutcome` reads it
+  from a running job, `isDrawingPictures` says that only pictures are left, and
+  `useGeneration`'s third argument (`onUsable`) fires when that begins. Show such a job with
+  `GenerationStatus lessonReady`. A tab of the course says "Lesson ready" with
+  `useLessonNotices`; everywhere else `WritingProvider` does, and it keeps the one record
+  of who was told (`wasTold`, `markTold`), so a lesson is announced once however the
+  learner moves about. Removing a lesson forgets its job on the screen; the core stops it.
 - Say what will be sent before it is sent, beside the control that sends it, and name the
   provider by the name the core gives (`provider.status`), never a hard-coded one.
 - Speech uses **local voices only** (`loadLocalVoices`). Do not list or use a voice whose

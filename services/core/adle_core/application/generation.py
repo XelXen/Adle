@@ -24,6 +24,7 @@ any other lesson before it is stored.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 import time
@@ -65,20 +66,17 @@ from adle_core.application.retrieval import Retriever
 from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
 from adle_core.generation import prompts
 from adle_core.generation.drafts import (
-    MAX_SCENES_PER_LESSON,
     DraftError,
     LessonContext,
     ObjectiveRef,
     PassageRef,
     SceneBrief,
-    as_visualization,
     compile_answer,
     compile_curriculum,
     compile_lesson,
     extract_json_object,
     extract_python_file,
     parse_lesson_draft,
-    without_scene,
 )
 from adle_core.generation.provider import (
     ChatRequest,
@@ -93,7 +91,12 @@ from adle_core.infrastructure.orm import Attempt, Concept, Course, StoredLesson
 from adle_core.ingestion.types import heading_leaf
 from adle_core.learner_model.next_step import MAX_LESSONS_PER_CONCEPT
 from adle_core.learner_model.preferences import LearnerPreferences
-from adle_core.lessons.bundle import SceneRejectedError, inspect_scene, parse_bundle
+from adle_core.lessons.bundle import (
+    LessonInvalidError,
+    SceneRejectedError,
+    inspect_scene,
+    parse_bundle,
+)
 from adle_core.lessons.ir import (
     STRATEGIES,
     CheckpointSegment,
@@ -129,9 +132,11 @@ _PASSED_OVER = {
     "unreachable": "couldn’t be reached",
     "unreadable": "sent an unreadable answer",
 }
-#: The requests one piece of work usually takes, for saying how long it will be.
+#: The requests that stand between asking and having something to use, for saying how
+#: long that will be. A lesson can be taken when its text is written (ADR-031): its
+#: pictures follow, and are not part of the wait.
 _REQUESTS_FOR = {
-    "lesson": ("lesson", *("scene",) * MAX_SCENES_PER_LESSON),
+    "lesson": ("lesson",),
     "curriculum": ("curriculum",),
     "ask": ("ask",),
 }
@@ -456,6 +461,23 @@ class GenerationService:
         """Long work that is waiting or under way, in any course, oldest first."""
         return self._jobs.list_all_active(LONG_JOB_KINDS)
 
+    def stop_for_lesson(self, lesson_id: str) -> None:
+        """A lesson was removed: stop drawing the pictures it was still waiting for.
+
+        Nothing more is asked of a provider for something the learner has thrown away.
+        """
+        for job in self._jobs.list_all_active((KIND_LESSON,)):
+            result = job.result
+            if isinstance(result, dict) and result.get("lesson_id") == lesson_id:
+                with contextlib.suppress(NotFoundError):
+                    self._jobs.cancel(job.id)
+
+    def stop_for_course(self, course_id: str) -> None:
+        """A course is about to be removed: stop whatever is under way for it."""
+        for job in self._jobs.list_active(course_id):
+            with contextlib.suppress(NotFoundError):
+                self._jobs.cancel(job.id)
+
     # -- curriculum ------------------------------------------------------------
 
     def propose_curriculum(self, course_id: str) -> JobSnapshot:
@@ -769,55 +791,101 @@ class GenerationService:
                 "The AI’s lesson wasn’t usable, twice. Nothing was saved. You can try again."
             )
 
-        total = 1 + len(briefs)
-        scenes: list[dict[str, str]] = []
-        notes: list[str] = []
-        for number, brief in enumerate(briefs, start=1):
-            context.check_cancelled()
-            label = f"Drawing picture {number} of {len(briefs)}"
-            context.report(number, total, label)
-            try:
-                artifact, answer = self._write_scene(brief, context, number, total, label)
-            except JobCancelledError:
-                raise
-            except (ProviderError, QuotaExhaustedError) as error:
-                # The lesson itself is written. Losing its pictures is better than losing it.
-                logger.info("generation.scene_skipped code=%s", error.code)
-                artifact, answer = None, None
-            if artifact is not None and answer is not None:
-                answers.append(answer)
-            if artifact is None:
-                lesson = without_scene(lesson, brief.scene_id)
-                notes.append(
-                    f"The picture for “{brief.title}” couldn’t be made, so that part is explained "
-                    "in words."
-                )
-                continue
-            if brief.kind == "interactive" and not artifact.interactive:
-                lesson = as_visualization(lesson, brief.scene_id)
-                notes.append(
-                    f"“{brief.title}” was meant to be interactive, but came out as an animation."
-                )
-            scenes.append(
-                {"id": artifact.id, "purpose": artifact.purpose, "source": artifact.source}
-            )
-
+        # From here on there is a lesson. It is stored now, with its pictures marked as
+        # still to come, so that the learner can begin while they are drawn (ADR-031).
         context.check_cancelled()
-        context.report(total, total, "Checking the lesson")
-        bundle = parse_bundle({"lesson": lesson, "scenes": scenes})
-        stored = self._lessons.store(bundle, origin="generated")
-        written_by = self._written_by(answers)
-        if written_by["note"]:
-            notes.append(written_by["note"])
-        return {
-            "kind": KIND_LESSON,
-            "lesson_id": stored.id,
-            "title": stored.title,
-            "pictures_planned": len(briefs),
-            "pictures_made": len(scenes),
-            "notes": notes,
-            "written_by": written_by,
-        }
+        waiting = [brief.scene_id for brief in briefs]
+        bundle = parse_bundle({"lesson": lesson, "scenes": [], "pending_scene_ids": waiting})
+        stored = self._lessons.store(
+            bundle, origin="generated", written_by=self._written_by(answers)
+        )
+        total = 1 + len(briefs)
+        made = 0
+        notes: list[str] = []
+
+        def so_far(left: int) -> dict[str, Any]:
+            written_by = self._written_by(answers)
+            return {
+                "kind": KIND_LESSON,
+                "lesson_id": stored.id,
+                "title": stored.title,
+                "pictures_planned": len(briefs),
+                "pictures_made": made,
+                "pictures_pending": left,
+                "notes": [*notes, *([written_by["note"]] if written_by["note"] else [])],
+                "written_by": written_by,
+            }
+
+        context.publish(so_far(len(briefs)))
+        try:
+            for number, brief in enumerate(briefs, start=1):
+                context.check_cancelled()
+                label = f"Drawing picture {number} of {len(briefs)}"
+                context.report(number, total, label)
+                try:
+                    artifact, answer = self._write_scene(brief, context, number, total, label)
+                except JobCancelledError:
+                    raise
+                except (ProviderError, QuotaExhaustedError) as error:
+                    # The lesson is written. Losing a picture is better than losing it.
+                    logger.info("generation.scene_skipped code=%s", error.code)
+                    artifact, answer = None, None
+                settled = None
+                if artifact is not None:
+                    try:
+                        settled = self._lessons.settle_scene(
+                            stored.id,
+                            brief.scene_id,
+                            {"purpose": artifact.purpose, "source": artifact.source},
+                        )
+                    except (LessonInvalidError, SceneRejectedError) as error:
+                        # Drawn, and yet not something this lesson can take. The lesson is
+                        # there already: that part is said in words, as for a picture that
+                        # never came, and the work goes on.
+                        logger.info("generation.scene_unattached code=%s", error.code)
+                if settled is None:
+                    self._lessons.settle_scene(stored.id, brief.scene_id, None)
+                    notes.append(
+                        f"The picture for “{brief.title}” couldn’t be made, so that part is "
+                        "explained in words."
+                    )
+                else:
+                    if answer is not None:
+                        answers.append(answer)
+                    made += 1
+                    if settled.as_animation:
+                        notes.append(
+                            f"“{brief.title}” was meant to be interactive, but came out as an "
+                            "animation."
+                        )
+                context.publish(so_far(len(briefs) - number))
+        except JobCancelledError:
+            # Stopped once there was a lesson: the lesson stays, and what was not drawn is
+            # said in words. Stopping before this point saves nothing, as it always did.
+            left = self._lessons.settle_unfinished(stored.id)
+            if left:
+                notes.append(
+                    "You stopped the pictures, so "
+                    + ("1 part is" if left == 1 else f"{left} parts are")
+                    + " explained in words."
+                )
+        except NotFoundError:
+            # The lesson went away under the work: said just below.
+            pass
+        finally:
+            # Whatever ended the work, nothing may be left waiting for a picture.
+            with contextlib.suppress(AdleError):
+                self._lessons.settle_unfinished(stored.id)
+
+        if not self._lessons.exists(stored.id):
+            # The learner removed the lesson, or its course, while its pictures were being
+            # drawn: there is nothing left to draw them for, and nothing to report.
+            raise JobCancelledError(None)
+
+        context.report(total, total, "Done")
+        final = so_far(0)
+        self._lessons.set_written_by(stored.id, final["written_by"])
+        return final
 
     def _write_scene(
         self, brief: SceneBrief, context: JobContext, done: int, total: int, label: str

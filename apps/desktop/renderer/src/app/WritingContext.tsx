@@ -14,7 +14,14 @@ import { useToast } from '@adle/design-system';
 
 import { getBridge } from '../lib/bridge';
 import { callCore } from '../lib/core-client';
-import { jobFailure, KIND_LESSON, KIND_PROPOSAL, readLessonOutcome } from '../lib/generation';
+import {
+  isDrawingPictures,
+  jobFailure,
+  KIND_LESSON,
+  KIND_PROPOSAL,
+  readLessonOutcome,
+  titled,
+} from '../lib/generation';
 import { useApp } from './AppContext';
 import { type Route, useRouter } from './router';
 
@@ -32,6 +39,14 @@ interface WritingValue {
   refresh: () => void;
   /** Put the last finished piece of work away: the learner has seen it. */
   acknowledge: () => void;
+  /**
+   * Whether the learner has been told that the lesson this job wrote is ready, wherever
+   * in the app that was. It is said once (ADR-031): a tab of the course that hears of the
+   * same lesson later has only something to add, if anything.
+   */
+  wasTold: (jobId: string) => boolean;
+  /** A screen has just told them. */
+  markTold: (jobId: string) => void;
 }
 
 const WritingContext = createContext<WritingValue | null>(null);
@@ -63,6 +78,42 @@ export function isWhereItIs(here: Route, job: Job): boolean {
 }
 
 /**
+ * Whether the screen in front of the learner says by itself that this work has something
+ * to use, and so keeps count of having said it. A tab of the course does. A break shows
+ * it without anyone having to say it; anywhere else, the app-wide watch says it.
+ */
+export function leavesTellingToScreen(here: Route, job: Pick<Job, 'kind' | 'course_id'>): boolean {
+  return here.name !== 'break' && showsOutcome(here, job);
+}
+
+/**
+ * What there is to say about a piece of long work now: it has something to use, it could
+ * not be finished, or nothing yet.
+ *
+ * A lesson has something to use as soon as its text is written, while its pictures are
+ * still being drawn (ADR-031). That is when it is said, and it is said once.
+ */
+export function newsOf(job: Job): 'usable' | 'failed' | null {
+  if (job.status === 'succeeded' || isDrawingPictures(job)) return 'usable';
+  return job.status === 'failed' ? 'failed' : null;
+}
+
+/** The words for something that arrived, for a learner who is somewhere else in the app. */
+export function arrivalNotice(job: Job): { title: string; description: string | undefined } {
+  if (job.kind !== KIND_LESSON) {
+    return {
+      title: 'Suggested concepts are ready',
+      description: 'Open the course to review them.',
+    };
+  }
+  const outcome = readLessonOutcome(job);
+  const words = titled(outcome?.title ?? '', [
+    outcome && outcome.picturesPending > 0 ? 'Its pictures are still being drawn.' : '',
+  ]);
+  return { title: 'Your lesson is ready', description: words || undefined };
+}
+
+/**
  * What is being written for the learner, wherever they are in the app (ADR-026).
  *
  * A lesson can take minutes to write, and the learner is told they need not wait for
@@ -89,6 +140,12 @@ export function WritingProvider({ children }: { children: ReactNode }) {
   const known = useRef<ReadonlySet<string>>(new Set());
   /** What has been said already, so that nothing is said twice. */
   const said = useRef(new Set<string>());
+  /** The jobs whose lesson the learner has been told is ready, here or on a screen. */
+  const told = useRef(new Set<string>());
+  const wasTold = useCallback((jobId: string) => told.current.has(jobId), []);
+  const markTold = useCallback((jobId: string) => {
+    told.current.add(jobId);
+  }, []);
   /** Counts the times the list has been asked for: only the latest answer is used. */
   const asked = useRef(0);
   /** False once the app is closing. Not the same as one turn of looking being over. */
@@ -106,23 +163,21 @@ export function WritingProvider({ children }: { children: ReactNode }) {
   const announce = useCallback(
     (job: Job) => {
       if (said.current.has(job.id)) return;
-      if (job.status !== 'succeeded' && job.status !== 'failed') return;
+      const news = newsOf(job);
+      if (news === null) return;
       said.current.add(job.id);
       const here = where.current;
       const lesson = job.kind === KIND_LESSON;
       // Kept for a break to show, unless the learner is already where it is.
       if (!isWhereItIs(here, job)) setArrived({ job, at: Date.now() });
 
-      if (job.status === 'succeeded') {
+      if (news === 'usable') {
         void getBridge().app.notify(lesson ? 'lesson_ready' : 'concepts_ready');
+        // Told here, or shown by a break: a tab of the course that hears of it later does
+        // not say it again. A tab that is showing it now says it itself.
+        if (!leavesTellingToScreen(here, job)) told.current.add(job.id);
         if (showsOutcome(here, job)) return;
-        toast.show({
-          tone: 'success',
-          title: lesson ? 'Your lesson is ready' : 'Suggested concepts are ready',
-          description: lesson
-            ? (readLessonOutcome(job)?.title ?? undefined)
-            : 'Open the course to review them.',
-        });
+        toast.show({ tone: 'success', ...arrivalNotice(job) });
         return;
       }
       void getBridge().app.notify('writing_stopped');
@@ -152,6 +207,8 @@ export function WritingProvider({ children }: { children: ReactNode }) {
           const gone = [...known.current].filter((id) => !now.has(id));
           known.current = now;
           setJobs(list.jobs);
+          // Work that is still under way and already has something to start.
+          for (const job of list.jobs) if (isDrawingPictures(job)) announce(job);
           for (const id of gone) {
             callCore('jobs.get', { path: { job_id: id } }).then(
               (job) => {
@@ -192,8 +249,8 @@ export function WritingProvider({ children }: { children: ReactNode }) {
   // While the core is away nothing is being written, whatever the list last said.
   const shown = ready ? jobs : NO_JOBS;
   const value = useMemo(
-    () => ({ jobs: shown, finished, finishedAt, refresh, acknowledge }),
-    [shown, finished, finishedAt, refresh, acknowledge],
+    () => ({ jobs: shown, finished, finishedAt, refresh, acknowledge, wasTold, markTold }),
+    [shown, finished, finishedAt, refresh, acknowledge, wasTold, markTold],
   );
   return <WritingContext.Provider value={value}>{children}</WritingContext.Provider>;
 }

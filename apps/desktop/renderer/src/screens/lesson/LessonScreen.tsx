@@ -57,8 +57,9 @@ import { answeredAskId, asksAbout, KIND_ASK } from '../../lib/asks';
 import { USUAL_BREAK_MINUTES } from '../../lib/breaks';
 import { getBridge } from '../../lib/bridge';
 import { callCore, CoreRequestError, describeError } from '../../lib/core-client';
-import { type JobFailure, jobFailure, refusalOf } from '../../lib/generation';
+import { authorName, type JobFailure, jobFailure, refusalOf } from '../../lib/generation';
 import { isJobActive, useJob } from '../../lib/use-job';
+import { useLessonPictures } from '../../lib/use-lesson-pictures';
 import { useResource } from '../../lib/use-resource';
 import { KNOWLEDGE_TONE } from '../course/ConceptDetail';
 import { AskDialog, AskNote } from './AskDialog';
@@ -229,7 +230,10 @@ function LessonPlayer({
   onLeave: () => void;
 }) {
   const toast = useToast();
-  const { lesson, scenes } = data;
+  const { lesson } = data;
+  // A lesson can be opened before all its pictures are drawn (ADR-031): they are looked
+  // for while any is still to come. The words stay as they were when it was opened.
+  const pictures = useLessonPictures(lesson.lesson_id, data);
   const [{ controller, cues, save, saved, silent, spoken }] = useState(() =>
     openSession(data, preferences, voices, (error) =>
       toast.show({
@@ -442,6 +446,13 @@ function LessonPlayer({
                 .join('; ')}
             </span>
           ) : null}
+          {/* Who wrote it, where a model did: one line, as under an answer (ADR-028). */}
+          {data.written_by ? (
+            <span className={styles.sources}>
+              Written by {authorName(data.written_by, 'AI')}. AI can make mistakes.
+              {data.written_by.note ? ` ${data.written_by.note}` : ''}
+            </span>
+          ) : null}
         </>
       }
     >
@@ -491,7 +502,8 @@ function LessonPlayer({
               key={segment.id}
               lessonId={lesson.lesson_id}
               segment={segment}
-              scene={sceneFor(segment, scenes)}
+              scene={sceneFor(segment, pictures.scenes)}
+              pending={isPictureComing(segment, pictures.pending)}
               state={state}
               controller={controller}
               cues={cues}
@@ -696,10 +708,16 @@ function LessonPlayer({
   );
 }
 
-function sceneFor(segment: LessonSegment, scenes: SceneArtifact[]): SceneArtifact | null {
+function sceneFor(segment: LessonSegment, scenes: readonly SceneArtifact[]): SceneArtifact | null {
   const reference = 'scene' in segment ? segment.scene : null;
   if (!reference) return null;
   return scenes.find((scene) => scene.id === reference.scene_id) ?? null;
+}
+
+/** Whether this part's picture is still being drawn. */
+function isPictureComing(segment: LessonSegment, coming: ReadonlySet<string>): boolean {
+  const reference = 'scene' in segment ? segment.scene : null;
+  return reference ? coming.has(reference.scene_id) : false;
 }
 
 /** The narration being spoken, with the word the narrator has reached marked. */
@@ -719,13 +737,17 @@ function SegmentStage({
   lessonId,
   segment,
   scene,
+  pending,
   state,
   controller,
   cues,
 }: {
   lessonId: string;
   segment: LessonSegment;
+  /** The part's picture, as the lesson has it now. */
   scene: SceneArtifact | null;
+  /** The picture is still being drawn (ADR-031). */
+  pending: boolean;
   state: PlaybackState;
   controller: LessonController;
   cues: SceneCues;
@@ -733,6 +755,12 @@ function SegmentStage({
   const player = useRef<ScenePlayerHandle>(null);
   const [sceneStatus, setSceneStatus] = useState<PlayerStatus | null>(null);
   const [describing, setDescribing] = useState(false);
+  // The picture this visit to the part shows. One that arrives once the part has begun is
+  // not sprung on the learner in the middle of a sentence: it is offered, and shown when
+  // they ask. Before the part has begun, it simply takes its place.
+  const [picture, setPicture] = useState<SceneArtifact | null>(scene);
+  if (scene !== null && picture === null && state.status === 'ready') setPicture(scene);
+  const arrived = scene !== null && picture === null;
 
   // While this part is on screen, its scene is the one the narration cues.
   useEffect(
@@ -752,9 +780,13 @@ function SegmentStage({
   // An interaction is live from the start. Any other scene follows the narration:
   // it holds on its first frame until the lesson starts, and pauses when it pauses.
   // A part that is being looked at again simply shows its picture.
+  //
+  // A picture that was meant to be operated can come out as an animation. The lesson is
+  // then stored as showing one; a lesson opened before the picture arrived still calls
+  // the part an interaction, so the picture itself is asked what it is.
+  const live = segment.type === 'interaction' && (picture?.interactive ?? true);
   const wantPlaying =
-    segment.type === 'interaction' ||
-    (state.status === 'ready' ? !waitingToStart : state.status !== 'paused');
+    live || (state.status === 'ready' ? !waitingToStart : state.status !== 'paused');
   useEffect(() => {
     if (sceneStatus === 'paused' && wantPlaying) player.current?.play();
     else if (!wantPlaying && (sceneStatus === 'playing' || sceneStatus === 'interactive')) {
@@ -783,20 +815,20 @@ function SegmentStage({
     <div className={styles.stage}>
       {/* What to try is said only while there is something to try it on: a picture that
           is not there, or did not run, is told in words below instead. */}
-      {segment.type === 'interaction' && scene && sceneStatus !== 'failed' ? (
+      {segment.type === 'interaction' && picture && live && sceneStatus !== 'failed' ? (
         <Callout tone="info" title="Try it">
           <MathText text={segment.prompt} />
         </Callout>
       ) : null}
 
-      {scene && reference ? (
+      {picture && reference ? (
         <>
           <ScenePlayer
             ref={player}
-            source={scene.source}
-            sceneName={scene.scene_class}
+            source={picture.source}
+            sceneName={picture.scene_class}
             title={segment.title}
-            autoplay={segment.type === 'interaction'}
+            autoplay={live}
             fallback={
               <p>
                 <MathText text={reference.fallback_text} />
@@ -831,9 +863,7 @@ function SegmentStage({
               ) : null}
             </div>
           ) : null}
-          {waitingToStart && segment.type !== 'interaction' ? (
-            <p className={styles.note}>Press Start to play.</p>
-          ) : null}
+          {waitingToStart && !live ? <p className={styles.note}>Press Start to play.</p> : null}
           {state.explored ? (
             <p className={styles.note} role="status">
               Keep exploring, or continue when you’re ready.
@@ -841,14 +871,27 @@ function SegmentStage({
           ) : null}
         </>
       ) : reference ? (
-        // The core withheld this scene (it is not something Adle will run): say it in words.
+        // No picture to show here: it is still being drawn, it arrived after this part had
+        // begun, or the core withheld it (it is not something Adle will run). Either way
+        // the same idea is said in words.
         <div className={styles.board}>
           <p>
             <MathText text={reference.fallback_text} />
           </p>
-          <p className={styles.boardEmpty}>
-            The picture isn’t available. Here’s the same idea in words.
-          </p>
+          {arrived ? (
+            <div className={styles.pictureReady} role="status">
+              <span>The picture is ready.</span>
+              <Button size="small" icon={<Play />} onClick={() => setPicture(scene)}>
+                Show picture
+              </Button>
+            </div>
+          ) : (
+            <p className={styles.boardEmpty} role={pending ? 'status' : undefined}>
+              {pending
+                ? 'This picture is still being drawn. It’ll appear here when it’s ready.'
+                : 'The picture isn’t available. Here’s the same idea in words.'}
+            </p>
+          )}
         </div>
       ) : null}
 

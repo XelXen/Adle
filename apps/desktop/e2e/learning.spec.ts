@@ -453,11 +453,10 @@ test.describe('learning', () => {
       );
       await screenshot(page, 'learn-new-explanation');
 
-      expect(provider.requests.map((request) => request.kind)).toEqual([
-        'lesson',
-        'scene',
-        'scene',
-      ]);
+      // The lesson is offered as soon as it is written; its two pictures follow it.
+      await expect
+        .poll(() => provider.requests.map((request) => request.kind))
+        .toEqual(['lesson', 'scene', 'scene']);
       const prompt = provider.requests[0]?.prompt ?? '';
       expect(prompt).toContain('Teach it the "analogy" way');
       expect(prompt).toContain('already had a lesson on this concept ("visual")');

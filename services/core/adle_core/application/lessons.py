@@ -10,14 +10,17 @@ scenes are put through the static policy again before they are handed out.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from adle_core.application.courses import get_course_or_404
 from adle_core.application.evidence import EVENT_LESSON_COMPLETED
 from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
+from adle_core.generation.drafts import as_visualization, without_scene
 from adle_core.infrastructure.database import Database, utc_now
 from adle_core.infrastructure.orm import (
     Concept,
@@ -29,7 +32,7 @@ from adle_core.infrastructure.orm import (
     StoredLesson,
     StoredScene,
 )
-from adle_core.lessons.bundle import SceneRejectedError, inspect_scene
+from adle_core.lessons.bundle import SceneRejectedError, inspect_scene, parse_bundle
 from adle_core.lessons.ir import SCHEMA_VERSION, Lesson, LessonBundle, SceneArtifact
 
 logger = logging.getLogger(__name__)
@@ -64,6 +67,8 @@ class LessonSummary:
     estimated_minutes: int
     segment_count: int
     progress: ProgressRecord
+    #: Pictures the lesson is still waiting for. It can be taken meanwhile (ADR-031).
+    pictures_pending: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +77,45 @@ class LessonForPlayer:
     scenes: list[SceneArtifact]
     origin: str
     progress: ProgressRecord
+    #: Scenes that parts refer to and that are still being drawn.
+    pending_scene_ids: list[str]
+    #: Who wrote it, where a model did: provider, models, and a note. ``None`` otherwise.
+    written_by: dict[str, Any] | None
+
+
+@dataclass(frozen=True, slots=True)
+class SettledScene:
+    """What became of a picture a lesson was waiting for."""
+
+    #: It is in the lesson now.
+    added: bool
+    #: It was asked for as something to try, and came out as something to watch.
+    as_animation: bool = False
+
+
+def _author(written_by: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """Who wrote a lesson, reduced to what is ever shown: names and one sentence."""
+    if not written_by:
+        return None
+    provider = written_by.get("provider")
+    if not isinstance(provider, str) or not provider:
+        return None
+    models = written_by.get("models")
+    note = written_by.get("note")
+    return {
+        "provider": provider[:120],
+        "models": [str(model)[:120] for model in models[:8]] if isinstance(models, list) else [],
+        "note": note[:400] if isinstance(note, str) else "",
+    }
+
+
+def _asks_to_try(document: Mapping[str, Any], scene_id: str) -> bool:
+    """Whether the part that shows this scene is one where the learner operates it."""
+    return any(
+        segment.get("type") == "interaction"
+        and (segment.get("scene") or {}).get("scene_id") == scene_id
+        for segment in document.get("segments", [])
+    )
 
 
 def _progress(row: LessonProgress | None) -> ProgressRecord:
@@ -90,6 +134,7 @@ def _summary(row: StoredLesson) -> LessonSummary:
         estimated_minutes=row.estimated_minutes,
         segment_count=row.segment_count,
         progress=_progress(row.progress),
+        pictures_pending=len(row.pending_scenes or []),
     )
 
 
@@ -129,8 +174,18 @@ class LessonService:
 
     # -- storing -----------------------------------------------------------
 
-    def store(self, bundle: LessonBundle, *, origin: str) -> LessonSummary:
-        """Store a validated bundle. Every id it refers to must exist in its course."""
+    def store(
+        self,
+        bundle: LessonBundle,
+        *,
+        origin: str,
+        written_by: Mapping[str, Any] | None = None,
+    ) -> LessonSummary:
+        """Store a validated bundle. Every id it refers to must exist in its course.
+
+        A bundle may list scenes that are still to come (ADR-031): the lesson can be taken
+        at once, and each is settled later with ``settle_scene``.
+        """
         lesson = bundle.lesson
         with self._database.session() as session:
             get_course_or_404(session, lesson.course_id)
@@ -147,6 +202,8 @@ class LessonService:
                 estimated_minutes=lesson.estimated_minutes,
                 segment_count=len(lesson.segments),
                 document=lesson.model_dump(mode="json"),
+                pending_scenes=list(bundle.pending_scene_ids),
+                written_by=_author(written_by),
             )
             session.add(row)
             for position, scene in enumerate(bundle.scenes):
@@ -206,6 +263,103 @@ class LessonService:
                     "The lesson cites a passage that is not in this course's materials."
                 )
 
+    # -- pictures that arrive after the lesson (ADR-031) -------------------
+
+    def settle_scene(
+        self, lesson_id: str, scene_id: str, scene: Mapping[str, str] | None
+    ) -> SettledScene:
+        """One picture a stored lesson was waiting for: here it is, or it is not coming.
+
+        ``scene`` has the ``purpose`` and the ``source`` of the file, or is ``None`` when
+        the picture could not be made. Either way the whole lesson goes through the gate
+        again, with the picture in place or with that part turned into words, and the
+        picture is no longer waited for.
+        """
+        with self._database.session() as session:
+            return self._settle(session, _get_or_404(session, lesson_id), scene_id, scene)
+
+    def settle_unfinished(self, lesson_id: str | None = None) -> int:
+        """Say in words every picture that is not coming after all. Returns how many.
+
+        For one lesson, when its pictures were stopped. For every lesson when the core
+        starts: nothing is being drawn then, so whatever is still waited for was left by
+        a run that ended.
+        """
+        settled = 0
+        with self._database.session() as session:
+            waiting = select(StoredLesson).where(
+                func.json_array_length(StoredLesson.pending_scenes) > 0
+            )
+            if lesson_id is not None:
+                waiting = waiting.where(StoredLesson.id == lesson_id)
+            for row in session.scalars(waiting).all():
+                for scene_id in list(row.pending_scenes):
+                    try:
+                        self._settle(session, row, scene_id, None)
+                    except (AdleError, ValueError, KeyError, TypeError) as error:
+                        # A lesson that no longer passes the gate is still not waiting for
+                        # anything. Its parts that refer to a missing picture are shown in
+                        # words by the player, as for any picture that is withheld.
+                        logger.warning(
+                            "lesson.settle_failed lesson=%s kind=%s", row.id, type(error).__name__
+                        )
+                        row.pending_scenes = [
+                            item for item in row.pending_scenes if item != scene_id
+                        ]
+                    settled += 1
+        return settled
+
+    def set_written_by(self, lesson_id: str, written_by: Mapping[str, Any] | None) -> None:
+        """Record who wrote a lesson, once all of it is written. Nothing if it is gone."""
+        with self._database.session() as session:
+            row = session.get(StoredLesson, lesson_id)
+            if row is not None:
+                row.written_by = _author(written_by)
+
+    @staticmethod
+    def _settle(
+        session: Session, row: StoredLesson, scene_id: str, scene: Mapping[str, str] | None
+    ) -> SettledScene:
+        if scene_id not in row.pending_scenes:
+            raise ConflictError("This lesson is not waiting for that picture.")
+        coming = [item for item in row.pending_scenes if item != scene_id]
+        document: dict[str, Any] = dict(row.document)
+        scenes = [
+            {
+                "id": stored.scene_id,
+                "purpose": stored.document["purpose"],
+                "source": stored.document["source"],
+            }
+            for stored in row.scenes
+        ]
+        as_animation = False
+        if scene is None:
+            document = without_scene(document, scene_id)
+        else:
+            artifact = inspect_scene(scene_id, scene["purpose"], scene["source"])
+            if not artifact.interactive and _asks_to_try(document, scene_id):
+                document = as_visualization(document, scene_id)
+                as_animation = True
+            scenes.append({"id": scene_id, "purpose": scene["purpose"], "source": scene["source"]})
+        bundle = parse_bundle({"lesson": document, "scenes": scenes, "pending_scene_ids": coming})
+        row.document = bundle.lesson.model_dump(mode="json")
+        row.pending_scenes = coming
+        row.estimated_minutes = bundle.lesson.estimated_minutes
+        row.segment_count = len(bundle.lesson.segments)
+        if scene is not None:
+            added = bundle.scenes[-1]
+            # Through the lesson's own list, so that it is there for whatever looks next.
+            row.scenes.append(
+                StoredScene(
+                    scene_id=added.id,
+                    position=len(row.scenes),
+                    content_hash=added.content_hash,
+                    document=added.model_dump(mode="json"),
+                )
+            )
+        session.flush()
+        return SettledScene(added=scene is not None, as_animation=as_animation)
+
     # -- reading -----------------------------------------------------------
 
     def list_for_course(self, course_id: str) -> list[LessonSummary]:
@@ -251,6 +405,8 @@ class LessonService:
                 scenes=scenes,
                 origin=row.origin,
                 progress=_progress(row.progress),
+                pending_scene_ids=list(row.pending_scenes or []),
+                written_by=row.written_by,
             )
 
     # -- progress ----------------------------------------------------------
@@ -282,6 +438,11 @@ class LessonService:
             progress.completed = progress.completed or completed
             session.flush()
             return _progress(progress)
+
+    def exists(self, lesson_id: str) -> bool:
+        """Whether the lesson is still there: the learner can remove one at any time."""
+        with self._database.read() as session:
+            return session.get(StoredLesson, lesson_id) is not None
 
     def delete(self, lesson_id: str) -> None:
         with self._database.session() as session:

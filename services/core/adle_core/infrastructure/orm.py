@@ -410,6 +410,14 @@ class StoredLesson(Base):
     segment_count: Mapped[int] = mapped_column(Integer, nullable=False)
     #: The lesson exactly as validated. Read back through the IR, never used raw.
     document: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    #: Ids of scenes its parts refer to that are still being drawn (ADR-031). Empty for
+    #: every lesson except one whose pictures are being drawn at this moment.
+    pending_scenes: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, server_default="[]"
+    )
+    #: Who wrote it, where a model did: the provider, the models, and a sentence if one
+    #: stood in for another. Names only.
+    written_by: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
 
     scenes: Mapped[list[StoredScene]] = relationship(

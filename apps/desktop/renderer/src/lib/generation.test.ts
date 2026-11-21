@@ -4,13 +4,17 @@ import type { Job } from '@adle/contracts';
 
 import {
   authorName,
+  isDrawingPictures,
   jobFailure,
   jobProgress,
   keptNeeds,
   KIND_LESSON,
   KIND_PROPOSAL,
   lessonDisclosure,
+  lessonNotice,
+  lessonWaitNote,
   readLessonOutcome,
+  titled,
   readProposal,
 } from './generation';
 
@@ -186,14 +190,112 @@ describe('readLessonOutcome', () => {
       lessonId: 'les_00000000000000000001',
       title: 'Weights',
       notes: ['One picture could not be made.'],
+      picturesPending: 0,
     });
   });
 
-  it('is null unless a lesson job succeeded with a lesson', () => {
+  it('reads a lesson that can be started while its pictures are still being drawn', () => {
+    const drawing = job({
+      kind: KIND_LESSON,
+      status: 'running',
+      result: { lesson_id: 'les_1', title: 'Weights', pictures_pending: 2, notes: [] },
+    });
+    expect(readLessonOutcome(drawing)).toEqual({
+      lessonId: 'les_1',
+      title: 'Weights',
+      notes: [],
+      picturesPending: 2,
+    });
+    expect(isDrawingPictures(drawing)).toBe(true);
+    // Once the work has ended nothing is still to come, whatever the last word on the way was.
+    const ended = { ...drawing, status: 'succeeded' as const };
+    expect(readLessonOutcome(ended)?.picturesPending).toBe(0);
+    expect(isDrawingPictures(ended)).toBe(false);
+    // Still writing the text: there is no lesson yet.
+    const writing = job({ kind: KIND_LESSON, status: 'running', result: null });
+    expect(readLessonOutcome(writing)).toBeNull();
+    expect(isDrawingPictures(writing)).toBe(false);
+    expect(isDrawingPictures(null)).toBe(false);
+  });
+
+  it('is null unless a lesson job has a lesson', () => {
     expect(readLessonOutcome(job({ result: { lesson_id: 'les_1' } }))).toBeNull();
     expect(readLessonOutcome(job({ kind: KIND_LESSON, status: 'cancelled' }))).toBeNull();
     expect(readLessonOutcome(job({ kind: KIND_LESSON, result: { title: 'no id' } }))).toBeNull();
     expect(readLessonOutcome(null)).toBeNull();
+    // A job that failed, or was stopped before there was a lesson, has none: not even
+    // if it named one on the way.
+    for (const status of ['failed', 'cancelled', 'queued'] as const) {
+      expect(
+        readLessonOutcome(job({ kind: KIND_LESSON, status, result: { lesson_id: 'les_1' } })),
+      ).toBeNull();
+    }
+  });
+});
+
+describe('lessonNotice', () => {
+  const drawing = job({
+    kind: KIND_LESSON,
+    status: 'running',
+    result: { lesson_id: 'les_1', title: 'Weights', pictures_pending: 2, notes: [] },
+  });
+  const done = (notes: string[]): Job =>
+    job({ kind: KIND_LESSON, result: { lesson_id: 'les_1', title: 'Weights', notes } });
+
+  it('says a lesson is ready as soon as it can be started', () => {
+    expect(lessonNotice(drawing, false)).toEqual({
+      tone: 'success',
+      title: 'Lesson ready',
+      description: 'Weights. Its pictures are still being drawn.',
+    });
+  });
+
+  it('does not say it a second time when the pictures are done', () => {
+    expect(lessonNotice(drawing, true)).toBeNull();
+    expect(lessonNotice(done([]), true)).toBeNull();
+  });
+
+  it('says so afterwards if a picture did not arrive', () => {
+    const note = 'The picture for “The weighted sum” couldn’t be made.';
+    expect(lessonNotice(done([note]), true)).toEqual({
+      tone: 'info',
+      title: 'About its pictures',
+      description: note,
+    });
+  });
+
+  it('says everything at once when the work ended before anyone was told', () => {
+    expect(lessonNotice(done(['One picture is in words.']), false)).toEqual({
+      tone: 'success',
+      title: 'Lesson ready',
+      description: 'Weights. One picture is in words.',
+    });
+  });
+
+  it('has nothing to say about work that produced no lesson', () => {
+    expect(lessonNotice(job({ kind: KIND_LESSON, status: 'failed' }), false)).toBeNull();
+    expect(lessonNotice(job({ kind: KIND_LESSON, status: 'running' }), false)).toBeNull();
+    expect(lessonNotice(job({ kind: KIND_PROPOSAL }), false)).toBeNull();
+  });
+});
+
+describe('titled', () => {
+  it('keeps a title and what is said about it apart', () => {
+    expect(titled('Weights', [])).toBe('Weights');
+    expect(titled('Weights', ['It has two pictures.'])).toBe('Weights. It has two pictures.');
+    // A title that ends a sentence already is left as it is.
+    expect(titled('What is a weight?', ['One note.'])).toBe('What is a weight? One note.');
+    expect(titled('', ['One note.', ''])).toBe('One note.');
+  });
+});
+
+describe('lessonWaitNote', () => {
+  it('says when the lesson can be started, and that its pictures follow', () => {
+    expect(lessonWaitNote('about 6 minutes')).toBe(
+      ' Ready to start in about 6 minutes. Its pictures follow.',
+    );
+    expect(lessonWaitNote(null)).toBe('');
+    expect(lessonWaitNote('')).toBe('');
   });
 });
 

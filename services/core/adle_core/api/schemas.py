@@ -370,10 +370,21 @@ class LessonSummary(_Output):
     estimated_minutes: int
     segment_count: int
     progress: LessonProgress
+    #: Pictures the lesson is still waiting for. It can be taken meanwhile (ADR-031).
+    pictures_pending: int = 0
 
 
 class LessonList(_Output):
     lessons: list[LessonSummary]
+
+
+class LessonAuthor(_Output):
+    """Who wrote a lesson, by the names they went by when it was written."""
+
+    provider: str
+    models: list[str]
+    #: A sentence saying that another model or provider stood in; empty when none did.
+    note: str
 
 
 class LessonForPlayer(_Output):
@@ -384,6 +395,12 @@ class LessonForPlayer(_Output):
     scenes: list[lesson_ir.SceneArtifact]
     origin: LessonOrigin
     progress: LessonProgress
+    #: Scenes that parts refer to and that are still being drawn. Each such part shows its
+    #: picture in words until the picture arrives (ADR-031).
+    pending_scene_ids: list[str] = Field(default_factory=list)
+    #: Who wrote it, where a model did. Absent for the sample course, and for lessons
+    #: written before this was kept.
+    written_by: LessonAuthor | None = None
 
 
 class LessonProgressUpdate(_Input):

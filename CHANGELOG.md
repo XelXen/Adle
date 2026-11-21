@@ -40,6 +40,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A lesson written by an AI can be removed from its concept, to make room for another way
   of teaching the same thing.
 - A lesson that draws on your own materials says which passages, under its title.
+- **Start a lesson as soon as it is written.** A lesson an AI writes can be opened when its
+  text is ready, about half the wait there used to be. Its pictures are drawn meanwhile and
+  appear in the lesson as they arrive; until then that part is explained in words. If one
+  arrives while you are reading its part, it is offered, not sprung on you. "Stop" at that
+  point stops the pictures and keeps the lesson. You are told once that the lesson is
+  ready.
+- A lesson an AI wrote says who wrote it, in one line under its title.
 
 ### Changed
 
@@ -69,6 +76,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Removing a lesson or a course now stops any work still under way for it, at once.
+  Before, a request already on its way to the provider ran to its end.
+- "Create a lesson with AI" no longer shows for a moment, with the wrong wording, while a
+  concept's lessons are still loading.
 - The loading mark sits in the middle of its frame.
 - A question whose answer could not be written is now reported even if you had gone back to
   the lesson, and "Ask a question" can be opened again while an answer is on its way, to

@@ -108,9 +108,14 @@ def record_requests(client: ChatClient, out: Path, calls: list[dict[str, Any]]) 
 def wait(services: Services, job_id: str, limit: float = 3000.0) -> Any:
     """Follow a job, saying what it says, until it has finished."""
     last = ""
+    usable = False
     started = time.monotonic()
     while time.monotonic() - started < limit:
         snapshot = services.jobs.get(job_id)
+        if not usable and not snapshot.finished and snapshot.result is not None:
+            # A lesson can be taken from here on, while its pictures are drawn (ADR-031).
+            usable = True
+            say(f"  [usable] {round(time.monotonic() - started)}s there is something to start")
         if snapshot.progress_message != last:
             last = snapshot.progress_message
             say(f"  [{snapshot.status}] {round(time.monotonic() - started)}s {last}")
@@ -191,7 +196,9 @@ def main() -> int:
             elif step == "ask":
                 say("ASK")
                 _, lesson_id, segment_id = sample_lesson(services)
-                snapshot = wait(services, services.generation.ask(lesson_id, segment_id, QUESTION).id)
+                snapshot = wait(
+                    services, services.generation.ask(lesson_id, segment_id, QUESTION).id
+                )
                 if snapshot.status == "succeeded":
                     kept = services.asks.get(snapshot.result["ask_id"])
                     (out / "answer.json").write_text(
