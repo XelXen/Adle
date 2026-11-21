@@ -115,32 +115,60 @@ async function startAndCheck(executable) {
       APPDATA: process.env.APPDATA ?? '',
       LOCALAPPDATA: process.env.LOCALAPPDATA ?? '',
       HOME: process.env.HOME ?? '',
+      // Where the screen is, and the right to draw on it. Without the second a display
+      // that asks for it (a virtual one on a build machine does) turns the app away.
       DISPLAY: process.env.DISPLAY ?? '',
+      XAUTHORITY: process.env.XAUTHORITY ?? '',
+      WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY ?? '',
+      XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR ?? '',
       PATH: isWindows() ? `${process.env.SystemRoot}\\System32` : '/usr/bin:/bin',
       ADLE_USER_DATA_DIR: profile,
       // A Python variable that would break an interpreter which listened to it.
       PYTHONHOME: path.join(os.tmpdir(), 'no-such-python'),
       PYTHONPATH: path.join(os.tmpdir(), 'no-such-packages'),
     },
-    stdio: 'ignore',
+    // What the app says when something is wrong with the system it is on (no display, no
+    // sandbox) is the only account there is of a start that never happened.
+    stdio: ['ignore', 'ignore', 'pipe'],
     windowsHide: false,
   });
   let exited = false;
+  let said = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk) => {
+    said = (said + chunk).slice(-4000);
+  });
   child.once('exit', () => {
     exited = true;
   });
+  /** What there is to go on when the app did not come up. */
+  const account = () => {
+    const parts = [];
+    if (said.trim()) parts.push(`The app said:\n${said.trim()}`);
+    for (const name of ['app.log', 'core.log']) {
+      const log = path.join(profile, 'logs', name);
+      if (existsSync(log)) parts.push(`${name} ends:\n${readFileSync(log, 'utf8').slice(-1500)}`);
+    }
+    return parts.length > 0 ? `\n${parts.join('\n')}` : '';
+  };
 
   const coreLog = path.join(profile, 'logs', 'core.log');
   const database = path.join(profile, 'data', 'adle.db');
   try {
     await until(
-      () =>
-        existsSync(database) &&
-        existsSync(coreLog) &&
-        /Starting adle-core/.test(readFileSync(coreLog, 'utf8')),
+      () => {
+        if (exited) throw new Error(`The app closed by itself before its core was up.${account()}`);
+        return (
+          existsSync(database) &&
+          existsSync(coreLog) &&
+          /Starting adle-core/.test(readFileSync(coreLog, 'utf8'))
+        );
+      },
       START_TIMEOUT_MS,
       'the core to start inside the packaged app',
-    );
+    ).catch((error) => {
+      throw new Error(`${error.message}${exited ? '' : account()}`);
+    });
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
     await sleep(3000);
     if (exited) throw new Error('The app closed by itself a few seconds after starting.');

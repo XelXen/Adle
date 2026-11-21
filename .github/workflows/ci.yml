@@ -75,13 +75,28 @@ jobs:
       - name: Run end-to-end tests (Windows)
         if: runner.os == 'Windows'
         run: npm run e2e
+      - name: A keyring for the test session (Linux)
+        if: runner.os == 'Linux'
+        # Adle keeps a provider's key only where the system can keep a secret, and says so
+        # where it cannot. A build machine has no keyring of its own, and twenty-three
+        # journeys save a key: without one they stop at the first step, as they should.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends gnome-keyring libsecret-1-0 dbus-daemon
       - name: Run end-to-end tests (Linux, virtual display)
         if: runner.os == 'Linux'
         # Run from its folder, Electron's sandbox helper is nobody's, so the sandbox is built
         # from namespaces, which this build machine is told to allow. The sandbox stays on.
+        # The session has a message bus and an unlocked keyring on it, and says it is a
+        # GNOME one, which is how Chromium knows to keep secrets there.
         run: |
           sudo sysctl --write kernel.apparmor_restrict_unprivileged_userns=0 || true
-          xvfb-run --auto-servernum npm run e2e
+          dbus-run-session -- bash -c '
+            set -euo pipefail
+            printf "%s" "a-keyring-for-tests-only" | gnome-keyring-daemon --daemonize --unlock --components=secrets > /dev/null
+            export XDG_CURRENT_DESKTOP=GNOME
+            xvfb-run --auto-servernum npm run e2e
+          '
       - name: Upload report and screenshots
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

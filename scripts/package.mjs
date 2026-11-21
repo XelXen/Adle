@@ -26,13 +26,13 @@ import {
   copyFileSync,
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -61,7 +61,10 @@ function run(command, args, options = {}) {
 }
 
 function sizeOf(target) {
-  const stats = statSync(target);
+  // A link is not what it points at: a framework on macOS is reached by three of them, and
+  // followed, each would be counted again.
+  const stats = lstatSync(target);
+  if (stats.isSymbolicLink()) return 0;
   if (!stats.isDirectory()) return stats.size;
   return readdirSync(target).reduce((total, name) => total + sizeOf(path.join(target, name)), 0);
 }
@@ -145,6 +148,19 @@ const UNUSED_ELSEWHERE = [
   'lib/python3.12/pydoc_data',
 ];
 
+/**
+ * And what is named with a version or a system in it. The static library and the build
+ * settings are what another program is compiled against to embed Python; on a Mac they were
+ * half as large again as everything the core runs. Tcl and Tk are for windows the core
+ * never opens.
+ */
+const UNUSED_ELSEWHERE_BY_PATTERN = [
+  /^lib\/python3\.12\/config-3\.12-[^/]+$/,
+  /^lib\/libpython[^/]*\.a$/,
+  /^lib\/(lib)?(tcl|tk|itcl|thread)[^/]*$/,
+  /^lib\/python3\.12\/lib-dynload\/_tkinter[^/]*$/,
+];
+
 /** Where the Python that uv manages for this project is installed. */
 function basePython() {
   const config = path.join(coreDir, '.venv', 'pyvenv.cfg');
@@ -186,7 +202,8 @@ function stageCore() {
     dereference: true,
     filter: (item) => {
       const relative = path.relative(source, item).split(path.sep).join('/').toLowerCase();
-      return !unused.has(relative) && path.basename(item) !== '__pycache__';
+      if (unused.has(relative) || path.basename(item) === '__pycache__') return false;
+      return isWindows || !UNUSED_ELSEWHERE_BY_PATTERN.some((pattern) => pattern.test(relative));
     },
   });
 
