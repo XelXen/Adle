@@ -99,7 +99,12 @@ def spread_across_sources(ranked: Sequence[Passage], limit: int) -> list[Passage
 
 
 class FtsRetriever:
-    """Keyword retrieval over the full-text index of a course's passages."""
+    """Keyword retrieval over the full-text index of a course's passages.
+
+    It reads the index that matches a word in any of its forms ("weights", "weight"),
+    ``source_chunks_stems`` (ADR-041): a concept and its objectives seldom use the very
+    forms the materials do.
+    """
 
     def __init__(self, database: Database) -> None:
         self._database = database
@@ -112,12 +117,12 @@ class FtsRetriever:
             """
             SELECT chunk.id, source.id, source.display_name, section.id, section.title,
                    section.page_number, chunk.text
-            FROM source_chunks_fts
-            JOIN source_chunks AS chunk ON chunk.id = source_chunks_fts.rowid
+            FROM source_chunks_stems
+            JOIN source_chunks AS chunk ON chunk.id = source_chunks_stems.rowid
             JOIN sources AS source ON source.id = chunk.source_id
             JOIN source_sections AS section ON section.id = chunk.section_id
-            WHERE source_chunks_fts MATCH :match AND chunk.course_id = :course_id
-            ORDER BY bm25(source_chunks_fts), chunk.id
+            WHERE source_chunks_stems MATCH :match AND chunk.course_id = :course_id
+            ORDER BY bm25(source_chunks_stems), chunk.id
             LIMIT :limit
             """
         )

@@ -32,6 +32,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
   With "Automatic", AIHubMix's coding model draws the pictures and NVIDIA writes
   everything else, so AIHubMix's small allowance goes on pictures alone. Settings shows
   which model writes what.
+- **More of a Word document is read.** Its equations are kept, written out in a line;
+  a picture is kept as its description, where it has one; a table stays a table. All of it
+  can be found, quoted in a lesson, and cited. Documents imported before are read the new
+  way if you import them again.
+- **A lesson finds your notes by any form of a word**: a lesson about weighted sums finds
+  notes that speak of weights.
 - **Far fewer sentences.** What a request to an AI provider sends, and where it goes, is one
   press away from the button that sends it (the small "i" beside it) instead of written out
   beside every button; it is still said in full in Settings. What a lesson is made from and

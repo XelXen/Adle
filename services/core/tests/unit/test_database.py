@@ -142,8 +142,9 @@ def test_the_migrated_schema_matches_the_models_exactly(database: Database, back
         differences = [
             difference
             for difference in compare_metadata(context, Base.metadata)
-            # The FTS index and its shadow tables are created with raw SQL on purpose.
+            # The full-text indexes and their shadow tables are created with raw SQL on purpose.
             if "source_chunks_fts" not in repr(difference)
+            and "source_chunks_stems" not in repr(difference)
         ]
     assert differences == []
 

@@ -24,7 +24,9 @@ from adle_core.ingestion.types import (
 )
 
 #: Bumped whenever extraction output changes, so cached extractions can be invalidated.
-PARSER_REVISION = "1"
+#: Bumped when what a parser makes of the same file changes. "2": Word documents keep
+#: their equations, the descriptions of their pictures, and their tables as tables (ADR-041).
+PARSER_REVISION = "2"
 
 LINE_BREAK = chr(10)
 #: Unicode replacement character: what a decoder emits for bytes it cannot read.
@@ -324,6 +326,135 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
 
 _HEADING_STYLE = re.compile(r"^heading\s*(\d)$", re.IGNORECASE)
 
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+_M = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
+_WP = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}"
+#: The longest an equation or a picture's description is kept, in characters.
+_MAX_INLINE = 600
+
+
+def _local(element: Any) -> str:
+    tag = element.tag if isinstance(element.tag, str) else ""
+    return tag.rsplit("}", 1)[-1]
+
+
+def _child(element: Any, name: str) -> Any:
+    return next((child for child in element if _local(child) == name), None)
+
+
+def _wrapped(text: str) -> str:
+    """A part of an equation, in brackets when it is more than one symbol."""
+    return text if len(text) <= 1 or text.isalnum() else f"({text})"
+
+
+def omml_text(element: Any) -> str:
+    """An Office Math equation written out in one line: x^2, (a+b)/c, √(x), ∑_(i=1)^n.
+
+    Not a typesetter: enough of the structure survives to be searched for and quoted, and a
+    reader can tell a fraction from a product. Anything not listed is read for its letters.
+    """
+    name = _local(element)
+
+    def part(child_name: str) -> str:
+        child = _child(element, child_name)
+        return omml_text(child) if child is not None else ""
+
+    def setting(properties: str, key: str, default: str) -> str:
+        found = _child(element, properties)
+        value = _child(found, key) if found is not None else None
+        if value is None:
+            return default
+        return str(value.get(f"{_M}val", default))
+
+    if name == "t":
+        return element.text or ""
+    if name == "f":
+        return f"{_wrapped(part('num'))}/{_wrapped(part('den'))}"
+    if name == "sSup":
+        return f"{part('e')}^{_wrapped(part('sup'))}"
+    if name == "sSub":
+        return f"{part('e')}_{_wrapped(part('sub'))}"
+    if name == "sSubSup":
+        return f"{part('e')}_{_wrapped(part('sub'))}^{_wrapped(part('sup'))}"
+    if name == "rad":
+        degree = part("deg")
+        inner = part("e")
+        return f"root({degree}, {inner})" if degree else f"√{_wrapped(inner)}"
+    if name == "nary":
+        symbol = setting("naryPr", "chr", "∫")
+        lower, upper = part("sub"), part("sup")
+        limits = (f"_{_wrapped(lower)}" if lower else "") + (f"^{_wrapped(upper)}" if upper else "")
+        return f"{symbol}{limits} {part('e')}"
+    if name == "d":
+        opening = setting("dPr", "begChr", "(")
+        closing = setting("dPr", "endChr", ")")
+        separator = setting("dPr", "sepChr", ",")
+        inside = [omml_text(child) for child in element if _local(child) == "e"]
+        return f"{opening}{separator.join(inside)}{closing}"
+    if name == "func":
+        return f"{part('fName')} {_wrapped(part('e'))}"
+    if name.endswith("Pr"):
+        # Properties say how a part is drawn, not what it is.
+        return ""
+    return "".join(omml_text(child) for child in element)
+
+
+def _docx_inline_text(paragraph_element: Any) -> str:
+    """A paragraph's text in document order: its runs and links, its equations written out,
+    and each picture as what its description says it is."""
+    pieces: list[str] = []
+
+    def visit(element: Any) -> None:
+        name = _local(element)
+        namespace = element.tag.split("}", 1)[0] + "}" if isinstance(element.tag, str) else ""
+        if namespace == _M and name in ("oMath", "oMathPara"):
+            equation = " ".join(omml_text(element).split())
+            if equation:
+                pieces.append(f" {equation[:_MAX_INLINE]} ")
+            return
+        if namespace == _W and name == "t":
+            pieces.append(element.text or "")
+            return
+        if namespace == _W and name == "tab":
+            pieces.append("\t")
+            return
+        if namespace == _W and name in ("br", "cr"):
+            pieces.append("\n")
+            return
+        if namespace == _W and name in ("drawing", "pict"):
+            described = next(
+                (
+                    found.get("descr") or found.get("title")
+                    for found in element.iter(f"{_WP}docPr")
+                    if found.get("descr") or found.get("title")
+                ),
+                None,
+            )
+            if described:
+                pieces.append(f" [Picture: {' '.join(described.split())[:_MAX_INLINE]}] ")
+            return
+        if namespace == _W and name in ("del", "instrText", "delText"):
+            # Deleted text and the codes behind fields are not what the reader sees.
+            return
+        for child in element:
+            visit(child)
+
+    visit(paragraph_element)
+    # Runs of spaces left around an equation or a picture are folded by ``clean_text``.
+    return "".join(pieces).strip()
+
+
+def _markdown_table(rows: list[list[str]]) -> str:
+    """Rows of cell texts as a Markdown table, the first row as its header."""
+    width = max(len(row) for row in rows)
+    lines = []
+    for index, row in enumerate(rows):
+        cells = [cell.replace("|", "\\|") for cell in row] + [""] * (width - len(row))
+        lines.append("| " + " | ".join(cells) + " |")
+        if index == 0:
+            lines.append("|" + " --- |" * width)
+    return "\n".join(lines)
+
 
 def _docx_heading_level(style_name: str) -> int | None:
     """Heading depth of a paragraph style. The document title sits above every heading."""
@@ -367,7 +498,7 @@ def parse_docx(path: Path, limits: Limits) -> ExtractedDocument:
 
     for block in document.iter_inner_content():
         if isinstance(block, Paragraph):
-            text = block.text.strip()
+            text = clean_text(_docx_inline_text(block._p))
             if not text:
                 continue
             style_name = (block.style.name if block.style is not None else None) or ""
@@ -378,12 +509,22 @@ def parse_docx(path: Path, limits: Limits) -> ExtractedDocument:
             else:
                 buffer.append(text)
         elif isinstance(block, Table):
+            rows: list[list[str]] = []
             for row in block.rows:
-                cells = [clean_text(cell.text).replace("\n", " ") for cell in row.cells]
-                # Merged cells repeat; keep each distinct neighbour once.
-                distinct = [c for i, c in enumerate(cells) if c and (i == 0 or c != cells[i - 1])]
-                if distinct:
-                    buffer.append(" | ".join(distinct))
+                cells: list[str] = []
+                previous: Any = None
+                for cell in row.cells:
+                    # A merged cell is the same cell again: said once, then left empty.
+                    same = previous is not None and cell._tc is previous._tc
+                    words = " ".join(
+                        _docx_inline_text(paragraph._p) for paragraph in cell.paragraphs
+                    )
+                    cells.append("" if same else " ".join(clean_text(words).split()))
+                    previous = cell
+                if any(cells):
+                    rows.append(cells)
+            if rows:
+                buffer.append(_markdown_table(rows))
     flush()
 
     return _require_content(

@@ -325,6 +325,19 @@ def test_search_is_scoped_to_one_course(client: TestClient, services: Services) 
     assert client.get(f"/v1/courses/{first['id']}/search", params={"q": "gradient"}).json()["hits"]
 
 
+def test_passages_for_a_lesson_are_found_by_a_word_in_any_of_its_forms(
+    client: TestClient, services: Services
+) -> None:
+    course = create_course(client)
+    import_files(client, services, course["id"], "study-notes.txt")
+    # The notes say "weight" and "weights", never "weighted": a concept may say it that way.
+    found = services.retriever.retrieve(course["id"], "weighted")
+    assert found
+    assert any("weight" in passage.text.lower() for passage in found)
+    # Searching while typing keeps matching the start of a word, from the index it had.
+    assert client.get(f"/v1/courses/{course['id']}/search", params={"q": "learni"}).json()["hits"]
+
+
 def test_search_falls_back_to_any_term_and_matches_prefixes(
     client: TestClient, services: Services
 ) -> None:
