@@ -63,6 +63,77 @@ describe('installFrameClock', () => {
     expect(frame).not.toHaveBeenCalled();
   });
 
+  it('hands frames out at once while rushing, one task each, and not through the display', () => {
+    const { target, flush, pending } = fakeTarget();
+    const tasks: (() => void)[] = [];
+    const clock = installFrameClock(
+      target,
+      (work) => tasks.push(work),
+      () => 42,
+    );
+    const first = vi.fn();
+    const second = vi.fn();
+
+    clock.rush();
+    expect(clock.rushing).toBe(true);
+    target.requestAnimationFrame(first);
+    target.requestAnimationFrame(second);
+    // Nothing was asked of the display, and nothing has run yet: each waits for its task.
+    expect(pending()).toBe(0);
+    expect(first).not.toHaveBeenCalled();
+    tasks.shift()?.();
+    expect(first).toHaveBeenCalledWith(42);
+    expect(second).not.toHaveBeenCalled();
+    tasks.shift()?.();
+    expect(second).toHaveBeenCalledOnce();
+    expect(flush()).toBe(0);
+
+    // Back at the display's pace, a frame waits for the display again.
+    clock.steady();
+    const third = vi.fn();
+    target.requestAnimationFrame(third);
+    expect(pending()).toBe(1);
+    expect(tasks).toHaveLength(0);
+    flush();
+    expect(third).toHaveBeenCalledOnce();
+  });
+
+  it('rushes the player’s housekeeping with the frames, and lets either be cancelled', () => {
+    const { target, pending } = fakeTarget();
+    const tasks: (() => void)[] = [];
+    const clock = installFrameClock(target, (work) => tasks.push(work));
+    clock.rush();
+
+    const housekeeping = vi.fn();
+    clock.requestNativeFrame(housekeeping);
+    expect(pending()).toBe(0);
+    tasks.shift()?.();
+    expect(housekeeping).toHaveBeenCalledOnce();
+
+    const cancelledFrame = vi.fn();
+    const cancelledChore = vi.fn();
+    target.cancelAnimationFrame(target.requestAnimationFrame(cancelledFrame));
+    clock.cancelNativeFrame(clock.requestNativeFrame(cancelledChore));
+    for (const task of tasks.splice(0)) task();
+    expect(cancelledFrame).not.toHaveBeenCalled();
+    expect(cancelledChore).not.toHaveBeenCalled();
+  });
+
+  it('holds a rushed frame while paused, and rushes it on resume', () => {
+    const { target } = fakeTarget();
+    const tasks: (() => void)[] = [];
+    const clock = installFrameClock(target, (work) => tasks.push(work));
+    clock.rush();
+    const heldBack = vi.fn();
+    clock.pause();
+    target.requestAnimationFrame(heldBack);
+    expect(tasks).toHaveLength(0);
+    clock.resume();
+    expect(tasks).toHaveLength(1);
+    tasks.shift()?.();
+    expect(heldBack).toHaveBeenCalledOnce();
+  });
+
   it('keeps the native clock available for housekeeping while paused', () => {
     const { target, flush } = fakeTarget();
     const clock = installFrameClock(target);

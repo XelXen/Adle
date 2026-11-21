@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from adle_core.api import schemas
+from adle_core.application.scene_trials import TrialFailure
 from adle_core.application.services import Services, get_services
 
 router = APIRouter(tags=["generation"])
@@ -76,6 +77,39 @@ def generate_lesson(
     return schemas.Job.model_validate(
         services.generation.generate_lesson(concept_id, strategy=strategy)
     )
+
+
+@router.get("/scene-trials", operation_id="scenes.trials", response_model=schemas.SceneTrialList)
+def scene_trials(services: ServicesDep) -> schemas.SceneTrialList:
+    """Pictures to try in the player before a learner is shown them (ADR-038).
+
+    The app asks while a lesson is being written; asking is also how it says that it is
+    there to try them.
+    """
+    return schemas.SceneTrialList(
+        trials=[
+            schemas.SceneTrial(
+                id=trial.id,
+                scene_class=trial.scene_class,
+                source=trial.source,
+                interactive=trial.interactive,
+                controls=list(trial.controls),
+            )
+            for trial in services.generation.trials.waiting()
+        ]
+    )
+
+
+@router.post("/scene-trials/{trial_id}", operation_id="scenes.report_trial", status_code=204)
+def report_scene_trial(
+    trial_id: str, body: schemas.SceneTrialReport, services: ServicesDep
+) -> Response:
+    """How a trial went. A report nobody is waiting for any more is let go."""
+    failure = (
+        None if body.passed else TrialFailure(stage=body.stage or "runtime", message=body.message)
+    )
+    services.generation.trials.report(trial_id, failure)
+    return Response(status_code=204)
 
 
 @router.get("/jobs", operation_id="jobs.list_writing", response_model=schemas.JobList)

@@ -78,6 +78,12 @@ export type HostMessage =
       quality: SceneQuality;
       /** When false the scene is prepared and held on its first frame until `play`. */
       autoplay: boolean;
+      /**
+       * Run the scene through as fast as it can be drawn, to find out whether it runs
+       * before anyone is shown it (ADR-038). What it reports is the same as ever; only
+       * the time it takes is not a learner's.
+       */
+      rehearsal: boolean;
     }
   | { adle: typeof PROTOCOL_VERSION; type: 'play'; runId: string }
   | { adle: typeof PROTOCOL_VERSION; type: 'pause'; runId: string }
@@ -264,7 +270,17 @@ export function parseHostMessage(data: unknown): HostMessage | null {
   const adle = PROTOCOL_VERSION;
   switch (data.type) {
     case 'load': {
-      const keys = ['adle', 'type', 'runId', 'source', 'sceneName', 'theme', 'quality', 'autoplay'];
+      const keys = [
+        'adle',
+        'type',
+        'runId',
+        'source',
+        'sceneName',
+        'theme',
+        'quality',
+        'autoplay',
+        'rehearsal',
+      ];
       if (!hasExactKeys(data, keys)) return null;
       if (
         !isRunId(data.runId) ||
@@ -274,7 +290,8 @@ export function parseHostMessage(data: unknown): HostMessage | null {
         !(data.sceneName === null || isIdentifier(data.sceneName)) ||
         !isOneOf(data.theme, THEMES) ||
         !isOneOf(data.quality, QUALITIES) ||
-        typeof data.autoplay !== 'boolean'
+        typeof data.autoplay !== 'boolean' ||
+        typeof data.rehearsal !== 'boolean'
       ) {
         return null;
       }
@@ -287,6 +304,7 @@ export function parseHostMessage(data: unknown): HostMessage | null {
         theme: data.theme,
         quality: data.quality,
         autoplay: data.autoplay,
+        rehearsal: data.rehearsal,
       };
     }
     case 'play':

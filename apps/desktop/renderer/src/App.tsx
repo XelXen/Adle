@@ -13,6 +13,7 @@ import {
 import { useApp } from './app/AppContext';
 import { BreakProvider, useBreak } from './app/BreakContext';
 import { type Route, useRouter } from './app/router';
+import { SceneTrials } from './app/SceneTrials';
 import { useWriting, WritingProvider } from './app/WritingContext';
 import { CoreStatusIndicator } from './components/CoreStatusIndicator';
 import { clockText } from './lib/breaks';
@@ -143,6 +144,7 @@ function Activity({ children }: { children: ReactNode }) {
   return (
     <WritingProvider>
       <BreakProvider>{children}</BreakProvider>
+      <SceneTrials />
     </WritingProvider>
   );
 }

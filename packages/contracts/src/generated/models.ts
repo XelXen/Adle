@@ -817,6 +817,29 @@ export interface ProviderStatus {
   routes: ProviderRoutes;
   selection: string;
 }
+/**
+ * A picture to try in the player before a learner is shown it (ADR-038).
+ *
+ */
+export interface SceneTrial {
+  controls: string[];
+  id: string;
+  interactive: boolean;
+  scene_class: string;
+  source: string;
+}
+export interface SceneTrialList {
+  trials: SceneTrial[];
+}
+/**
+ * How a trial went. ``passed``, or where it failed and what the player said.
+ *
+ */
+export interface SceneTrialReport {
+  message?: string;
+  passed: boolean;
+  stage?: ('boot' | 'compile' | 'runtime' | 'timeout' | 'unresponsive' | 'controls') | null;
+}
 export interface SearchHit {
   chunk_id: number;
   excerpt: HighlightSegment[];

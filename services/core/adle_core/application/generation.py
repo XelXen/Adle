@@ -65,6 +65,7 @@ from adle_core.application.lessons import LessonService
 from adle_core.application.model_gateway import ModelGateway, QuotaExhaustedError
 from adle_core.application.retrieval import Passage as StoredPassage
 from adle_core.application.retrieval import Retriever
+from adle_core.application.scene_trials import SceneTrials, TrialFailure
 from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
 from adle_core.generation import prompts
 from adle_core.generation.drafts import (
@@ -380,6 +381,7 @@ class GenerationService:
         learner: LearnerService,
         retriever: Retriever,
         asks: AskService,
+        trials: SceneTrials | None = None,
     ) -> None:
         self._database = database
         self._jobs = jobs
@@ -389,10 +391,16 @@ class GenerationService:
         self._learner = learner
         self._retriever = retriever
         self._asks = asks
+        self._trials = trials if trials is not None else SceneTrials()
         #: Looking for work that is under way and starting it are one step. Without this,
         #: two requests arriving together both find nothing and both begin: the same
         #: lesson written twice, or a provider chosen under a job that has just started.
         self._starting = threading.Lock()
+
+    @property
+    def trials(self) -> SceneTrials:
+        """Pictures waiting to be tried in the app's player (ADR-038)."""
+        return self._trials
 
     # -- the one way a request is made ---------------------------------------
 
@@ -993,9 +1001,14 @@ class GenerationService:
     ) -> tuple[SceneArtifact | None, ChatResult | None]:
         """One scene file and the answer it came in, or neither.
 
-        One request, and one more only if the file was refused.
+        One request, and one more only if the file was refused by the rules or failed when
+        it was tried in the app's player (ADR-038); the second is told what went wrong. A
+        file that failed its trial is never kept: a part without its picture is said in
+        words, and a picture that breaks in front of the learner is said in words too, late.
         """
         problems: list[str] = []
+        #: The first file, when it passed the rules and failed when it was run.
+        previous: str | None = None
         fallback: tuple[SceneArtifact | None, ChatResult | None] = (None, None)
         for attempt in (1, 2):
             context.check_cancelled()
@@ -1003,7 +1016,7 @@ class GenerationService:
             if attempt == 2:
                 context.report(done, total, doing, {"stage": "drawing"})
             result = self._ask(
-                prompts.scene_request(brief, problems=problems),
+                prompts.scene_request(brief, problems=problems, previous=previous),
                 context,
                 done,
                 total,
@@ -1011,6 +1024,7 @@ class GenerationService:
                 stage="drawing",
             )
             source = extract_python_file(result.text)
+            previous = None
             try:
                 artifact = inspect_scene(brief.scene_id, brief.title, source)
             except SceneRejectedError as error:
@@ -1025,6 +1039,15 @@ class GenerationService:
             except ValidationError as error:
                 problems = _problem_list(error)
                 continue
+            failure = self._try_in_player(artifact, context)
+            if failure is not None:
+                # The stage only: what the scene said is the model's text (ADR-029).
+                logger.info(
+                    "generation.scene_failed_trial attempt=%s stage=%s", attempt, failure.stage
+                )
+                problems = [failure.as_problem()]
+                previous = artifact.source
+                continue
             if brief.kind == "interactive" and not artifact.interactive:
                 # Usable as a picture, but not what was asked for: worth one more try.
                 fallback = (artifact, result)
@@ -1036,6 +1059,27 @@ class GenerationService:
                 continue
             return artifact, result
         return fallback
+
+    def _try_in_player(self, artifact: SceneArtifact, context: JobContext) -> TrialFailure | None:
+        """Run a picture in the app's player before it is kept, if the app is there to.
+
+        The verdict, or None when it ran, or when it could not be tried: the app was not
+        asking for trials, or did not answer in time. An untried picture is kept as pictures
+        were before trials, and the player says it in words if it fails.
+        """
+        if not self._trials.present():
+            return None
+        trial_id = self._trials.offer(
+            scene_class=artifact.scene_class,
+            source=artifact.source,
+            interactive=artifact.interactive,
+            controls=tuple(artifact.controls),
+        )
+        verdict = self._trials.wait(trial_id, cancelled=lambda: context.cancelled)
+        context.check_cancelled()
+        if verdict == "untried":
+            logger.info("generation.scene_untried")
+        return verdict if isinstance(verdict, TrialFailure) else None
 
     # -- a question the learner asks in the middle of a lesson -------------------
 

@@ -24,6 +24,7 @@ const load = {
   theme: 'light',
   quality: 'medium',
   autoplay: true,
+  rehearsal: false,
 };
 
 describe('parseHostMessage', () => {
@@ -34,6 +35,8 @@ describe('parseHostMessage', () => {
   it.each([
     ['unknown field', { ...load, callback: 'x' }],
     ['missing field', (({ autoplay: _autoplay, ...rest }) => rest)(load)],
+    ['no word on whether it is a rehearsal', (({ rehearsal: _rehearsal, ...rest }) => rest)(load)],
+    ['a rehearsal that is not yes or no', { ...load, rehearsal: 'fast' }],
     ['wrong protocol version', { ...load, adle: 2 }],
     ['empty source', { ...load, source: '' }],
     ['oversized source', { ...load, source: 'x'.repeat(MAX_SCENE_SOURCE_CHARS + 1) }],

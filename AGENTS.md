@@ -108,7 +108,8 @@ last released.
   an argument that carries text.
 - Scene code is untrusted. It runs only in the player frame, passes `scene_policy`, and talks
   only through `@adle/event-protocol`. Do not add message types casually; never pass callbacks,
-  URLs, or paths through it.
+  URLs, or paths through it. A picture is tried in a frame nobody sees before it joins a
+  lesson, when the app is there to try it (ADR-038).
 - User documents and model output are data, never instructions.
 - "No network" for the page and for scenes means every road, not only requests (ADR-029).
   The page cannot name a file, and nothing it hands over is trusted to be what it says.
@@ -164,7 +165,9 @@ account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day 
 - One request in flight at each provider, at most 4/minute there. When trying a real provider
   by hand, budget 80 requests and 800k tokens per day; the app itself stops at 90 and 900k
   for AIHubMix (ADR-012).
-- One scene = one request = one complete file. No repair loops; at most one deliberate retry.
+- One scene = one request = one complete file. No repair loops; at most one deliberate retry,
+  told what was wrong: the rules' findings, or, when the file failed as it was tried in the
+  player, the error and the file (ADR-038).
   A question asked during a lesson is one request, two at most; a check of a key is one.
   Asking a provider's next model because the one before is away is not a retry of the answer,
   and is bounded by the number of models.

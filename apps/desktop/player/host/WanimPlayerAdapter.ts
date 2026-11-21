@@ -56,6 +56,12 @@ export interface LoadSceneOptions {
   quality?: SceneQuality;
   /** Start playing immediately (default) or hold on the first frame until `play()`. */
   autoplay?: boolean;
+  /**
+   * Run the scene through as fast as it can be drawn, to find out whether it runs
+   * (ADR-038). Drawn small unless a quality is given. Never for a scene a learner is
+   * looking at.
+   */
+  rehearsal?: boolean;
 }
 
 export interface SceneEvent {
@@ -120,6 +126,11 @@ export interface WanimPlayerAdapterOptions {
   /** Accessible name of the frame. */
   title?: string;
   className?: string;
+  /**
+   * A frame nobody sees or reaches: out of the order of the keyboard and of what assistive
+   * technology reads. For trying a picture before it is shown (ADR-038).
+   */
+  hidden?: boolean;
   timeouts?: Partial<PlayerTimeouts>;
 }
 
@@ -239,6 +250,10 @@ export class WanimPlayerAdapter {
     frame.setAttribute('referrerpolicy', 'no-referrer');
     frame.title = this.options.title ?? 'Interactive visualization';
     if (this.options.className) frame.className = this.options.className;
+    if (this.options.hidden) {
+      frame.tabIndex = -1;
+      frame.setAttribute('aria-hidden', 'true');
+    }
     frame.src = playerEntryUrl(instanceId);
 
     this.frame = frame;
@@ -278,8 +293,9 @@ export class WanimPlayerAdapter {
       source: options.source,
       sceneName: options.sceneName ?? null,
       theme: options.theme,
-      quality: options.quality ?? this.suitableQuality(),
+      quality: options.quality ?? (options.rehearsal ? 'low' : this.suitableQuality()),
       autoplay: options.autoplay ?? true,
+      rehearsal: options.rehearsal === true,
     });
     this.loadTimer = window.setTimeout(() => {
       this.fail({ stage: 'timeout', message: 'The scene took too long to prepare.' });

@@ -1744,6 +1744,52 @@
         "title": "SceneRef",
         "type": "object"
       },
+      "SceneTrial": {
+        "description": "A picture to try in the player before a learner is shown it (ADR-038).",
+        "properties": {
+          "controls": { "items": { "type": "string" }, "title": "Controls", "type": "array" },
+          "id": { "title": "Id", "type": "string" },
+          "interactive": { "title": "Interactive", "type": "boolean" },
+          "scene_class": { "title": "Scene Class", "type": "string" },
+          "source": { "title": "Source", "type": "string" }
+        },
+        "required": ["id", "scene_class", "source", "interactive", "controls"],
+        "title": "SceneTrial",
+        "type": "object"
+      },
+      "SceneTrialList": {
+        "properties": {
+          "trials": {
+            "items": { "$ref": "#/components/schemas/SceneTrial" },
+            "title": "Trials",
+            "type": "array"
+          }
+        },
+        "required": ["trials"],
+        "title": "SceneTrialList",
+        "type": "object"
+      },
+      "SceneTrialReport": {
+        "additionalProperties": false,
+        "description": "How a trial went. ``passed``, or where it failed and what the player said.",
+        "properties": {
+          "message": { "default": "", "maxLength": 2000, "title": "Message", "type": "string" },
+          "passed": { "title": "Passed", "type": "boolean" },
+          "stage": {
+            "anyOf": [
+              {
+                "enum": ["boot", "compile", "runtime", "timeout", "unresponsive", "controls"],
+                "type": "string"
+              },
+              { "type": "null" }
+            ],
+            "title": "Stage"
+          }
+        },
+        "required": ["passed"],
+        "title": "SceneTrialReport",
+        "type": "object"
+      },
       "SearchHit": {
         "properties": {
           "chunk_id": { "title": "Chunk Id", "type": "integer" },
@@ -4112,6 +4158,71 @@
         },
         "summary": "Provider Usage",
         "tags": ["provider"]
+      }
+    },
+    "/v1/scene-trials": {
+      "get": {
+        "description": "Pictures to try in the player before a learner is shown them (ADR-038).\n\nThe app asks while a lesson is being written; asking is also how it says that it is\nthere to try them.",
+        "operationId": "scenes.trials",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SceneTrialList" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Scene Trials",
+        "tags": ["generation"]
+      }
+    },
+    "/v1/scene-trials/{trial_id}": {
+      "post": {
+        "description": "How a trial went. A report nobody is waiting for any more is let go.",
+        "operationId": "scenes.report_trial",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trial_id",
+            "required": true,
+            "schema": { "title": "Trial Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SceneTrialReport" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": { "description": "Successful Response" },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Report Scene Trial",
+        "tags": ["generation"]
       }
     },
     "/v1/sources/{source_id}": {

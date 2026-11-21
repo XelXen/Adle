@@ -20,6 +20,7 @@ import { version as wanimVersion } from '@wanimjs/wanim/package.json';
 
 import { installFrameClock } from './frame-clock';
 import { SceneRun, type WanimBridge } from './scene-run';
+import { installTimeWarp } from './time-warp';
 
 /**
  * Local font chain for Wanim `Text` (parsed by opentype.js, which reads WOFF1).
@@ -32,6 +33,14 @@ const FONT_FILES = [
 ];
 
 const clock = installFrameClock(window);
+// Before Wanim, which paces a scene by this clock, is loaded.
+const warp = installTimeWarp(performance);
+/**
+ * How much faster than a learner's a rehearsal runs: a second of a scene in 40 ms of the
+ * computer's. The frames themselves are drawn as fast as they can be, and a scene's waits
+ * pass at this speed.
+ */
+const REHEARSAL_SPEED = 25;
 /** The trusted embedder. Messages from any other window or origin are ignored. */
 const host: Window = window.parent;
 
@@ -78,6 +87,15 @@ function start(bridge: WanimBridge): void {
         return;
       case 'load':
         current?.dispose();
+        // A rehearsal is run through as fast as it can be; anything else at the display's
+        // pace, as a learner sees it.
+        if (message.rehearsal) {
+          clock.rush();
+          warp.setSpeed(REHEARSAL_SPEED);
+        } else {
+          clock.steady();
+          warp.setSpeed(1);
+        }
         current = new SceneRun(bridge, canvas, clock, message, post);
         current.start();
         return;

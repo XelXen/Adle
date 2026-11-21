@@ -159,7 +159,13 @@ describe('WanimPlayerAdapter', () => {
 
     h.ready();
     const load = h.sent[0];
-    expect(load).toMatchObject({ type: 'load', theme: 'light', quality: 'medium', autoplay: true });
+    expect(load).toMatchObject({
+      type: 'load',
+      theme: 'light',
+      quality: 'medium',
+      autoplay: true,
+      rehearsal: false,
+    });
 
     h.player({ type: 'loaded', runId: h.runId(), sceneName: 'Demo', loadMs: 120 });
     expect(h.adapter.status).toBe('playing');

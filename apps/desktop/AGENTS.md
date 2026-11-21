@@ -134,6 +134,11 @@ most, a file's name.
   frame is saying too much: report a change, not a state.
 - Any behaviour of Wanim you rely on must be written into
   `skills/wanim-scene-authoring/reference.md` as Verified, with a test.
+- **A picture is tried before it is shown** (ADR-038). `SceneTrials` (mounted with the
+  writing context) asks the core for trials while a lesson is written and runs each with
+  `runTrial` in a frame nobody sees (`hidden: true`): a load with `rehearsal: true`, which
+  the frame runs through fast (`frame-clock.ts` rushes, `time-warp.ts` speeds its clock).
+  Never rehearse a scene a learner is looking at, and never show a frame that rehearses.
 - **The adapter chooses the size a scene is drawn at** from the width of its frame
   (`qualityForWidth`, ADR-032). Do not pass `quality` to make a picture "sharper": drawn
   more than twice as wide as it is shown, a picture loses its thinnest strokes when the

@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
 
 from adle_core.lessons import ir as lesson_ir
 from adle_core.lessons.player import PlayerLesson, PlayerQuestion
@@ -688,6 +688,35 @@ class Job(_Output):
 
 class JobList(_Output):
     jobs: list[Job]
+
+
+class SceneTrial(_Output):
+    """A picture to try in the player before a learner is shown it (ADR-038)."""
+
+    id: str
+    #: The scene class to run.
+    scene_class: str
+    #: The whole file, as it would be shown.
+    source: str
+    interactive: bool
+    #: The names of the controls an interactive picture has.
+    controls: list[str]
+
+
+class SceneTrialList(_Output):
+    trials: list[SceneTrial]
+
+
+class SceneTrialReport(_Input):
+    """How a trial went. ``passed``, or where it failed and what the player said."""
+
+    #: True or false, and nothing that only reads as one.
+    passed: StrictBool
+    stage: Literal["boot", "compile", "runtime", "timeout", "unresponsive", "controls"] | None = (
+        None
+    )
+    #: What the player said, cut short: it is told to the model that writes the file again.
+    message: Annotated[str, StringConstraints(max_length=2000)] = ""
 
 
 class LatestJob(_Output):

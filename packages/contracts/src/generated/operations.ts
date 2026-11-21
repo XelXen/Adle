@@ -42,6 +42,8 @@ import type {
   ProviderSelection,
   ProviderStatus,
   ProviderUsage,
+  SceneTrialList,
+  SceneTrialReport,
   SearchResults,
   SelfRating,
   SourceDetail,
@@ -209,6 +211,8 @@ export const OPERATIONS = {
   'provider.set_credential': { method: 'PUT', path: '/v1/provider/credential', internal: true },
   'provider.status': { method: 'GET', path: '/v1/provider', internal: false },
   'provider.usage': { method: 'GET', path: '/v1/provider/usage', internal: false },
+  'scenes.report_trial': { method: 'POST', path: '/v1/scene-trials/{trial_id}', internal: false },
+  'scenes.trials': { method: 'GET', path: '/v1/scene-trials', internal: false },
   'sources.delete': { method: 'DELETE', path: '/v1/sources/{source_id}', internal: false },
   'sources.get': { method: 'GET', path: '/v1/sources/{source_id}', internal: false },
   'sources.import_paths': {
@@ -535,6 +539,18 @@ export interface OperationTypes {
     query: { provider_id?: string | null } | undefined;
     body: undefined;
     result: ProviderUsage;
+  };
+  'scenes.report_trial': {
+    path: { trial_id: string };
+    query: undefined;
+    body: SceneTrialReport;
+    result: null;
+  };
+  'scenes.trials': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: SceneTrialList;
   };
   'sources.delete': {
     path: { source_id: string };

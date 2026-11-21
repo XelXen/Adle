@@ -88,6 +88,32 @@ function defaultAnswer(kind: RequestKind, user: string): string {
   return exampleScene(user.includes('Kind: interactive') ? 'neuron_weight.py' : 'weighted_sum.py');
 }
 
+/** The answer the fake gives a request of this kind when nothing else was queued. */
+export function cannedAnswer(kind: 'curriculum' | 'lesson' | 'ask'): string {
+  return defaultAnswer(kind, '');
+}
+
+/**
+ * A scene that passes every rule and breaks when it runs: only trying it shows that
+ * (ADR-038).
+ */
+export const BROKEN_SCENE = `from manim import *
+
+
+class Broken(Scene):
+    """Passes the rules and fails when it runs."""
+
+    def setup(self):
+        dark = self.theme == "dark"
+        self.ink = "#E7EFE9" if dark else "#17251E"
+
+    def construct(self):
+        dot = Dot(color=self.ink)
+        self.play(FadeIn(dot))
+        self.wait(0.5)
+        raise ValueError("this picture breaks halfway")
+`;
+
 function readBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];

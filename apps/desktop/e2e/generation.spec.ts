@@ -19,7 +19,13 @@ import {
   openWhatIsSent,
   closeWhatIsSent,
 } from './support/courses';
-import { type FakeProvider, HANG, startFakeProvider } from './support/fake-provider';
+import {
+  BROKEN_SCENE,
+  cannedAnswer,
+  type FakeProvider,
+  HANG,
+  startFakeProvider,
+} from './support/fake-provider';
 
 /** A recognisable fake key. It only ever reaches the fake provider. */
 const KEY = 'sk-e2e-not-a-real-key-7Hq2mZx94Wd1';
@@ -279,6 +285,76 @@ test.describe('generation with the AI provider', () => {
     });
     await expect(parts).toHaveCount(0);
     expect(session.adle.problems).toEqual([]);
+    await close(session);
+  });
+
+  test('each picture is tried before it is shown, and one that breaks is written again, told why', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await open(profileDir);
+    const { page, provider } = session;
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    const limits = detail(page, 'Limits');
+    const lessons = limits.getByRole('list', { name: 'Lessons for this concept' });
+
+    // The first picture passes every rule, and breaks halfway through when it runs.
+    provider.queue(cannedAnswer('lesson'), BROKEN_SCENE);
+    await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible({
+      timeout: 60_000,
+    });
+    // It was tried, failed, and written once more; then the second picture.
+    await expect
+      .poll(() => provider.requests.map((request) => request.kind), { timeout: 60_000 })
+      .toEqual(['lesson', 'scene', 'scene', 'scene']);
+    const again = provider.requests[2]!.prompt;
+    expect(again).toContain('was run in the player and failed');
+    expect(again).toContain('this picture breaks halfway');
+    expect(again).toContain('class Broken(Scene):');
+    await expect(limits.getByRole('progressbar')).toHaveCount(0, { timeout: 60_000 });
+    // Every picture was made in the end, so there is nothing to say about them.
+    await expect(page.getByRole('status').filter({ hasText: 'About its pictures' })).toHaveCount(0);
+
+    // ---- In the lesson, the picture is the one that ran ----
+    await lessons.getByRole('button', { name: /^Start lesson/ }).click();
+    await expect(page.getByText('Part 1 of 8')).toBeVisible();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    const first = page.getByRole('figure', { name: 'The weighted sum' });
+    await expect(first).toBeVisible();
+    await expect(first.getByText('Loading animation…')).toBeHidden({ timeout: 30_000 });
+    await expect(first.getByText('Couldn’t show the animation')).toHaveCount(0);
+    await close(session);
+  });
+
+  test('a picture that breaks twice is said in words, and the learner is told', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await open(profileDir);
+    const { page, provider } = session;
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    const limits = detail(page, 'Limits');
+
+    provider.queue(cannedAnswer('lesson'), BROKEN_SCENE, BROKEN_SCENE);
+    await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible({
+      timeout: 60_000,
+    });
+    const about = page.getByRole('status').filter({ hasText: 'About its pictures' });
+    await expect(about).toBeVisible({ timeout: 60_000 });
+    await expect(about).toContainText(
+      'The picture for “The weighted sum” couldn’t be made, so that part is explained in words.',
+    );
+    // Two tries at the first picture and no more, then the second picture.
+    expect(provider.requests.map((request) => request.kind)).toEqual([
+      'lesson',
+      'scene',
+      'scene',
+      'scene',
+    ]);
     await close(session);
   });
 

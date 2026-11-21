@@ -32,6 +32,8 @@ export interface RawPlayer {
       autoplay?: boolean;
       /** The size the scene is drawn at. The adapter chooses one to suit the frame. */
       quality?: 'low' | 'medium' | 'high';
+      /** Run it through as fast as it can be drawn (ADR-038). */
+      rehearsal?: boolean;
     },
   ) => Promise<void>;
   remove: () => Promise<void>;
@@ -136,6 +138,7 @@ export async function mountRawPlayer(
         theme: options.theme ?? 'light',
         quality: options.quality ?? 'medium',
         autoplay: options.autoplay ?? true,
+        rehearsal: options.rehearsal ?? false,
       }),
     remove: () =>
       page.evaluate((instance) => {

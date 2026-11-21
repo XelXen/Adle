@@ -16,6 +16,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
   by title as each one is begun, and keeps a clock moving. The bar counts parts, and
   moves without a measure while the model is still thinking instead of standing empty.
   Suggested concepts appear by name the same way.
+- **Every picture is tried before you see it.** Adle runs each new picture through,
+  unseen and in a second or so, and moves its controls. One that breaks is written again,
+  told what went wrong; if that one breaks too, the part is explained in words and you are
+  told. No more "Couldn't show the animation" in the middle of a lesson for a picture that
+  could have been caught.
 - **Far fewer sentences.** What a request to an AI provider sends, and where it goes, is one
   press away from the button that sends it (the small "i" beside it) instead of written out
   beside every button; it is still said in full in Settings. What a lesson is made from and

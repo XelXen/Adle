@@ -94,6 +94,17 @@ def _block(label: str, text: str) -> str:
     return f'<learner_material kind="{label}">\n{safe}\n</learner_material>'
 
 
+#: The most of a failed file shown back to the model that wrote it.
+MAX_PREVIOUS_FILE_CHARACTERS = 12_000
+
+
+def _quoted_file(source: str) -> str:
+    """A file the model wrote, quoted as data with its lines and indentation as they were."""
+    if len(source) > MAX_PREVIOUS_FILE_CHARACTERS:
+        source = source[:MAX_PREVIOUS_FILE_CHARACTERS] + "\n# … (the rest is not shown)"
+    return _block("first_version", source)
+
+
 def _clip(text: str, limit: int) -> str:
     text = " ".join(text.split())
     return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + " …"
@@ -303,8 +314,15 @@ def scene_guide() -> str:
     )
 
 
-def scene_request(brief: SceneBrief, *, problems: Sequence[str] = ()) -> ChatRequest:
-    """The request for one complete scene file."""
+def scene_request(
+    brief: SceneBrief, *, problems: Sequence[str] = (), previous: str | None = None
+) -> ChatRequest:
+    """The request for one complete scene file.
+
+    ``problems`` are what was wrong with a first version. ``previous`` is that version, when
+    it passed the rules and failed when it was run (ADR-038): the model is shown the file
+    and what went wrong, and writes the whole file again, fixed.
+    """
     system = (
         "You write one complete Wanim scene file in Python for Adle. Wanim runs manim-style "
         "scenes in a browser. Follow the guide below exactly: it lists what exists, the layout "
@@ -340,7 +358,17 @@ def scene_request(brief: SceneBrief, *, problems: Sequence[str] = ()) -> ChatReq
         "plain words; define every name you use; import only from manim (and numpy or math "
         "if needed); one scene class in the file.",
     ]
-    if problems:
+    if problems and previous is not None:
+        listed = "\n".join(f"- {problem}" for problem in problems[:MAX_PROBLEMS_IN_RETRY])
+        parts.append(
+            "A first version of this file was run in the player and failed. Here it is, and "
+            "what went wrong. Write the whole file again, with the fault fixed; keep what it "
+            "draws unless the fault is in it.\n"
+            + _quoted_file(previous)
+            + "\nWhat went wrong:\n"
+            + _block("error", listed)
+        )
+    elif problems:
         listed = "\n".join(f"- {problem}" for problem in problems[:MAX_PROBLEMS_IN_RETRY])
         parts.append(
             "A first version of this file was rejected for these reasons. Write the whole file "

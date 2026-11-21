@@ -171,6 +171,34 @@ test.describe('scene player frame', () => {
     expect((await player.messages()).length).toBe(count);
   });
 
+  test('runs a scene through in a fraction of its length as a rehearsal, and reports as ever', async ({
+    adle,
+  }) => {
+    test.setTimeout(90_000);
+    const source = sampleScene('tangent_slope.py');
+    const timed = async (instance: string, rehearsal: boolean) => {
+      const player = await mountRawPlayer(adle.page, instance, { width: 427, height: 240 });
+      await player.waitFor(`m.type === 'ready'`);
+      const began = Date.now();
+      await player.load(source, { theme: 'dark', quality: 'low', rehearsal });
+      const end = await player.waitFor(`m.type === 'error' || m.type === 'finished'`, 60_000);
+      const seconds = (Date.now() - began) / 1000;
+      const kinds = (await player.messages()).map((message) => message.type);
+      await player.remove();
+      return { end: end?.type, seconds, kinds };
+    };
+    const rehearsed = await timed('rehearsalfast', true);
+    const watched = await timed('rehearsalslow', false);
+    // Wanim waits for its frame interval, and lasts a `wait`, by the frame's clock: run
+    // fast, the whole scene goes by in a small part of the time it takes a learner.
+    expect(watched.end).toBe('finished');
+    expect(rehearsed.end).toBe('finished');
+    expect(watched.seconds).toBeGreaterThan(8);
+    expect(rehearsed.seconds).toBeLessThan(watched.seconds / 4);
+    // What the frame says along the way is what it always says.
+    expect(rehearsed.kinds).toEqual(watched.kinds);
+  });
+
   test('holds on the first frame when autoplay is off, until play', async ({ adle }) => {
     const player = await mountRawPlayer(adle.page, 'e2ehold');
     await player.waitFor(`m.type === 'ready'`);
@@ -457,6 +485,10 @@ test.describe('scene player frame', () => {
 });
 
 /** The scene files that ship with the app as part of the sample course. */
+function sampleScene(file: string): string {
+  return readFileSync(path.join(sampleScenesDir, file), 'utf8');
+}
+
 const sampleScenesDir = path.join(
   repoRoot,
   'services',
