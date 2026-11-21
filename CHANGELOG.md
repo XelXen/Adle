@@ -11,6 +11,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
   theme, with the words being said along the foot of it, one line at a time, the word being
   spoken marked. One press shows every line. "Full screen" gives the lesson the whole
   screen; Escape gives it back.
+- **A lesson can be watched taking shape.** While it is written, the card says what is
+  happening ("Planning the lesson", then "Writing" and the lesson's title), lists its parts
+  by title as each one is begun, and keeps a clock moving. The bar counts parts, and
+  moves without a measure while the model is still thinking instead of standing empty.
+  Suggested concepts appear by name the same way.
 - **Far fewer sentences.** What a request to an AI provider sends, and where it goes, is one
   press away from the button that sends it (the small "i" beside it) instead of written out
   beside every button; it is still said in full in Settings. What a lesson is made from and

@@ -44,6 +44,7 @@ supersedes the old one and update this index.
 | [034](../decisions/ADR-034-installers-and-releases.md) | Installers for Windows, macOS and Linux made with each system's own tool (Inno Setup, hdiutil, dpkg-deb) and no new dependency; unsigned by the owner's decision; each one installed, started and removed on GitHub's machines for every push; a tag publishes a release |
 | [035](../decisions/ADR-035-a-lesson-is-watched.md) | A lesson has a screen: one dark surface in either theme, pictures always drawn with the dark palette, the words being said along its foot one line at a time with the spoken word marked, and the whole screen if wanted (the one permission the app's own page is granted) |
 | [036](../decisions/ADR-036-say-less.md) | Say less: what a request sends and where it goes is said where the key is given and kept one press away from every control that sends, not written beside it; what a lesson is made from and who wrote it is one press away beside its title; a request that only fetches something to review is not asked about twice |
+| [037](../decisions/ADR-037-watching-a-lesson-being-written.md) | While a lesson or a list of concepts is written, the core says the stage it is at (waiting, thinking, writing, drawing) and reads the titles off the answer as it arrives, nothing else of it; the card says what is happening in the learner's terms, lists the parts so far, counts parts and not minutes, and keeps a clock moving |
 
 ## Smaller standing choices (no ADR)
 

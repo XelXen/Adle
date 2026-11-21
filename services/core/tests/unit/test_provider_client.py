@@ -195,6 +195,24 @@ def test_thinking_and_keepalive_events_are_not_mistaken_for_the_answer() -> None
     assert client_for(handler).complete(REQUEST).text == "answer"
 
 
+def test_each_piece_of_the_answer_is_handed_on_as_it_arrives_and_none_of_the_thinking() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return sse(
+            {"choices": [{"delta": {"reasoning_content": "a plan nobody is shown"}}]},
+            delta('{"title": '),
+            {"choices": [{"delta": {"reasoning": "more of it"}}]},
+            delta('"Slopes"'),
+            delta(""),
+            delta("}", "stop"),
+            "[DONE]",
+        )
+
+    pieces: list[str] = []
+    result = client_for(handler).complete(REQUEST, on_piece=pieces.append)
+    assert pieces == ['{"title": ', '"Slopes"', "}"]
+    assert result.text == "".join(pieces)
+
+
 def test_without_a_key_nothing_is_sent() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise AssertionError("no request may be made without a key")

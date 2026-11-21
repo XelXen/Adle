@@ -333,6 +333,7 @@ export function ConceptDetail({
           starting={generation.starting}
           refusal={generation.refusal}
           subject="the lesson"
+          kind="lesson"
           waitingText="Queued"
           usualSeconds={generation.usualSeconds}
           lessonReady={generation.lessonReady}

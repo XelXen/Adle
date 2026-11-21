@@ -584,11 +584,14 @@ class ChatClient:
         model: ModelSpec | None = None,
         cancelled: Callable[[], bool] = _never_cancelled,
         on_stage: Callable[[Stage], None] | None = None,
+        on_piece: Callable[[str], None] | None = None,
     ) -> ChatResult:
         """Ask one model of this provider. ``model`` is the provider's first unless given.
 
         ``on_stage`` is told when the model is seen to begin thinking, and when it begins
-        to write its answer: once each, at most.
+        to write its answer: once each, at most. ``on_piece`` is handed each piece of the
+        answer as it arrives, in order, and never any of the model's thinking: enough to
+        say how far a long answer has come before it is whole.
 
         Raises ``RequestCancelledError`` as soon as ``cancelled`` turns true, however
         silent the provider is being. A model can take a minute before its first word,
@@ -600,7 +603,7 @@ class ChatClient:
             raise ValueError("That model does not belong to this provider.")
         if cancelled is _never_cancelled:
             # Nobody can change their mind, so there is nothing to wait beside.
-            return self._send(request, spec, cancelled, on_stage)
+            return self._send(request, spec, cancelled, on_stage, on_piece=on_piece)
 
         given_up = threading.Event()
         outcome: queue.Queue[ChatResult | BaseException] = queue.Queue(maxsize=1)
@@ -612,6 +615,10 @@ class ChatClient:
         def stage_while_wanted(stage: Stage) -> None:
             if on_stage is not None and not given_up.is_set():
                 on_stage(stage)
+
+        def piece_while_wanted(piece: str) -> None:
+            if on_piece is not None and not given_up.is_set():
+                on_piece(piece)
 
         def hang_up() -> None:
             # Closing the answer ends the request at the provider, instead of leaving it
@@ -628,7 +635,16 @@ class ChatClient:
 
         def work() -> None:
             try:
-                outcome.put(self._send(request, spec, no_longer_wanted, stage_while_wanted, opened))
+                outcome.put(
+                    self._send(
+                        request,
+                        spec,
+                        no_longer_wanted,
+                        stage_while_wanted,
+                        opened,
+                        on_piece=piece_while_wanted,
+                    )
+                )
             except BaseException as error:  # handed to whoever asked, or dropped with them
                 outcome.put(error)
 
@@ -653,6 +669,8 @@ class ChatClient:
         cancelled: Callable[[], bool],
         on_stage: Callable[[Stage], None] | None,
         opened: Callable[[httpx.Response], None] | None = None,
+        *,
+        on_piece: Callable[[str], None] | None = None,
     ) -> ChatResult:
         """Make the request and read the answer. Blocks for as long as the provider does.
 
@@ -694,7 +712,8 @@ class ChatClient:
                     opened(response)
                 self._raise_for_status(response)
                 return replace(
-                    self._read(response, cancelled, deadline, on_stage), model_name=spec.name
+                    self._read(response, cancelled, deadline, on_stage, on_piece),
+                    model_name=spec.name,
                 )
         except (httpx.ConnectTimeout, httpx.PoolTimeout) as error:
             # The provider itself could not be reached; no model of it would do better.
@@ -739,6 +758,7 @@ class ChatClient:
         cancelled: Callable[[], bool],
         deadline: float,
         on_stage: Callable[[Stage], None] | None = None,
+        on_piece: Callable[[str], None] | None = None,
     ) -> ChatResult:
         def still_wanted() -> None:
             if cancelled():
@@ -806,6 +826,8 @@ class ChatClient:
                         raise ProviderBadResponseError
                     pieces.append(text)
                     reached("writing")
+                    if on_piece is not None:
+                        on_piece(text)
                 if isinstance(choice.get("finish_reason"), str):
                     finish_reason = choice["finish_reason"]
         if not saw_data:

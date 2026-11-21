@@ -278,7 +278,11 @@ most, a file's name.
   (`lib/use-generation.ts`), which also picks up work that was already under way. Show it with
   `GenerationStatus`, which has every state: waiting, running with a way to cancel, refused
   before it started, failed with what to do next, cancelled. Give it `usualSeconds` from the
-  core's plan: it says how long the wait usually is and offers a break of that length.
+  core's plan: it says how long the wait usually is and offers a break of that length,
+  and `kind` (`lesson` or `suggestions`): while words are written it says what is
+  happening in the learner's terms and lists the titles written so far
+  (`lib/writing-progress.ts` reads `Job.progress_detail`, ADR-037). Never show more of an
+  answer than its titles while it is written.
 - Long work is watched app-wide by `WritingProvider` (the rail's "Now", the toast and the
   notification when it is ready). Something that arrived is said once, unless the screen in
   front of the learner shows it (`showsOutcome`); something that failed is always said. A
@@ -308,7 +312,8 @@ most, a file's name.
   address in `ADLE_PROVIDER_BASE_URL` (one endpoint in place of the choice), or start two and
   pass both in `ADLE_PROVIDER_ENDPOINTS` (the two providers, moved; `e2e/providers.spec.ts`).
   The app keeps its real limit of four requests a minute, so a journey that needs a fifth
-  will see the app wait: test that, or stay under it.
+  will see the app wait: test that, or stay under it. `{ slowly: true, thinkMs, pieceMs }`
+  answers like a model that thinks first and writes a title at a time.
 - A toast that reports a failure is an `alert`; one that reports a success is a `status`.
 - **Words** (ADR-028): short, plain, about the learner's task. "Couldn't save your goal",
   "Loading library…", "Cancel" and the action by its name. Typographic quotation marks and

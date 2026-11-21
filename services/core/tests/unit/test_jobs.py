@@ -55,6 +55,31 @@ def test_a_job_reports_progress_and_its_result(runner: JobRunner) -> None:
     assert seen == [(1, 3, "first file")]
 
 
+def test_a_job_can_say_what_its_work_is_doing_just_now(runner: JobRunner) -> None:
+    seen: list[object] = []
+    release = threading.Event()
+
+    def work(context: JobContext) -> None:
+        context.report(0, 2, "Writing the lesson")
+        seen.append(runner.get(context.job_id).progress_detail)
+        detail = {"stage": "writing", "title": "Slopes", "outline": ["Why a slope"]}
+        context.report(0, 2, "Writing the lesson", detail)
+        seen.append(runner.get(context.job_id).progress_detail)
+        # Said again without it, it is no longer what the work is doing.
+        context.report(1, 2, "Drawing picture 1 of 1")
+        seen.append(runner.get(context.job_id).progress_detail)
+        release.wait(5)
+
+    submitted = runner.submit("generate_lesson", work)
+    release.set()
+    assert runner.wait(submitted.id).status == "succeeded"
+    assert seen == [
+        None,
+        {"stage": "writing", "title": "Slopes", "outline": ["Why a slope"]},
+        None,
+    ]
+
+
 def test_an_expected_failure_keeps_its_code_and_message(runner: JobRunner) -> None:
     def work(_: JobContext) -> None:
         raise AdleError("The provider is out of quota for today.", code="quota_exhausted")

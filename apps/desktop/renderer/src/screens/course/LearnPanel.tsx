@@ -109,6 +109,7 @@ export function LearnPanel({ course }: { course: Course }) {
           starting={starting}
           refusal={refusal}
           subject="the lesson"
+          kind="lesson"
           waitingText="Queued"
           usualSeconds={providerStatus?.routes.lesson.wait_seconds}
           onCancel={() => generation.cancel(job)}
@@ -176,6 +177,7 @@ export function LearnPanel({ course }: { course: Course }) {
           starting={false}
           refusal={null}
           subject="the lesson"
+          kind="lesson"
           waitingText="Queued"
           lessonReady
           onCancel={() => generation.cancel(job)}

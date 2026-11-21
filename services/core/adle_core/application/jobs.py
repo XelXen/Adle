@@ -59,6 +59,9 @@ class JobSnapshot:
     error_message: str | None
     #: When it was asked for, so that the interface can say how long it has been.
     created_at: datetime | None = None
+    #: What the work is doing just now, where it can say: the stage it is at and, for
+    #: something written part by part, the parts written so far (``Progress``).
+    progress_detail: dict[str, Any] | None = None
 
     @property
     def finished(self) -> bool:
@@ -68,6 +71,7 @@ class JobSnapshot:
 def _snapshot(job: Job) -> JobSnapshot:
     progress = job.progress or {}
     error = job.error or {}
+    detail = progress.get("detail")
     return JobSnapshot(
         id=job.id,
         kind=job.kind,
@@ -81,6 +85,7 @@ def _snapshot(job: Job) -> JobSnapshot:
         error_code=error.get("code"),
         error_message=error.get("message"),
         created_at=job.created_at,
+        progress_detail=detail if isinstance(detail, dict) else None,
     )
 
 
@@ -112,10 +117,15 @@ class JobContext:
         if self.cancelled:
             raise JobCancelledError(partial_result)
 
-    def report(self, done: int, total: int, message: str = "") -> None:
-        self._runner._update(
-            self.job_id, progress={"done": done, "total": total, "message": message}
-        )
+    def report(
+        self, done: int, total: int, message: str = "", detail: dict[str, Any] | None = None
+    ) -> None:
+        """Say where the work stands: steps done of how many, in a sentence, and, where
+        the work can say more, what it is doing just now (``detail``)."""
+        progress: dict[str, Any] = {"done": done, "total": total, "message": message}
+        if detail is not None:
+            progress["detail"] = detail
+        self._runner._update(self.job_id, progress=progress)
 
     def publish(self, result: Any) -> None:
         """Make something usable known before the work has ended (ADR-031).

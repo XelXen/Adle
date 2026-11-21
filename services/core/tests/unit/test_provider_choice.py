@@ -985,11 +985,16 @@ def test_a_long_wait_says_what_the_model_is_doing(
 ) -> None:
     """A model that thinks for minutes must not look like a job that has stalled."""
     said: list[str] = []
+    details: list[dict[str, Any] | None] = []
     update = services.jobs._update
 
     def recording(job_id: str, **fields: Any) -> None:
         if "progress" in fields:
-            said.append(fields["progress"]["message"])
+            message = fields["progress"]["message"]
+            # The sentence is said again beside each title written: once is enough here.
+            if not said or said[-1] != message:
+                said.append(message)
+            details.append(fields["progress"].get("detail"))
         update(job_id, **fields)
 
     monkeypatch.setattr(services.jobs, "_update", recording)
@@ -1013,6 +1018,18 @@ def test_a_long_wait_says_what_the_model_is_doing(
         f"Suggesting concepts: {MISTRAL_NAME} is writing",
         "Done",
     ]
+    # Beside the sentences, what stage the work is at and which concepts have been
+    # written so far: their titles, one more each time, and nothing else of the answer.
+    stages = [detail.get("stage") for detail in details if detail]
+    assert stages[:3] == ["waiting", "thinking", "writing"]
+    outlines = [detail["outline"] for detail in details if detail and detail.get("outline")]
+    titles = [concept["title"] for concept in CURRICULUM["concepts"]]
+    assert outlines[-1] == titles
+    # Here the answer arrives in one piece; piece by piece, see test_writing_outline.py.
+    lengths = [len(outline) for outline in outlines]
+    assert lengths == sorted(lengths)
+    summaries = [concept["summary"] for concept in CURRICULUM["concepts"]]
+    assert not any(summary in str(details) for summary in summaries)
 
 
 def test_what_the_first_model_wrote_carries_no_note(

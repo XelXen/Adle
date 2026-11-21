@@ -330,6 +330,7 @@ class ModelGateway:
         on_stage: Callable[[str, Stage], None] | None = None,
         on_busy: Callable[[str], None] | None = None,
         provider_id: str | None = None,
+        on_piece: Callable[[str], None] | None = None,
     ) -> ChatResult:
         """Send one request, or raise an ``AdleError`` that says why it was not answered.
 
@@ -366,7 +367,14 @@ class ModelGateway:
                 self._take_turn(config, cancelled, on_busy)
                 try:
                     result = self._ask_provider(
-                        client, request, prompt_tokens, cancelled, on_wait, on_fallback, on_stage
+                        client,
+                        request,
+                        prompt_tokens,
+                        cancelled,
+                        on_wait,
+                        on_fallback,
+                        on_stage,
+                        on_piece,
                     )
                 finally:
                     self._in_flight[config.provider_id].release()
@@ -424,6 +432,7 @@ class ModelGateway:
         on_wait: Callable[[float], None] | None,
         on_fallback: Callable[[str, str, PassedOver], None] | None,
         on_stage: Callable[[str, Stage], None] | None,
+        on_piece: Callable[[str], None] | None = None,
     ) -> ChatResult:
         """One provider: its first model, or the next when that one is away (ADR-021)."""
         if not client.has_key:
@@ -433,7 +442,7 @@ class ModelGateway:
         for position, spec in enumerate(models):
             try:
                 result = self._ask(
-                    client, spec, request, prompt_tokens, cancelled, on_wait, on_stage
+                    client, spec, request, prompt_tokens, cancelled, on_wait, on_stage, on_piece
                 )
             except (ProviderModelUnavailableError, ProviderRequestRefusedError) as error:
                 if len(config.models) == 1:
@@ -483,6 +492,7 @@ class ModelGateway:
         cancelled: Callable[[], bool],
         on_wait: Callable[[float], None] | None,
         on_stage: Callable[[str, Stage], None] | None = None,
+        on_piece: Callable[[str], None] | None = None,
     ) -> ChatResult:
         """One model, asked once; twice only if the provider said to slow down."""
 
@@ -499,7 +509,11 @@ class ModelGateway:
             began = time.monotonic()
             try:
                 result = client.complete(
-                    request, model=spec, cancelled=cancelled, on_stage=stage_of_this_model
+                    request,
+                    model=spec,
+                    cancelled=cancelled,
+                    on_stage=stage_of_this_model,
+                    on_piece=on_piece,
                 )
             except ProviderRateLimitedError as error:
                 self._record_end(usage_id, "rate_limited")

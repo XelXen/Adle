@@ -23,6 +23,7 @@ import {
   KIND_PROPOSAL,
   readLessonOutcome,
 } from '../../lib/generation';
+import { barValue, readWritingProgress, writingHeadline } from '../../lib/writing-progress';
 import styles from './Break.module.css';
 
 const LENGTHS = [3, 5, 10, 15] as const;
@@ -222,6 +223,13 @@ function Waiting({
       {finished ? <Arrived job={finished} drawing={drawing} onOpen={onOpen} /> : null}
       {others.map((job) => {
         const progress = jobProgress(job, 'Queued');
+        const drawing = isDrawingPictures(job);
+        const writing = drawing ? null : readWritingProgress(job);
+        const kind = job.kind === KIND_LESSON ? 'lesson' : 'suggestions';
+        const headline = drawing
+          ? progress.message
+          : writingHeadline(writing, kind, progress.message);
+        const value = drawing ? progress.value : barValue(job, writing, progress.value);
         return (
           <Card key={job.id} padding="compact">
             <Stack gap={2}>
@@ -232,7 +240,7 @@ function Waiting({
                     : 'Writing your lesson'
                   : 'Suggesting concepts'}
               </p>
-              <ProgressBar label={progress.message} showLabel value={progress.value} />
+              <ProgressBar label={headline} showLabel value={value} />
             </Stack>
           </Card>
         );

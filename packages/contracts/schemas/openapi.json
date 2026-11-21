@@ -613,6 +613,9 @@
           },
           "id": { "title": "Id", "type": "string" },
           "kind": { "title": "Kind", "type": "string" },
+          "progress_detail": {
+            "anyOf": [{ "$ref": "#/components/schemas/JobProgressDetail" }, { "type": "null" }]
+          },
           "progress_done": { "title": "Progress Done", "type": "integer" },
           "progress_message": { "title": "Progress Message", "type": "string" },
           "progress_total": { "title": "Progress Total", "type": "integer" },
@@ -653,6 +656,22 @@
         },
         "required": ["jobs"],
         "title": "JobList",
+        "type": "object"
+      },
+      "JobProgressDetail": {
+        "description": "What long work is doing just now, for a learner who is waiting for it.\n\nNothing here is the answer itself: a stage, and the titles of what has been written.",
+        "properties": {
+          "outline": { "items": { "type": "string" }, "title": "Outline", "type": "array" },
+          "stage": {
+            "anyOf": [
+              { "enum": ["waiting", "thinking", "writing", "drawing"], "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Stage"
+          },
+          "title": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Title" }
+        },
+        "title": "JobProgressDetail",
         "type": "object"
       },
       "Knowledge": {

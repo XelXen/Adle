@@ -299,12 +299,24 @@ export interface Job {
   error_message: string | null;
   id: string;
   kind: string;
+  progress_detail?: JobProgressDetail | null;
   progress_done: number;
   progress_message: string;
   progress_total: number;
   result: unknown;
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
   subject_id: string | null;
+}
+/**
+ * What long work is doing just now, for a learner who is waiting for it.
+ *
+ * Nothing here is the answer itself: a stage, and the titles of what has been written.
+ *
+ */
+export interface JobProgressDetail {
+  outline?: string[];
+  stage?: ('waiting' | 'thinking' | 'writing' | 'drawing') | null;
+  title?: string | null;
 }
 export interface JobList {
   jobs: Job[];

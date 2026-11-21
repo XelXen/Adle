@@ -39,10 +39,16 @@ export interface RecordedRequest {
  *  - `{ status }`: an HTTP error with that status;
  *  - `{ notice }`: a successful answer that the provider wrote itself, in the model's place,
  *    in the shape the real provider was seen to use on 2026-11-20;
- *  - `HANG`: accept the request and say nothing until the test releases it or the app gives up.
+ *  - `HANG`: accept the request and say nothing until the test releases it or the app gives up;
+ *  - `{ slowly }`: the ordinary answer, the way a model that thinks gives it: thinking for
+ *    `thinkMs`, then the answer in pieces that each end just after a title, `pieceMs` apart.
  */
 export type Answer =
-  string | { status: number; retryAfter?: number } | { notice: string } | { hang: true };
+  | string
+  | { status: number; retryAfter?: number }
+  | { notice: string }
+  | { hang: true }
+  | { slowly: true; thinkMs: number; pieceMs: number };
 
 /** An answer that never comes by itself. */
 export const HANG: Answer = { hang: true };
@@ -104,6 +110,49 @@ function stream(response: ServerResponse, text: string): void {
   );
   response.write(
     `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 1200, completion_tokens: 600 } })}\n\n`,
+  );
+  response.end('data: [DONE]\n\n');
+}
+
+const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** `text` cut just after each title, so that each piece completes one title. */
+export function piecesAtTitles(text: string): string[] {
+  const pieces: string[] = [];
+  let from = 0;
+  for (const match of text.matchAll(/"title"\s*:\s*"(?:[^"\\]|\\.)*"/g)) {
+    const end = match.index + match[0].length;
+    pieces.push(text.slice(from, end));
+    from = end;
+  }
+  pieces.push(text.slice(from));
+  return pieces.filter((piece) => piece.length > 0);
+}
+
+/**
+ * Send `text` the way a model that thinks first sends it: its thinking, a pause, then the
+ * answer piece by piece. Stops as soon as the app hangs up.
+ */
+async function streamSlowly(
+  request: IncomingMessage,
+  response: ServerResponse,
+  text: string,
+  thinkMs: number,
+  pieceMs: number,
+): Promise<void> {
+  const gone = (): boolean => response.destroyed || request.socket.destroyed;
+  response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  const thinking = { choices: [{ delta: { content: null, reasoning_content: 'Planning.' } }] };
+  response.write(`data: ${JSON.stringify(thinking)}\n\n`);
+  await pause(thinkMs);
+  for (const piece of piecesAtTitles(text)) {
+    if (gone()) return;
+    response.write(`data: ${JSON.stringify({ choices: [{ delta: { content: piece } }] })}\n\n`);
+    await pause(pieceMs);
+  }
+  if (gone()) return;
+  response.write(
+    `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`,
   );
   response.end('data: [DONE]\n\n');
 }
@@ -170,6 +219,16 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
       }
       if ('notice' in answer) {
         streamNotice(response, answer.notice);
+        return;
+      }
+      if ('slowly' in answer) {
+        await streamSlowly(
+          request,
+          response,
+          defaultAnswer(kind, user),
+          answer.thinkMs,
+          answer.pieceMs,
+        );
         return;
       }
       const headers: Record<string, string> = { 'content-type': 'application/json' };

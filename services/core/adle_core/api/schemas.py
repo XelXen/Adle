@@ -649,6 +649,23 @@ class UnhelpfulReport(_Input):
 # -- jobs ------------------------------------------------------------------
 
 
+class JobProgressDetail(_Output):
+    """What long work is doing just now, for a learner who is waiting for it.
+
+    Nothing here is the answer itself: a stage, and the titles of what has been written.
+    """
+
+    #: ``waiting`` for a turn, ``thinking`` before the first word, ``writing``, or
+    #: ``drawing`` a picture.
+    stage: Literal["waiting", "thinking", "writing", "drawing"] | None = None
+    #: For something written part by part: the titles of the parts so far, in order (at
+    #: most 40, each one line of at most 120 characters: ``generation.Outline``). The last
+    #: one may still be being written.
+    outline: list[str] = Field(default_factory=list)
+    #: What is being written, as its own title, once that has arrived.
+    title: str | None = None
+
+
 class Job(_Output):
     id: str
     kind: str
@@ -659,6 +676,8 @@ class Job(_Output):
     progress_done: int
     progress_total: int
     progress_message: str
+    #: What the work is doing just now, where it can say (see ``JobProgressDetail``).
+    progress_detail: JobProgressDetail | None = None
     #: Present once the job has finished (or was cancelled part-way).
     result: Any | None
     error_code: str | None

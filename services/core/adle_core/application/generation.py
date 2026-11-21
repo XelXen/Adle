@@ -25,11 +25,13 @@ any other lesson before it is stored.
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
+import re
 import threading
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import ValidationError
@@ -142,6 +144,73 @@ _REQUESTS_FOR = {
 }
 #: What a model is seen to be doing while its answer is on the way, in the learner's words.
 _STAGES = {"thinking": "thinking", "writing": "writing"}
+
+#: In an answer that is still arriving: a title, as the JSON of a draft writes one, or the
+#: key that opens a lesson's list of parts. Inside a sentence the quotation marks of such a
+#: pair are escaped, so this finds keys only.
+_TITLE_IN_DRAFT = re.compile(r'"segments"\s*:|"title"\s*:\s*"((?:[^"\\]|\\.)*)"')
+#: The longest piece of an answer kept to look for the end of a title that has begun.
+_TITLE_LOOKBACK = 600
+#: Titles shown while something is written: enough for any lesson or list of concepts.
+_MAX_OUTLINE = 40
+
+
+def _plain_title(raw: str) -> str:
+    """A title as it will read, from the text between its quotation marks in the draft."""
+    try:
+        value = json.loads(f'"{raw}"')
+    except ValueError:
+        value = raw
+    return " ".join(str(value).split())[:120]
+
+
+@dataclass(slots=True)
+class Outline:
+    """What can be said about an answer while it is still being written: its titles (ADR-037).
+
+    A lesson's draft names the lesson first and then each of its parts; a list of concepts
+    names each concept. Nothing else of the answer is read here, and nothing of it is
+    kept: a learner who is waiting is shown which parts exist so far, never the words.
+    """
+
+    #: The answer has a title of its own before its list of parts (a lesson's draft): a
+    #: title found before ``"segments"`` names the whole thing, and every later one a part.
+    named: bool = False
+    title: str = ""
+    parts: list[str] = field(default_factory=list)
+    _among_parts: bool = False
+    _unread: str = ""
+
+    def add(self, piece: str) -> bool:
+        """Take in the next piece of the answer. True when it completed a title."""
+        self._unread += piece
+        found = False
+        consumed = 0
+        for match in _TITLE_IN_DRAFT.finditer(self._unread):
+            consumed = match.end()
+            if match.group(1) is None:
+                self._among_parts = True
+                continue
+            title = _plain_title(match.group(1))
+            if not title:
+                continue
+            if self.named and not self._among_parts and not self.title:
+                self.title = title
+            elif len(self.parts) < _MAX_OUTLINE:
+                self.parts.append(title)
+            else:
+                continue
+            found = True
+        self._unread = self._unread[consumed:][-_TITLE_LOOKBACK:]
+        return found
+
+    def start_again(self) -> None:
+        """Another model begins the answer from its first word."""
+        self.title = ""
+        self.parts.clear()
+        self._among_parts = False
+        self._unread = ""
+
 
 _PACE = {"relaxed": "unhurried", "standard": "moderate", "brisk": "brisk"}
 _DENSITY = {
@@ -336,6 +405,8 @@ class GenerationService:
         doing: str,
         *,
         provider_id: str | None = None,
+        outline: Outline | None = None,
+        stage: str | None = None,
     ) -> ChatResult:
         """Send one request from inside a job, keeping the job's progress honest while it waits.
 
@@ -343,29 +414,58 @@ class GenerationService:
         that thinks before it writes can take minutes over one answer, so what it is
         seen to be doing is said beside it: a long wait should not look like a stall.
         ``provider_id`` asks one provider whatever the learner's choice would plan.
+
+        Beside the sentence the job says what stage the request is at (``stage`` names it
+        where it is not a matter of thinking and writing: a picture is ``drawing``) and,
+        given an ``outline``, which titles of the answer have been written so far.
         """
+        message = doing
+        at: str | None = stage
+
+        def say(now: str | None = None, reached: str | None = None) -> None:
+            nonlocal message, at
+            if now is not None:
+                message = now
+            if reached is not None:
+                at = stage or reached
+            detail: dict[str, Any] = {}
+            if at is not None:
+                detail["stage"] = at
+            if outline is not None:
+                if outline.title:
+                    detail["title"] = outline.title
+                detail["outline"] = list(outline.parts)
+            context.report(done, total, message, detail or None)
 
         def busy(provider: str) -> None:
-            context.report(done, total, f"Waiting for {provider} to finish another request")
+            say(f"Waiting for {provider} to finish another request", "waiting")
 
-        def at_stage(model: str, stage: str) -> None:
-            context.report(done, total, f"{doing}: {model} is {_STAGES.get(stage, 'working')}")
+        def at_stage(model: str, reached: str) -> None:
+            if reached == "thinking" and outline is not None:
+                # Whoever thinks now writes the answer from its first word.
+                outline.start_again()
+            say(f"{doing}: {model} is {_STAGES.get(reached, 'working')}", reached)
 
         def waiting(seconds: float) -> None:
-            context.report(
-                done,
-                total,
+            say(
                 f"Waiting about {max(1, round(seconds))} seconds to stay under the rate limit",
+                "waiting",
             )
 
         def standing_in(unavailable: str, following: str, why: str) -> None:
             # Said while it happens, so that a longer wait has its reason beside it.
-            context.report(
-                done,
-                total,
+            if outline is not None:
+                outline.start_again()
+            say(
                 f"{unavailable} {_PASSED_OVER.get(why, 'is not answering')}. "
                 f"Asking {following} instead",
+                "waiting",
             )
+
+        def piece(written: str) -> None:
+            # Only a new title is worth saying: the words between them are the answer.
+            if outline is not None and outline.add(written):
+                say()
 
         try:
             return self._gateway.complete(
@@ -376,6 +476,7 @@ class GenerationService:
                 on_stage=at_stage,
                 on_busy=busy,
                 provider_id=provider_id,
+                on_piece=piece if outline is not None else None,
             )
         except RequestCancelledError as error:
             raise JobCancelledError from error
@@ -539,7 +640,7 @@ class GenerationService:
                 passages=excerpts,
                 problems=problems,
             )
-            result = self._ask(request, context, attempt - 1, 2, doing)
+            result = self._ask(request, context, attempt - 1, 2, doing, outline=Outline())
             try:
                 proposed = compile_curriculum(
                     extract_json_object(result.text),
@@ -769,7 +870,7 @@ class GenerationService:
                 approach=inputs.approach,
                 earlier=inputs.earlier,
             )
-            result = self._ask(request, context, 0, planned, doing)
+            result = self._ask(request, context, 0, planned, doing, outline=Outline(named=True))
             try:
                 compiled = compile_lesson(
                     parse_lesson_draft(extract_json_object(result.text)), inputs.context
@@ -821,7 +922,7 @@ class GenerationService:
             for number, brief in enumerate(briefs, start=1):
                 context.check_cancelled()
                 label = f"Drawing picture {number} of {len(briefs)}"
-                context.report(number, total, label)
+                context.report(number, total, label, {"stage": "drawing"})
                 try:
                     artifact, answer = self._write_scene(brief, context, number, total, label)
                 except JobCancelledError:
@@ -900,9 +1001,14 @@ class GenerationService:
             context.check_cancelled()
             doing = label if attempt == 1 else f"{label} (second try)"
             if attempt == 2:
-                context.report(done, total, doing)
+                context.report(done, total, doing, {"stage": "drawing"})
             result = self._ask(
-                prompts.scene_request(brief, problems=problems), context, done, total, doing
+                prompts.scene_request(brief, problems=problems),
+                context,
+                done,
+                total,
+                doing,
+                stage="drawing",
             )
             source = extract_python_file(result.text)
             try:

@@ -231,6 +231,57 @@ test.describe('generation with the AI provider', () => {
     await close(session);
   });
 
+  test('while a lesson is written it is seen taking shape, part by part, and never its words', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await open(profileDir);
+    const { page, provider } = session;
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    const limits = detail(page, 'Limits');
+
+    // The model thinks for a while, and then writes the lesson a part at a time.
+    provider.queue({ slowly: true, thinkMs: 2_500, pieceMs: 900 });
+    await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
+
+    // ---- Thinking: said in the learner's terms, with a clock that moves ----
+    const bar = limits.getByRole('progressbar');
+    await expect(bar).toHaveAccessibleName('Planning the lesson');
+    // Nothing can be counted yet, so the bar has no measure, rather than standing empty.
+    await expect(bar).not.toHaveAttribute('aria-valuenow');
+    const clock = limits.locator('[aria-hidden="true"]', { hasText: /^\d+:\d\d$/ });
+    const first = await clock.textContent();
+    await expect(clock).not.toHaveText(first ?? '', { timeout: 5_000 });
+
+    // ---- Writing: the lesson by its title, and its parts as each one is begun ----
+    await expect(bar).toHaveAccessibleName('Writing “How a neuron weighs its inputs”');
+    const parts = limits.getByRole('list', { name: 'Parts so far' });
+    await expect(parts.getByRole('listitem')).toHaveCount(2, { timeout: 15_000 });
+    await expect(parts.getByRole('listitem').nth(0)).toHaveText('Why inputs are weighted');
+    await expect(parts.getByRole('listitem').nth(1)).toHaveText('The weighted sum');
+    // The part being written is the last, and it is said to be the present one.
+    await expect(parts.getByRole('listitem').nth(1)).toHaveAttribute('aria-current', 'step');
+    await expect(bar).toHaveAttribute('aria-valuetext', /^\d+ parts? so far$/);
+    // Titles, and nothing of what the parts say.
+    await expect(limits).not.toContainText('has to turn them into one');
+    await expect(limits).not.toContainText('its own weight');
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'writing-a-lesson-part-by-part');
+    await expect(parts.getByRole('listitem')).toHaveCount(5, { timeout: 15_000 });
+    const moved = Number(await bar.getAttribute('aria-valuenow'));
+    expect(moved).toBeGreaterThan(30);
+    expect(moved).toBeLessThan(100);
+
+    // ---- And then it is a lesson ----
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(parts).toHaveCount(0);
+    expect(session.adle.problems).toEqual([]);
+    await close(session);
+  });
+
   test('a lesson can be started as soon as it is written, while its pictures are drawn', async ({
     profileDir,
   }) => {

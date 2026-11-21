@@ -371,6 +371,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
         starting={starting.has(courseId)}
         refusal={refusals.get(courseId) ?? null}
         subject="the suggestions"
+        kind="suggestions"
         waitingText="Queued"
         usualSeconds={providerStatus?.routes.curriculum.wait_seconds}
         onCancel={() => cancelJob(proposalJob)}
