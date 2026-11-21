@@ -1,0 +1,47 @@
+.anchor {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Beside its button: below it and running on from its near edge, or wherever else there
+   is room. The button that opens a popover is what it is placed against. */
+.popover {
+  /* It can open over the strip the window is moved by, and must still take a press. */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  position: absolute;
+  inset: auto;
+  position-area: block-end span-inline-end;
+  position-try-fallbacks:
+    flip-inline,
+    flip-block,
+    flip-block flip-inline;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(24rem, 100vw - 2 * var(--ad-space-4));
+  margin: var(--ad-space-1) 0;
+  padding: var(--ad-space-3) var(--ad-space-4);
+  background: var(--ad-color-surface);
+  border: var(--ad-border-width) solid var(--ad-color-border-control);
+  border-radius: var(--ad-radius-control);
+  box-shadow: var(--ad-shadow-3);
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-ink);
+}
+
+.title {
+  margin: 0 0 var(--ad-space-1);
+  font: var(--ad-text-control);
+  letter-spacing: var(--ad-tracking-tight);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  color: var(--ad-color-muted);
+}
+
+.body p {
+  margin: 0;
+}

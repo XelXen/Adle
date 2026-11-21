@@ -12,6 +12,7 @@ import {
   EmptyState,
   ErrorState,
   IconButton,
+  InfoPopover,
   LoadingState,
   Logo,
   ProgressBar,
@@ -104,6 +105,23 @@ describe('Select', () => {
     );
     await userEvent.selectOptions(screen.getByLabelText('Pace'), 'brisk');
     expect(onValueChange).toHaveBeenCalledWith('brisk');
+  });
+});
+
+describe('InfoPopover', () => {
+  it('is a named button that opens the note it points at', () => {
+    render(
+      <InfoPopover label="What is sent" icon={<span>i</span>} title="What is sent">
+        <p>The course name and this concept.</p>
+      </InfoPopover>,
+    );
+    const button = screen.getByRole('button', { name: 'What is sent' });
+    const note = screen.getByText('The course name and this concept.').closest('[popover]');
+    // The browser opens and closes it, and says so on the button: all this needs is
+    // that the button points at the note and the note is one.
+    expect(note).toHaveAttribute('popover', 'auto');
+    expect(button).toHaveAttribute('popovertarget', note?.id);
+    expect(note?.id).toBeTruthy();
   });
 });
 

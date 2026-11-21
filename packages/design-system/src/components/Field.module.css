@@ -90,20 +90,94 @@
   line-height: 1.5rem;
 }
 
+/* ---- Select ---------------------------------------------------------------
+ * The list of choices is drawn by the page, not by the system. The system's own list takes
+ * its colours from the computer and not from the theme: in the dark theme it showed the
+ * theme's light words on the computer's light ground. `base-select` hands the whole
+ * control to the page, list included, and keeps what a select does for the keyboard and
+ * for assistive technology. */
+.select,
+.select::picker(select) {
+  appearance: base-select;
+}
+
 .select {
-  appearance: none;
-  padding-right: var(--ad-space-7);
-  background-image:
-    linear-gradient(45deg, transparent 50%, currentcolor 50%),
-    linear-gradient(135deg, currentcolor 50%, transparent 50%);
-  background-position:
-    calc(100% - 1.0625rem) 50%,
-    calc(100% - 0.8125rem) 50%;
-  background-size:
-    0.25rem 0.25rem,
-    0.25rem 0.25rem;
-  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  gap: var(--ad-space-2);
+  padding-right: var(--ad-space-3);
   cursor: pointer;
+}
+
+/* A chevron in the words' colour, in place of the system's arrow. */
+.select::picker-icon {
+  content: '';
+  flex: none;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin: 0 0.125rem 0.1875rem auto;
+  border: solid var(--ad-color-muted);
+  border-width: 0 1.5px 1.5px 0;
+  rotate: 45deg;
+  transition: rotate var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.select:open::picker-icon {
+  margin-bottom: -0.1875rem;
+  rotate: 225deg;
+}
+
+.select::picker(select) {
+  /* It can open over the strip the window is moved by, and must still take a press. */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  box-sizing: border-box;
+  min-width: anchor-size(width);
+  max-height: min(22rem, 100vh - 2 * var(--ad-layout-titlebar-height));
+  margin: var(--ad-space-1) 0;
+  padding: var(--ad-space-1);
+  overflow: hidden auto;
+  background: var(--ad-color-surface);
+  border: var(--ad-border-width) solid var(--ad-color-border-control);
+  border-radius: var(--ad-radius-control);
+  box-shadow: var(--ad-shadow-3);
+  font: var(--ad-text-body);
+  color: var(--ad-color-ink);
+}
+
+.select option {
+  display: flex;
+  align-items: center;
+  gap: var(--ad-space-2);
+  min-height: 2rem;
+  padding: 0 var(--ad-space-2);
+  border-radius: var(--ad-radius-small);
+  background: transparent;
+  color: var(--ad-color-ink);
+  cursor: pointer;
+}
+
+.select option:hover,
+.select option:focus-visible {
+  outline: none;
+  background: var(--ad-color-surface-sunken);
+}
+
+.select option:checked {
+  font-weight: 550;
+}
+
+/* The mark of the choice in force, after its words and in the colour of selection. */
+.select option::checkmark {
+  order: 1;
+  margin-left: auto;
+  padding-left: var(--ad-space-3);
+  color: var(--ad-color-primary-text);
+}
+
+.select option:disabled {
+  color: var(--ad-color-faint);
+  cursor: not-allowed;
 }
 
 .trailing {

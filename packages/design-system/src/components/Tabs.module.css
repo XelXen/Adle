@@ -62,7 +62,12 @@
   stroke-width: 1.75;
 }
 
+/* What a tab shows is laid out like a page: its sections stand a page's distance apart,
+   whether a screen wraps them itself or hands them over one by one. */
 .panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-6);
   min-width: 0;
   border-radius: var(--ad-radius-small);
 }

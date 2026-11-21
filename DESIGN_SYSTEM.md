@@ -150,7 +150,8 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 |---|---|---|
 | `Button` | An action | `primary`, `secondary` (default), `tertiary`, `destructive`; `small`/`medium`/`large`; hover, pressed, focus, disabled, **loading** (stays focusable, ignores clicks, `aria-busy`); optional leading icon. A `secondary` button with `aria-pressed` is a toggle and shows when it is on |
 | `IconButton` | An icon-only action | `label` is required |
-| `TextField`, `TextArea`, `Select` | Form input | Label (hideable, never absent), description, **error** (sets `aria-invalid`, announced), disabled, trailing slot |
+| `TextField`, `TextArea`, `Select` | Form input | Label (hideable, never absent), description, **error** (sets `aria-invalid`, announced), disabled, trailing slot. A `Select`'s list is drawn by the page in the theme's colours (`appearance: base-select`), never by the system, whose list takes its colours from the computer and not from the theme; it keeps a native select's keys (arrows, typing, Escape) and its meaning for assistive technology |
+| `InfoPopover` | Something worth knowing that nobody needs to read every time (what a request sends and where, who wrote a lesson) | An icon button and a note that opens beside it, above everything else; Escape or a press elsewhere closes it; the button says whether it is open. Never the only place for something the learner must act on |
 | `Switch` | An immediate on/off setting | `role="switch"`, optional description |
 | `Checkbox` | One of several independent choices in a form that is submitted | Native checkbox; label, optional description, disabled |
 | `SegmentedControl` | Two to four exclusive options | Radio group, arrow keys, single tab stop |
@@ -319,6 +320,9 @@ The rule is ADR-028: short, plain, and about the learner's task.
 ### Layout
 
 - One `h1` per page (`Page`), `h2` per `Section`.
+- **Sections of a page stand 32 px apart** (`--ad-space-6`), and what belongs to a section
+  12 px under its title (`--ad-space-3`). `Page` and a tab's panel lay their children out
+  that way: a screen hands them its sections and sets no distance between them itself.
 - Prefer sections and spacing to nested cards. A card inside a card needs a reason.
 - Reading text stays under about 44 rem wide (`width="reading"` or `--ad-layout-reading-max`).
 - Target sizes: controls are 36 px tall (30 px for `small`, used in rows and toolbars; 44 px

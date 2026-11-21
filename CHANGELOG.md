@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A list of choices now follows the theme. In the dark theme it showed light words on a
+  light ground.
+- The sections of a course's Materials tab stand as far apart as sections do everywhere else.
+
 ## [0.1.0-alpha.1] - 2026-11-21
 
 The first alpha of Adle, for Windows, macOS and Linux. Adle turns a topic or your own

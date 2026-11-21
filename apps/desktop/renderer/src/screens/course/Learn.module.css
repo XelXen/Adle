@@ -1,7 +1,7 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--ad-space-7);
+  gap: var(--ad-space-6);
   min-width: 0;
 }
 

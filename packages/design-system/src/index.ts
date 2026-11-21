@@ -58,6 +58,7 @@ export {
   type StackProps,
 } from './components/Layout';
 export { Logo, type LogoProps } from './components/Logo';
+export { InfoPopover, type InfoPopoverProps } from './components/Popover';
 export { ProgressBar, type ProgressBarProps } from './components/Progress';
 export { Spinner, type SpinnerProps } from './components/Spinner';
 export {
