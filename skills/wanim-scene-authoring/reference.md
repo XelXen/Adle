@@ -110,7 +110,10 @@ Write ordinary manim Community v0.21 Python. Only the Wanim-specific parts are l
 `Rectangle`, `Line`, `Dot`, `VGroup`; `Axes`, `Axes.plot`, `Axes.c2p`; `ValueTracker`,
 `always_redraw`, `.animate`; `Write`, `Create`, `FadeIn`, `GrowFromCenter`; `Slider`, `Switch`;
 `add_reaction`, `on_input`; positioning with `to_edge`, `next_to`, `move_to`, `shift`, `arrange`;
-`set_value`, `set_color`, `set_width`, `stretch_to_fit_height`; `np.exp`.
+`set_value`, `set_color`, `set_width`, `stretch_to_fit_height`; `np.exp`; and from
+`examples/sum_to_output.py`: `Arrow`, `LaggedStart`, `GrowArrow`, `Indicate`,
+`TransformMatchingTex` (on `MathTex` split into parts), `SurroundingRectangle`, `FadeOut`,
+`FadeIn(..., shift=...)`, `formula[i].set_color(...)`.
 
 ### Verified by a test of its own
 
@@ -152,6 +155,7 @@ Rules that come with the interactive API (documented upstream):
 | `while True:` without `self.wait` | The frame stops answering; watchdog fires | `unresponsive` |
 | `set_fill(opacity=...)`, `set_fill(color=..., opacity=...)`, `set_color(color=...)` (no argument in first place) | "ManimColor only accepts int, str, ... not Object". The names are taken for the colour. The static policy rejects these forms. | `runtime` |
 | `set_fill(colour, opacity=...)` (the opacity by name) | No error. The shape is left with no fill. Use `set_fill(colour, 0.3)`, or `set_fill(None, 0.3)` to keep the colour. The static policy rejects the named form. | none |
+| `Circumscribe(..., color=...)` | "shape should be either Rectangle or Circle." The name is taken for the shape and the scene stops. Without a colour it runs, drawn in a yellow outside the palette. The static policy rejects both (`e2e/fixtures/scenes/circumscribe.py`). | `runtime` |
 | `Dot(point, color=...)` (position as an argument) | No error. The dot is drawn white: invisible on the light stage. Use `Dot(color=..., radius=...).move_to(point)`. The static policy rejects the first form. **Observed** in the sample scenes' screenshots. | none |
 
 Scenes and mobjects are JavaScript `Proxy` objects that throw an `AttributeError` for unknown

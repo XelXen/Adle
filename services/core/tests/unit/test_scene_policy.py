@@ -119,6 +119,8 @@ def test_allowed_standard_library_imports() -> None:
         # Run, these two go wrong in the pinned runtime: one leaves a shape empty, one stops.
         ("fill_by_name.py", "unreliable_call"),
         ("fill_without_colour.py", "unreliable_call"),
+        # And this one stops whatever it is given.
+        ("circumscribe.py", "unreliable_call"),
     ],
 )
 def test_broken_and_hostile_fixtures_are_rejected(fixture: str, expected: str) -> None:

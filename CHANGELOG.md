@@ -16,6 +16,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
   by title as each one is begun, and keeps a clock moving. The bar counts parts, and
   moves without a measure while the model is still thinking instead of standing empty.
   Suggested concepts appear by name the same way.
+- **Pictures are a bigger part of a lesson.** A picture now lasts as long as the words said
+  over it and moves a step for each sentence: an equation rewritten before your eyes, a
+  value turned and everything that depends on it following, each quantity in one colour
+  wherever it appears. Before, it drew itself in a few seconds and stood still.
 - **Every picture is tried before you see it.** Adle runs each new picture through,
   unseen and in a second or so, and moves its controls. One that breaks is written again,
   told what went wrong; if that one breaks too, the part is explained in words and you are

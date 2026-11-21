@@ -137,3 +137,46 @@ def test_a_question_sends_what_the_interface_says_it_sends_and_nothing_more() ->
     outside = re.sub(r"<learner_material.*?</learner_material>", "", request.user, flags=re.S)
     for about_them in ("goal", "pace", "preference", "has seen of the learner", "level"):
         assert about_them not in outside.lower(), about_them
+
+
+def test_a_picture_is_asked_to_last_as_long_as_the_words_said_over_it() -> None:
+    from adle_core.generation.drafts import SceneBrief
+
+    def brief(narration: list[str]) -> SceneBrief:
+        return SceneBrief(
+            scene_id="scn_1",
+            segment_id="seg_1",
+            kind="animation",
+            title="A weighted sum",
+            brief="Two inputs, two arrows, one neuron.",
+            description="Each input is multiplied by its weight.",
+            narration=narration,
+        )
+
+    sentence = "Each input travels along an arrow, and each arrow has a weight of its own."
+    # Fifteen words a sentence at two and a half words a second: six seconds each.
+    assert "about 18 seconds in all" in prompts.scene_request(brief([sentence] * 3)).user
+    # Never shorter than there is time to see, never longer than a part should hold a picture.
+    assert "about 8 seconds in all" in prompts.scene_request(brief([])).user
+    assert "about 40 seconds in all" in prompts.scene_request(brief([sentence] * 40)).user
+
+
+def test_a_picture_that_failed_when_it_ran_is_shown_back_with_its_lines_as_they_were() -> None:
+    from adle_core.generation.drafts import SceneBrief
+
+    scene = SceneBrief(
+        scene_id="scn_1",
+        segment_id="seg_1",
+        kind="animation",
+        title="A weighted sum",
+        brief="Two inputs.",
+        description="Inputs.",
+        narration=["Two inputs."],
+    )
+    previous = "class A(Scene):\n    def construct(self):\n        self.play(Write(x))\n"
+    request = prompts.scene_request(
+        scene, problems=["The scene failed while it ran: NameError: x"], previous=previous
+    )
+    assert "was run in the player and failed" in request.user
+    assert "    def construct(self):\n        self.play(Write(x))" in request.user
+    assert "NameError: x" in request.user

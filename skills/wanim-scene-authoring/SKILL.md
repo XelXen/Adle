@@ -160,11 +160,38 @@ is silently dropped twice (by the player and by the host).
 Values must be a boolean, a finite number, a string of at most 200 characters, or `None`. Events are
 weak evidence of engagement, never proof of understanding; the lesson's questions decide that.
 
-### Motion
+### Motion: draw the idea happening
 
-- One idea per animation; `run_time` 0.5–1.5 s; end with a short `self.wait(0.3–0.6)`.
-- No flashing, strobing, shaking, or rapid colour cycling. No decorative movement.
-- Total `construct()` time under about 15 seconds. Longer explanations are separate segments.
+A lesson is watched (ADR-035): while its words are said, the picture is most of what the
+learner looks at. Draw the idea happening, the way a good mathematics video does, and not a
+slide with things fading in. **Verified:** every tool named here runs in the pinned runtime
+(`examples/sum_to_output.py`).
+
+- **Follow the narration, a step for each sentence.** Build the picture in the order the
+  narration says it. Pace it to the narration, which is read at about two and a half words a
+  second: an animation where something happens, a `self.wait(...)` where the voice explains
+  what is already on screen. The whole scene lasts about as long as the narration, 8 to 40
+  seconds, and ends on a frame that holds the idea.
+- **Show change as change.** When one thing becomes another, transform it: `Transform` or
+  `ReplacementTransform` for a shape, `TransformMatchingTex` for an equation that is rewritten
+  (split the `MathTex` into the parts that move, `MathTex("z", "=", "w_1", "x_1", ...)`, and
+  keep the same pieces in the next one), `TransformFromCopy` to show where a term comes from.
+  Never fade one formula out and the next in.
+- **Let a value move, and everything that depends on it with it.** A `ValueTracker` animated
+  with `self.play(tracker.animate.set_value(...))`, and the shapes and numbers that depend on
+  it rebuilt by `always_redraw(lambda: ...)`, show cause and effect in one motion.
+- **One colour, one meaning.** A quantity keeps its colour everywhere it appears: the input
+  dots and the `x` in the formula are both `blue`, the weights `green`. Colour the parts of a
+  `MathTex` with `formula[i].set_color(...)`. Words stay `ink` or `muted`.
+- **Point at what the narration names**: `Indicate(...)` on the part in the picture and the
+  symbol in the formula together, or a `SurroundingRectangle(..., color=self.sun)` drawn with
+  `Create` and taken away with `FadeOut`. (`Circumscribe` given a colour stops the scene in this runtime; the static policy refuses it.)
+  `LaggedStart(...)` for things that arrive together; `GrowArrow`, `GrowFromCenter`, `Create`
+  for lines and shapes, `Write` for formulas, `FadeIn(..., shift=...)` for labels.
+- **Keep the stage clear.** At most about seven things at once; `FadeOut` what the narration
+  has finished with. Little text: a label, not a sentence (the words are said).
+- `run_time` 0.6–2.5 s for each animation. No flashing, strobing, shaking, or rapid colour
+  cycling. No decorative movement.
 
 ## Performance rules for reactions
 
@@ -224,6 +251,7 @@ npm run e2e -- scene-player.spec.ts
 | [examples/weighted_sum.py](examples/weighted_sum.py) | Animation-only `Scene`: shapes, `Text`, `MathTex`, `Write`/`Create`/`FadeIn` |
 | [examples/neuron_weight.py](examples/neuron_weight.py) | `InteractiveScene`: `Slider` + `Switch`, reactions, `on_input`, `explored`/`passed`, then `construct()` |
 | [examples/activation_curve.py](examples/activation_curve.py) | `Axes.plot`, a point driven along a curve, `DecimalNumber`, `ValueTracker` + `always_redraw` |
+| [examples/sum_to_output.py](examples/sum_to_output.py) | The style to aim for: a step for each sentence, colours that keep their meaning, `TransformMatchingTex`, `Indicate`, a drawn `SurroundingRectangle`, `LaggedStart`, a value that moves the picture |
 
 ## When the pinned version changes
 

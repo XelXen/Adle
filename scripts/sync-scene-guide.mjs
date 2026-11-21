@@ -43,6 +43,11 @@ const EXAMPLES = [
     'An interactive scene: a slider and a switch, reactions, events, named controls.',
   ],
   ['activation_curve.py', 'Axes with a plotted curve and a point that moves along it.'],
+  [
+    'sum_to_output.py',
+    'The style to aim for: a step for each sentence of narration, colours that keep their ' +
+      'meaning, an equation rewritten with TransformMatchingTex, and a value that moves the picture.',
+  ],
 ];
 
 const read = (file) => readFileSync(path.join(skillDir, file), 'utf8').replace(/\r\n/g, '\n');

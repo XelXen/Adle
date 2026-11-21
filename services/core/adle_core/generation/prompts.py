@@ -171,10 +171,11 @@ A beat is {{"say": "...", "show": "..."}}:
   It may contain $math$. A segment has 2 to 5 beats.
 
 A scene is {{"brief": "...", "description": "..."}}:
-- "brief" tells an animator exactly what to draw: the objects, their labels, what moves or
-  changes and in which order, and for an interaction which controls exist (at most two:
-  sliders with a range, or on/off switches) and what each one changes. Under 120 words.
-  Keep it simple: a handful of shapes, one idea.
+- "brief" tells an animator exactly what to draw: the objects, their labels, and step by
+  step, in the order of the beats, what appears, what changes into what, and what is pointed
+  at; for an interaction which controls exist (at most two: sliders with a range, or on/off
+  switches) and what each one changes. Under 150 words. One idea, shown happening: a handful
+  of shapes, each quantity in one colour wherever it appears.
 - "description" says the same thing for someone who cannot see the picture. It may contain
   $math$. Two to four sentences.
 Use at most {MAX_SCENES_PER_LESSON} scenes in the lesson, and at least one.
@@ -314,6 +315,16 @@ def scene_guide() -> str:
     )
 
 
+#: How fast narration is read aloud, for pacing a picture to it.
+WORDS_PER_SECOND = 2.5
+
+
+def _scene_seconds(narration: Sequence[str]) -> int:
+    """About how long a picture should last: as long as the words said over it, 8 to 40 s."""
+    words = sum(len(line.split()) for line in narration)
+    return max(8, min(40, round(words / WORDS_PER_SECOND)))
+
+
 def scene_request(
     brief: SceneBrief, *, problems: Sequence[str] = (), previous: str | None = None
 ) -> ChatRequest:
@@ -341,8 +352,10 @@ def scene_request(
     else:
         shape = (
             "Kind: animation. Subclass Scene and write setup() and construct() only. "
-            "Build the picture up in the order the narration talks about it. "
-            "Total running time between 6 and 14 seconds."
+            "Draw the idea happening, a step for each sentence of the narration, in its order, "
+            "as the guide's section on motion says. Pace it to the narration: about "
+            f"{_scene_seconds(brief.narration)} seconds in all, ending on a frame that holds "
+            "the idea."
         )
     narration = "\n".join(f"- {line}" for line in brief.narration) or "- (no narration)"
     parts = [

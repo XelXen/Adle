@@ -333,6 +333,18 @@ class _Checker:
                     node,
                 )
             return
+        if isinstance(function, ast.Name) and function.id == "Circumscribe":
+            # Observed in the pinned runtime, 2026-11-21: given a colour by name, it takes the
+            # name for its shape and stops the scene ("shape should be either Rectangle or
+            # Circle"); without one it runs, in a yellow that is not in the palette.
+            self.fail(
+                "unreliable_call",
+                "Circumscribe stops the scene in this runtime when it is given a colour, and "
+                "without one draws outside the palette. Point with Indicate(...), or draw a "
+                "SurroundingRectangle with Create and take it away with FadeOut.",
+                node,
+            )
+            return
         if isinstance(function, ast.Name) and function.id == "Dot":
             positioned = bool(node.args) or any(key.arg == "point" for key in node.keywords)
             if positioned:

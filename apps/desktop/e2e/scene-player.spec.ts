@@ -429,6 +429,8 @@ test.describe('scene player frame', () => {
     ['bad_import.py', 'compile', /cannot use Python module 'os'/],
     ['no_scene.py', 'compile', /No Scene subclass/],
     ['runtime_error.py', 'runtime', /.+/],
+    // Refused by the static rules for this reason: given a colour, it stops the scene.
+    ['circumscribe.py', 'runtime', /shape should be either Rectangle or Circle/],
   ] as const) {
     test(`a broken scene (${file}) fails safely with a ${stage} error`, async ({ adle }) => {
       const player = await mountRawPlayer(adle.page, `e2e${stage}${file.length}`);
