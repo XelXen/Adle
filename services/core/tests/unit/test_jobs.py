@@ -75,9 +75,62 @@ def test_an_unexpected_failure_never_exposes_internals(
     assert finished.status == "failed"
     assert finished.error_code == "internal_error"
     assert "private-notes" not in (finished.error_message or "")
-    assert "Nothing was lost" in (finished.error_message or "")
+    assert "Please try again" in (finished.error_message or "")
     # It is still diagnosable from the log.
     assert any("failed unexpectedly" in record.message for record in caplog.records)
+    # By what kind of error it was and where it happened, never by what it said.
+    logged = " ".join(record.getMessage() for record in caplog.records)
+    assert "RuntimeError" in logged
+    assert "test_jobs.py" in logged
+    assert "private-notes" not in logged
+    assert "private-notes" not in caplog.text
+
+
+def test_a_job_whose_record_cannot_be_written_does_not_stop_the_ones_behind_it(
+    runner: JobRunner, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The lane has one thread. If it ended, everything after would wait for ever."""
+    real_update = runner._update
+    failed_once = threading.Event()
+
+    def update(job_id: str, **fields: object) -> None:
+        # The write that says the first job succeeded fails, as when the disk is full.
+        if fields.get("status") == "succeeded" and not failed_once.is_set():
+            failed_once.set()
+            raise OSError("database or disk is full: /home/learner/adle.db")
+        real_update(job_id, **fields)
+
+    monkeypatch.setattr(runner, "_update", update)
+    first = runner.submit("import_sources", lambda _: {"imported": 1})
+    second = runner.submit("import_sources", lambda _: {"imported": 2})
+
+    # The one behind it runs, and the first is not left saying it is still running.
+    assert runner.wait(second.id).result == {"imported": 2}
+    assert runner.wait(first.id).status == "failed"
+    assert runner.wait(first.id).error_code == "internal_error"
+    assert "could not be recorded (OSError)" in caplog.text
+    assert "adle.db" not in caplog.text
+
+
+def test_what_is_logged_about_an_error_is_its_kind_and_place_never_its_text() -> None:
+    from adle_core.logs import where
+
+    def inner() -> None:
+        raise ValueError("the learner typed: my password is hunter2")
+
+    try:
+        try:
+            inner()
+        except ValueError as error:
+            raise RuntimeError("while importing C:/Users/someone/notes.pdf") from error
+    except RuntimeError as error:
+        said = where(error)
+    assert "RuntimeError" in said
+    assert "ValueError" in said
+    assert "test_jobs.py" in said
+    assert "in inner" in said
+    assert "hunter2" not in said
+    assert "notes.pdf" not in said
 
 
 def test_jobs_run_one_at_a_time_in_submission_order(runner: JobRunner) -> None:

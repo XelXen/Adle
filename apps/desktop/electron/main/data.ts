@@ -32,8 +32,6 @@ export interface DataDependencies {
   core: CoreProcess;
   /** Everything the core persists. Deleted as a whole when the learner deletes everything. */
   dataDir: string;
-  /** What must happen whenever the core has started again (it is handed the provider key). */
-  afterStart: () => Promise<void>;
 }
 
 type Handle = <Args extends unknown[], Result>(
@@ -53,7 +51,7 @@ function owner(): BrowserWindow | undefined {
 }
 
 export function registerDataHandlers(deps: DataDependencies, handle: Handle): void {
-  const { core, dataDir, afterStart } = deps;
+  const { core, dataDir } = deps;
 
   /** One of these at a time: each reads, replaces, or deletes the whole of the data. */
   let busy = false;
@@ -123,18 +121,17 @@ export function registerDataHandlers(deps: DataDependencies, handle: Handle): vo
       // data as the first thing it does when it starts again: after checking the copy,
       // after bringing it up to date, and after keeping what it replaces.
       const status = await core.restart({ restoreFrom: parsed.path });
-      if (status.state === 'ready') await afterStart();
       const report = core.lastRestore;
       if (status.state !== 'ready') {
         return failure(
           'core_unavailable',
           status.state === 'failed'
             ? status.message
-            : 'Adle could not start again after the restore.',
+            : 'Adle couldn’t start again after the restore.',
         );
       }
       if (!report) {
-        return failure('restore_failed', 'The copy was not restored. Your data is as it was.');
+        return failure('restore_failed', 'The copy wasn’t restored. Your data is unchanged.');
       }
       if (!report.ok) return failure('restore_refused', report.message);
       return { ok: true, data: { restored: true } };
@@ -148,9 +145,8 @@ export function registerDataHandlers(deps: DataDependencies, handle: Handle): vo
         title: 'Delete everything',
         message: 'Delete everything Adle has stored on this computer?',
         detail:
-          'Every course, imported material, lesson, answer, and safety copy will be ' +
-          'permanently deleted. This cannot be undone. Copies you saved elsewhere, and your ' +
-          'AI provider key, are not touched.',
+          'Every course, material, lesson, answer, and safety copy will be permanently ' +
+          'deleted. This can’t be undone. Copies saved elsewhere and your provider keys are kept.',
         buttons: ['Cancel', 'Delete everything'],
         defaultId: 0,
         cancelId: 0,
@@ -162,7 +158,7 @@ export function registerDataHandlers(deps: DataDependencies, handle: Handle): vo
         : await dialog.showMessageBox(options);
       if (answer.response !== 1) return { ok: true, data: null };
       if (!canErase(dataDir)) {
-        return failure('erase_failed', 'Adle could not tell which folder holds its data.');
+        return failure('erase_failed', 'Adle couldn’t find its data folder.');
       }
 
       // Nothing can start the core between stopping it and the folder being gone.
@@ -176,12 +172,11 @@ export function registerDataHandlers(deps: DataDependencies, handle: Handle): vo
       });
       // Whatever happened, the core is started again so the app is usable.
       const status = await core.start();
-      if (status.state === 'ready') await afterStart();
       if (!erased) {
         return failure(
           'erase_failed',
-          'Some of the data could not be deleted. Close anything that may have a file of ' +
-            'Adle open, then try again.',
+          'Some data couldn’t be deleted. Close anything that may have an Adle file open, ' +
+            'then try again.',
         );
       }
       if (status.state !== 'ready') {
@@ -189,7 +184,7 @@ export function registerDataHandlers(deps: DataDependencies, handle: Handle): vo
           'core_unavailable',
           status.state === 'failed'
             ? status.message
-            : 'Everything was deleted, but Adle could not start again. Restart the app.',
+            : 'Everything was deleted, but Adle couldn’t start again. Restart the app.',
         );
       }
       return { ok: true, data: { erased: true } };
@@ -201,7 +196,7 @@ export function registerDataHandlers(deps: DataDependencies, handle: Handle): vo
     const folder = safetyCopiesDir(dataDir);
     if (!existsSync(folder)) return failure('not_found', 'There are no safety copies yet.');
     const problem = await shell.openPath(folder);
-    if (problem) return failure('not_opened', 'The folder could not be opened.');
+    if (problem) return failure('not_opened', 'Couldn’t open the folder.');
     return { ok: true, data: null };
   });
 }

@@ -183,7 +183,7 @@ def test_skipped_questions_are_activity_but_not_answers(
     assert session.answered == 0
     assert session.shown == []
     # Nothing was shown either way, and what is needed is simply answers.
-    assert [line.label for line in session.still_needed] == ["Not assessed"]
+    assert [line.label for line in session.still_needed] == ["Not started"]
 
 
 def test_coming_back_later_it_is_last_time_with_the_same_account(

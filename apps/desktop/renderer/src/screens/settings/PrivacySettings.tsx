@@ -50,8 +50,7 @@ function YourData() {
       setOutcome({
         kind: 'failed',
         action,
-        message:
-          'Something went wrong before Adle could finish. Open the library to see how things stand.',
+        message: 'Something went wrong before this finished. Open the library to check your data.',
       });
     } finally {
       setWorking(null);
@@ -64,7 +63,7 @@ function YourData() {
       const result = await getBridge().data.showSafetyCopies();
       if (!result.ok) setFolderProblem(result.error.message);
     } catch {
-      setFolderProblem('The folder could not be opened.');
+      setFolderProblem('Couldn’t open the folder.');
     }
   };
 
@@ -75,13 +74,13 @@ function YourData() {
   return (
     <Section
       title="Your data"
-      description="Everything Adle holds is on this computer. You can take a copy of it, put a copy back, or remove it all."
+      description="Back up, restore, or delete everything Adle stores on this computer."
     >
       <Stack gap={4}>
         {serviceDown && working === null ? (
-          <Callout tone="warning" title="The local service is not running">
-            A copy cannot be saved until it is. Restoring from a copy and deleting everything still
-            work, and restoring may be what gets it going again.
+          <Callout tone="warning" title="Adle isn’t fully running">
+            You can’t save a copy right now. Restoring and deleting still work, and a restore may
+            fix it.
           </Callout>
         ) : null}
 
@@ -96,7 +95,7 @@ function YourData() {
                   <>
                     {said.offersLibrary ? (
                       <Button icon={<Library />} onClick={() => navigate({ name: 'home' })}>
-                        Go to the library
+                        Open library
                       </Button>
                     ) : null}
                     {said.offersSafetyCopies ? (
@@ -122,11 +121,9 @@ function YourData() {
             <div className={styles.dataText}>
               <h3 className={styles.rowTitle}>Save a copy</h3>
               <p className={styles.muted}>
-                One file with your courses, the text taken from your materials, your lessons,
-                answers, and progress. Keep it wherever you like, or take it to another computer. It
-                is an ordinary file, not protected by a password, so keep it as you would the notes
-                themselves. Your AI provider key is not in it, and neither are the original files
-                you imported: Adle does not need them again.
+                One file with your courses, lessons, answers, and progress, to keep or move to
+                another computer. It isn’t password-protected, and doesn’t include your provider
+                keys or the original files you imported.
               </p>
             </div>
             <div className={styles.dataActions}>
@@ -147,9 +144,8 @@ function YourData() {
             <div className={styles.dataText}>
               <h3 className={styles.rowTitle}>Restore from a copy</h3>
               <p className={styles.muted}>
-                Replaces what is here now with a copy you saved. What is here now is kept as a
-                safety copy first, so you can go back. The local service restarts while this
-                happens; it takes a few seconds.
+                Replaces everything here with a copy you saved. What’s here now is kept as a safety
+                copy first, so you can go back.
               </p>
               {folderProblem ? (
                 <p className={styles.muted} role="alert">
@@ -183,9 +179,9 @@ function YourData() {
             <div className={styles.dataText}>
               <h3 className={styles.rowTitle}>Delete everything</h3>
               <p className={styles.muted}>
-                Permanently removes every course, imported material, lesson, answer, and safety copy
-                from this computer. Copies you saved elsewhere and your AI provider key are not
-                touched. You are asked once more before anything is deleted.
+                Permanently removes every course, material, lesson, answer, and safety copy from
+                this computer. Copies saved elsewhere and your provider keys are kept. You’ll be
+                asked to confirm.
               </p>
             </div>
             <div className={styles.dataActions}>
@@ -210,66 +206,49 @@ function YourData() {
 export function PrivacySettings() {
   return (
     <Stack gap={6}>
-      <Section title="Stored on this computer">
+      <Section title="On this computer">
         <Card>
           <ul className={styles.list}>
-            <li>Course materials you import, and the text taken from them.</li>
-            <li>Your curriculum, lessons, answers, and learning progress.</li>
-            <li>
-              Lessons written with AI, including the code that draws their pictures. Narration is
-              spoken by a voice already on this computer and is never recorded.
-            </li>
-            <li>Safety copies Adle makes before it updates or replaces your data.</li>
-            <li>
-              The key of each AI provider you set up, encrypted by your operating system, and
-              whether you chose one provider or let Adle use each you have a key for.
-            </li>
-            <li>
-              Questions you ask about a lesson, and the answers, beside the part they were about.
-            </li>
+            <li>Your courses, imported materials, lessons, answers, and progress.</li>
+            <li>Questions you ask during lessons, and their answers.</li>
+            <li>Your provider keys, encrypted by your operating system.</li>
+            <li>Safety copies made before your data is updated or replaced.</li>
+            <li>Narration is spoken by a voice already on this computer, and never recorded.</li>
           </ul>
         </Card>
       </Section>
 
-      <Section title="Sent to the AI provider">
+      <Section
+        title="Sent to your AI provider"
+        description="Only when you ask Adle to create something, and only what that request needs."
+      >
         <Card>
           <Stack gap={3}>
             <ul className={styles.list}>
               <li>
-                When you ask for concepts: the course&rsquo;s name, topic, and description, your
-                goal, the names of the concepts it already has, and the headings of your materials
-                with a few short excerpts.
+                <strong>Suggested concepts:</strong> the course name, topic, and description, your
+                goal, existing concept names, and headings with short excerpts from your materials.
               </li>
               <li>
-                When you ask for a lesson: the course&rsquo;s name, the concept and its objectives,
-                where you stand on that concept in a few words, your preferences for pace and depth,
-                your goal, and a few related passages from your materials.
+                <strong>A lesson:</strong> the course name, the concept and its objectives, your
+                level on that concept in a few words, your preferences and goal, and a few related
+                passages from your materials.
               </li>
               <li>
-                When you ask a question during a lesson: your question as you typed it, what that
-                part of the lesson says and shows, the lesson&rsquo;s outline, the course&rsquo;s
-                name and the concept, and a few related passages from your materials. Never the
-                answer to a question the lesson is asking you.
+                <strong>A question during a lesson:</strong> your question, that part of the lesson,
+                the lesson outline, the course name, the concept, and a few related passages. Never
+                the answer to a question you haven’t answered.
               </li>
               <li>
-                When you check that a key works: one fixed sentence asking for one word, with
-                nothing of yours in it.
+                <strong>A key test:</strong> a fixed one-word prompt, with nothing of yours in it.
               </li>
             </ul>
             <p className={styles.muted}>
-              Nothing is sent until you start one of these, and each says what it sends before it
-              does. Whole documents, your answers, the record of what you have learnt, and your key
-              are never sent as content. Your answers are checked on this computer.
-            </p>
-            <p className={styles.muted}>
-              These go only to a provider you have given a key to, with that provider&rsquo;s key
-              and no other, and Adle contacts no other service. If you chose one provider under AI
-              provider, everything goes there, whatever happens. If you chose Automatic, Adle uses
-              each provider you have a key for, for what it is best at, and may ask the other when
-              one cannot answer. Either way it says where a request may go before sending it, and
-              who wrote the answer afterwards. Where a provider offers several models, another of
-              its models can stand in while the first is not available; you are told there which
-              ones, and told again whenever it happens.
+              Whole documents, your answers, your history, and your keys are never sent. Each key
+              goes only to its own provider, and Adle contacts no other service. With one provider
+              chosen, nothing ever goes to another. With Automatic, a request may go to the other
+              provider you have a key for, and Adle says where before sending and who answered
+              afterwards.
             </p>
           </Stack>
         </Card>
@@ -278,8 +257,8 @@ export function PrivacySettings() {
       <Section title="Never collected">
         <Card>
           <ul className={styles.list}>
-            <li>No accounts, analytics, advertising identifiers, or usage telemetry.</li>
-            <li>No crash reports are uploaded.</li>
+            <li>No accounts, analytics, or telemetry.</li>
+            <li>No crash reports.</li>
           </ul>
         </Card>
       </Section>

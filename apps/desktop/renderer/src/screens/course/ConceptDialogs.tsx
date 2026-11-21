@@ -62,7 +62,7 @@ export function ConceptDialog({
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     if (!title.trim()) {
-      setTitleError('Give the concept a name.');
+      setTitleError('Enter a name.');
       return;
     }
     setTitleError(undefined);
@@ -92,7 +92,7 @@ export function ConceptDialog({
         if (!saving) onClose();
       }}
       title={concept ? 'Edit concept' : 'Add a concept'}
-      description="A concept is one idea or skill, small enough for a single lesson."
+      description="One idea or skill, small enough for a single lesson."
       size="medium"
       dismissible={!saving}
     >
@@ -103,7 +103,7 @@ export function ConceptDialog({
           value={title}
           maxLength={200}
           error={titleError}
-          placeholder="For example: The chain rule"
+          placeholder="e.g. The chain rule"
           onChange={(event) => setTitle(event.target.value)}
         />
         <TextArea
@@ -111,14 +111,14 @@ export function ConceptDialog({
           value={summary}
           maxLength={4000}
           rows={3}
-          description="Optional. A sentence or two in your own words."
+          description="Optional. A sentence or two."
           onChange={(event) => setSummary(event.target.value)}
         />
         <fieldset className={styles.fieldGroup}>
           <legend className={styles.fieldGroupLabel}>Learning objectives</legend>
           <p className={styles.muted}>
-            What should you be able to do afterwards? Start with something that can be checked:
-            “Compute…”, “Explain why…”, “Predict what happens when…”.
+            What should you be able to do afterwards? Start with a verb: “Compute…”, “Explain why…”,
+            “Predict…”.
           </p>
           {objectives.map((row, index) => (
             <div key={row.key} className={styles.objectiveRow}>
@@ -158,7 +158,7 @@ export function ConceptDialog({
                   setNextKey((key) => key + 1);
                 }}
               >
-                Add another objective
+                Add objective
               </Button>
             </div>
           ) : null}
@@ -235,14 +235,14 @@ export function PrerequisitesDialog({
       onClose={() => {
         if (!saving) onClose();
       }}
-      title={`What does “${concept.title}” need first?`}
-      description="Tick what has to be understood before this makes sense. Adle teaches those first, and comes back to them if this one proves difficult."
+      title={`Prerequisites for “${concept.title}”`}
+      description="Select what you need to understand first. These are taught first, and revisited if this concept proves difficult."
       size="medium"
       dismissible={!saving}
     >
       <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
         {others.length === 0 ? (
-          <p className={styles.muted}>There are no other concepts in this course yet.</p>
+          <p className={styles.muted}>No other concepts yet.</p>
         ) : (
           <ul className={styles.choices} aria-label="Other concepts in this course">
             {others.map((other) => {
@@ -253,7 +253,9 @@ export function PrerequisitesDialog({
                   <Checkbox
                     label={other.title}
                     description={
-                      blocked ? `Builds on “${concept.title}”, so it cannot come first.` : undefined
+                      blocked
+                        ? `Builds on “${concept.title}”, so it can’t be a prerequisite.`
+                        : undefined
                     }
                     checked={checked}
                     disabled={blocked && !checked}
@@ -266,7 +268,7 @@ export function PrerequisitesDialog({
                         hideLabel
                         value={chosen.get(other.id) ?? ''}
                         maxLength={500}
-                        placeholder="Why is it needed? (optional)"
+                        placeholder="Reason (optional)"
                         onChange={(event) =>
                           setChosen((current) => new Map(current).set(other.id, event.target.value))
                         }
@@ -280,7 +282,7 @@ export function PrerequisitesDialog({
         )}
 
         {formError ? (
-          <Callout tone="danger" urgent title="That could not be saved">
+          <Callout tone="danger" urgent title="Couldn’t save that">
             {formError}
           </Callout>
         ) : null}
@@ -340,7 +342,7 @@ export function OutlineDialog({
         if (!saving) onClose();
       }}
       title="Start from your materials"
-      description="These are the headings of what you imported. Keep the ones that are things to learn. Adle does not guess which depends on which; you can say so afterwards."
+      description="Headings from your materials. Keep the ones you want to learn. You can set prerequisites afterwards."
       size="medium"
       dismissible={!saving}
     >

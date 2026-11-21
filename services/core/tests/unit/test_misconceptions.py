@@ -69,7 +69,7 @@ def test_one_answer_is_a_suspicion_not_a_diagnosis() -> None:
     assert hypothesis.suggested == 1
     assert hypothesis.is_open
     assert not hypothesis.blocks_mastery
-    assert "One answer is not enough to say" in hypothesis.describe()
+    assert "will check" in hypothesis.describe()
 
 
 def test_an_independent_second_answer_makes_it_supported() -> None:
@@ -96,7 +96,7 @@ def test_a_question_that_could_have_shown_it_and_did_not_rejects_a_suspicion() -
     hypothesis = fold([wrong(0), right(5)])[KIND]
     assert hypothesis.status is Status.REJECTED
     assert not hypothesis.is_open
-    assert "A later question did not show it" in hypothesis.describe()
+    assert "A later question didn’t show it" in hypothesis.describe()
 
 
 def test_a_right_answer_to_an_unrelated_question_clears_nothing() -> None:
@@ -120,7 +120,7 @@ def test_a_supported_hypothesis_takes_two_clean_answers_to_resolve() -> None:
     resolved = fold([*events, right(15, "q_5")])[KIND]
     assert resolved.status is Status.RESOLVED
     assert not resolved.blocks_mastery
-    assert "show it is sorted" in resolved.describe()
+    assert "show it’s resolved" in resolved.describe()
 
 
 def test_pointing_at_it_again_undoes_progress_towards_resolving_it() -> None:
@@ -148,7 +148,7 @@ def test_the_learner_can_say_it_was_a_slip() -> None:
     dismissed = fold([wrong(0), Dismissal(START + timedelta(minutes=2), KIND)])[KIND]
     assert dismissed.status is Status.REJECTED
     assert dismissed.dismissed_by_learner
-    assert "You said it was a slip" in dismissed.describe()
+    assert "You marked it as a slip" in dismissed.describe()
     # Even a supported one: the learner has the last word, until the answers say otherwise.
     supported = [wrong(0, "q_1"), wrong(5, "q_3"), Dismissal(START + timedelta(minutes=6), KIND)]
     assert fold(supported)[KIND].status is Status.REJECTED
@@ -168,7 +168,7 @@ def test_a_slip_is_noted_and_never_held_against_understanding(kind: str) -> None
     assert hypothesis.status is Status.SUPPORTED
     assert hypothesis.is_slip
     assert not hypothesis.blocks_mastery
-    assert "treated as a slip, not as a gap" in hypothesis.describe()
+    assert "Treated as a slip, not a gap" in hypothesis.describe()
     assert needing_a_check([hypothesis]) == []
 
 

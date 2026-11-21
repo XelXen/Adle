@@ -26,14 +26,14 @@ export function suggestedQuestions(kind: string, unanswered: boolean): string[] 
   if (kind === 'checkpoint') {
     return unanswered
       ? [
-          'Help me get started, without giving the answer.',
+          'Give me a nudge, not the answer.',
           'Which idea is this question about?',
           'Show me a similar example.',
         ]
       : ['Why is that the right answer?', 'Show me a similar example.'];
   }
   return [
-    'Say this more simply.',
+    'Explain this more simply.',
     'Give me an example.',
     'Show the mathematics behind this.',
     'Why is this true?',
@@ -41,25 +41,25 @@ export function suggestedQuestions(kind: string, unanswered: boolean): string[] 
 }
 
 /**
- * Everything a question sends, as a list to put after "Sends to <provider>:".
+ * Everything a question sends, as a list to put between "Sends" and "to <provider>".
  *
  * A promise made before anything is sent. Keep it in step with `ask_request` in the core
  * (`generation/prompts.py`): if the request gains something, it is named here first.
  */
 export function askDisclosure(): string {
   return (
-    "your question, what this part of the lesson says and shows, the lesson's outline, " +
-    "this course's name and this concept, and any related passages from your materials"
+    'your question, this part of the lesson, the lesson outline, the course name, this ' +
+    'concept, and any related passages from your materials'
   );
 }
 
 /** What is wrong with a question as typed, or null if it can be asked. */
 export function questionProblem(text: string): string | null {
   const length = text.trim().length;
-  if (length === 0) return 'Type your question first, or pick one of the suggestions.';
-  if (length < MIN_QUESTION_CHARACTERS) return 'That is too short to be a question.';
+  if (length === 0) return 'Type a question, or pick a suggestion.';
+  if (length < MIN_QUESTION_CHARACTERS) return 'That’s too short to be a question.';
   if (length > MAX_QUESTION_CHARACTERS) {
-    return `Keep it under ${MAX_QUESTION_CHARACTERS} characters: one question at a time.`;
+    return `Keep it under ${MAX_QUESTION_CHARACTERS} characters.`;
   }
   return null;
 }
@@ -80,7 +80,7 @@ export function answeredBy(ask: Pick<Ask, 'written_by'>): string {
   const provider = ask.written_by.provider ?? '';
   const [model, ...others] = ask.written_by.models ?? [];
   if (model !== undefined && others.length === 0 && provider) return `${model} on ${provider}`;
-  return provider || 'a model';
+  return provider || 'AI';
 }
 
 /** The questions asked about one part of a lesson, oldest first. */

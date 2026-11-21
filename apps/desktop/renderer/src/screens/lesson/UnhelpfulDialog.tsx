@@ -58,8 +58,8 @@ export function UnhelpfulDialog({
       });
       toast.show({
         tone: 'info',
-        title: 'Another lesson is being written',
-        description: 'You can follow it here, and it will be suggested when it is ready.',
+        title: 'Writing another lesson',
+        description: 'It’ll be suggested as your next step when it’s ready.',
       });
       navigate({ name: 'course', courseId, tab: 'learn' });
     } catch (error) {
@@ -73,15 +73,15 @@ export function UnhelpfulDialog({
       open
       onClose={onClose}
       dismissible={!creating}
-      title="Thanks for saying so"
+      title="Thanks for the feedback"
       description={
         report === 'failed'
-          ? 'That says something about the explanation, not about you. It could not be noted just now, but everything below still works.'
-          : 'That says something about the explanation, not about you. It has been noted, and what Adle suggests next takes it into account.'
+          ? 'That’s about the explanation, not you. It couldn’t be saved just now, but the options below still work.'
+          : 'That’s about the explanation, not you. Adle will take it into account.'
       }
       actions={
         <Button onClick={onClose} disabled={creating}>
-          Keep going with this lesson
+          Continue this lesson
         </Button>
       }
     >
@@ -89,7 +89,7 @@ export function UnhelpfulDialog({
         {canSkipToQuestion ? (
           <Way
             title="Go straight to the next question"
-            text="Leave the rest of this part and see whether the idea is there already. What you skip stays open."
+            text="Skip the rest of this part and check what you already know."
           >
             <Button icon={<ArrowRight />} disabled={creating} onClick={onSkipToQuestion}>
               Skip to the question
@@ -98,18 +98,18 @@ export function UnhelpfulDialog({
         ) : null}
 
         <Way
-          title="Have it explained another way"
+          title="Try a different explanation"
           text={
             status?.key_configured
               ? 'A new lesson on the same concept, taught differently.'
-              : 'A new lesson on the same concept, taught differently. That needs the AI provider, and no key is set up yet.'
+              : 'A new lesson on the same concept, taught differently. Needs an AI provider key.'
           }
         >
           {status?.key_configured ? (
             <>
               <div className={styles.wayField}>
                 <Select
-                  label="How should it explain?"
+                  label="Teaching style"
                   value={strategy}
                   options={choices}
                   disabled={creating}
@@ -123,30 +123,29 @@ export function UnhelpfulDialog({
                   loading={creating}
                   onClick={() => void create()}
                 >
-                  Create that lesson
+                  Create lesson
                 </Button>
               </div>
               <p className={styles.note}>
-                Sends to {destination(status, 'lesson')}: {lessonDisclosure('unknown')}. It usually
-                takes three of today&rsquo;s requests
-                {usualWait(status, 'lesson') ? `, and ${usualWait(status, 'lesson')}` : ''}.
+                Sends {lessonDisclosure('unknown')} to {destination(status, 'lesson')}.
+                {usualWait(status, 'lesson') ? ` Takes ${usualWait(status, 'lesson')}.` : ''}
               </p>
             </>
           ) : provider.resource.status === 'loading' ? (
             <p className={styles.note} role="status">
-              Checking whether the AI provider is set up…
+              Checking AI provider…
             </p>
           ) : (
             <div>
               <Button icon={<Settings />} onClick={() => navigate({ name: 'settings', tab: 'ai' })}>
-                Set up the AI provider
+                Set up AI provider
               </Button>
             </div>
           )}
           {refusal ? (
             <Callout
               tone={refusal.remedy === 'wait' ? 'warning' : 'danger'}
-              title="The lesson could not be started"
+              title="Couldn’t start the lesson"
               urgent
               actions={
                 refusal.remedy === 'settings' ? (
@@ -163,7 +162,7 @@ export function UnhelpfulDialog({
 
         <Way
           title="Do something else for now"
-          text="See what else is worth doing in this course. Stopping for today is fine too: your place here is saved."
+          text="See what else there is in this course. Your place here is saved."
         >
           <Button
             disabled={creating}

@@ -113,8 +113,7 @@ class QuotaExhaustedError(AdleError):
 
     def __init__(self, resets_at: datetime | None, limit: str | None) -> None:
         super().__init__(
-            "Today's allowance for AI requests is used up. Adle keeps its own count so that "
-            "your key is never the one that runs out. The count starts again at midnight UTC.",
+            "Today’s AI allowance is used up. It resets at midnight UTC.",
             detail={
                 "resets_at": resets_at.isoformat() if resets_at else None,
                 "limit": limit,
@@ -196,6 +195,9 @@ class ModelGateway:
         #: Providers that could not answer, and until when each is asked second. Only
         #: matters when the learner lets Adle use more than one.
         self._providers_resting: dict[str, datetime] = {}
+        #: Counts the keys each provider has had. What a request found out with one key
+        #: is not remembered once there is another.
+        self._key_changes = dict.fromkeys(self._clients, 0)
 
     # -- which provider -------------------------------------------------------
 
@@ -229,7 +231,10 @@ class ModelGateway:
 
     def forget_trouble(self, provider_id: str) -> None:
         """Ask this provider first again. Its key has just been changed: what went wrong
-        with the old one says nothing about the new one."""
+        with the old one says nothing about the new one, including whatever a request
+        that is still out with the old one comes back with."""
+        if provider_id in self._key_changes:
+            self._key_changes[provider_id] += 1
         self._providers_resting.pop(provider_id, None)
 
     def accepts(self, selection: str) -> bool:
@@ -239,7 +244,7 @@ class ModelGateway:
     def select(self, selection: str) -> None:
         """Record the learner's choice. Only ever called because the learner made it."""
         if not self.accepts(selection):
-            raise NotFoundError("Adle does not know that AI provider.")
+            raise NotFoundError("Unknown AI provider.")
         self._vault.select(selection)
         logger.info("provider.selected selection=%s", selection)
 
@@ -345,7 +350,7 @@ class ModelGateway:
         """
         if provider_id is not None:
             if provider_id not in self._clients:
-                raise NotFoundError("Adle does not know that AI provider.")
+                raise NotFoundError("Unknown AI provider.")
             name = self._clients[provider_id].config.display_name
             route = Plan((provider_id,), (name,), automatic=False)
         else:
@@ -356,6 +361,7 @@ class ModelGateway:
         prompt_tokens = estimate_tokens(request.system) + estimate_tokens(request.user)
         for position, client in enumerate(clients):
             config = client.config
+            key_at_start = self._key_changes[config.provider_id]
             try:
                 self._take_turn(config, cancelled, on_busy)
                 try:
@@ -366,7 +372,7 @@ class ModelGateway:
                     self._in_flight[config.provider_id].release()
             except (ProviderError, QuotaExhaustedError) as error:
                 why = _why(error)
-                if why != "spent":
+                if why != "spent" and self._key_changes[config.provider_id] == key_at_start:
                     # Asked second for a while, not dropped: see ``routing``. Remembered
                     # whoever asked, so that a check of a key that failed is not followed
                     # by a question sent the same way.

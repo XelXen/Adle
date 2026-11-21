@@ -1,5 +1,5 @@
 import { ArrowRight, Hand, Settings, Square } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import type { Ask, Job } from '@adle/contracts';
 import { Button, Callout, Dialog, ProgressBar, TextArea } from '@adle/design-system';
@@ -33,6 +33,10 @@ export interface AskDialogProps {
   starting: boolean;
   /** Why it could not be started, or why it failed. */
   failure: JobFailure | null;
+  /** The question was turned away before anything was sent, rather than left unanswered. */
+  refused: boolean;
+  /** Why "Stop" did not work, if it did not. */
+  stopProblem: string | null;
   /** The answer that has just arrived, once it has. */
   answer: Ask | null;
   onAsk: (question: string) => void;
@@ -41,6 +45,8 @@ export interface AskDialogProps {
   onAnother: () => void;
   onClose: () => void;
 }
+
+type View = 'waiting' | 'answer' | 'no-key' | 'form';
 
 /**
  * Asking Adle about the part of the lesson on screen (ADR-024).
@@ -58,6 +64,8 @@ export function AskDialog({
   job,
   starting,
   failure,
+  refused,
+  stopProblem,
   answer,
   onAsk,
   onStop,
@@ -68,9 +76,20 @@ export function AskDialog({
   const provider = useResource('provider-status', () => callCore('provider.status'));
   const [draft, setDraft] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
 
   const status = provider.resource.status === 'ready' ? provider.resource.data : undefined;
   const waiting = starting || isJobActive(job);
+  const noKey = provider.resource.status === 'ready' && !provider.resource.data.key_configured;
+  const view: View = waiting ? 'waiting' : answer ? 'answer' : noKey ? 'no-key' : 'form';
+
+  // Coming back to the form from an answer ("Ask another"), typing starts in the field
+  // again. The dialog itself only places the focus when it opens.
+  const shown = useRef(view);
+  useEffect(() => {
+    if (view === 'form' && shown.current !== 'form') field.current?.focus();
+    shown.current = view;
+  }, [view]);
 
   const submit = (event: FormEvent): void => {
     event.preventDefault();
@@ -79,121 +98,107 @@ export function AskDialog({
     if (!found) onAsk(draft.trim());
   };
 
-  if (waiting) {
-    const progress = job
-      ? jobProgress(job, 'Waiting for its turn')
-      : { value: undefined, message: 'Sending your question' };
-    return (
-      <Dialog
-        open
-        onClose={onClose}
-        title="Your question is being answered"
-        description={partLabel}
-        actions={
-          <>
-            <Button icon={<Square />} disabled={!job} onClick={onStop}>
-              Stop
-            </Button>
-            <Button variant="primary" icon={<ArrowRight />} onClick={onClose}>
-              Carry on with the lesson
-            </Button>
-          </>
-        }
-      >
-        <div className={styles.askBody}>
-          <ProgressBar label={progress.message} showLabel value={progress.value} />
-          <p className={styles.note}>
-            You do not have to wait here. The answer will appear beside this part of the lesson when
-            it arrives.
-          </p>
-        </div>
-      </Dialog>
-    );
-  }
+  let title: string;
+  let actions: ReactNode;
+  let body: ReactNode;
 
-  if (answer) {
-    return (
-      <Dialog
-        open
-        onClose={onClose}
-        title="An answer to your question"
-        description={partLabel}
-        actions={
-          <>
-            <Button onClick={onAnother}>Ask something else</Button>
-            <Button variant="primary" icon={<ArrowRight />} onClick={onClose}>
-              Back to the lesson
-            </Button>
-          </>
-        }
-      >
-        <AskNote ask={answer} />
-      </Dialog>
+  if (view === 'waiting') {
+    const progress = job ? jobProgress(job, 'Queued') : { value: undefined, message: 'Sending' };
+    title = 'Answering your question';
+    actions = (
+      <>
+        <Button icon={<Square />} disabled={!job} onClick={onStop}>
+          Stop
+        </Button>
+        <Button variant="primary" icon={<ArrowRight />} onClick={onClose}>
+          Continue lesson
+        </Button>
+      </>
     );
-  }
-
-  if (provider.resource.status === 'ready' && !provider.resource.data.key_configured) {
-    return (
-      <Dialog
-        open
-        onClose={onClose}
-        title="Ask about this part"
-        description={partLabel}
-        actions={
-          <>
-            <Button onClick={onClose}>Back to the lesson</Button>
-            <Button
-              variant="primary"
-              icon={<Settings />}
-              onClick={() => navigate({ name: 'settings', tab: 'ai' })}
-            >
-              Set up the AI provider
-            </Button>
-          </>
-        }
-      >
-        <p className={styles.askLead}>
-          An answer to a question is written by an AI model, and no key for an AI provider is set up
-          yet. The lesson itself, its pictures, and its questions work without one.
+    body = (
+      <>
+        <ProgressBar label={progress.message} showLabel value={progress.value} />
+        <p className={styles.note}>
+          No need to wait here. The answer will appear next to this part of the lesson.
         </p>
-      </Dialog>
+        {stopProblem ? (
+          <p className={styles.note} role="alert">
+            Couldn’t stop it. {stopProblem}
+          </p>
+        ) : null}
+      </>
     );
-  }
-
-  const suggestions = suggestedQuestions(kind, unanswered);
-  const wait = usualWait(status, 'ask');
-  return (
-    <Dialog
-      open
-      onClose={onClose}
-      title="Ask about this part"
-      description={partLabel}
-      actions={
-        <>
-          <Button onClick={onClose}>Not now</Button>
-          <Button type="submit" form="ask-form" variant="primary" icon={<Hand />}>
-            Ask
-          </Button>
-        </>
-      }
-    >
+  } else if (view === 'answer' && answer) {
+    title = 'Answer';
+    actions = (
+      <>
+        <Button
+          onClick={() => {
+            // A new question starts from an empty field.
+            setDraft('');
+            setProblem(null);
+            onAnother();
+          }}
+        >
+          Ask another
+        </Button>
+        <Button variant="primary" icon={<ArrowRight />} onClick={onClose}>
+          Back to lesson
+        </Button>
+      </>
+    );
+    body = <AskNote ask={answer} />;
+  } else if (view === 'no-key') {
+    title = 'Ask about this part';
+    actions = (
+      <>
+        <Button onClick={onClose}>Back to lesson</Button>
+        <Button
+          variant="primary"
+          icon={<Settings />}
+          onClick={() => navigate({ name: 'settings', tab: 'ai' })}
+        >
+          Set up AI provider
+        </Button>
+      </>
+    );
+    body = (
+      <p className={styles.askLead}>
+        Answers are written by AI, and no provider key is set up yet. The rest of the lesson works
+        without one.
+      </p>
+    );
+  } else {
+    const suggestions = suggestedQuestions(kind, unanswered);
+    const wait = usualWait(status, 'ask');
+    title = 'Ask about this part';
+    actions = (
+      <>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button type="submit" form="ask-form" variant="primary" icon={<Hand />}>
+          Ask
+        </Button>
+      </>
+    );
+    body = (
       <form id="ask-form" className={styles.askBody} onSubmit={submit} noValidate>
         {failure ? (
           <Callout
             tone={failure.remedy === 'wait' ? 'warning' : 'danger'}
-            title="No answer came"
+            title={refused ? 'Couldn’t ask that' : 'Couldn’t get an answer'}
             urgent
           >
             {failure.message}
           </Callout>
         ) : null}
         {unanswered ? (
-          <Callout tone="info" title="This part is a question for you">
-            Adle will help you think about it, and will not give the answer away. Asking here counts
-            like using the hint: a right answer afterwards counts for a little less.
+          <Callout tone="info" title="You haven’t answered this question yet">
+            You’ll get help thinking it through, not the answer. Like a hint, asking makes a correct
+            answer count a little less.
           </Callout>
         ) : null}
         <TextArea
+          ref={field}
           label="Your question"
           data-autofocus
           rows={3}
@@ -208,7 +213,7 @@ export function AskDialog({
         />
         <div>
           <p className={styles.askHint} id="ask-suggestions">
-            Or ask one of these
+            Or pick one
           </p>
           <ul className={styles.askSuggestions} aria-labelledby="ask-suggestions">
             {suggestions.map((suggestion) => (
@@ -227,11 +232,27 @@ export function AskDialog({
           </ul>
         </div>
         <p className={styles.note}>
-          Sends to {destination(status, 'ask')}: {askDisclosure()}. It uses one of today&rsquo;s
-          requests{wait ? `, and usually takes ${wait}` : ''}. The answer is written by an AI model,
-          and can be wrong.
+          Sends {askDisclosure()} to {destination(status, 'ask')}.{wait ? ` Takes ${wait}.` : ''} AI
+          answers can be wrong.
         </p>
       </form>
+    );
+  }
+
+  return (
+    <Dialog open onClose={onClose} title={title} description={partLabel} actions={actions}>
+      <div className={styles.askBody}>
+        {/* Always here, so that what it comes to say is heard: the dialog changes from
+            waiting to the answer in place, with nothing else to announce it. */}
+        <p className="ad-visually-hidden" role="status">
+          {view === 'waiting'
+            ? 'Answering your question.'
+            : view === 'answer'
+              ? 'The answer has arrived.'
+              : ''}
+        </p>
+        {body}
+      </div>
     </Dialog>
   );
 }
@@ -258,7 +279,7 @@ export function AskNote({ ask }: { ask: Ask }) {
         </p>
       ) : null}
       <p className={styles.askMeta}>
-        Written by {answeredBy(ask)}. A model wrote this, and it can be wrong.
+        Answered by {answeredBy(ask)}. AI can make mistakes.
         {ask.written_by.note ? ` ${ask.written_by.note}` : ''}
       </p>
     </div>

@@ -113,14 +113,14 @@ def schedule(
             return ReviewDecision(NOT_SCHEDULED, None)
         return ReviewDecision(
             NOT_SCHEDULED,
-            "This concept is being worked on again, so its reviews are paused for now.",
+            "You’re working on this concept again, so its reviews are paused.",
         )
 
     if outcome is not Outcome.CORRECT:
         gap = parameters.first_interval_days
         return ReviewDecision(
             ReviewState(interval_days=gap, due_at=now + timedelta(days=gap), streak=0),
-            f"That one slipped, so it comes back {describe_gap(gap)}.",
+            f"That one slipped, so it’ll come back {describe_gap(gap)}.",
         )
 
     planned = state.interval_days
@@ -135,7 +135,7 @@ def schedule(
     elapsed = max(0.0, (now - last_practised).total_seconds() / 86_400)
     if elapsed < planned * parameters.min_elapsed_fraction:
         return ReviewDecision(
-            state, "Practised again before the review was due; the schedule stays as it is."
+            state, "Practised before the review was due. The schedule is unchanged."
         )
 
     assisted = hinted or unsure

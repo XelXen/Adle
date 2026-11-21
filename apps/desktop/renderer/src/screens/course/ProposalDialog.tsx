@@ -67,8 +67,8 @@ export function ProposalDialog({
       title="Suggested concepts"
       description={
         proposal.groundedInMaterials
-          ? `Suggested by ${author} from your course details and the headings of your materials.${standIn} Keep what fits; you can edit, reorder, and remove anything afterwards.`
-          : `Suggested by ${author} from your course details. It did not see any of your materials.${standIn} Keep what fits; you can edit, reorder, and remove anything afterwards.`
+          ? `Suggested by ${author} from your course details and material headings.${standIn} Keep what fits. You can edit everything later.`
+          : `Suggested by ${author} from your course details only.${standIn} Keep what fits. You can edit everything later.`
       }
       size="medium"
       dismissible={busy === null}
@@ -116,7 +116,7 @@ export function ProposalDialog({
                   ) : null}
                   {needs.length > 0 ? (
                     <p className={styles.muted}>
-                      Needs first:{' '}
+                      Prerequisites:{' '}
                       {needs
                         .map((need) => {
                           const title = proposal.concepts[need.index]?.title ?? '';
@@ -128,8 +128,8 @@ export function ProposalDialog({
                   {chosen.has(index) && dropped > 0 ? (
                     <p className={styles.muted}>
                       {dropped === 1
-                        ? 'It builds on a suggestion you have not kept. That link will not be added.'
-                        : 'It builds on suggestions you have not kept. Those links will not be added.'}
+                        ? 'Builds on a suggestion you didn’t keep, so that link won’t be added.'
+                        : 'Builds on suggestions you didn’t keep, so those links won’t be added.'}
                     </p>
                   ) : null}
                 </div>
@@ -151,7 +151,7 @@ export function ProposalDialog({
             disabled={busy === 'add'}
             onClick={() => void run('discard', onDiscard)}
           >
-            Discard suggestions
+            Discard
           </Button>
           <Button onClick={onClose} disabled={busy !== null}>
             Decide later

@@ -45,8 +45,8 @@ export function LoadingState({
 }: Omit<StateMessageProps, 'actions'>) {
   return (
     <div className={cx(styles.state, className)} role="status">
-      <div className={styles.visual}>
-        <Spinner size="large" />
+      <div className={styles.visual} aria-hidden="true">
+        <Spinner size="medium" />
       </div>
       <p className={styles.title}>{title}</p>
       {description ? <p className={styles.description}>{description}</p> : null}

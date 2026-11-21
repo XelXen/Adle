@@ -37,7 +37,7 @@ function Group({ title, lines }: { title: string; lines: Line[] }) {
           </li>
         ))}
         {more > 0 ? (
-          <li className={styles.more}>and {more} more, listed under &ldquo;Where you are&rdquo;</li>
+          <li className={styles.more}>and {more} more, listed under “Your progress”</li>
         ) : null}
       </ul>
     </div>
@@ -58,7 +58,7 @@ export function SessionSummary({ session }: { session: Session }) {
       <p className={styles.counts}>{sessionCounts(session)}</p>
       <div className={styles.groups}>
         <Group
-          title="What you showed"
+          title="What you got right"
           lines={session.shown.map((line) => ({
             key: line.concept_id,
             title: line.title,
@@ -66,7 +66,7 @@ export function SessionSummary({ session }: { session: Session }) {
           }))}
         />
         <Group
-          title="Needs more evidence"
+          title="Still in progress"
           lines={session.still_needed.map((line) => ({
             key: line.concept_id,
             title: line.title,
@@ -75,7 +75,7 @@ export function SessionSummary({ session }: { session: Session }) {
           }))}
         />
         <Group
-          title="Planned review"
+          title="Upcoming reviews"
           lines={session.reviews.map((line) => ({
             key: line.concept_id,
             title: line.title,

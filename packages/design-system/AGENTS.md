@@ -21,12 +21,28 @@ Read the root `AGENTS.md` and `DESIGN_SYSTEM.md` first.
   page). A new text colour needs a contrast pair on each ground it is used on.
 - **Teal is for the filled action and for selection.** Do not use it to decorate, and do not
   mark importance with a coloured edge.
-- The `scene-*` tokens are frozen: scene files have those values written into them. If you
+- **The grounds and the text are neutral** (ADR-027): no tint in any grey, in either theme.
+  The filled action is a deep fill with a white label in both themes; do not bring back a
+  bright fill with dark text for the dark theme.
+- `scene-ink` and `scene-muted` are frozen: scene files have those values written into
+  them. `scene-background` is the player's (`scene-run.ts`) and follows `surface`: change
+  the token, `scene-palette.ts`, the player and the skill together. If you
   change an accent that scenes share (`success`, `sun`, `coral`, `blue`, `violet`), update
   `src/scene-palette.ts` and the palette table in `skills/wanim-scene-authoring/SKILL.md` (a
   test checks the first; you check the second), then `npm run scene-guide`.
 - **One component, one file pair:** `Name.tsx` + `Name.module.css`, exported from `src/index.ts`.
   No one-off variants in screens: extend the component here.
+- **A dialog gives the focus back** to what had it, also when it is taken off the page while
+  open (a dialog with a form in it is mounted only while open). It is dismissed by a press
+  that began and ended on the backdrop, not by a drag that ends there.
+- **Where the window is moved** (ADR-030): `WindowStrip` is a drag region along the top
+  of the page. Anything that can be pressed and may come to lie there says
+  `app-region: no-drag` (the skip link, `Dialog`); the browser cuts those boxes out of the
+  strip. The end-to-end helper that runs axe also fails on a control left under it.
+- **Scroll bars** are styled once, in `base.css`, with the `::-webkit-scrollbar` parts.
+  Setting `scrollbar-width` or `scrollbar-color` anywhere turns those parts off.
+- **A toast is not shown over a modal dialog**: everything behind one is inert and blurred.
+  Say it inside the dialog, or close the dialog first.
 - **Accessibility is part of the component.** Real elements (`button`, `input`, `dialog`), a
   visible label or required `label` prop, keyboard behaviour that follows the WAI-ARIA pattern,
   state exposed with ARIA, visible focus (the global `:focus-visible` ring), and no meaning

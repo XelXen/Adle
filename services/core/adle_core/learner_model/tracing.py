@@ -267,60 +267,59 @@ def _what_happened(observation: Observation) -> str:
     if observation.kind is ObservationKind.SELF_REPORT:
         return {
             SelfReport.NEW: "You said this is new to you.",
-            SelfReport.SOME: "You said you have some familiarity with this.",
+            SelfReport.SOME: "You said you know some of this.",
             SelfReport.CONFIDENT: "You said you already know this well.",
             None: "",
         }[observation.self_report]
 
     if observation.kind is ObservationKind.DISMISSAL:
-        return "You said a suspected mix-up was only a slip, so it has been set aside."
+        return "You marked a suspected mix-up as a slip, so it’s set aside."
 
     question = QUESTION_FORM_LABELS.get(observation.question_form or "", "a question")
     if observation.is_transfer:
         question += " that applied the idea to a new situation"
     if observation.outcome is Outcome.SKIPPED:
-        return "You skipped a question. Skipping is not counted either way."
+        return "You skipped a question. Skips don’t count either way."
     if observation.outcome is Outcome.CORRECT:
         if observation.repeated:
             return (
-                f"You answered {question} correctly. You had seen its explanation a short "
-                "while ago, so it counts as lighter evidence."
+                f"You answered {question} correctly. You’d just seen its explanation, so it "
+                "counts a little less."
             )
         if observation.hinted:
-            return (
-                f"You answered {question} correctly after a hint, which counts as lighter evidence."
-            )
+            return f"You answered {question} correctly after a hint, which counts a little less."
         if observation.unsure and observation.question_form == SELF_MARKED_FORM:
             # Nobody said they were unsure: the answer was the learner's own judgement.
             return (
-                "You judged that your own explanation covered the points. An answer you "
-                "mark yourself counts as lighter evidence."
+                "You marked your own explanation as covering the points. Self-marked answers "
+                "count a little less."
             )
         if observation.unsure:
             return (
-                f"You answered {question} correctly but said you were unsure, "
-                "which counts as lighter evidence."
+                f"You answered {question} correctly but weren’t sure, which counts a little less."
             )
         return f"You answered {question} correctly."
     if observation.outcome is Outcome.PARTIAL:
         return f"Your answer to {question} was partly right."
     if observation.slip:
         return (
-            f"Your answer to {question} was not right, but it looks like a slip rather than "
-            "a gap in understanding. It counts as partly right."
+            f"Your answer to {question} wasn’t right, but it looks like a slip, not a gap. It "
+            "counts as partly right."
         )
-    return f"Your answer to {question} was not right yet."
+    return f"Your answer to {question} wasn’t right."
 
 
 def _what_it_means(state_before: MasteryState, assessment: Assessment) -> str:
     label = STATE_LABELS[assessment.state]
     if assessment.state is MasteryState.DEMONSTRATED:
         if state_before is MasteryState.DEMONSTRATED:
-            return f"Still: {label}."
-        return f"Now: {label}. Adle will check again later to see that it has stuck."
+            return f"Still {label.lower()}."
+        return f"Now: {label}. A review later will check that it stuck."
     still_needed = "; ".join(assessment.missing)
-    lead = "Still" if state_before is assessment.state else "Now"
-    return f"{lead}: {label}. Still needed: {still_needed}."
+    if state_before is assessment.state:
+        # The state is beside this sentence wherever it is shown: only what is left is news.
+        return f"Still needed: {still_needed}."
+    return f"Now: {label}. Still needed: {still_needed}."
 
 
 def apply(

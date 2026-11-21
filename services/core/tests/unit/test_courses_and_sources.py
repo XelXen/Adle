@@ -395,3 +395,36 @@ def test_the_import_route_is_internal(services: Services) -> None:
         for method, operation in methods.items():
             if "paths" in str(operation.get("requestBody", "")) or path.endswith("/import"):
                 assert operation.get("x-adle-internal") is True, (method, path)
+
+
+def test_a_file_far_past_the_limit_is_refused_before_any_of_it_is_read(
+    client: TestClient, services: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Whether a file is here already is found by reading all of it: not worth gigabytes."""
+    import dataclasses
+
+    from adle_core.application import sources as sources_module
+
+    read: list[Path] = []
+    hash_file = sources_module.hash_file
+
+    def recorded(path: Path) -> tuple[str, int]:
+        read.append(path)
+        return hash_file(path)
+
+    monkeypatch.setattr(sources_module, "hash_file", recorded)
+    monkeypatch.setattr(
+        services.sources,
+        "_limits",
+        dataclasses.replace(services.sources._limits, max_file_bytes=1000),
+    )
+    course = create_course(client)
+    job = import_files(client, services, course["id"], "lecture-notes.pdf", "study-notes.txt")
+    result = outcomes(job)
+
+    assert result["lecture-notes.pdf"]["outcome"] == "rejected"
+    assert result["lecture-notes.pdf"]["error_code"] == "file_too_large"
+    assert "Split it into smaller parts" in result["lecture-notes.pdf"]["message"]
+    # The small file beside it was read and imported; the large one was never opened.
+    assert result["study-notes.txt"]["outcome"] == "imported"
+    assert [path.name for path in read] == ["study-notes.txt"]

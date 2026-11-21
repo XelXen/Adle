@@ -207,6 +207,14 @@ export async function waitForCore(page: Page): Promise<void> {
     .toBe('ready');
 }
 
+/**
+ * The page itself knows the core is ready. It draws nothing to say so while all is well
+ * (see `CoreStatusIndicator`), so this reads what it wrote on the document.
+ */
+export async function expectReadyOnPage(page: Page): Promise<void> {
+  await expect(page.locator('html[data-core="ready"]')).toHaveCount(1, { timeout: 30_000 });
+}
+
 /** Every regular file under `directory`, recursively. */
 export function listFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

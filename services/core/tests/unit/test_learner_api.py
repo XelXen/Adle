@@ -150,8 +150,8 @@ def test_saying_you_know_a_concept_is_recorded_as_a_claim_to_check(client: TestC
     evidence = response.json()
     assert evidence["knowledge"] == {
         "state": "needs_evidence",
-        "label": "Needs more evidence",
-        "missing": ["a few answered questions to confirm what you already know"],
+        "label": "Nearly there",
+        "missing": ["a few questions to confirm what you know"],
         "answered": 0,
         "self_report": "confident",
         "review_due_at": None,
@@ -163,7 +163,7 @@ def test_saying_you_know_a_concept_is_recorded_as_a_claim_to_check(client: TestC
 
     # The curriculum shows the same state.
     shown = client.get(f"/v1/courses/{concept['course_id']}/curriculum").json()["concepts"][0]
-    assert shown["knowledge"]["label"] == "Needs more evidence"
+    assert shown["knowledge"]["label"] == "Nearly there"
 
 
 def test_a_later_self_rating_is_added_to_the_record_not_written_over_it(client: TestClient) -> None:
@@ -232,7 +232,7 @@ def test_evidence_moves_a_concept_through_the_states_with_reasons(
 
     evidence = client.get(f"/v1/concepts/{concept['id']}/evidence").json()
     assert evidence["knowledge"]["state"] == "demonstrated"
-    assert evidence["knowledge"]["label"] == "Demonstrated for now"
+    assert evidence["knowledge"]["label"] == "Understood"
     assert evidence["knowledge"]["missing"] == []
     assert evidence["knowledge"]["answered"] == 3
     assert evidence["knowledge"]["review_due_at"] is not None
@@ -245,7 +245,7 @@ def test_evidence_moves_a_concept_through_the_states_with_reasons(
     ]
     for earlier, later in itertools.pairwise(history):
         assert later["state_before"] == earlier["state_after"]
-    assert "Now: Demonstrated for now." in history[-1]["explanation"]
+    assert "Now: Understood." in history[-1]["explanation"]
 
 
 def test_one_answer_never_marks_a_concept_as_demonstrated(

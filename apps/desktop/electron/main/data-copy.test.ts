@@ -67,7 +67,7 @@ describe('parseSavePath', () => {
   ])('refuses a place inside %s', (_label, chosen) => {
     const parsed = parseSavePath(chosen, dataDir);
     expect(parsed.ok).toBe(false);
-    expect(parsed).toHaveProperty('message', "Choose a place outside Adle's own data folder.");
+    expect(parsed).toHaveProperty('message', 'Choose a place outside Adle’s own data folder.');
   });
 
   it.each([
@@ -80,7 +80,7 @@ describe('parseSavePath', () => {
     ['a list', [absolute('copy.adle')]],
   ])('refuses %s without repeating it', (_label, chosen) => {
     const parsed = parseSavePath(chosen, dataDir);
-    expect(parsed).toEqual({ ok: false, message: 'That file name cannot be used.' });
+    expect(parsed).toEqual({ ok: false, message: 'That file name can’t be used.' });
   });
 });
 
@@ -112,7 +112,7 @@ describe('parseRestorePath', () => {
     ['a number', 7],
     ['nothing', null],
   ])('refuses %s', (_label, chosen) => {
-    expect(parseRestorePath(chosen)).toEqual({ ok: false, message: 'That file cannot be used.' });
+    expect(parseRestorePath(chosen)).toEqual({ ok: false, message: 'That file can’t be used.' });
   });
 });
 

@@ -51,7 +51,7 @@ export function buildAnswer(question: PlayerQuestion, draft: AnswerDraft): Built
     case 'multiple_choice':
     case 'prediction':
       return draft.choice === null
-        ? { ok: false, message: 'Choose one of the options first.' }
+        ? { ok: false, message: 'Choose an option first.' }
         : { ok: true, body: { option_id: draft.choice } };
     case 'true_false':
       return draft.choice === null

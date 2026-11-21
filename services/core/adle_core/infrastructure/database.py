@@ -127,6 +127,9 @@ def create_database_engine(path: Path, *, read_only: bool = False) -> Engine:
         URL.create("sqlite", database=path.as_posix()),
         # Request handlers run in a thread pool and jobs in a worker thread.
         connect_args={"check_same_thread": False, "timeout": BUSY_TIMEOUT_MS / 1000},
+        # An error from the database names the statement and never its values: those are
+        # the learner's documents, questions, and answers, and an error may be logged.
+        hide_parameters=True,
     )
     event.listen(engine, "connect", _configure_reader if read_only else _configure_connection)
     event.listen(engine, "begin", _begin_for_reading if read_only else _begin_for_writing)

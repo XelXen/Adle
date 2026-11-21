@@ -32,8 +32,8 @@ const ANSWER_STARTS = 'A weight says how much one input counts.';
 const continueButton = (page: Page) => page.getByRole('button', { name: 'Continue', exact: true });
 const askButton = (page: Page) => page.getByRole('button', { name: 'Ask a question' });
 const askDialog = (page: Page) => page.getByRole('dialog', { name: 'Ask about this part' });
-const answerDialog = (page: Page) =>
-  page.getByRole('dialog', { name: 'An answer to your question' });
+// Exactly: "Answering your question" is the dialog before this one.
+const answerDialog = (page: Page) => page.getByRole('dialog', { name: 'Answer', exact: true });
 const kept = (page: Page) => page.getByRole('region', { name: 'Your questions about this part' });
 
 interface Session {
@@ -103,11 +103,10 @@ test.describe('asking a question during a lesson', () => {
     await expect(dialog).toContainText('Part 1: Not every input counts the same');
     // What will be sent, and where, is said before anything is.
     await expect(dialog).toContainText(
-      `Sends to ${PROVIDER}: your question, what this part of the lesson says and shows, ` +
-        "the lesson's outline, this course's name and this concept, and any related " +
-        'passages from your materials. It uses one of',
+      'Sends your question, this part of the lesson, the lesson outline, the course name, ' +
+        `this concept, and any related passages from your materials to ${PROVIDER}.`,
     );
-    await expect(dialog).toContainText('The answer is written by an AI model, and can be wrong.');
+    await expect(dialog).toContainText('AI answers can be wrong.');
     expect(provider.requests).toHaveLength(0);
     // The lesson waits while the learner asks.
     await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
@@ -116,7 +115,7 @@ test.describe('asking a question during a lesson', () => {
 
     // ---- An empty question is not sent ----
     await dialog.getByRole('button', { name: 'Ask', exact: true }).click();
-    await expect(dialog.getByRole('alert')).toContainText('Type your question first');
+    await expect(dialog.getByRole('alert')).toContainText('Type a question');
     expect(provider.requests).toHaveLength(0);
 
     // ---- A question in the learner's own words ----
@@ -129,7 +128,7 @@ test.describe('asking a question during a lesson', () => {
     // Mathematics in an answer is typeset like the lesson's own.
     await expect(answer.locator('.katex').first()).toBeVisible();
     await expect(answer).toContainText(
-      `Written by Coding Kimi K3 (free) on ${PROVIDER}. A model wrote this, and it can be wrong.`,
+      `Answered by Coding Kimi K3 (free) on ${PROVIDER}. AI can make mistakes.`,
     );
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'ask-answer');
@@ -145,7 +144,7 @@ test.describe('asking a question during a lesson', () => {
     expect(sent.prompt).not.toContain(KEY);
 
     // ---- Back in the lesson, the answer is kept beside the part ----
-    await answer.getByRole('button', { name: 'Back to the lesson' }).click();
+    await answer.getByRole('button', { name: 'Back to lesson' }).click();
     await expect(answer).toBeHidden();
     const toggle = page.getByRole('button', { name: 'Your questions about this part (1)' });
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -157,11 +156,11 @@ test.describe('asking a question during a lesson', () => {
 
     // ---- A ready-made question: the usual ways of having something explained again ----
     await askButton(page).click();
-    await expect(askDialog(page).getByRole('list')).toContainText('Say this more simply.');
+    await expect(askDialog(page).getByRole('list')).toContainText('Explain this more simply.');
     await askDialog(page).getByRole('button', { name: 'Give me an example.' }).click();
     await expect(answerDialog(page)).toContainText('Give me an example.', { timeout: 30_000 });
     expect(provider.requests.at(-1)?.prompt).toContain('Give me an example.');
-    await answerDialog(page).getByRole('button', { name: 'Back to the lesson' }).click();
+    await answerDialog(page).getByRole('button', { name: 'Back to lesson' }).click();
     await expect(
       page.getByRole('button', { name: 'Your questions about this part (2)' }),
     ).toBeVisible();
@@ -172,7 +171,7 @@ test.describe('asking a question during a lesson', () => {
     await kept(page)
       .getByRole('listitem')
       .filter({ hasText: 'Give me an example.' })
-      .getByRole('button', { name: 'Remove this question and its answer' })
+      .getByRole('button', { name: 'Remove question' })
       .click();
     await expect(
       page.getByRole('button', { name: 'Your questions about this part (1)' }),
@@ -232,18 +231,16 @@ test.describe('asking a question during a lesson', () => {
     // ---- The learner is told, before asking, what asking here means ----
     await askButton(page).click();
     const dialog = askDialog(page);
-    await expect(dialog).toContainText('This part is a question for you');
+    await expect(dialog).toContainText('You haven’t answered this question yet');
     await expect(dialog).toContainText(
-      'Adle will help you think about it, and will not give the answer away. Asking here ' +
-        'counts like using the hint',
+      'You’ll get help thinking it through, not the answer. Like a hint, asking makes a ' +
+        'correct answer count a little less.',
     );
     // Nothing offered asks for the answer.
     await expect(dialog.getByRole('list')).not.toContainText(/right answer|which option/i);
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'ask-about-a-question');
-    await dialog
-      .getByRole('button', { name: 'Help me get started, without giving the answer.' })
-      .click();
+    await dialog.getByRole('button', { name: 'Give me a nudge, not the answer.' }).click();
     await expect(answerDialog(page)).toBeVisible({ timeout: 30_000 });
 
     // ---- What was sent has the question and its choices, and nothing that settles it ----
@@ -257,7 +254,7 @@ test.describe('asking a question during a lesson', () => {
     expect(prompt).not.toContain('Influence comes from the weight');
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'ask-answer-dark');
-    await answerDialog(page).getByRole('button', { name: 'Back to the lesson' }).click();
+    await answerDialog(page).getByRole('button', { name: 'Back to lesson' }).click();
 
     // ---- The answer the learner then gives is theirs, recorded as an aided one ----
     const question = page.locator('form');
@@ -270,15 +267,15 @@ test.describe('asking a question during a lesson', () => {
 
     // ---- Asking afterwards is curiosity: the next answer counts in full ----
     await askButton(page).click();
-    await expect(askDialog(page)).not.toContainText('This part is a question for you');
+    await expect(askDialog(page)).not.toContainText('You haven’t answered this question yet');
     await askDialog(page).getByRole('button', { name: 'Why is that the right answer?' }).click();
     await expect(answerDialog(page)).toBeVisible({ timeout: 30_000 });
     expect(provider.requests.at(-1)!.prompt).toContain('they have answered it');
-    await answerDialog(page).getByRole('button', { name: 'Back to the lesson' }).click();
+    await answerDialog(page).getByRole('button', { name: 'Back to lesson' }).click();
     await continueButton(page).click();
     await continueButton(page).click();
     await expect(page.getByText('Part 6 of 10')).toBeVisible();
-    await page.locator('form').getByRole('button', { name: 'Skip this question' }).click();
+    await page.locator('form').getByRole('button', { name: 'Skip question' }).click();
     expect(aidedAnswers(profileDir)[0]).toBe(true);
 
     expect(adle.problems).toEqual([]);
@@ -297,13 +294,13 @@ test.describe('asking a question during a lesson', () => {
     await askButton(page).click();
     await askDialog(page).getByRole('textbox', { name: 'Your question' }).fill(QUESTION);
     await askDialog(page).getByRole('button', { name: 'Ask', exact: true }).click();
-    const waiting = page.getByRole('dialog', { name: 'Your question is being answered' });
+    const waiting = page.getByRole('dialog', { name: 'Answering your question' });
     await expect(waiting).toBeVisible();
-    await expect(waiting).toContainText('You do not have to wait here.');
+    await expect(waiting).toContainText('No need to wait here.');
     await expect(waiting.getByRole('progressbar')).toBeVisible();
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'ask-waiting');
-    await waiting.getByRole('button', { name: 'Carry on with the lesson' }).click();
+    await waiting.getByRole('button', { name: 'Continue lesson' }).click();
     await expect(waiting).toBeHidden();
     // The lesson is theirs again, and the control says an answer is on its way.
     await expect(page.getByRole('button', { name: 'Answering' })).toBeVisible();
@@ -313,16 +310,16 @@ test.describe('asking a question during a lesson', () => {
     // ---- It arrives while they are on another part, and in another window ----
     await adle.setFocused(false);
     provider.release();
-    const told = page.getByRole('status').filter({ hasText: 'Your question has an answer' });
+    const told = page.getByRole('status').filter({ hasText: 'Your answer is ready' });
     await expect(told).toBeVisible({ timeout: 30_000 });
-    await expect(told).toContainText('It is beside part 1 of this lesson.');
+    await expect(told).toContainText('See part 1 of this lesson.');
     // The computer says so too, in fixed words with nothing of the lesson in them.
     await expect
       .poll(() => adle.notices())
       .toEqual([
         {
-          title: 'Your question has an answer',
-          body: 'It is beside the part of the lesson you asked about.',
+          title: 'Your answer is ready',
+          body: 'It’s next to the part of the lesson you asked about.',
         },
       ]);
     await adle.setFocused(true);
@@ -333,12 +330,12 @@ test.describe('asking a question during a lesson', () => {
     // ---- Stopping a question that is taking too long: nothing is kept ----
     provider.queue(HANG);
     await askButton(page).click();
-    await askDialog(page).getByRole('button', { name: 'Say this more simply.' }).click();
-    const again = page.getByRole('dialog', { name: 'Your question is being answered' });
+    await askDialog(page).getByRole('button', { name: 'Explain this more simply.' }).click();
+    const again = page.getByRole('dialog', { name: 'Answering your question' });
     await expect(again).toBeVisible();
     await again.getByRole('button', { name: 'Stop' }).click();
     await expect(askDialog(page)).toBeVisible({ timeout: 30_000 });
-    await askDialog(page).getByRole('button', { name: 'Not now' }).click();
+    await askDialog(page).getByRole('button', { name: 'Cancel' }).click();
     await expect(
       page.getByRole('button', { name: 'Your questions about this part (1)' }),
     ).toBeVisible();
@@ -348,11 +345,11 @@ test.describe('asking a question during a lesson', () => {
     await askButton(page).click();
     await askDialog(page).getByRole('button', { name: 'Give me an example.' }).click();
     await expect(
-      askDialog(page).getByRole('alert').filter({ hasText: 'No answer came' }),
+      askDialog(page).getByRole('alert').filter({ hasText: 'Couldn’t get an answer' }),
     ).toBeVisible({
       timeout: 30_000,
     });
-    await askDialog(page).getByRole('button', { name: 'Not now' }).click();
+    await askDialog(page).getByRole('button', { name: 'Cancel' }).click();
     await expect(
       page.getByRole('button', { name: 'Your questions about this part (1)' }),
     ).toBeVisible();
@@ -369,13 +366,11 @@ test.describe('asking a question during a lesson', () => {
 
     await askButton(page).click();
     const dialog = askDialog(page);
-    await expect(dialog).toContainText('no key for an AI provider is set up yet');
-    await expect(dialog).toContainText(
-      'The lesson itself, its pictures, and its questions work without one.',
-    );
+    await expect(dialog).toContainText('no provider key is set up yet');
+    await expect(dialog).toContainText('The rest of the lesson works without one.');
     await expect(dialog.getByRole('textbox')).toHaveCount(0);
     await expectNoAccessibilityViolations(page);
-    await dialog.getByRole('button', { name: 'Back to the lesson' }).click();
+    await dialog.getByRole('button', { name: 'Back to lesson' }).click();
     await expect(dialog).toBeHidden();
     await expect(continueButton(page)).toBeEnabled();
     expect(provider.requests).toHaveLength(0);

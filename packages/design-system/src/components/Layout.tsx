@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react';
+import { type ComponentProps, type ReactNode, useEffect } from 'react';
 
 import { cx } from '../cx';
 import styles from './Layout.module.css';
@@ -24,6 +24,13 @@ export interface AppShellProps {
  * region set into it as a panel.
  */
 export function AppShell({ brand, navigation, footer, focus = false, children }: AppShellProps) {
+  // Said on the document, so that what lies outside the shell (toasts) can keep clear of
+  // the controls such a screen puts along its foot.
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-ad-focus', focus);
+    return () => document.documentElement.removeAttribute('data-ad-focus');
+  }, [focus]);
+
   return (
     <div className={cx(styles.shell, focus && styles.focus)}>
       <a className={styles.skipLink} href="#ad-main">
@@ -45,16 +52,36 @@ export function AppShell({ brand, navigation, footer, focus = false, children }:
   );
 }
 
+/**
+ * The strip along the top that the window is moved by, where the app has a title bar of
+ * its own (ADR-030). Rendered once, above every screen. It has no height unless the page
+ * was told the window has no title bar of the operating system's (`data-ad-titlebar` on
+ * the document), so it is harmless anywhere else.
+ */
+export function WindowStrip() {
+  return <div className={styles.windowStrip} aria-hidden="true" />;
+}
+
 export interface NavSectionProps {
   /** What the items in this group are, e.g. "Courses". */
   label: string;
+  /**
+   * Keep the group when the rail narrows to icons. For items that say something by their
+   * icon alone (work in progress); a list of names is left out there, as it would say
+   * nothing.
+   */
+  keepWhenNarrow?: boolean;
   children: ReactNode;
 }
 
 /** A labelled group of destinations in the rail, below the primary ones. */
-export function NavSection({ label, children }: NavSectionProps) {
+export function NavSection({ label, keepWhenNarrow = false, children }: NavSectionProps) {
   return (
-    <div className={styles.navSection} role="group" aria-label={label}>
+    <div
+      className={cx(styles.navSection, keepWhenNarrow && styles.navSectionKept)}
+      role="group"
+      aria-label={label}
+    >
       <span className={styles.navSectionLabel} aria-hidden="true">
         {label}
       </span>

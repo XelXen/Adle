@@ -17,19 +17,19 @@ export interface Notice {
 const NOTICES: Record<NoticeKind, Notice> = {
   lesson_ready: {
     title: 'Your lesson is ready',
-    body: 'Adle has finished writing it.',
+    body: 'Open Adle to start it.',
   },
   concepts_ready: {
     title: 'Suggested concepts are ready',
-    body: 'Have a look, and choose what to add.',
+    body: 'Review them and choose what to add.',
   },
   answer_ready: {
-    title: 'Your question has an answer',
-    body: 'It is beside the part of the lesson you asked about.',
+    title: 'Your answer is ready',
+    body: 'It’s next to the part of the lesson you asked about.',
   },
   writing_stopped: {
-    title: 'Adle could not finish what it was writing',
-    body: 'Open Adle to see what happened. Nothing was lost.',
+    title: 'Adle couldn’t finish writing',
+    body: 'Open Adle to see what happened.',
   },
   break_over: {
     title: 'Your break is over',
@@ -59,6 +59,30 @@ export function shouldNotify(state: {
   enabled: boolean;
   supported: boolean;
   focused: boolean;
+  /** One of this kind was shown a moment ago. */
+  justShown?: boolean;
 }): boolean {
-  return state.enabled && state.supported && !state.focused;
+  return state.enabled && state.supported && !state.focused && !state.justShown;
+}
+
+/** One notification of a kind says it; a second within this long says nothing new. */
+export const SAME_NOTICE_AGAIN_AFTER_MS = 10_000;
+
+/**
+ * Remembers when each kind of notification was last shown, so that a page that asks again
+ * and again (by mistake, or on purpose) gets one notification and not a stream of them.
+ */
+export class NoticePace {
+  private readonly shownAt = new Map<NoticeKind, number>();
+
+  constructor(private readonly now: () => number = Date.now) {}
+
+  justShown(kind: NoticeKind): boolean {
+    const last = this.shownAt.get(kind);
+    return last !== undefined && this.now() - last < SAME_NOTICE_AGAIN_AFTER_MS;
+  }
+
+  shown(kind: NoticeKind): void {
+    this.shownAt.set(kind, this.now());
+  }
 }

@@ -1,5 +1,7 @@
 import { type ReactNode, type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
+import { Play } from 'lucide-react';
+
 import { Button, Slider, Spinner, Switch } from '@adle/design-system';
 import type { ControlDescriptor } from '@adle/event-protocol';
 
@@ -38,6 +40,11 @@ export interface ScenePlayerProps {
   onStatusChange?: (status: PlayerStatus) => void;
   onSceneEvent?: (event: SceneEvent) => void;
   onFailure?: (failure: SceneFailure) => void;
+  /**
+   * Given while the scene is waiting to be started: pressing the picture starts it. A
+   * convenience for the pointer; the screen keeps a named, keyboard-operable control.
+   */
+  onStart?: () => void;
   ref?: Ref<ScenePlayerHandle>;
 }
 
@@ -66,6 +73,7 @@ export function ScenePlayer({
   onStatusChange,
   onSceneEvent,
   onFailure,
+  onStart,
   ref,
 }: ScenePlayerProps) {
   const host = useRef<HTMLDivElement>(null);
@@ -118,6 +126,8 @@ export function ScenePlayer({
 
   const failed = status === 'failed';
   const interactive = status === 'interactive' && controls.length > 0;
+  // Loaded, and waiting to be started: the picture has nothing in it yet.
+  const poster = onStart !== undefined && !failed && status !== 'loading';
 
   return (
     <figure className={styles.player} aria-label={title}>
@@ -126,18 +136,34 @@ export function ScenePlayer({
         {status === 'loading' ? (
           <div className={styles.overlay} role="status">
             <Spinner size="large" />
-            <span>Preparing the visualization…</span>
+            <span>Loading animation…</span>
           </div>
+        ) : null}
+        {poster ? (
+          // For the pointer only: the control that starts a lesson, with its name and its
+          // place in the keyboard's order, is the Start button beside the picture.
+          <button
+            type="button"
+            className={styles.poster}
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={onStart}
+          >
+            <span className={styles.posterMark}>
+              <Play />
+            </span>
+            <span className={styles.posterTitle}>{title}</span>
+          </button>
         ) : null}
         {failed ? (
           <div className={styles.fallback}>
             <div className={styles.fallbackBody}>{fallback}</div>
             <div className={styles.fallbackActions}>
               <p className={styles.fallbackNote}>
-                The animation could not be shown, so here is the same idea in words.
+                Couldn’t show the animation. Here’s the same idea in words.
               </p>
               <Button size="small" onClick={() => adapter.current?.reset()}>
-                Try the animation again
+                Retry animation
               </Button>
             </div>
           </div>
@@ -146,12 +172,15 @@ export function ScenePlayer({
 
       {interactive ? (
         <figcaption className={styles.controls}>
-          <p className={styles.controlsHint}>
-            Adjust the controls here or directly on the picture.
-          </p>
+          <p className={styles.controlsHint}>Use these controls, or the ones on the picture.</p>
           <div className={styles.controlGrid}>
             {controls.map((control) => {
-              const label = controlLabels?.[control.name] ?? humanise(control.name);
+              // The name is the scene's: only a label written down for it counts, never
+              // something every object happens to have.
+              const label =
+                controlLabels && Object.hasOwn(controlLabels, control.name)
+                  ? (controlLabels[control.name] ?? humanise(control.name))
+                  : humanise(control.name);
               if (control.kind === 'switch' && typeof control.value === 'boolean') {
                 return (
                   <Switch

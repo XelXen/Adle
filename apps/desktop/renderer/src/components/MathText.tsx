@@ -44,6 +44,9 @@ function Formula({ tex }: { tex: string }) {
         strict: 'ignore',
         trust: false,
         maxExpand: 200,
+        // Nothing a formula asks for may be larger than this many ems: a rule or a
+        // space of any size could otherwise be drawn across the rest of the page.
+        maxSize: 12,
       });
     } catch {
       // Show what was written rather than nothing or an error.

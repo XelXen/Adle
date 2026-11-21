@@ -43,6 +43,57 @@
   font: var(--ad-text-supporting);
 }
 
+/* A scene that has not been started has nothing drawn in it yet. Rather than an empty
+   frame, it says what it is and that it can be played. */
+.poster {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-5);
+  border: 0;
+  background: var(--ad-color-scene-background);
+  color: var(--ad-color-scene-muted);
+  cursor: pointer;
+}
+
+.posterMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: var(--ad-border-width) solid var(--ad-color-border-control);
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-color-surface);
+  color: var(--ad-color-ink);
+  box-shadow: var(--ad-shadow-2);
+  transition:
+    transform var(--ad-duration-fast) var(--ad-ease-out),
+    border-color var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.posterMark svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  /* The triangle's weight sits left of its box. */
+  margin-left: 0.125rem;
+}
+
+.poster:hover .posterMark {
+  border-color: var(--ad-color-primary);
+  transform: scale(1.04);
+}
+
+.posterTitle {
+  max-width: 28rem;
+  font: var(--ad-text-supporting);
+  text-align: center;
+}
+
 .fallback {
   position: absolute;
   inset: 0;

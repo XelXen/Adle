@@ -85,6 +85,15 @@ class IngestionError(AdleError):
         super().__init__(message, code=code)
 
 
+def too_large(ceiling: int) -> IngestionError:
+    """A file over the limit for its kind, in megabytes a learner can act on."""
+    return IngestionError(
+        "file_too_large",
+        f"The file is larger than {ceiling // (1024 * 1024)} MB. "
+        "Split it into smaller parts and import them separately.",
+    )
+
+
 def unsupported_type(detail: str) -> IngestionError:
     return IngestionError(
         "unsupported_type",

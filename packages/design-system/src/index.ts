@@ -54,6 +54,7 @@ export {
   Section,
   type SectionProps,
   Stack,
+  WindowStrip,
   type StackProps,
 } from './components/Layout';
 export { Logo, type LogoProps } from './components/Logo';

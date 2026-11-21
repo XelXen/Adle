@@ -17,6 +17,7 @@ hostile file cannot run code in the service by crafting its answer.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -102,4 +103,35 @@ def extract_isolated(
         raise
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         raise IngestionError("malformed_document", CRASH_MESSAGE) from error
-    raise IngestionError(code[:60], message[:600])
+    raise _refusal(code, message)
+
+
+#: Every reason a parser gives for not reading a file. A reply with any other is not one a
+#: parser of ours wrote.
+_REFUSALS = frozenset(
+    {
+        "empty_document",
+        "encrypted_document",
+        "file_too_large",
+        "file_unreadable",
+        "malformed_document",
+        "scanned_document",
+        "unsupported_type",
+    }
+)
+_MAX_REFUSAL_CHARACTERS = 600
+#: Control characters, and the characters that reorder or hide text.
+_UNPRINTABLE = re.compile("[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]")
+
+
+def _refusal(code: str, message: str) -> IngestionError:
+    """What a worker said about a file it would not read, made fit to show.
+
+    The worker read a file from elsewhere, and what it says is shown to the learner. So
+    its reason must be one a parser has, and its sentence is one plain line of limited
+    length, whatever was sent. Anything else is treated as a worker that broke.
+    """
+    one_line = " ".join(_UNPRINTABLE.sub(" ", message).split())
+    if code not in _REFUSALS or not one_line:
+        return IngestionError("malformed_document", CRASH_MESSAGE)
+    return IngestionError(code, one_line[:_MAX_REFUSAL_CHARACTERS])

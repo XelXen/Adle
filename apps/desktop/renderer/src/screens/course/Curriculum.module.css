@@ -318,9 +318,16 @@
 
 .itemText {
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Where a small icon button would stand, in a row that has none. */
+.itemSpacer {
+  flex: none;
+  width: var(--ad-control-height-small);
 }
 
 .itemTitle {

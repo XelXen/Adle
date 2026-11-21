@@ -56,12 +56,12 @@ export function LearningSettings() {
   const [savingGoal, setSavingGoal] = useState(false);
 
   if (preferences.resource.status === 'loading') {
-    return <LoadingState title="Reading your preferences…" />;
+    return <LoadingState title="Loading preferences…" />;
   }
   if (preferences.resource.status === 'error') {
     return (
       <ErrorState
-        title="Your preferences could not be read"
+        title="Couldn’t load your preferences"
         description={describeError(preferences.resource.error)}
         actions={<Button onClick={preferences.reload}>Try again</Button>}
       />
@@ -81,7 +81,7 @@ export function LearningSettings() {
       preferences.setData(current);
       toast.show({
         tone: 'danger',
-        title: 'That preference could not be saved',
+        title: 'Couldn’t save that preference',
         description: describeError(error),
       });
     }
@@ -98,7 +98,7 @@ export function LearningSettings() {
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'Your goal could not be saved',
+        title: 'Couldn’t save your goal',
         description: describeError(error),
       });
     } finally {
@@ -110,7 +110,7 @@ export function LearningSettings() {
     <Stack gap={6}>
       <Section
         title="Pace and depth"
-        description="Adle uses these when it prepares a lesson. They are a starting point: what you show in your answers still decides when to slow down or move on."
+        description="Used when preparing lessons. Your answers still decide when to slow down or move on."
       >
         <Card>
           <Stack gap={5}>
@@ -151,13 +151,13 @@ export function LearningSettings() {
           <Stack gap={4}>
             <Switch
               label="Narration"
-              description="Read lessons aloud with a voice from this computer. You can still pause, replay, or switch it off inside a lesson."
+              description="Read lessons aloud using a voice on this computer."
               checked={current.narration}
               onCheckedChange={(narration) => void change({ narration })}
             />
             <Switch
               label="Captions"
-              description="Show the words as they are spoken. The full transcript is always available either way."
+              description="Show words as they’re spoken. The transcript is always available."
               checked={current.captions}
               onCheckedChange={(captions) => void change({ captions })}
             />
@@ -170,7 +170,7 @@ export function LearningSettings() {
 
       <Section
         title="Your goal"
-        description="Optional. In your own words, what do you want to be able to do? Adle keeps it in mind when choosing examples."
+        description="Optional. What do you want to be able to do? Adle uses it when choosing examples."
       >
         <Card>
           <Stack gap={3}>

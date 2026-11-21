@@ -5,7 +5,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { NOTICE_KINDS } from '../shared/ipc';
-import { noticeFor, parseNoticeKind, shouldNotify } from './notices';
+import {
+  noticeFor,
+  NoticePace,
+  parseNoticeKind,
+  SAME_NOTICE_AGAIN_AFTER_MS,
+  shouldNotify,
+} from './notices';
 
 describe('parseNoticeKind', () => {
   it('accepts the kinds Adle has words for and nothing else', () => {
@@ -43,11 +49,11 @@ describe('noticeFor', () => {
   it('says what happened without anything of the learner in it', () => {
     expect(noticeFor('lesson_ready')).toEqual({
       title: 'Your lesson is ready',
-      body: 'Adle has finished writing it.',
+      body: 'Open Adle to start it.',
     });
     expect(noticeFor('break_over').title).toBe('Your break is over');
-    // When something could not be finished, it is said calmly, and that nothing is lost.
-    expect(noticeFor('writing_stopped').body).toContain('Nothing was lost');
+    // When something could not be finished, it is said calmly, with where to look.
+    expect(noticeFor('writing_stopped').body).toBe('Open Adle to see what happened.');
   });
 });
 
@@ -62,5 +68,26 @@ describe('shouldNotify', () => {
   it('never speaks when the learner turned notifications off, or the system has none', () => {
     expect(shouldNotify({ ...quiet, enabled: false })).toBe(false);
     expect(shouldNotify({ ...quiet, supported: false })).toBe(false);
+  });
+
+  it('does not say the same thing twice in a row', () => {
+    expect(shouldNotify({ ...quiet, justShown: true })).toBe(false);
+    expect(shouldNotify({ ...quiet, justShown: false })).toBe(true);
+  });
+});
+
+describe('NoticePace', () => {
+  it('lets one notification of a kind through, and the next only after a while', () => {
+    let now = 1_000;
+    const pace = new NoticePace(() => now);
+    expect(pace.justShown('lesson_ready')).toBe(false);
+    pace.shown('lesson_ready');
+    expect(pace.justShown('lesson_ready')).toBe(true);
+    // Another kind is another thing to say.
+    expect(pace.justShown('break_over')).toBe(false);
+    now += SAME_NOTICE_AGAIN_AFTER_MS - 1;
+    expect(pace.justShown('lesson_ready')).toBe(true);
+    now += 1;
+    expect(pace.justShown('lesson_ready')).toBe(false);
   });
 });

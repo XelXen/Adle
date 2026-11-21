@@ -51,14 +51,18 @@ The operation table and the TypeScript types come from the core's OpenAPI docume
 
 ## Startup
 
-1. Main registers the `adle` scheme, applies the saved theme, locks the session down (no network,
-   no permissions, storage cleared), and opens the window on `adle://app/index.html`.
+1. Main registers the `adle` scheme, applies the saved theme, locks the session down (no network
+   by any road, no name lookups, no permissions, storage cleared; ADR-029), and opens the
+   window on `adle://app/index.html`. On Windows and macOS the window has a title bar of the
+   app's own (ADR-030).
 2. The renderer reads app info and UI state through the bridge and shows the welcome screen or the
    library. It is usable immediately.
-3. In parallel, main starts the core (ADR-002). On `ready` it asks the core which providers
-   there are and where, pushes the key stored for each at that address, and then the
-   learner's choice: one provider, or "automatic" (`syncProviders`, ADR-021, ADR-023).
-   Status changes are broadcast to the renderer.
+3. In parallel, main starts the core (ADR-002). When the core says it is up, main first hands
+   it what it needs, as part of starting it: it asks which providers there are and where,
+   pushes the learner's choice (one provider, or "automatic"), and then the key stored for
+   each provider at that address (`syncProviders`, ADR-021, ADR-023, ADR-029). Only then is
+   the core reported as ready; if the choice could not be applied, no key is handed over and
+   the start has failed. Status changes are broadcast to the renderer.
 4. On quit, main closes the core's stdin, waits for it to exit, then quits.
 
 ## Playing a scene
@@ -136,8 +140,8 @@ flowchart LR
 - A course's concepts form a directed graph. Every write is checked first; a change that would
   close a loop is refused with the loop named. Reading validates again and reports problems.
 - What a learner has shown about a concept is a list of observations. The state the interface
-  shows (*Not assessed*, *Building understanding*, *Needs more evidence*, *Demonstrated for
-  now*) is computed from them, with a sentence for each change. The numeric estimate behind it
+  shows (*Not started*, *Learning*, *Nearly there*, *Understood*) is computed from them, with a
+  sentence for each change. The numeric estimate behind it
   never leaves the core. See ADR-009.
 
 ## Taking a lesson

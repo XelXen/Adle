@@ -44,7 +44,7 @@ export function checkMove(
     return { allowed: false, reason: `Needs “${neighbour.title}” first.` };
   }
   if (direction === 'later' && needs(neighbour, concept)) {
-    return { allowed: false, reason: `“${neighbour.title}” needs this first.` };
+    return { allowed: false, reason: `“${neighbour.title}” depends on this.` };
   }
   return { allowed: true };
 }
@@ -240,9 +240,9 @@ function listNames(names: readonly string[]): string {
 /** Advice that tends to apply to many concepts at once is said once, with the names. */
 const GROUPED: Record<string, (count: number, names: string) => string> = {
   no_objective: (count, names) =>
-    `${count} concepts have no learning objective yet: ${names}. Add one to each so there is something to check understanding against.`,
+    `${count} concepts have no learning objective yet: ${names}. Add one to each.`,
   no_source_reference: (count, names) =>
-    `${count} concepts are not linked to anything in your materials: ${names}.`,
+    `${count} concepts aren’t linked to anything in your materials: ${names}.`,
 };
 
 /** The messages to show for a set of issues: one line per problem, repeats folded together. */
@@ -282,7 +282,7 @@ export function lessonsByConcept(lessons: readonly LessonSummary[]): Map<string,
 
 /** What opening a lesson will do, in the words on its button. */
 export function lessonAction(progress: LessonSummary['progress']): string {
-  if (progress.completed) return 'Go through it again';
+  if (progress.completed) return 'Replay lesson';
   return progress.started ? 'Continue' : 'Start lesson';
 }
 

@@ -71,7 +71,7 @@ from adle_core.learner_model.practice import (
 from adle_core.learner_model.sitting import Activity, ConceptNow, Sitting, latest_sitting
 from adle_core.learner_model.tracing import Observation, ObservationKind
 from adle_core.lessons.ir import SCHEMA_VERSION, AssessmentItem, Lesson
-from adle_core.lessons.player import PlayerQuestion, player_question
+from adle_core.lessons.player import ItemMask, PlayerQuestion, player_question
 
 #: How many of a concept's latest answers the policy looks at for "how is it going".
 RECENT_ANSWERS = 8
@@ -306,11 +306,13 @@ class LearningService:
         curriculum: CurriculumService,
         learner: LearnerService,
         credentials: CredentialVault,
+        mask: ItemMask,
     ) -> None:
         self._database = database
         self._curriculum = curriculum
         self._learner = learner
         self._credentials = credentials
+        self._mask = mask
 
     # -- gathering -----------------------------------------------------------
 
@@ -639,11 +641,10 @@ class LearningService:
         waiting = next_fresh_at(picture.pool, moment)
         if not chosen:
             reason = (
-                f'Every question on "{status.title}" was answered in the last few hours. '
-                "Asking again now would only show that you remember the answers."
+                f"You answered every question on “{status.title}” in the last few hours. Asking "
+                "again now would only test your memory of the answers."
                 if picture.pool
-                else f'There are no questions on "{status.title}" yet. '
-                "A lesson on it brings some with it."
+                else f"No questions on “{status.title}” yet. A lesson will add some."
             )
         return PracticeSetRecord(
             course_id=course_id,
@@ -655,7 +656,9 @@ class LearningService:
                 PracticeQuestionRecord(
                     lesson_id=item.lesson_id,
                     question=player_question(
-                        picture.items[(item.lesson_id, item.question_id)], item.lesson_id
+                        picture.items[(item.lesson_id, item.question_id)],
+                        item.lesson_id,
+                        self._mask,
                     ),
                 )
                 for item in chosen

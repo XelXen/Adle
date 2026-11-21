@@ -14,7 +14,7 @@ test.describe('configuring the AI provider', () => {
     await page.getByRole('button', { name: 'Settings' }).click();
 
     const aihubmix = providerCard(page, 'AIHubMix');
-    await expect(aihubmix).toContainText('No key yet');
+    await expect(aihubmix).toContainText('No key');
     const field = page.getByRole('textbox', { name: 'AIHubMix API key' });
     await expect(field).toHaveAttribute('type', 'password');
     await saveProviderKey(page, 'AIHubMix', KEY);
@@ -53,10 +53,10 @@ test.describe('configuring the AI provider', () => {
 
     await second.page.getByRole('button', { name: 'Settings' }).click();
     await providerCard(second.page, 'AIHubMix').getByRole('button', { name: 'Remove key' }).click();
-    const dialog = second.page.getByRole('dialog', { name: 'Remove the saved AIHubMix key?' });
+    const dialog = second.page.getByRole('dialog', { name: 'Remove the AIHubMix key?' });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Remove key' }).click();
-    await expect(providerCard(second.page, 'AIHubMix')).toContainText('No key yet');
+    await expect(providerCard(second.page, 'AIHubMix')).toContainText('No key');
     expect(await second.page.evaluate(() => window.adle!.provider.keyState())).toEqual({
       aihubmix: { stored: false, hint: null },
       nvidia: { stored: false, hint: null },
@@ -73,15 +73,13 @@ test.describe('configuring the AI provider', () => {
     const aihubmix = providerCard(page, 'AIHubMix');
 
     await aihubmix.getByRole('button', { name: 'Save key' }).click();
-    await expect(
-      page.getByRole('alert').filter({ hasText: 'Enter your API key first.' }),
-    ).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: 'Enter a key first.' })).toBeVisible();
 
     await providerKeyField(page, 'AIHubMix').fill('short');
     await aihubmix.getByRole('button', { name: 'Save key' }).click();
     await expect(page.getByRole('alert').filter({ hasText: 'looks too short' })).toBeVisible();
     await expect(providerKeyField(page, 'AIHubMix')).toHaveAttribute('aria-invalid', 'true');
-    await expect(aihubmix).toContainText('No key yet');
+    await expect(aihubmix).toContainText('No key');
     // A mistake made at one provider says nothing at the other.
     await expect(providerKeyField(page, 'NVIDIA NIM')).not.toHaveAttribute('aria-invalid', 'true');
   });
@@ -93,7 +91,7 @@ test.describe('configuring the AI provider', () => {
     await saveProviderKey(page, 'AIHubMix', KEY);
 
     await providerCard(page, 'AIHubMix').getByRole('button', { name: 'Remove key' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Remove the saved AIHubMix key?' });
+    const dialog = page.getByRole('dialog', { name: 'Remove the AIHubMix key?' });
     await expect(dialog).toBeVisible();
     // Focus stays inside the modal while tabbing.
     for (let presses = 0; presses < 6; presses += 1) {

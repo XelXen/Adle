@@ -77,7 +77,7 @@ async function once() {
     await page
       .getByRole('heading', { name: 'Introduction to neural networks', level: 1 })
       .waitFor();
-    await page.getByText('Suggested next step').waitFor();
+    await page.getByText('Up next').first().waitFor();
     marks['Sample course added and its first suggestion shown'] = Math.round(
       performance.now() - from,
     );
@@ -88,9 +88,11 @@ async function once() {
     marks['Lesson opened'] = Math.round(performance.now() - from);
 
     // A live scene, from asking for it to its first frame: the frame is created, the
-    // runtime loads, the scene is compiled, and something is drawn.
+    // runtime loads, the scene is compiled, and something is drawn. A lesson has the whole
+    // window, so the way to Settings is back through the course.
+    await page.getByRole('button', { name: 'Back to course' }).click();
     await page.getByRole('navigation').getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('tab', { name: 'About & diagnostics' }).click();
+    await page.getByRole('tab', { name: 'About', exact: true }).click();
     from = performance.now();
     await page.getByRole('button', { name: 'Run check' }).click();
     await page.getByText('Rendering works').waitFor({ timeout: 60_000 });

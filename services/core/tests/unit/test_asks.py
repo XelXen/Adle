@@ -229,7 +229,7 @@ def test_an_answer_that_cannot_be_used_is_asked_for_once_more_and_then_given_up(
     provider.queue(with_a_link, '{"paragraphs": ["half an answer')
     failed = finished(services, ask(keyed, lesson, explanation))
     assert (failed.status, failed.error_code) == ("failed", "generation_failed")
-    assert "Nothing was kept" in failed.error_message
+    assert "Nothing was saved" in failed.error_message
     assert len(kept(keyed, lesson)) == 1
 
 
@@ -409,7 +409,7 @@ def test_a_question_does_not_wait_behind_a_lesson_that_is_being_written(
             if snapshot.status == "running" and "Waiting for AIHubMix" in waiting:
                 break
             threading.Event().wait(0.02)
-        assert waiting == "Waiting for AIHubMix to finish what it is writing"
+        assert waiting == "Waiting for AIHubMix to finish another request"
         assert services.jobs.get(long_work.json()["id"]).status == "running"
         # A second question about the same lesson waits for the first to be answered.
         again = ask(keyed, lesson, part(lesson, "explanation"), "And the bias?")
@@ -492,3 +492,47 @@ def test_asking_about_another_part_or_after_answering_changes_nothing(
     # Asking about it afterwards is curiosity, not help with an answer already given.
     finished(services, ask(keyed, lesson, checkpoint, "Why is that so?"))
     assert attempts(services) == [("correct", False)]
+
+
+def test_removing_a_note_takes_its_words_and_keeps_that_it_was_asked(
+    keyed: TestClient, services: Services
+) -> None:
+    lesson = a_lesson(keyed, services)
+    checkpoint = part(lesson, "checkpoint", 1)
+    finished(services, ask(keyed, lesson, checkpoint, "Where do I begin?"))
+    (found,) = kept(keyed, lesson)
+    url = f"/v1/lessons/{lesson['lesson_id']}/asks/{found['id']}"
+
+    assert keyed.delete(url).status_code == 204
+    # Gone from what the learner sees and from what the lesson may hold, and gone once.
+    assert kept(keyed, lesson) == []
+    assert services.asks.count(lesson["lesson_id"]) == 0
+    assert keyed.delete(url).status_code == 404
+    # None of the words are left: not the question, not the answer, not who wrote it.
+    with services.database.read() as session:
+        (row,) = session.scalars(select(LessonAsk)).all()
+        assert (row.question, row.answer, row.written_by) == ("", {}, {})
+
+    # The learner still read an answer about this question before answering it.
+    answered = keyed.post(
+        f"/v1/lessons/{lesson['lesson_id']}/questions/{checkpoint['question']['id']}/answer",
+        json={"number": 3},
+    )
+    assert answered.status_code == 200, answered.text
+    assert attempts(services) == [("correct", True)]
+
+
+def test_a_question_that_was_skipped_has_shown_its_explanation_so_it_may_be_discussed(
+    keyed: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    lesson = a_lesson(keyed, services)
+    checkpoint = part(lesson, "checkpoint", 1)
+    skipped = keyed.post(
+        f"/v1/lessons/{lesson['lesson_id']}/questions/{checkpoint['question']['id']}/answer",
+        json={"skipped": True},
+    )
+    assert skipped.status_code == 200, skipped.text
+    finished(services, ask(keyed, lesson, checkpoint, "Why is it not five?"))
+    prompt = provider.prompt()
+    assert "they have answered it" in prompt
+    assert "they have NOT answered it yet" not in prompt

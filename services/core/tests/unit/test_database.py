@@ -852,3 +852,23 @@ def test_removing_a_course_removes_what_the_learner_did_in_it(
         session.delete(session.get(Course, "crs_00000000000000000001"))
     with database.engine.connect() as connection:
         assert connection.execute(text("SELECT count(*) FROM learner_events")).scalar_one() == 0
+
+
+def test_an_error_from_the_database_never_carries_the_values_of_its_statement(
+    tmp_path: Path,
+) -> None:
+    """Those values are the learner's documents, questions, and answers, and errors are logged."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
+
+    database = Database(tmp_path / "adle.db")
+    try:
+        with pytest.raises(SQLAlchemyError) as raised, database.session() as session:
+            session.execute(
+                text("INSERT INTO no_such_table (words) VALUES (:words)"),
+                {"words": "what the learner wrote, word for word"},
+            )
+        assert "word for word" not in str(raised.value)
+        assert "no_such_table" in str(raised.value)
+    finally:
+        database.dispose()

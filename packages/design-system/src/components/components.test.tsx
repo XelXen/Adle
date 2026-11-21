@@ -219,7 +219,7 @@ describe('RadioGroup', () => {
         value="b"
         readOnly
         options={[
-          { value: 'a', label: 'The first input', description: 'The right answer' },
+          { value: 'a', label: 'The first input', description: 'Correct answer' },
           { value: 'b', label: 'The second input', description: 'Your answer' },
         ]}
         onValueChange={onValueChange}
@@ -230,7 +230,7 @@ describe('RadioGroup', () => {
     expect(screen.getByRole('radio', { name: 'The second input' })).toBeChecked();
     // What each option turned out to be is part of what is announced for it.
     expect(screen.getByRole('radio', { name: 'The first input' })).toHaveAccessibleDescription(
-      'The right answer',
+      'Correct answer',
     );
   });
 });
@@ -433,6 +433,61 @@ describe('Dialog', () => {
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it('is dismissed by a press on the backdrop, not by a drag that ends there', () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog open onClose={onClose} title="Ask about this part">
+        <TextField label="Your question" />
+      </Dialog>,
+    );
+    const dialog = screen.getByRole('dialog');
+    const field = screen.getByLabelText('Your question');
+
+    // Selecting what was typed and letting go outside the dialog: the click that follows
+    // lands on the backdrop, but it did not begin there.
+    fireEvent.pointerDown(field);
+    fireEvent.click(dialog);
+    expect(onClose).not.toHaveBeenCalled();
+
+    // A click inside changes nothing either.
+    fireEvent.pointerDown(field);
+    fireEvent.click(field);
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Pressed and released on the backdrop: that is asking for it to go.
+    fireEvent.pointerDown(dialog);
+    fireEvent.click(dialog);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('gives the focus back to what had it, also when it is taken off the page while open', () => {
+    function Asking() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>Ask a question</button>
+          {/* Mounted only while open, as a dialog with a form in it is. */}
+          {open ? (
+            <Dialog open onClose={() => setOpen(false)} title="Ask about this part">
+              <button onClick={() => setOpen(false)}>Done</button>
+            </Dialog>
+          ) : null}
+        </>
+      );
+    }
+    render(<Asking />);
+    const opener = screen.getByRole('button', { name: 'Ask a question' });
+    opener.focus();
+    fireEvent.click(opener);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    // Wherever the focus went inside, it is nowhere once the dialog has gone.
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+  });
 });
 
 describe('Toast', () => {
@@ -511,18 +566,18 @@ describe('status components', () => {
   it('uses the right live-region role for each kind of message', () => {
     render(
       <>
-        <LoadingState title="Reading provider settings…" />
-        <ErrorState title="Provider settings are unavailable" description="Try again." />
+        <LoadingState title="Loading provider settings…" />
+        <ErrorState title="Couldn’t load provider settings" description="Try again." />
         <EmptyState title="No courses yet" description="They will appear here." />
         <Callout tone="danger" urgent title="Import failed">
           The file is encrypted.
         </Callout>
       </>,
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Reading provider settings…');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading provider settings…');
     const alerts = screen.getAllByRole('alert');
     expect(alerts.map((alert) => alert.textContent)).toEqual(
-      expect.arrayContaining([expect.stringContaining('Provider settings are unavailable')]),
+      expect.arrayContaining([expect.stringContaining('Couldn’t load provider settings')]),
     );
     expect(screen.getByRole('heading', { name: 'No courses yet' })).toBeInTheDocument();
   });

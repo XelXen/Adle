@@ -249,7 +249,7 @@ def test_a_fault_at_the_provider_is_not_blamed_on_the_learners_connection() -> N
 
     assert "on its side" in str(at_provider.value)
     assert "connection" not in str(at_provider.value)
-    assert "could not be reached" in str(on_the_way.value)
+    assert "Couldn’t reach the AI provider" in str(on_the_way.value)
     # One code for the interface either way: nothing arrived, try again later.
     assert at_provider.value.code == on_the_way.value.code == "provider_unavailable"
 
@@ -358,3 +358,161 @@ def test_a_request_has_a_total_time_budget_however_steadily_it_drips() -> None:
 
     with pytest.raises(ProviderUnavailableError):
         client_for(lambda request: response, monotonic=clock).complete(REQUEST)
+
+
+# -- a provider that means harm, or is simply broken ------------------------------------
+
+
+class Pieces(httpx.SyncByteStream):
+    """A body that arrives in the pieces given, and says how many were taken and if it was closed."""
+
+    def __init__(self, pieces: Any) -> None:
+        self._pieces = pieces
+        self.taken = 0
+        self.closed = False
+
+    def __iter__(self) -> Any:
+        for piece in self._pieces:
+            self.taken += 1
+            yield piece
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def streamed(body: Pieces, content_type: str = "text/event-stream") -> httpx.Response:
+    return httpx.Response(200, headers={"content-type": content_type}, stream=body)
+
+
+def test_the_answer_is_asked_for_uncompressed() -> None:
+    """A few compressed bytes can unfold into a great many: there is nothing to unfold."""
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return sse(delta("ok", finish="stop"), "[DONE]")
+
+    client_for(handler).complete(REQUEST)
+    assert seen[0].headers["accept-encoding"] == "identity"
+
+
+def test_a_line_that_never_ends_is_cut_off_and_not_kept() -> None:
+    def endless() -> Any:
+        while True:
+            yield b"x" * 65_536
+
+    body = Pieces(endless())
+    with pytest.raises(ProviderBadResponseError):
+        client_for(lambda request: streamed(body)).complete(REQUEST)
+    # About a megabyte was looked at, not the whole of what was on offer.
+    assert body.taken <= 20
+
+
+def test_a_stream_of_nothing_is_cut_off_however_short_its_lines() -> None:
+    def keepalives() -> Any:
+        while True:
+            yield b": keep-alive\n\n" * 4096
+
+    body = Pieces(keepalives())
+    with pytest.raises(ProviderBadResponseError):
+        client_for(lambda request: streamed(body)).complete(REQUEST)
+    assert body.taken < 2000
+
+
+def test_stop_and_the_time_limit_are_asked_while_a_line_is_still_arriving() -> None:
+    def never_a_newline() -> Any:
+        while True:
+            yield b"data: "
+
+    calls = 0
+
+    def cancelled() -> bool:
+        nonlocal calls
+        calls += 1
+        return calls >= 5
+
+    with pytest.raises(RequestCancelledError):
+        client_for(lambda request: streamed(Pieces(never_a_newline()))).complete(
+            REQUEST, cancelled=cancelled
+        )
+
+    now = 0.0
+
+    def clock() -> float:
+        nonlocal now
+        now += 30.0
+        return now
+
+    with pytest.raises(ProviderUnavailableError):
+        client_for(lambda request: streamed(Pieces(never_a_newline())), monotonic=clock).complete(
+            REQUEST
+        )
+
+
+def test_a_document_dripped_slowly_meets_the_same_time_limit_as_a_stream() -> None:
+    def dripping() -> Any:
+        while True:
+            yield b" "
+
+    now = 0.0
+
+    def clock() -> float:
+        nonlocal now
+        now += 30.0
+        return now
+
+    document = streamed(Pieces(dripping()), "application/json")
+    with pytest.raises(ProviderUnavailableError):
+        client_for(lambda request: document, monotonic=clock).complete(REQUEST)
+
+    calls = 0
+
+    def cancelled() -> bool:
+        nonlocal calls
+        calls += 1
+        return calls >= 3
+
+    document = streamed(Pieces(dripping()), "application/json")
+    with pytest.raises(RequestCancelledError):
+        client_for(lambda request: document).complete(REQUEST, cancelled=cancelled)
+
+
+def test_a_line_ending_split_between_two_pieces_is_one_line_ending() -> None:
+    first = json.dumps(delta("one"))
+    second = json.dumps(delta("two", finish="stop"))
+    body = Pieces(
+        [
+            f"data: {first}\r".encode(),
+            f"\n\r\ndata: {second}\r\n\r".encode(),
+            b"\ndata: [DONE]\r\n\r\n",
+        ]
+    )
+    assert client_for(lambda request: streamed(body)).complete(REQUEST).text == "onetwo"
+
+
+def test_stopping_hangs_up_instead_of_leaving_the_answer_to_be_written_for_nobody() -> None:
+    import threading
+
+    reading = threading.Event()
+    hung_up = threading.Event()
+
+    class Silent(httpx.SyncByteStream):
+        """Connected and saying nothing, as a model does while it thinks."""
+
+        def __iter__(self) -> Any:
+            reading.set()
+            hung_up.wait(10)
+            return
+            yield b""  # pragma: no cover
+
+        def close(self) -> None:
+            hung_up.set()
+
+    def cancelled() -> bool:
+        return reading.is_set()
+
+    client = client_for(lambda request: streamed(Silent()))
+    with pytest.raises(RequestCancelledError):
+        client.complete(REQUEST, cancelled=cancelled)
+    # The answer was closed by whoever stopped waiting, not left open until it next spoke.
+    assert hung_up.wait(5)

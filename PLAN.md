@@ -991,7 +991,25 @@ _Last updated: 2026-11-20._
 | M7 — Complete UX/sample course | **Done** (two items left open by decision) | The bundled sample course is complete, with a lesson for each of its eight concepts (nine animated scenes, two interactions, questions tagged with the mistakes their wrong options point at, practice questions). Acceptance so far shown by `test_lessons_api` (the course installs whole, every lesson passes the gateway), `test_scene_policy` (every sample scene passes), `sample-content-math.test.ts` (every formula typesets), `e2e/lesson` (every lesson played from start to finish) and `e2e/scene-player` (every scene run in both themes). Also done: saving a copy of everything, restoring from one, and deleting everything in Settings → Privacy & data (ADR-016), shown by `test_data_copy`, `test_process_lifecycle`, `data.test.ts`, and `e2e/data` (save, delete a course, restore, undo; delete everything). Also done: the session summary on the Learn tab, as the latest sitting read off the record: right answers per concept, what still needs evidence, planned reviews, with the suggested next step as its "Continue" (ADR-017), shown by `test_sitting`, `test_session_summary_api`, and `e2e/learning`. Polish: axe on every outcome of the new screens; focus kept after "That was a slip". **Left open:** narration and animation are synchronised per segment, not per sentence (Wanim's slides mode was not tried); screenshots are saved for review, not compared against baselines. |
 | M8 — Release hardening | **Done as far as one Windows machine allows** | Done: a crashed or hung page, an uncaught error in the main process, and a core that dies are handled with a plain message, a way on, and a local log; nothing is reported anywhere (ADR-018), shown by `recovery.test.ts` and `e2e/recovery` (the page's process is killed for real). Packaging (ADR-019): `npm run package` builds a folder that runs by itself, with a private Python for the core started cut off from the computer it is on, and the binary's fuses set. The whole end-to-end suite passes against the packaged app (`npm run e2e:packaged`), which re-verifies player isolation there; the release build passes a start-up check from outside (`npm run package:check`). Licences are inventoried and checked in every gate (`THIRD_PARTY.md`); `npm audit` and `pip-audit` are clean; timings and sizes are in `PERFORMANCE.md`; `RELEASE_CHECKLIST.md` holds the build steps, the acceptance list with evidence, and the known limitations. **Not done:** an installer and code signing; macOS and Linux; a clean-machine installation; CI has never run (no remote); a generated lesson sat by a person. |
 
+After M8, on 2026-11-20, the owner looked at the app and asked for a review of it. What
+followed is not a milestone of this plan: neutral colours and a near-black dark theme
+(ADR-027), every sentence rewritten short and plain (ADR-028), the findings of a security
+review and a correctness review fixed with a test for each (ADR-029), and a title bar of the
+app's own (ADR-030). Evidence: the gate in `PROJECT_STATE.md`, and in particular
+`test_api_boundary`, `test_prompt_quoting`, `session-hardening.test.ts`,
+`dropped.test.ts`, `e2e/security` and `e2e/appearance-a11y`.
+
 ### Deviations from this plan (each has an ADR)
+
+- **Colours** (section 7): the palette is neutral greys with the mark's teal as the one
+  colour, and a near-black dark theme, not the green-tinted values first listed (ADR-027).
+- **Wording**: mastery is said as Not started, Learning, Nearly there, Understood, and the
+  interface speaks in short, plain sentences with contractions (ADR-028). The rules behind
+  the words are unchanged.
+- **The window** has a title bar of the app's own on Windows and macOS (ADR-030).
+- **Boundaries added after a review** (ADR-029): a gate in front of the core's routes, no
+  network by any road, the provider choice before the keys, names in place of the ids of an
+  ordering question.
 
 - **The design system is a second edition, and no longer "playful" in its chrome.** The owner
   asked for a professional-grade design. A serif sets what is read and a sans what is

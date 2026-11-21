@@ -37,7 +37,7 @@ function concept(id: string, layer: number | null, ...needs: string[]): Concept 
     layer,
     knowledge: {
       state: 'not_assessed',
-      label: 'Not assessed',
+      label: 'Not started',
       missing: [],
       answered: 0,
       self_report: null,
@@ -107,7 +107,7 @@ describe('moving a concept along the path', () => {
     });
     expect(checkMove(PATH, 'activation', 'later')).toEqual({
       allowed: false,
-      reason: '“PERCEPTRON” needs this first.',
+      reason: '“PERCEPTRON” depends on this.',
     });
   });
 
@@ -235,8 +235,8 @@ describe('summariseIssues', () => {
       COURSE.concepts,
     );
     expect(messages).toEqual([
-      '5 concepts have no learning objective yet: WEIGHTS, CHAIN, PERCEPTRON and 2 more. Add one to each so there is something to check understanding against.',
-      '2 concepts are not linked to anything in your materials: WEIGHTS, CHAIN.',
+      '5 concepts have no learning objective yet: WEIGHTS, CHAIN, PERCEPTRON and 2 more. Add one to each.',
+      '2 concepts aren’t linked to anything in your materials: WEIGHTS, CHAIN.',
     ]);
   });
 
@@ -291,7 +291,7 @@ describe('lessons of a concept', () => {
       lessonAction(
         lesson('a', 'weights', { started: true, position: 9, completed: true }).progress,
       ),
-    ).toBe('Go through it again');
+    ).toBe('Replay lesson');
   });
 
   it('says how long a lesson takes and how far the learner has got', () => {

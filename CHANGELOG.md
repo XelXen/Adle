@@ -43,6 +43,21 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Plainer words everywhere.** Shorter sentences, ordinary speech, and nothing about how the
+  app works inside. Progress is now Not started, Learning, Nearly there, and Understood. An
+  answer says who wrote it in one line: "Answered by Kimi K3.1 Pro on NVIDIA NIM. AI can
+  make mistakes."
+- **A darker, neutral dark theme.** Near black, with no green tint, and plain greys in the
+  light theme too. The one filled button is a deep teal with a white label in both.
+- **A title bar of Adle's own** on Windows and macOS: the window's buttons sit on the app's
+  own surface, in its colours, and the system's band above it is gone. The window is moved
+  by the strip along its top.
+- Scroll bars are thin and quiet, without arrows.
+- The side rail no longer says "Local service ready". It only speaks when Adle is starting
+  or something has stopped.
+- A picture that has not started shows a play mark instead of an empty frame; pressing it
+  starts the lesson, like the Start button.
+- Settings → AI provider and Privacy & data say the same things in a third of the space.
 - **A new look throughout.** Titles, lesson text, and questions are set in a serif, and the
   interface around them in a quieter sans: Geist Serif, Geist Sans, and Geist Mono, one
   family. Corners, borders, and shadows are finer; the brand's teal is kept for the one
@@ -54,6 +69,36 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The loading mark sits in the middle of its frame.
+- A question whose answer could not be written is now reported even if you had gone back to
+  the lesson, and "Ask a question" can be opened again while an answer is on its way, to
+  watch it or stop it. A question still being answered when you leave a lesson is picked up
+  when you come back.
+- A lesson or a list of concepts that could not be written is always reported, wherever you
+  are. A break no longer announces a lesson that was ready before the break began.
+- The library no longer says "Not set up" for a moment when a key is saved.
+- At the smallest window size the rail keeps showing what is being written and a running
+  break.
+- Closing a dialog returns you to the button that opened it. Selecting text in a dialog and
+  letting go outside it no longer closes it.
+- A break taken at the end of a lesson returns to the course, not to the lesson's first part.
+- "Your break is over" and "Your lesson is ready" arrive on time while the window is
+  minimised, and a break's end is also said inside the app.
+- Messages no longer appear underneath a dialog or on top of a lesson's controls, and what
+  is said after an answer is scrolled clear of them.
+- Skipping a question shows its explanation, so answering it straight afterwards now counts
+  as an answer with help. So does answering after a question you asked and then removed.
+- Testing a key just after replacing it now tests the new key.
+- A white line at the edge of a picture in the dark theme.
+- A tall dialog no longer reaches under the top edge of the window, where a press on its
+  close button would have moved the window instead. While a dialog is open the top of the
+  window keeps its own look, like the title bar it is.
+- A lesson a model writes is checked for a way of colouring shapes that stopped its picture
+  from running. The model is asked once more with the reason, instead of the picture being
+  lost when the lesson is played.
+- "Try it" is no longer said about a picture that is not there.
+- A concept's lessons line up, whether or not a lesson can be removed.
+- "Up next" is said once on a course's Learn tab, not twice.
 - "Cancel" and "Stop" now take effect at once. They used to wait until the provider next
   sent something, which with a model that thinks before it writes could be minutes.
 - The time a lesson takes is no longer described as "a minute or two".
@@ -167,6 +212,27 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Adle has its logo: the letters "a" and "d" as two linked rings. It appears in the app, in the
   window and taskbar icon, and the app's accent colour is now the logo's teal. Green is kept for
   one meaning only: something went well.
+
+### Security
+
+- A page that had been taken over could have made Adle import a file of its choosing by
+  handing over a forged list of "dropped files". It cannot any more.
+- "No network" for the interface and for a lesson's pictures now also covers peer
+  connections and name lookups, which are not requests and were not refused.
+- The part of Adle that holds your data refuses a request before reading any of it unless
+  it comes from Adle, and refuses oversized ones.
+- If you chose one provider, its keys reach Adle's service only after that choice has; a
+  start where the choice could not be applied hands over no key at all.
+- A document's file name and headings are quoted like its text when a lesson is written, so
+  they cannot pass for instructions.
+- An ordering question no longer reveals its order to the interface.
+- A provider's answer is read within limits on its size and time, and "Stop" hangs up.
+- The log records what kind of error happened and where, never its text.
+- A picture that floods the app with messages is ended, like one that hangs.
+- Two requests arriving at the same moment can no longer start the same lesson twice, and
+  the provider cannot be changed in the instant something starts to be written.
+- A file far over the size limit is refused before it is read. What the separate process
+  that reads documents says about a file is shown only if it is one of its known reasons.
 
 ### Notes
 

@@ -59,5 +59,5 @@ export async function callCore<K extends OperationId>(
 export function describeError(error: unknown): string {
   if (error instanceof CoreRequestError) return error.message;
   if (error instanceof Error && error.message) return error.message;
-  return 'Something unexpected happened. Please try again.';
+  return 'Something went wrong. Please try again.';
 }

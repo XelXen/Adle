@@ -73,9 +73,9 @@ export function GenerationStatus({
             />
             <p className={styles.note}>
               {usualSeconds
-                ? `This usually takes ${aboutHowLong(usualSeconds)}. `
+                ? `Usually takes ${aboutHowLong(usualSeconds)}. `
                 : 'This can take a few minutes. '}
-              You do not have to wait here: Adle will tell you when it is ready.
+              You’ll be notified when it’s ready.
             </p>
           </div>
           <div className={styles.actions}>
@@ -85,6 +85,8 @@ export function GenerationStatus({
               icon={<Coffee />}
               onClick={() => {
                 if (!rest.times) rest.start(suggestedBreakMinutes(usualSeconds));
+                // Back here afterwards: this is where what is being written will be.
+                rest.returnVia(null);
                 navigate({ name: 'break' });
               }}
             >
@@ -104,7 +106,7 @@ export function GenerationStatus({
     return (
       <Callout
         tone={failure.remedy === 'wait' ? 'warning' : 'danger'}
-        title={`${subject.charAt(0).toUpperCase()}${subject.slice(1)} could not be made`}
+        title={`Couldn’t create ${subject}`}
         urgent
         actions={
           <>

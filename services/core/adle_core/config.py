@@ -47,6 +47,11 @@ class Settings:
         return self.data_dir / "assets"
 
     @property
+    def item_key_path(self) -> Path:
+        """A secret of this installation, for naming what the page must not tell apart."""
+        return self.data_dir / "items.key"
+
+    @property
     def backups_dir(self) -> Path:
         """Automatic pre-migration database backups."""
         return self.data_dir / "backups"

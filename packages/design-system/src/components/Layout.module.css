@@ -8,12 +8,41 @@
   background: var(--ad-color-canvas);
 }
 
+/* ---- The window's own title bar -------------------------------------------------------- */
+
+/* What the window is moved by. It lies over the top of the page and holds nothing: the
+   window's buttons are drawn at its end by the operating system, and whatever is under it
+   (the mark, the top of a panel) is only looked at. */
+.windowStrip {
+  position: fixed;
+  top: 0;
+  left: env(titlebar-area-x, 0px);
+  z-index: 150;
+  width: env(titlebar-area-width, 100%);
+  height: var(--ad-layout-titlebar-height);
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* The mark sits in the strip, level with the window's buttons. */
+:global(html[data-ad-titlebar]) .rail {
+  padding-top: max(0px, calc((var(--ad-layout-titlebar-height) - 2rem) / 2));
+}
+
+/* On macOS the window's buttons are at this end: the mark starts after them. */
+:global(html[data-ad-titlebar='darwin']) .brand {
+  padding-left: max(var(--ad-space-2), env(titlebar-area-x, 0px));
+}
+
 /* One thing at a time: a lesson has the whole window. */
 .focus {
   grid-template-columns: minmax(0, 1fr);
 }
 
 .skipLink {
+  /* It lies where the window is held to be moved, and must still take a click. */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
   position: absolute;
   top: var(--ad-space-2);
   left: var(--ad-space-2);
@@ -36,7 +65,7 @@
   flex-direction: column;
   gap: var(--ad-space-4);
   padding: var(--ad-space-4) var(--ad-space-3) var(--ad-space-3);
-  overflow-y: auto;
+  overflow: hidden auto;
 }
 
 .brand {
@@ -133,16 +162,12 @@
   white-space: nowrap;
 }
 
-.navTrailing {
-  flex: none;
-  font: var(--ad-text-caption);
-  font-variant-numeric: tabular-nums;
-  color: var(--ad-color-faint);
-}
-
 .main {
   min-width: 0;
   margin: var(--ad-space-2) var(--ad-space-2) var(--ad-space-2) 0;
+  /* Below the strip the window is moved by, where there is one, and clear of it by a hair:
+     the window's buttons are drawn over the page, and would cover the panel's top edge. */
+  margin-top: max(var(--ad-space-2), calc(var(--ad-layout-titlebar-height) + 2px));
   border: var(--ad-border-width) solid var(--ad-color-border);
   border-radius: var(--ad-radius-card);
   background: var(--ad-color-page);
@@ -153,6 +178,9 @@
 
 .focus .main {
   margin-left: var(--ad-space-2);
+  /* Such a screen keeps its controls along the foot of the window. What is scrolled to,
+     by the keyboard or by the page itself, stops clear of them. */
+  scroll-padding-bottom: calc(var(--ad-layout-bar-height) + var(--ad-space-7));
 }
 
 .main:focus {
@@ -329,11 +357,26 @@
   }
 
   .brand {
+    justify-content: center;
     padding: 0;
   }
 
-  /* A list of names has nothing to show without the names. */
-  .navSection {
+  /* There is room for the mark and not for the name beside it. */
+  .brand > * > span {
+    display: none;
+  }
+
+  /* A list of names has nothing to show without the names. A group whose icons speak for
+     themselves (what is being written, a break that is running) stays, without its heading. */
+  .navSection:not(.navSectionKept) {
+    display: none;
+  }
+
+  .navSectionKept {
+    align-items: center;
+  }
+
+  .navSectionKept .navSectionLabel {
     display: none;
   }
 
@@ -345,8 +388,7 @@
     gap: 0;
   }
 
-  .navLabel,
-  .navTrailing {
+  .navLabel {
     position: absolute;
     width: 1px;
     height: 1px;

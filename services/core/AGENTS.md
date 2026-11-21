@@ -59,6 +59,9 @@ everything and decides nothing.
 
 - **Every route** has `operation_id="area.action"`, named Pydantic request/response models, and
   sits behind the launch-token dependency (applied app-wide). Then run `npm run contracts`.
+- **Nothing of a request is read before `api/gate.py` has let it in**: the token first, then
+  a bound on the body (ADR-029). The dependency stays as a second check. Do not add a
+  middleware in front of the gate, or a route that needs a larger body.
 - Routes only the main process may call get `openapi_extra={"x-adle-internal": True}`.
 - **Errors:** raise an `AdleError` subclass with a stable `code` and a learner-readable message.
   Never return framework error shapes; never put submitted values or internals in a message.
@@ -77,7 +80,10 @@ everything and decides nothing.
   (`ask`, `curriculum`, `check` are waited for; `lesson`, `scene` are long work). A new
   kind of request needs a purpose there. Never add a path that reaches a provider without a
   key of its own (ADR-023).
-- **Logging:** log event types and identifiers, not document text, answers, or prompts.
+- **Logging:** log event types and identifiers, not document text, answers, or prompts. The
+  text of an exception can hold any of those: log an error with `logs.where(error)` (its
+  kind and where it happened), never with `logger.exception` or `exc_info`. The database
+  keeps a statement's values out of its errors (`hide_parameters`).
 - **Paths:** store only under `Settings.data_dir`, under generated names. Never use a
   user-supplied path as a destination. The one exception is `data.save_copy` (ADR-016): an
   internal route that writes a copy of the data where the learner chose in a save dialog.
@@ -106,6 +112,9 @@ everything and decides nothing.
   blocked on its own stdin; on Windows a child that shares that handle hangs at start-up
   (ADR-007). Exchange JSON with children, not pickle. Start a Python child with
   `interpreter_flags()` (`ingestion/extract.py`), so that it is as isolated as its parent.
+  What a child says about a file is shown to the learner only if its reason is one a parser
+  has, as one plain line (`_refusal`): a new reason for refusing a file is a new entry in
+  `_REFUSALS`.
 - **The service ships as a wheel inside a private Python** (ADR-019), started with `-I`.
   So: anything read at run time is package data inside `adle_core/` and is found with
   `importlib.resources`, never by a path relative to the repository; nothing may depend on
@@ -129,7 +138,10 @@ everything and decides nothing.
   on every read and withholds what fails (ADR-010).
 - **Answer keys do not leave the core.** `lessons.get` returns `player_view(lesson)`. A new
   field on a question must be added to `lessons/player.py` deliberately; `test_lesson_ir.py`
-  fails if a key leaks into the player view.
+  fails if a key leaks into the player view. An id can be a key too: the items of an
+  ordering question are shown under names made by `ItemMask`, in the order of those names,
+  and `AssessmentService` turns them back. Never show their own ids, and never shuffle with
+  something the page could work out again.
 - **An answer is recorded once, whole:** the attempt and its observation in one transaction
   (`AssessmentService.answer`). Scoring is deterministic; anything a model helps judge (M6) is
   bounded by a rubric and marked as such.
@@ -163,9 +175,15 @@ everything and decides nothing.
   of concepts) runs one at a time in the main lane. What the learner waits for (an ask, a
   check of a key) runs in the quick lane, so it never queues behind a lesson. One request
   is in flight at each provider, whichever lane asks.
+- **Looking for work that is under way and starting it are one step**
+  (`GenerationService._starting`). Two requests arriving together must not both find
+  nothing and both begin, and the provider must not be chosen under a job that has just
+  started. A new way of starting model work takes the same lock around its look and its
+  `submit`.
 - **An ask is a note, not evidence** (`application/asks.py`, ADR-024). Only its existence is
   ever read by anything else: an answer to a checkpoint given after an ask about that part
-  is an aided answer. Never send an answer key in `prompts.ask_request`: see
+  is an aided answer. Removing one takes its words and leaves the row (`REMOVED`), so that
+  it still counts; a skip counts too, because it shows the explanation. Never send an answer key in `prompts.ask_request`: see
   `_part_brief` for what a part may show a model.
 - **A provider's models are tried in order** (ADR-021), and only `ModelGateway` decides
   which. The next is asked when the one before is away (`ProviderModelUnavailableError`:
@@ -179,9 +197,11 @@ everything and decides nothing.
 - **Each provider is counted alone** (`model_usage.provider`), against `ProviderConfig.limits`.
   Where a provider publishes no limits, set `limits_published=False` so the interface does
   not call Adle's caution "the provider's limit".
-- **"Stop" and the time limit are checked on every line of a streamed answer**, not on each
-  piece of the answer: a model's thinking and a provider's keep-alives arrive for minutes
-  before the first piece does.
+- **"Stop" and the time limit are checked on everything that arrives**, complete line or
+  not: a model's thinking and a provider's keep-alives arrive for minutes before the first
+  piece of an answer does, and a provider may send no line ending at all. An answer is read
+  with a bound on a line and on the whole (`_lines`), is asked for uncompressed, and is
+  closed when the learner stops it.
 - **A provider can answer in the model's place.** `ChatClient` raises `ProviderNoticeError`
   for a successful answer that the provider wrote itself (ADR-020). It carries the
   provider's words through `clean_notice`: quote them to the learner, never log them, never
@@ -191,7 +211,8 @@ everything and decides nothing.
   citations, and durations are assigned in `generation/drafts.py`. A citation is a number the
   prompt offered, or it is dropped.
 - **Text from the learner or their documents goes in a `_block(...)`** in `prompts.py`. Never
-  concatenate it into an instruction.
+  concatenate it into an instruction. That includes what a document is called: a file's
+  name and a heading go inside the block with the excerpt (`_excerpt`).
 - `adle_core/generation/data/` is generated (`npm run wanim-names`, `npm run scene-guide`) and
   excluded from ruff. Do not edit it by hand.
 - **No score leaves the core.** `api/schemas.py` must not expose the tracing estimate or anything

@@ -118,6 +118,11 @@ Write ordinary manim Community v0.21 Python. Only the Wanim-specific parts are l
   its ends (`e2e/fixtures/scenes/curve_stroke.py` and `curve_opacity.py`, read back pixel by
   pixel in `e2e/scene-player.spec.ts`). Found in the first interactive scene a real model
   wrote for Adle, 2026-11-20.
+- `set_fill(colour, opacity)` given in order fills a shape; `set_fill(colour, opacity=...)`
+  runs and leaves it with no fill; `set_fill(opacity=...)` and `set_color(color=...)` stop
+  the scene (`e2e/fixtures/scenes/fill_in_order.py`, `fill_by_name.py` and
+  `fill_without_colour.py`, read back pixel by pixel in `e2e/scene-player.spec.ts`). Found
+  by sitting a lesson a real model wrote, 2026-11-21: its interactive picture never ran.
 
 ### Documented upstream, not yet exercised here
 
@@ -144,6 +149,8 @@ Rules that come with the interactive API (documented upstream):
 | Exception during `construct()` | The JavaScript error message | `runtime` |
 | `ImageMobject("x.png")` | "could not find x.png" | `runtime` |
 | `while True:` without `self.wait` | The frame stops answering; watchdog fires | `unresponsive` |
+| `set_fill(opacity=...)`, `set_fill(color=..., opacity=...)`, `set_color(color=...)` (no argument in first place) | "ManimColor only accepts int, str, ... not Object". The names are taken for the colour. The static policy rejects these forms. | `runtime` |
+| `set_fill(colour, opacity=...)` (the opacity by name) | No error. The shape is left with no fill. Use `set_fill(colour, 0.3)`, or `set_fill(None, 0.3)` to keep the colour. The static policy rejects the named form. | none |
 | `Dot(point, color=...)` (position as an argument) | No error. The dot is drawn white: invisible on the light stage. Use `Dot(color=..., radius=...).move_to(point)`. The static policy rejects the first form. **Observed** in the sample scenes' screenshots. | none |
 
 Scenes and mobjects are JavaScript `Proxy` objects that throw an `AttributeError` for unknown

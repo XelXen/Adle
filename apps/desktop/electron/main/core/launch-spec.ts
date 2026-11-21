@@ -50,7 +50,7 @@ export function resolveLaunchSpec(context: LaunchContext): LaunchSpec {
       : path.join(coreDir, 'bin', 'python3.12');
     if (!exists(executable)) {
       throw new CoreNotInstalledError(
-        'The Adle core service is missing from this installation. Please reinstall Adle.',
+        'Part of Adle is missing from this installation. Please reinstall it.',
       );
     }
     return {

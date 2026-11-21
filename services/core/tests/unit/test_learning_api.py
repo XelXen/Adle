@@ -26,7 +26,7 @@ from adle_core.learner_model.next_step import PAUSE_NOTE
 
 T0 = datetime(2026, 11, 19, 12, 0, tzinfo=UTC)
 CONCEPT_TITLE = "Weights and bias"
-#: The right answers to the first sample lesson's questions.
+#: Correct answers to the first sample lesson's questions.
 RIGHT: dict[str, dict[str, Any]] = {
     "q_influence": {"option_id": "a"},
     "q_compute": {"number": 3},
@@ -126,8 +126,8 @@ def test_a_new_course_suggests_its_first_lesson_and_says_why(
     step = view["plan"]["recommended"]
     assert step["kind"] == "start_lesson"
     assert step["lesson_id"] == lesson["lesson_id"]
-    assert step["title"] == f'Start "{lesson["title"]}"'
-    assert step["reason"] == f'"{CONCEPT_TITLE}" is next in your course. It needs nothing first.'
+    assert step["title"] == f"Start “{lesson['title']}”"
+    assert step["reason"] == f"“{CONCEPT_TITLE}” is next in your course. It has no prerequisites."
     assert not step["needs_key"]
     assert view["plan"]["note"] is None
 
@@ -166,7 +166,7 @@ def test_a_lesson_left_part_way_is_what_to_continue(
     client.put(f"/v1/lessons/{lesson['lesson_id']}/progress", json={"position": 2})
     step = overview(client, course)["plan"]["recommended"]
     assert (step["kind"], step["lesson_id"]) == ("resume_lesson", lesson["lesson_id"])
-    assert step["reason"] == "You stopped part-way through this lesson."
+    assert step["reason"] == "You stopped partway through this lesson."
 
 
 def test_an_empty_course_asks_for_concepts(client: TestClient) -> None:
@@ -212,7 +212,7 @@ def test_one_answer_is_a_suspicion_and_a_second_makes_it_something_to_come_back_
     first = answer(client, lesson, "q_influence", option_id="c")
     assert (
         "That answer could mean that what causes what may be the other way round. "
-        "One answer is not enough to say" in first["change"]
+        "A follow-up question will check." in first["change"]
     )
     assert "a possible misunderstanding to clear up" not in first["knowledge"]["missing"]
     (suspected,) = progress_of(overview(client, course), concept_id)["hypotheses"]
@@ -221,7 +221,7 @@ def test_one_answer_is_a_suspicion_and_a_second_makes_it_something_to_come_back_
         "status": "tentative",
         "description": (
             "One answer suggested that what causes what may be the other way round. "
-            "One answer is not enough to say: Adle will ask a question that would show it."
+            "A follow-up question will check."
         ),
         "is_slip": False,
         "can_dismiss": True,
@@ -230,7 +230,7 @@ def test_one_answer_is_a_suspicion_and_a_second_makes_it_something_to_come_back_
     second = answer(client, lesson, "q_baseline", option_id="b")
     assert (
         "This is the second answer suggesting that what causes what may be the other way "
-        "round, so the next steps come back to it." in second["change"]
+        "round, so upcoming steps will revisit it." in second["change"]
     )
     assert "a possible misunderstanding to clear up" in second["knowledge"]["missing"]
     view = overview(client, course)
@@ -245,7 +245,7 @@ def test_one_answer_is_a_suspicion_and_a_second_makes_it_something_to_come_back_
         "causal_confusion",
     )
     assert step["reason"].startswith(
-        f'More than one answer on "{CONCEPT_TITLE}" suggests that what causes what'
+        f"More than one answer on “{CONCEPT_TITLE}” suggests that what causes what"
     )
     assert view["plan"]["note"] == PAUSE_NOTE
 
@@ -260,25 +260,25 @@ def test_a_check_asks_the_question_that_would_show_it_and_right_answers_settle_i
     later = T0 + timedelta(minutes=5)
     practice = services.learning.start_practice(concept_id, about="causal_confusion", now=later)
     assert practice.purpose == "check"
-    assert practice.reason.startswith(f'More than one answer on "{CONCEPT_TITLE}" suggests that')
+    assert practice.reason.startswith(f"More than one answer on “{CONCEPT_TITLE}” suggests that")
     asked = [item.question.id for item in practice.questions]
     assert asked[0] == "q_negative_weight"
     # The two questions answered a moment ago are not asked again so soon.
     assert not {"q_influence", "q_baseline"} & set(asked)
 
     once = answer_at(services, lesson, "q_negative_weight", later)
-    assert "This one goes against that; one more like it settles it." in once.change
+    assert "This one goes against that. One more like it settles it." in once.change
     assert "a possible misunderstanding to clear up" in once.knowledge.missing
 
     # A day later the first question is worth asking again, and a right answer settles it.
     next_day = T0 + timedelta(days=1)
     twice = answer_at(services, lesson, "q_influence", next_day)
-    assert "Your recent answers show it is sorted." in twice.change
+    assert "Recent answers show it’s resolved." in twice.change
     assert "a possible misunderstanding to clear up" not in twice.knowledge.missing
     view = services.learning.overview(course["id"], now=next_day)
     (settled,) = next(item.hypotheses for item in view.concepts if item.concept_id == concept_id)
     assert (settled.status, settled.can_dismiss) == ("resolved", False)
-    assert settled.description.endswith("Your later answers show it is sorted.")
+    assert settled.description.endswith("Later answers show it’s resolved.")
 
 
 def test_a_right_answer_soon_after_seeing_the_explanation_settles_nothing(
@@ -288,7 +288,7 @@ def test_a_right_answer_soon_after_seeing_the_explanation_settles_nothing(
     answer_at(services, lesson, "q_influence", T0, option_id="c")
     # The same question, answered right a minute later: recall of the explanation.
     again = answer_at(services, lesson, "q_influence", T0 + timedelta(minutes=1))
-    assert "You had seen its explanation a short while ago" in again.change
+    assert "You’d just seen its explanation" in again.change
     view = services.learning.overview(course["id"], now=T0 + timedelta(minutes=2))
     (suspected,) = next(item.hypotheses for item in view.concepts if item.concept_id == concept_id)
     assert suspected.status == "tentative"
@@ -309,14 +309,14 @@ def test_the_learner_can_set_a_suspicion_aside(
     (hypothesis,) = after["hypotheses"]
     assert hypothesis["status"] == "rejected"
     assert not hypothesis["can_dismiss"]
-    assert "You said it was a slip, so it is set aside." in hypothesis["description"]
+    assert "You marked it as a slip, so it’s set aside." in hypothesis["description"]
     # The learner has the last word: it no longer stands in the way.
     assert "a possible misunderstanding to clear up" not in after["knowledge"]["missing"]
 
     history = client.get(f"/v1/concepts/{concept_id}/evidence").json()["history"]
     assert history[0]["kind"] == "dismissal"
     assert history[0]["explanation"].startswith(
-        "You said a suspected mix-up was only a slip, so it has been set aside."
+        "You marked a suspected mix-up as a slip, so it’s set aside."
     )
     with services.database.session() as session:
         (event,) = session.scalars(select(LearnerEvent)).all()
@@ -382,11 +382,11 @@ def estimate(services: Services, concept_id: str) -> float:
     ("how", "wording"),
     [
         ("right", "You answered a numeric question correctly."),
-        ("hinted", "correctly after a hint, which counts as lighter evidence"),
-        ("unsure", "correctly but said you were unsure, which counts as lighter evidence"),
-        ("slip", "it looks like a slip rather than a gap in understanding"),
-        ("wrong", "Your answer to a numeric question was not right yet."),
-        ("skipped", "You skipped a question. Skipping is not counted either way."),
+        ("hinted", "correctly after a hint, which counts a little less"),
+        ("unsure", "correctly but weren’t sure, which counts a little less"),
+        ("slip", "it looks like a slip, not a gap"),
+        ("wrong", "Your answer to a numeric question wasn’t right."),
+        ("skipped", "You skipped a question. Skips don’t count either way."),
     ],
 )
 def test_each_kind_of_answer_is_recorded_as_what_it_is(
@@ -470,7 +470,7 @@ def test_practice_asks_what_the_evidence_still_lacks_and_never_sends_an_answer(
     practice = response.json()
     assert practice["purpose"] == "practise"
     assert practice["concept_title"] == CONCEPT_TITLE
-    assert practice["reason"].startswith(f'"{CONCEPT_TITLE}" is at "Building understanding".')
+    assert practice["reason"].startswith(f"“{CONCEPT_TITLE}” is at “Learning”.")
     assert practice["next_fresh_at"] is None
     questions = practice["questions"]
     assert len(questions) == 3
@@ -532,8 +532,7 @@ def test_a_concept_without_questions_says_so(client: TestClient, course: dict[st
     practice = client.post(f"/v1/concepts/{without_lesson['id']}/practice", json={}).json()
     assert practice["questions"] == []
     assert practice["reason"] == (
-        f'There are no questions on "{without_lesson["title"]}" yet. '
-        "A lesson on it brings some with it."
+        f"No questions on “{without_lesson['title']}” yet. A lesson will add some."
     )
 
 
@@ -545,7 +544,7 @@ def test_what_was_answered_today_is_not_asked_again_today(
         answer_at(services, lesson, question, T0)
     soon = services.learning.start_practice(concept_id, now=T0 + timedelta(hours=1))
     assert soon.questions == []
-    assert soon.reason.startswith(f'Every question on "{CONCEPT_TITLE}" was answered in the last')
+    assert soon.reason.startswith(f"You answered every question on “{CONCEPT_TITLE}” in the last")
     assert soon.next_fresh_at == T0 + timedelta(hours=12)
     later = services.learning.start_practice(concept_id, now=T0 + timedelta(hours=13))
     assert len(later.questions) == 3
@@ -566,7 +565,7 @@ def test_a_repeat_counts_in_full_only_after_a_real_gap(
     first = answer_at(services, lesson, "q_compute", T0)
     assert (first.attempt_number, unaided()) == (1, 1)
     soon = answer_at(services, lesson, "q_compute", T0 + timedelta(hours=1))
-    assert "You had seen its explanation a short while ago" in soon.change
+    assert "You’d just seen its explanation" in soon.change
     assert (soon.attempt_number, unaided()) == (2, 1)
     next_day = answer_at(services, lesson, "q_compute", T0 + timedelta(hours=14))
     assert next_day.change.startswith("You answered a numeric question correctly.")
@@ -589,10 +588,10 @@ def test_a_review_comes_due_is_suggested_and_moves_on_when_it_is_done(
     due = services.learning.overview(course["id"], now=two_days_on)
     step = due.plan.recommended
     assert (step.kind, step.concept_id) == ("review", concept_id)
-    assert step.title == f'Review "{CONCEPT_TITLE}"'
+    assert step.title == f"Review “{CONCEPT_TITLE}”"
     assert step.reason == (
-        f'A review of "{CONCEPT_TITLE}" was due a day ago. '
-        "Answering from memory after a gap is what makes it last."
+        f"A review of “{CONCEPT_TITLE}” was due a day ago. "
+        "Recalling it after a gap is what makes it stick."
     )
     assert due.summary.reviews_due == 1
     assert next(item for item in due.concepts if item.concept_id == concept_id).review_due
@@ -648,7 +647,7 @@ def test_saying_an_explanation_did_not_help_changes_what_is_suggested(
     another = next(step for step in offered if step["kind"] == "another_explanation")
     assert another["concept_id"] == concept_id
     assert another["reason"].startswith(
-        f'You said an explanation of "{CONCEPT_TITLE}" did not help.'
+        f"You said an explanation of “{CONCEPT_TITLE}” didn’t help."
     )
     # No key is set up in this test. The offer says so instead of hiding, and something
     # that can be done without one is suggested first.

@@ -16,6 +16,7 @@ import {
   type NoticeKind,
   type UiState,
 } from '../shared/ipc';
+import { droppedPaths } from './dropped';
 
 const bridge: AdleBridge = {
   app: {
@@ -49,9 +50,10 @@ const bridge: AdleBridge = {
     importWithPicker: (courseId: string) =>
       ipcRenderer.invoke(IPC.sourcesImportWithPicker, courseId),
     importDropped: (courseId: string, files: File[]) => {
-      // Paths come from real File objects the learner dropped. Page script has
-      // no way to construct a File that maps to a path of its choosing.
-      const paths = files.map((file) => webUtils.getPathForFile(file)).filter(Boolean);
+      // Paths come from real File objects the learner dropped. Page script has no way to
+      // construct a File that maps to a path of its choosing, and nothing it hands over
+      // is asked for one in any other way (see `droppedPaths`).
+      const paths = droppedPaths(files, (file) => webUtils.getPathForFile(file));
       return ipcRenderer.invoke(IPC.sourcesImportPaths, courseId, paths);
     },
   },

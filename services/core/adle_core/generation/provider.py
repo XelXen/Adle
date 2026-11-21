@@ -24,6 +24,7 @@ Rules that hold here:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import queue
@@ -57,6 +58,11 @@ _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 #: An answer longer than this is not a lesson; it is a model that did not stop.
 MAX_RESPONSE_CHARACTERS = 400_000
+#: Everything a streamed answer may send, wrappers and thinking included. A long lesson
+#: arrives as some ten thousand small events of a few hundred characters each.
+MAX_STREAM_CHARACTERS = 48_000_000
+#: One line of a stream. An event carries a few words of the answer; nothing honest is longer.
+MAX_LINE_CHARACTERS = 1_000_000
 #: Upper bound honoured for a ``Retry-After`` header.
 MAX_RETRY_AFTER_SECONDS = 90.0
 
@@ -340,9 +346,7 @@ class ProviderKeyRejectedError(ProviderError):
     code = "provider_key_rejected"
 
     def __init__(self) -> None:
-        super().__init__(
-            "The AI provider did not accept the key. Check it in Settings, under AI provider."
-        )
+        super().__init__("The AI provider rejected the key. Check it in Settings.")
 
 
 class ProviderRateLimitedError(ProviderError):
@@ -351,8 +355,7 @@ class ProviderRateLimitedError(ProviderError):
 
     def __init__(self, retry_after_seconds: float | None) -> None:
         super().__init__(
-            "The AI provider is limiting requests for this key at the moment. "
-            "Wait a minute and try again.",
+            "The AI provider is limiting requests for this key. Wait a minute and try again.",
             retry_after_seconds=retry_after_seconds,
         )
 
@@ -366,10 +369,9 @@ class ProviderUnavailableError(ProviderError):
         #: True when the provider answered, with an error of its own.
         self.provider_side = provider_side
         super().__init__(
-            "The AI provider reported a problem on its side. Nothing was changed; "
-            "try again in a little while."
+            "The AI provider had a problem on its side. Try again in a little while."
             if provider_side
-            else "The AI provider could not be reached. Check your connection and try again."
+            else "Couldn’t reach the AI provider. Check your connection and try again."
         )
 
 
@@ -378,13 +380,8 @@ class ProviderUnavailableError(ProviderError):
 ModelTrouble = Literal["failing", "gone", "silent"]
 
 _MODEL_TROUBLE: dict[str, str] = {
-    "gone": (
-        "The AI provider says its model is not available at the moment. Nothing was "
-        "changed; try again in a little while."
-    ),
-    "silent": (
-        "The AI provider did not answer in time. Nothing was changed; try again in a little while."
-    ),
+    "gone": ("The AI provider’s model isn’t available right now. Try again in a little while."),
+    "silent": ("The AI provider took too long to answer. Try again in a little while."),
 }
 
 
@@ -409,8 +406,8 @@ class NoModelAnsweredError(ProviderUnavailableError):
     def __init__(self, provider_name: str, model_names: Sequence[str]) -> None:
         super().__init__(provider_side=True)
         self.message = (
-            f"None of {provider_name}'s models answered ({', '.join(model_names)}). "
-            "Nothing was changed; try again in a little while."
+            f"None of {provider_name}’s models answered ({', '.join(model_names)}). Try again in "
+            "a little while."
         )
         self.args = (self.message,)
 
@@ -419,18 +416,14 @@ class ProviderRequestRefusedError(ProviderError):
     code = "provider_request_refused"
 
     def __init__(self) -> None:
-        super().__init__(
-            "The AI provider refused the request. Nothing was changed; you can try again."
-        )
+        super().__init__("The AI provider refused the request. You can try again.")
 
 
 class ProviderBadResponseError(ProviderError):
     code = "provider_bad_response"
 
     def __init__(self) -> None:
-        super().__init__(
-            "The AI provider's answer could not be read. Nothing was changed; you can try again."
-        )
+        super().__init__("Couldn’t read the AI provider’s answer. You can try again.")
 
 
 #: How the documented provider marks an answer it wrote itself, in the model's place.
@@ -470,9 +463,8 @@ class ProviderNoticeError(ProviderError):
         self.notice = clean_notice(notice)
         said = f' It said: "{self.notice}"' if self.notice else ""
         super().__init__(
-            "The AI provider answered with a notice of its own instead of passing this to "
-            f"the model.{said} This is about your account with the provider, not about "
-            "Adle. Nothing was changed."
+            f"The AI provider returned an account notice instead of an answer.{said} This is "
+            "about your account with the provider, not Adle."
         )
 
 
@@ -612,6 +604,7 @@ class ChatClient:
 
         given_up = threading.Event()
         outcome: queue.Queue[ChatResult | BaseException] = queue.Queue(maxsize=1)
+        answers: list[httpx.Response] = []
 
         def no_longer_wanted() -> bool:
             return given_up.is_set() or cancelled()
@@ -620,9 +613,22 @@ class ChatClient:
             if on_stage is not None and not given_up.is_set():
                 on_stage(stage)
 
+        def hang_up() -> None:
+            # Closing the answer ends the request at the provider, instead of leaving it
+            # to be written for nobody until its next line or the time limit. Best effort:
+            # if it cannot be closed from here, the worker stops at the next thing it reads.
+            for answer in list(answers):
+                with contextlib.suppress(Exception):
+                    answer.close()
+
+        def opened(answer: httpx.Response) -> None:
+            answers.append(answer)
+            if given_up.is_set():
+                hang_up()
+
         def work() -> None:
             try:
-                outcome.put(self._send(request, spec, no_longer_wanted, stage_while_wanted))
+                outcome.put(self._send(request, spec, no_longer_wanted, stage_while_wanted, opened))
             except BaseException as error:  # handed to whoever asked, or dropped with them
                 outcome.put(error)
 
@@ -633,6 +639,7 @@ class ChatClient:
             except queue.Empty:
                 if cancelled():
                     given_up.set()
+                    hang_up()
                     raise RequestCancelledError from None
                 continue
             if isinstance(found, BaseException):
@@ -645,8 +652,13 @@ class ChatClient:
         spec: ModelSpec,
         cancelled: Callable[[], bool],
         on_stage: Callable[[Stage], None] | None,
+        opened: Callable[[httpx.Response], None] | None = None,
     ) -> ChatResult:
-        """Make the request and read the answer. Blocks for as long as the provider does."""
+        """Make the request and read the answer. Blocks for as long as the provider does.
+
+        ``opened`` is handed the answer as soon as there is one, so that whoever is
+        waiting beside this can close it.
+        """
         # This provider's key, and no other's: a key goes only to the address it was given for.
         api_key = self._vault.api_key(self.config.provider_id)
         if api_key is None:
@@ -675,8 +687,11 @@ class ChatClient:
                 "POST",
                 f"{self.config.base_url}/chat/completions",
                 json=body,
-                headers={"Authorization": f"Bearer {api_key}"},
+                # Not compressed: a few bytes must not be able to unfold into a great many.
+                headers={"Authorization": f"Bearer {api_key}", "Accept-Encoding": "identity"},
             ) as response:
+                if opened is not None:
+                    opened(response)
                 self._raise_for_status(response)
                 return replace(
                     self._read(response, cancelled, deadline, on_stage), model_name=spec.name
@@ -725,10 +740,16 @@ class ChatClient:
         deadline: float,
         on_stage: Callable[[Stage], None] | None = None,
     ) -> ChatResult:
+        def still_wanted() -> None:
+            if cancelled():
+                raise RequestCancelledError
+            if self._monotonic() > deadline:
+                raise httpx.ReadTimeout("the answer took too long")
+
         content_type = response.headers.get("content-type", "")
         if "text/event-stream" not in content_type:
             # A server that ignores "stream" answers with one JSON document.
-            return _result_from_document(_bounded_body(response))
+            return _result_from_document(_bounded_body(response, still_wanted))
 
         pieces: list[str] = []
         size = 0
@@ -747,13 +768,7 @@ class ChatClient:
                 if on_stage is not None:
                     on_stage(now)
 
-        def still_wanted() -> None:
-            if cancelled():
-                raise RequestCancelledError
-            if self._monotonic() > deadline:
-                raise httpx.ReadTimeout("the answer took too long")
-
-        # Asked on every line that arrives, whatever it carries: a model's thinking and
+        # Asked on every piece that arrives, whatever it carries: a model's thinking and
         # a provider's keep-alive lines are not answers, but each is a moment to stop.
         for payload in _events(response, still_wanted):
             if payload == "[DONE]":
@@ -813,14 +828,48 @@ def _retry_after(value: str | None) -> float | None:
     return min(max(seconds, 0.0), MAX_RETRY_AFTER_SECONDS)
 
 
-def _events(response: httpx.Response, on_line: Callable[[], None]) -> Iterator[str]:
+def _lines(response: httpx.Response, on_piece: Callable[[], None]) -> Iterator[str]:
+    """The lines of an answer as they arrive, with a bound on each and on all of them.
+
+    The HTTP library's own line reader keeps a line in memory until its end arrives,
+    however long that takes and however much comes first. A provider that never sends
+    a newline could fill the memory that way, with "Stop" and the time limit never
+    asked. Here ``on_piece`` is called for every piece received, complete line or not.
+    """
+    held = ""
+    total = 0
+    after_return = False
+    for piece in response.iter_text():
+        on_piece()
+        total += len(piece)
+        if total > MAX_STREAM_CHARACTERS:
+            raise ProviderBadResponseError
+        if after_return and piece.startswith("\n"):
+            # The two halves of one line ending, in two pieces.
+            piece = piece[1:]
+        after_return = piece.endswith("\r")
+        held += piece
+        if "\n" not in piece and "\r" not in piece:
+            if len(held) > MAX_LINE_CHARACTERS:
+                raise ProviderBadResponseError
+            continue
+        *complete, held = held.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        if len(held) > MAX_LINE_CHARACTERS:
+            raise ProviderBadResponseError
+        yield from complete
+    if held:
+        yield held
+
+
+def _events(response: httpx.Response, on_piece: Callable[[], None]) -> Iterator[str]:
     """The ``data:`` payloads of a server-sent event stream, one per event.
 
-    ``on_line`` is called for every line received, including the ones that carry nothing.
+    ``on_piece`` is called for everything received, including what carries nothing.
     """
     data: list[str] = []
-    for line in response.iter_lines():
-        on_line()
+    for line in _lines(response, on_piece):
+        # Asked again for every line: many may arrive in one piece.
+        on_piece()
         if line == "":
             if data:
                 yield "\n".join(data)
@@ -832,10 +881,12 @@ def _events(response: httpx.Response, on_line: Callable[[], None]) -> Iterator[s
         yield "\n".join(data)
 
 
-def _bounded_body(response: httpx.Response) -> str:
+def _bounded_body(response: httpx.Response, on_piece: Callable[[], None]) -> str:
     chunks: list[str] = []
     size = 0
     for text in response.iter_text():
+        # A document dripped slowly is stopped by "Stop" and by the time limit like a stream.
+        on_piece()
         size += len(text)
         if size > MAX_RESPONSE_CHARACTERS * 2:
             raise ProviderBadResponseError

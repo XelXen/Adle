@@ -38,7 +38,7 @@ export function PracticeScreen({
   const leave = (): void => navigate({ name: 'course', courseId, tab: 'learn' });
   const back = (
     <Button variant="tertiary" size="small" icon={<ArrowLeft />} onClick={leave}>
-      Back to the course
+      Back to course
     </Button>
   );
 
@@ -55,12 +55,12 @@ export function PracticeScreen({
     return (
       <Page title="Practice" eyebrow={back} width="reading">
         <ErrorState
-          title={missing ? 'This concept no longer exists' : 'The questions could not be chosen'}
+          title={missing ? 'This concept no longer exists' : 'Couldn’t load questions'}
           description={describeError(error)}
           actions={
             missing ? (
               <Button variant="primary" onClick={leave}>
-                Back to the course
+                Back to course
               </Button>
             ) : (
               <Button onClick={practice.reload}>Try again</Button>
@@ -79,12 +79,12 @@ export function PracticeScreen({
           title="Nothing to ask right now"
           description={
             data.next_fresh_at
-              ? `${data.reason} There will be something to ask ${formatWait(data.next_fresh_at)}.`
+              ? `${data.reason} Check back ${formatWait(data.next_fresh_at)}.`
               : data.reason
           }
           actions={
             <Button variant="primary" onClick={leave}>
-              Back to the course
+              Back to course
             </Button>
           }
         />
@@ -137,16 +137,14 @@ function PracticeRun({ data }: { data: PracticeSet }) {
         />
       </div>
       <div className={styles.controls}>
-        {!answered ? (
-          <span className={styles.note}>Answer or skip the question to go on.</span>
-        ) : null}
+        {!answered ? <span className={styles.note}>Answer or skip to continue.</span> : null}
         <Button
           variant="primary"
           icon={last ? <Check /> : <ArrowRight />}
           disabled={!answered}
           onClick={() => (last ? setFinished(true) : setIndex(index + 1))}
         >
-          {last ? 'See how it went' : 'Next question'}
+          {last ? 'See results' : 'Next question'}
         </Button>
       </div>
     </div>
@@ -193,15 +191,13 @@ function PracticeFinished({
         {knowledge ? (
           <div className={styles.standing}>
             <p className={styles.standingLine}>
-              <span>Where “{data.concept_title}” stands:</span>
+              <span>Status of “{data.concept_title}”:</span>
               <Badge tone={KNOWLEDGE_TONE[knowledge.state]}>{knowledge.label}</Badge>
             </p>
             {knowledge.missing.length > 0 ? (
               <p className={styles.note}>Still needed: {knowledge.missing.join('; ')}.</p>
             ) : (
-              <p className={styles.note}>
-                Adle will check again after a while to see that it has stuck.
-              </p>
+              <p className={styles.note}>A review later will check that it stuck.</p>
             )}
           </div>
         ) : null}
@@ -209,12 +205,12 @@ function PracticeFinished({
 
       {overview.resource.status === 'loading' ? (
         <p className={styles.note} role="status">
-          Working out what to do next…
+          Planning your next step…
         </p>
       ) : overview.resource.status === 'error' ? (
         <p className={styles.note}>
-          What to do next could not be worked out just now. Your answers are saved, and the course
-          page will show it.
+          Couldn’t plan your next step just now. Your answers are saved, and the course page will
+          show it.
         </p>
       ) : (
         <NextSteps plan={overview.resource.data.plan} courseId={data.course_id} />

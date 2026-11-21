@@ -207,7 +207,7 @@ def _known(services: Services, provider_id: str | None) -> str:
     if provider_id is None:
         return services.credentials.default_provider_id
     if not services.gateway.knows(provider_id):
-        raise NotFoundError("Adle does not know that AI provider.")
+        raise NotFoundError("Unknown AI provider.")
     return provider_id
 
 
@@ -224,7 +224,7 @@ def provider_usage(
     """Today's count at one provider: the one named, or the one a lesson would go to."""
     name = provider_id if provider_id is not None else services.gateway.config.provider_id
     if not services.gateway.knows(name):
-        raise NotFoundError("Adle does not know that AI provider.")
+        raise NotFoundError("Unknown AI provider.")
     config = next(item for item in services.gateway.providers if item.provider_id == name)
     return _usage(services, config)
 
@@ -253,6 +253,8 @@ def set_credential(
     credential: ProviderCredential, services: Services = Depends(get_services)
 ) -> Response:
     provider_id = _known(services, credential.provider_id)
+    # A check still under way was sent with the key before this one.
+    services.generation.key_changed(provider_id)
     services.credentials.set_api_key(credential.api_key, provider_id)
     # Whatever the provider said about the key before this one is no longer about this one.
     services.gateway.forget_trouble(provider_id)
@@ -269,7 +271,10 @@ def clear_credential(
     provider_id: str | None = Query(default=None, pattern=PROVIDER_ID),
     services: Services = Depends(get_services),
 ) -> Response:
-    services.credentials.clear_api_key(_known(services, provider_id))
+    known = _known(services, provider_id)
+    services.generation.key_changed(known)
+    services.credentials.clear_api_key(known)
+    services.gateway.forget_trouble(known)
     return Response(status_code=204)
 
 

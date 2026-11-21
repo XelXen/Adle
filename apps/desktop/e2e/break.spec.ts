@@ -25,7 +25,7 @@ const WRITTEN = 'How a neuron weighs its inputs';
 const detail = (page: Page) => page.getByRole('region', { name: CONCEPT });
 const now = (page: Page) => page.getByRole('navigation').getByRole('group', { name: 'Now' });
 const timer = (page: Page) => page.getByRole('timer');
-const meanwhile = (page: Page) => page.getByRole('region', { name: 'What Adle is writing' });
+const meanwhile = (page: Page) => page.getByRole('region', { name: 'In progress' });
 
 interface Session {
   adle: LaunchedApp;
@@ -68,8 +68,7 @@ test.describe('waiting for something to be written', () => {
     await detail(page).getByRole('button', { name: 'Create another lesson with AI' }).click();
     await expect(detail(page).getByRole('progressbar')).toBeVisible();
     await expect(detail(page)).toContainText(
-      'This usually takes about 3 minutes. You do not have to wait here: Adle will tell you ' +
-        'when it is ready.',
+      'Usually takes about 3 minutes. You’ll be notified when it’s ready.',
     );
     // What is being written is in the rail, one click from anywhere.
     await expect(now(page).getByRole('button', { name: 'Writing a lesson' })).toBeVisible();
@@ -82,7 +81,7 @@ test.describe('waiting for something to be written', () => {
     await expect(timer(page)).toHaveAccessibleName(
       /^Time left: (3 minutes|2 minutes \d+ seconds?)$/,
     );
-    await expect(meanwhile(page)).toContainText('A lesson is being written');
+    await expect(meanwhile(page)).toContainText('Writing your lesson');
     await expect(meanwhile(page).getByRole('progressbar')).toBeVisible();
     // A lesson and a break each have the window: no rail here, and a way back.
     await expect(page.getByRole('navigation')).toHaveCount(0);
@@ -113,7 +112,7 @@ test.describe('waiting for something to be written', () => {
     // The computer says so too. Its words are fixed: nothing of the lesson is in them.
     await expect
       .poll(() => adle.notices())
-      .toEqual([{ title: 'Your lesson is ready', body: 'Adle has finished writing it.' }]);
+      .toEqual([{ title: 'Your lesson is ready', body: 'Open Adle to start it.' }]);
     await adle.setFocused(true);
     await expect(now(page).getByRole('button', { name: 'Writing a lesson' })).toHaveCount(0);
 
@@ -122,11 +121,11 @@ test.describe('waiting for something to be written', () => {
       .getByRole('button', { name: /^On a break/ })
       .click();
     await expect(meanwhile(page)).toContainText('Your lesson is ready');
-    await expect(meanwhile(page)).toContainText(`"${WRITTEN}" is there whenever you want it.`);
+    await expect(meanwhile(page)).toContainText(`“${WRITTEN}” is ready.`);
     await screenshot(page, 'break-with-the-lesson-ready');
-    await meanwhile(page).getByRole('button', { name: 'Open the lesson' }).click();
+    await meanwhile(page).getByRole('button', { name: 'Open lesson' }).click();
     await expect(page.getByRole('heading', { name: WRITTEN, level: 1 })).toBeVisible();
-    await page.getByRole('button', { name: 'Back to the course' }).click();
+    await page.getByRole('button', { name: 'Back to course' }).click();
     await expect(now(page)).toHaveCount(0);
 
     // What was sent: the lesson and its pictures, to the one provider, and nothing else.
@@ -157,7 +156,7 @@ test.describe('waiting for something to be written', () => {
       timeout: 20_000,
     });
     await expect(timer(page)).toHaveAccessibleName('The break is over');
-    await expect(page.getByText('Ready when you are. There is no hurry.')).toBeVisible();
+    await expect(page.getByText('Ready when you are.')).toBeVisible();
     await expect
       .poll(() => adle.notices())
       .toEqual([{ title: 'Your break is over', body: 'Ready when you are.' }]);
@@ -168,7 +167,7 @@ test.describe('waiting for something to be written', () => {
     // ---- More rest is as welcome as going back ----
     await page.getByRole('button', { name: '5 more minutes' }).click();
     await expect(page.getByRole('heading', { name: 'Taking a break', level: 1 })).toBeVisible();
-    await page.getByRole('button', { name: 'End the break' }).click();
+    await page.getByRole('button', { name: 'End break' }).click();
     await expect(detail(page)).toBeVisible();
     await expect(now(page).getByRole('button', { name: /break/i })).toHaveCount(0);
     // It was said once, and ending a break early says nothing at all.
@@ -192,9 +191,9 @@ test.describe('waiting for something to be written', () => {
 
     await page.getByRole('navigation').getByRole('button', { name: 'Settings' }).click();
     await page.getByRole('tab', { name: 'Appearance' }).click();
-    const toggle = page.getByRole('switch', { name: 'Tell me when something is ready' });
+    const toggle = page.getByRole('switch', { name: 'Notify me when something is ready' });
     await expect(toggle).toBeChecked();
-    await expect(page.getByText('never with anything from your lessons in it')).toBeVisible();
+    await expect(page.getByText('never with any lesson content')).toBeVisible();
     await expectNoAccessibilityViolations(page);
     await toggle.click();
     await expect(toggle).not.toBeChecked();

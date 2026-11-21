@@ -45,7 +45,7 @@ NVIDIA_KEY = "nvapi-test-0123456789abcdefghijkl"
 AIHUBMIX_URL = "https://aihubmix.com/v1/chat/completions"
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 START = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
-BOTH = "AIHubMix, or NVIDIA NIM if AIHubMix cannot answer"
+BOTH = "AIHubMix, then NVIDIA NIM if needed"
 
 
 def quick(**changes: Any) -> Standing:
@@ -90,7 +90,7 @@ def test_what_the_learner_waits_for_goes_to_the_quick_provider_first(purpose: st
     assert found.provider_ids == ("aihubmix", "nvidia")
     assert found.automatic is True
     assert found.sentence == BOTH
-    assert found.reason == "AIHubMix answers quickly, and you are waiting for this."
+    assert found.reason == "AIHubMix is faster, and you’re waiting on this."
 
 
 @pytest.mark.parametrize("purpose", ["lesson", "scene"])
@@ -99,13 +99,13 @@ def test_long_work_goes_to_the_quick_provider_only_while_most_of_its_day_is_unus
 ) -> None:
     early = plan(purpose, AUTOMATIC, [quick(used=HEAVY_WORK_SHARE - 0.01), roomy()])
     assert early.provider_ids == ("aihubmix", "nvidia")
-    assert "most of today's allowance there is unused" in early.reason
+    assert "plenty of allowance left today" in early.reason
 
     later = plan(purpose, AUTOMATIC, [quick(used=HEAVY_WORK_SHARE), roomy()])
     # The quick one is still there to fall back on: finishing matters more than saving.
     assert later.provider_ids == ("nvidia", "aihubmix")
-    assert later.sentence == "NVIDIA NIM, or AIHubMix if NVIDIA NIM cannot answer"
-    assert "kept for what you wait for" in later.reason
+    assert later.sentence == "NVIDIA NIM, then AIHubMix if needed"
+    assert "saved for what you wait on" in later.reason
 
 
 def test_a_provider_with_nothing_left_today_is_not_in_the_plan_while_another_is() -> None:
@@ -119,7 +119,7 @@ def test_a_provider_with_nothing_left_today_is_not_in_the_plan_while_another_is(
 def test_a_provider_that_just_failed_is_asked_second_not_dropped() -> None:
     found = plan("ask", AUTOMATIC, [quick(resting=True), roomy()])
     assert found.provider_ids == ("nvidia", "aihubmix")
-    assert found.reason == "AIHubMix could not answer when it was last asked."
+    assert found.reason == "AIHubMix couldn’t answer earlier, so it’s paused for now."
     # And when both failed a moment ago there is still a plan.
     assert plan("ask", AUTOMATIC, [quick(resting=True), roomy(resting=True)]).provider_ids
 
@@ -329,7 +329,7 @@ def test_when_the_first_provider_cannot_answer_the_next_is_asked_and_it_is_said(
     # For a while the one that failed is asked second, so a lesson does not keep finding
     # out the same thing; then it is first again.
     assert gateway.plan("ask").provider_ids == ("nvidia", "aihubmix")
-    assert gateway.plan("ask").reason == "AIHubMix could not answer when it was last asked."
+    assert gateway.plan("ask").reason == "AIHubMix couldn’t answer earlier, so it’s paused for now."
     fleet.failing.clear()
     assert gateway.complete(request("ask")).provider_name == "NVIDIA NIM"
     clock.now += PROVIDER_REST + timedelta(seconds=1)
@@ -468,7 +468,7 @@ def test_one_provider_can_be_asked_by_name_whatever_the_plan_would_be(services: 
     with pytest.raises(ProviderError):
         gateway.complete(request("check"), provider_id="nvidia")
     assert AIHUBMIX_URL not in fleet.urls
-    with pytest.raises(Exception, match="does not know that AI provider"):
+    with pytest.raises(Exception, match="Unknown AI provider"):
         gateway.complete(request("check"), provider_id="openai")
 
 
@@ -702,3 +702,88 @@ def test_long_work_under_way_can_be_seen_from_anywhere(
     services.jobs.wait(job.json()["id"], timeout=30)
     assert services.jobs.wait(check.json()["id"], timeout=30).status == "succeeded"
     assert client.get("/v1/jobs").json() == {"jobs": []}
+
+
+def test_the_reason_is_about_the_provider_that_is_away_not_the_one_that_is_used() -> None:
+    """Long work, the quick one more than half used, and the one with room unable to answer."""
+    resting = plan("lesson", AUTOMATIC, [quick(used=0.8), roomy(resting=True)])
+    assert resting.provider_ids == ("aihubmix", "nvidia")
+    assert resting.reason == "NVIDIA NIM couldn’t answer earlier, so it’s paused for now."
+    spent = plan("lesson", AUTOMATIC, [quick(used=0.8), roomy(spent=True)])
+    assert spent.provider_ids == ("aihubmix",)
+    assert spent.reason == "NVIDIA NIM has no allowance left today."
+    # Nothing untrue is said of the quick one while it can answer.
+    assert "AIHubMix couldn’t" not in resting.reason + spent.reason
+
+
+def test_what_a_request_finds_out_with_the_old_key_is_not_held_against_the_new_one(
+    services: Services,
+) -> None:
+    arrived = threading.Event()
+    go_on = threading.Event()
+
+    class RefusesLate(Fleet):
+        def __call__(self, request: httpx.Request) -> httpx.Response:
+            if str(request.url) == AIHUBMIX_URL and not go_on.is_set():
+                self.calls.append((AIHUBMIX_URL, request.headers.get("authorization")))
+                arrived.set()
+                go_on.wait(20)
+                return httpx.Response(401, text="no")
+            return super().__call__(request)
+
+    gateway, _, vault = automatic(services, RefusesLate())
+    raised: list[BaseException] = []
+
+    def check() -> None:
+        try:
+            gateway.complete(request("check"), provider_id="aihubmix")
+        except BaseException as error:
+            raised.append(error)
+
+    thread = threading.Thread(target=check)
+    thread.start()
+    assert arrived.wait(10)
+    # The learner replaces the key while the check of the old one is still out.
+    vault.set_api_key("sk-test-another-0123456789abcdef", "aihubmix")
+    gateway.forget_trouble("aihubmix")
+    go_on.set()
+    thread.join(10)
+    assert [type(error) for error in raised] == [ProviderKeyRejectedError]
+    # The old key was refused. That says nothing about the new one: it is asked first.
+    assert gateway.plan("ask").provider_ids == ("aihubmix", "nvidia")
+
+
+def test_changing_or_removing_a_key_stops_a_check_of_the_key_before_it(
+    client: TestClient, services: Services
+) -> None:
+    import time
+
+    from adle_core.application.jobs import LANE_QUICK, JobContext
+
+    give_keys(client, "nvidia")
+
+    def started_check() -> Any:
+        running = threading.Event()
+
+        def work(context: JobContext) -> None:
+            running.set()
+            while not context.cancelled:
+                time.sleep(0.01)
+            context.check_cancelled()
+
+        job = services.jobs.submit("provider_check", work, subject_id="nvidia", lane=LANE_QUICK)
+        assert running.wait(5)
+        return job
+
+    first = started_check()
+    replaced = client.put(
+        "/v1/provider/credential",
+        json={"api_key": "nvapi-test-another-0123456789abcd", "provider_id": "nvidia"},
+    )
+    assert replaced.status_code == 204
+    assert services.jobs.wait(first.id, timeout=10).status == "cancelled"
+
+    second = started_check()
+    removed = client.delete("/v1/provider/credential", params={"provider_id": "nvidia"})
+    assert removed.status_code == 204
+    assert services.jobs.wait(second.id, timeout=10).status == "cancelled"

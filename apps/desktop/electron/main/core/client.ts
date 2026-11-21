@@ -18,9 +18,11 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 
 const UNAVAILABLE: CoreError = {
   code: 'core_unavailable',
-  message: 'Adle is still starting its local service. Please try again in a moment.',
+  message: 'Adle is still starting. Try again in a moment.',
   status: 0,
 };
+
+const PATH_VALUE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** Substitute `{name}` placeholders. Throws on a missing or unsafe value. */
 export function buildPath(template: string, values: CoreInvokeParams['path'] = {}): string {
@@ -29,7 +31,11 @@ export function buildPath(template: string, values: CoreInvokeParams['path'] = {
     if (typeof value !== 'string' && typeof value !== 'number') {
       throw new TypeError(`Missing path parameter "${name}".`);
     }
-    return encodeURIComponent(String(value));
+    // Every identifier the core gives out is made of these. Anything else ("..", a slash,
+    // a percent sign) could turn one address into another once it is decoded.
+    const text = String(value);
+    if (!PATH_VALUE.test(text)) throw new TypeError(`Malformed path parameter "${name}".`);
+    return encodeURIComponent(text);
   });
 }
 
@@ -60,7 +66,7 @@ function toCoreError(status: number, payload: unknown): CoreError {
   }
   return {
     code: 'core_error',
-    message: 'The local service returned an unexpected response.',
+    message: 'Adle got an unexpected response. Please try again.',
     status,
   };
 }
@@ -120,7 +126,7 @@ export async function callCore(
     return {
       ok: false,
       error: timedOut
-        ? { code: 'core_timeout', message: 'The local service took too long to answer.', status: 0 }
+        ? { code: 'core_timeout', message: 'That took too long. Please try again.', status: 0 }
         : UNAVAILABLE,
     };
   }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from adle_core.application.services import Services
+from adle_core.evaluation.scoring import Response
 from adle_core.infrastructure.orm import Attempt, LearnerObservation
 
 
@@ -53,7 +55,7 @@ def test_a_wrong_answer_says_what_was_wrong_without_blame_and_notes_a_hypothesis
     assert result["outcome"] == "incorrect"
     assert result["feedback"].startswith("The inputs are equal, but each is multiplied")
     assert result["correct_answer"] == "The first input"
-    assert "was not right yet" in result["change"]
+    assert "wasn’t right" in result["change"]
     for word in ("wrong!", "fail", "mistake", "bad"):
         assert word not in (result["change"] + result["feedback"]).lower()
     with services.database.session() as session:
@@ -73,10 +75,10 @@ def test_working_through_the_lesson_can_demonstrate_the_concept(
     states.append(last["knowledge"]["state"])
     # Three unaided answers, two kinds of question, one of them a transfer question.
     assert states == ["building", "needs_evidence", "demonstrated"]
-    assert last["knowledge"]["label"] == "Demonstrated for now"
+    assert last["knowledge"]["label"] == "Understood"
     assert last["knowledge"]["missing"] == []
     assert last["knowledge"]["review_due_at"] is not None
-    assert "Now: Demonstrated for now." in last["change"]
+    assert "Now: Understood." in last["change"]
 
     curriculum = client.get(f"/v1/courses/{lesson['course_id']}/curriculum").json()
     shown = next(c for c in curriculum["concepts"] if c["id"] == lesson["concept_ids"][0])
@@ -97,9 +99,9 @@ def test_a_hint_or_doubt_makes_a_right_answer_count_for_less(
     client: TestClient, lesson: dict[str, Any]
 ) -> None:
     hinted = answer(client, lesson, "q_influence", option_id="a", hinted=True).json()
-    assert "after a hint, which counts as lighter evidence" in hinted["change"]
+    assert "after a hint, which counts a little less" in hinted["change"]
     unsure = answer(client, lesson, "q_compute", number=3, unsure=True).json()
-    assert "said you were unsure" in unsure["change"]
+    assert "weren’t sure" in unsure["change"]
     # Two right answers, neither unaided: nothing counts towards the criteria yet.
     assert "3 more correct answers without a hint" in unsure["knowledge"]["missing"]
 
@@ -111,7 +113,7 @@ def test_answering_again_after_seeing_the_explanation_counts_as_aided(
     second = answer(client, lesson, "q_influence", option_id="a").json()
     assert (first["attempt_number"], second["attempt_number"]) == (1, 2)
     assert second["outcome"] == "correct"
-    assert "seen its explanation a short while ago" in second["change"]
+    assert "just seen its explanation" in second["change"]
     assert "3 more correct answers without a hint" in second["knowledge"]["missing"]
     with services.database.session() as session:
         attempts = session.scalars(select(Attempt).order_by(Attempt.id)).all()
@@ -184,3 +186,20 @@ def test_no_answer_response_ever_contains_a_score(
         text = answer(client, lesson, "q_influence", **body).text
         assert "probability" not in text
         assert "%" not in text
+
+
+def test_a_skip_shows_the_explanation_so_the_answer_that_follows_is_an_aided_one(
+    client: TestClient, lesson: dict[str, Any], services: Services
+) -> None:
+    """Skipping is free, but what it shows is help: the next answer is not a first unaided one."""
+    skipped = answer(client, lesson, "q_compute", skipped=True).json()
+    assert skipped["explanation"]
+    after = answer(client, lesson, "q_compute", number=3).json()
+    assert after["outcome"] == "correct"
+    assert "You’d just seen its explanation, so it counts a little less." in after["change"]
+    # After a real gap the same answer is recall, and counts in full.
+    later = datetime.now(UTC) + timedelta(days=2)
+    recalled = services.assessment.answer(
+        lesson["lesson_id"], "q_compute", Response(number=3), now=later
+    )
+    assert "just seen its explanation" not in recalled.change

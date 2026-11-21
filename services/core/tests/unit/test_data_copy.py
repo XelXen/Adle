@@ -44,7 +44,9 @@ def running(settings: Settings) -> Iterator[tuple[Services, TestClient]]:
     )
     try:
         with TestClient(
-            create_app(services), headers={"Authorization": f"Bearer {TEST_TOKEN}"}
+            create_app(services),
+            base_url="http://127.0.0.1",
+            headers={"Authorization": f"Bearer {TEST_TOKEN}"},
         ) as client:
             yield services, client
     finally:
@@ -188,7 +190,10 @@ def test_a_copy_is_not_written_where_it_should_not_go(
     assert not Path("relative-copy.adle").exists()
     assert not (tmp_path / "nowhere").exists()
     written = [entry for entry in tmp_path.rglob("*") if entry.is_file()]
-    assert all(entry.name.startswith("adle.db") for entry in written), written
+    # The database and the installation's own secret, and nothing the request asked for.
+    assert all(
+        entry.name.startswith("adle.db") or entry.name == "items.key" for entry in written
+    ), written
 
 
 @pytest.mark.parametrize(

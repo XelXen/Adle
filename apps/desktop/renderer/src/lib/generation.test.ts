@@ -57,7 +57,7 @@ describe('lessonDisclosure', () => {
   it('names what is said about the learner, not only what is said about the concept', () => {
     for (const materials of ['some', 'none', 'unknown'] as const) {
       const said = lessonDisclosure(materials);
-      for (const item of ['where you stand', 'pace and depth', 'your goal', "course's name"]) {
+      for (const item of ['your level', 'preferences', 'goal', 'course name', 'objectives']) {
         expect(said).toContain(item);
       }
     }
@@ -65,7 +65,7 @@ describe('lessonDisclosure', () => {
 
   it('mentions passages from the materials only when there may be some', () => {
     expect(lessonDisclosure('none')).not.toContain('materials');
-    expect(lessonDisclosure('some')).toContain('a few related passages from your materials');
+    expect(lessonDisclosure('some')).toContain('a few passages from your materials');
     expect(lessonDisclosure('unknown')).toContain('any related passages from your materials');
   });
 });
@@ -241,7 +241,7 @@ describe('jobFailure', () => {
   it('offers another try for anything else, with a sentence even if none was given', () => {
     expect(jobFailure(failed('provider_unavailable'))?.remedy).toBe('retry');
     expect(jobFailure(failed('generation_failed', null))).toEqual({
-      message: 'Something went wrong. Nothing was changed; you can try again.',
+      message: 'Something went wrong. Please try again.',
       remedy: 'retry',
     });
   });

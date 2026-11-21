@@ -31,6 +31,7 @@ from adle_core.errors import AdleError, NotFoundError
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.ids import new_id
 from adle_core.infrastructure.orm import Job
+from adle_core.logs import where
 
 logger = logging.getLogger(__name__)
 
@@ -299,9 +300,31 @@ class JobRunner:
                 cancel_event = self._cancel_events.get(job_id, threading.Event())
             try:
                 self._run_one(job_id, work, cancel_event)
+            except Exception as error:
+                # Recording what happened to the job failed (the database was busy for too
+                # long, or the disk is full). The lane has one thread: if it ended here,
+                # this job would say "running" for ever and nothing behind it would start.
+                logger.error("Job %s could not be recorded (%s)", job_id, type(error).__name__)
+                self._give_up(job_id)
             finally:
                 with self._lock:
                     self._cancel_events.pop(job_id, None)
+
+    def _give_up(self, job_id: str) -> None:
+        """Mark a job failed after its own record could not be written, if that is possible now."""
+        try:
+            self._update(
+                job_id,
+                status="failed",
+                error={
+                    "code": "internal_error",
+                    "message": "Something went wrong. Please try again.",
+                },
+            )
+        except Exception as error:
+            # Nothing more can be done from here. It is put right when Adle next starts:
+            # jobs left unfinished are marked as such then.
+            logger.error("Job %s is left unfinished (%s)", job_id, type(error).__name__)
 
     def _run_one(self, job_id: str, work: Work, cancel_event: threading.Event) -> None:
         if cancel_event.is_set():
@@ -316,15 +339,18 @@ class JobRunner:
             self._update(
                 job_id, status="failed", error={"code": error.code, "message": error.message}
             )
-        except Exception:
-            # Log where it failed, not what it was processing.
-            logger.exception("Job %s failed unexpectedly", job_id)
+        except Exception as error:
+            # Log where it failed, not what it was processing: the text of an error can
+            # hold what the learner typed or what a document says.
+            logger.error(
+                "Job %s failed unexpectedly (%s)\n%s", job_id, type(error).__name__, where(error)
+            )
             self._update(
                 job_id,
                 status="failed",
                 error={
                     "code": "internal_error",
-                    "message": "Something went wrong. Nothing was lost; please try again.",
+                    "message": "Something went wrong. Please try again.",
                 },
             )
         else:

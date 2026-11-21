@@ -56,7 +56,7 @@ describe('buildAnswer', () => {
     const item = question('multiple_choice', { options });
     expect(buildAnswer(item, emptyDraft(item))).toEqual({
       ok: false,
-      message: 'Choose one of the options first.',
+      message: 'Choose an option first.',
     });
     expect(buildAnswer(item, { ...emptyDraft(item), choice: 'a' })).toEqual({
       ok: true,

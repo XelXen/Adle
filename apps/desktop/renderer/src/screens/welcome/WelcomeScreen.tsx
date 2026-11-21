@@ -10,18 +10,18 @@ import styles from './WelcomeScreen.module.css';
 const HIGHLIGHTS = [
   {
     icon: RouteIcon,
-    title: 'A curriculum you can inspect',
-    body: 'Adle turns a topic or your own materials into concepts and prerequisites that you can review and edit before you start.',
+    title: 'A curriculum you control',
+    body: 'Turn a topic or your own materials into a map of concepts you can review and edit.',
   },
   {
     icon: Blocks,
-    title: 'Lessons you can touch',
-    body: 'Narrated explanations with interactive visuals, followed by short questions. Every animation has a text equivalent.',
+    title: 'Interactive lessons',
+    body: 'Narrated explanations with visuals you can interact with, then a few short questions.',
   },
   {
     icon: Sparkles,
-    title: 'Teaching that adapts, with reasons',
-    body: 'Adle tracks what you have shown you understand and explains why it chose your next step. You can always choose differently.',
+    title: 'Teaching that adapts',
+    body: 'Adle follows what you understand and explains every next step. You can always choose another.',
   },
 ] as const;
 
@@ -99,8 +99,7 @@ export function WelcomeScreen() {
             <Logo size="large" />
             <h1 className={styles.headline}>Learn at your own pace. Understand for real.</h1>
             <p className={styles.lede}>
-              Adle is a learning environment that works out what you already understand and teaches
-              what you need next.
+              Adle works out what you already know and teaches what you need next.
             </p>
           </header>
 
@@ -122,17 +121,15 @@ export function WelcomeScreen() {
             <HardDrive className={styles.promiseIcon} aria-hidden="true" />
             <div className={styles.promiseText}>
               <h2 id="welcome-promise" className={styles.promiseTitle}>
-                Your learning stays on this computer
+                Private by default
               </h2>
               <p>
-                Course files, answers, and progress are stored only here. There are no accounts and
-                no analytics.
+                Your files, answers, and progress stay on this computer. No accounts, no analytics.
               </p>
               <p>
-                One thing uses the internet: when you ask an AI to write a course, a lesson, or an
-                answer to your question, Adle sends the relevant text to an AI provider you have
-                given a key to (AIHubMix or NVIDIA NIM), and says which before it does. Nothing is
-                sent until you add a key and ask for it.
+                Only AI generation uses the internet: when you ask for a course, a lesson, or an
+                answer, the relevant text goes to the provider you set up (AIHubMix or NVIDIA NIM).
+                Nothing is sent until you add a key and ask.
               </p>
             </div>
           </section>

@@ -16,5 +16,8 @@ guide says about Wanim is true. **They are test fixtures, not examples to copy.*
 | `hostile_probe.py` | Attempts to reach the bridge, the parent window, storage, and the network |
 | `curve_opacity.py` | A plotted curve shown with `set_opacity(1)`: the path is filled, and draws as a solid shape. The first interactive scene a real model wrote did this (2026-11-20) |
 | `curve_stroke.py` | The same curve shown with `set_stroke(opacity=1)`: a line, as meant |
+| `fill_in_order.py` | A shape filled with `set_fill(colour, 0.9)`: filled, as meant |
+| `fill_by_name.py` | The same with `set_fill(colour, opacity=0.9)`: it runs, and the shape has no fill |
+| `fill_without_colour.py` | `set_fill(opacity=0.9)`: the scene stops with an error. A lesson a real model wrote lost its interactive picture this way (2026-11-21) |
 
 Known-good scenes live in `skills/wanim-scene-authoring/examples/`.

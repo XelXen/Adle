@@ -61,12 +61,12 @@ export function LearnPanel({ course }: { course: Course }) {
   });
 
   if (overview.resource.status === 'loading') {
-    return <LoadingState title="Working out what to do next…" />;
+    return <LoadingState title="Planning your next step…" />;
   }
   if (overview.resource.status === 'error') {
     return (
       <ErrorState
-        title="Your progress could not be read"
+        title="Couldn’t load your progress"
         description={describeError(overview.resource.error)}
         actions={<Button onClick={overview.reload}>Try again</Button>}
       />
@@ -101,7 +101,7 @@ export function LearnPanel({ course }: { course: Course }) {
           starting={starting}
           refusal={refusal}
           subject="the lesson"
-          waitingText="Waiting for its turn"
+          waitingText="Queued"
           usualSeconds={providerStatus?.routes.lesson.wait_seconds}
           onCancel={() => generation.cancel(job)}
           onRetry={() => void createLesson(conceptId)}
@@ -116,13 +116,12 @@ export function LearnPanel({ course }: { course: Course }) {
                 icon={<Sparkles />}
                 onClick={() => void createLesson(conceptId)}
               >
-                Create the lesson
+                Create lesson
               </Button>
             </div>
             <p className={styles.aiNote}>
-              Sends to {destination(providerStatus, 'lesson')}:{' '}
-              {lessonDisclosure(course.source_count > 0 ? 'some' : 'none')}. It usually takes three
-              of today&rsquo;s requests{lessonWait ? `, and ${lessonWait}` : ''}.
+              Sends {lessonDisclosure(course.source_count > 0 ? 'some' : 'none')} to{' '}
+              {destination(providerStatus, 'lesson')}.{lessonWait ? ` Takes ${lessonWait}.` : ''}
             </p>
           </>
         ) : null}
@@ -141,7 +140,7 @@ export function LearnPanel({ course }: { course: Course }) {
       toast.show({
         tone: 'success',
         title: 'Set aside',
-        description: 'It only comes back if later answers point the same way.',
+        description: 'It only comes back if later answers suggest it again.',
       });
       // The button that was pressed is gone with the update. Without this the keyboard
       // would be left nowhere; the line it belonged to now says what became of it.
@@ -150,7 +149,7 @@ export function LearnPanel({ course }: { course: Course }) {
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'That could not be set aside',
+        title: 'Couldn’t set that aside',
         description: describeError(error),
       });
       overview.reload();
@@ -163,9 +162,15 @@ export function LearnPanel({ course }: { course: Course }) {
     <div className={styles.panel}>
       <section className={styles.section} aria-labelledby={nextId}>
         <h2 id={nextId} className={styles.heading}>
-          What next
+          Up next
         </h2>
-        <NextSteps plan={data.plan} courseId={courseId} renderGeneration={lessonControl} />
+        {/* The heading above already says "Up next". */}
+        <NextSteps
+          plan={data.plan}
+          courseId={courseId}
+          renderGeneration={lessonControl}
+          eyebrow={null}
+        />
       </section>
 
       {data.session ? (
@@ -180,7 +185,7 @@ export function LearnPanel({ course }: { course: Course }) {
       {data.concepts.length > 0 ? (
         <section className={styles.section} aria-labelledby={progressId}>
           <h2 id={progressId} className={styles.heading}>
-            Where you are
+            Your progress
           </h2>
           <p className={styles.summary}>
             {summarySentence(data.summary)}
@@ -200,8 +205,7 @@ export function LearnPanel({ course }: { course: Course }) {
             ))}
           </ol>
           <p className={styles.footnote}>
-            These words describe what your answers have shown so far. They change as you answer
-            more, and they are never a grade.
+            Based on your answers so far. It changes as you learn, and it’s never a grade.
           </p>
         </section>
       ) : null}
@@ -217,7 +221,7 @@ function hypothesisDomId(conceptId: string, kind: string): string {
 function lessonsNote(concept: ConceptProgress): string {
   if (concept.lessons_total === 0) return 'No lesson yet.';
   if (concept.lessons_completed === 0) {
-    return concept.lessons_total === 1 ? 'Its lesson is not finished.' : 'No lesson finished yet.';
+    return concept.lessons_total === 1 ? 'Lesson not finished.' : 'No lesson finished yet.';
   }
   return `${concept.lessons_completed} of ${pluralise(concept.lessons_total, 'lesson')} finished.`;
 }
@@ -261,10 +265,7 @@ function ConceptRow({
             : ''}
         </p>
         {concept.hypotheses.length > 0 ? (
-          <ul
-            className={styles.hypotheses}
-            aria-label={`What Adle has noticed about ${concept.title}`}
-          >
+          <ul className={styles.hypotheses} aria-label={`Notes on ${concept.title}`}>
             {concept.hypotheses.map((hypothesis) => {
               const label = hypothesisLabel(hypothesis);
               return (

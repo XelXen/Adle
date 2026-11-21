@@ -188,7 +188,7 @@ def test_parameters_that_would_break_the_model_are_refused(changes: dict[str, fl
 def test_nothing_answered_is_not_assessed() -> None:
     assessment = assess(Evidence(probability=0.2))
     assert assessment.state is MasteryState.NOT_ASSESSED
-    assert assessment.label == "Not assessed"
+    assert assessment.label == "Not started"
     assert assessment.missing
 
 
@@ -236,9 +236,9 @@ def test_demonstrated_needs_several_answers_across_forms_including_transfer() ->
         MasteryState.DEMONSTRATED,
     ]
     # Three right answers of one kind still name what is missing.
-    assert "a correct answer to a different kind of question" in explanations[2]
-    assert "applies the idea to a new situation" in explanations[3]
-    assert "Now: Demonstrated for now." in explanations[4]
+    assert "a correct answer to another kind of question" in explanations[2]
+    assert "in a new situation" in explanations[3]
+    assert "Now: Understood." in explanations[4]
 
 
 def test_hinted_and_unsure_answers_do_not_count_towards_the_criteria() -> None:
@@ -256,8 +256,8 @@ def test_hinted_and_unsure_answers_do_not_count_towards_the_criteria() -> None:
     assert knowledge.forms_correct == frozenset()
     assert knowledge.transfer_correct == 0
     assert MasteryState.DEMONSTRATED not in states
-    assert "after a hint, which counts as lighter evidence" in explanations[0]
-    assert "said you were unsure" in explanations[1]
+    assert "after a hint, which counts a little less" in explanations[0]
+    assert "weren’t sure" in explanations[1]
 
 
 def test_an_answer_the_learner_marked_themselves_is_described_as_that() -> None:
@@ -265,8 +265,8 @@ def test_an_answer_the_learner_marked_themselves_is_described_as_that() -> None:
     knowledge, _, explanations = run([answer(form="explanation", unsure=True, minutes=0)])
     assert knowledge.unaided_correct == 0
     assert explanations[0].startswith(
-        "You judged that your own explanation covered the points. "
-        "An answer you mark yourself counts as lighter evidence."
+        "You marked your own explanation as covering the points. "
+        "Self-marked answers count a little less."
     )
     assert "unsure" not in explanations[0]
 
@@ -284,7 +284,7 @@ def test_understanding_can_be_lost_again_and_the_reason_is_given() -> None:
     slipped_again = apply(slipped.after, answer(Outcome.INCORRECT, form="numeric", minutes=4))
     assert slipped.state_before is MasteryState.DEMONSTRATED
     assert slipped_again.state_after is not MasteryState.DEMONSTRATED
-    assert "was not right yet" in slipped_again.explanation
+    assert "wasn’t right" in slipped_again.explanation
     assert "more consistent correct answers" in slipped_again.explanation
 
 
@@ -323,7 +323,7 @@ def test_saying_you_know_something_asks_for_evidence_rather_than_granting_it() -
     assert states == [MasteryState.NEEDS_EVIDENCE]
     assert knowledge.answered == 0
     assert explanations[0].startswith("You said you already know this well.")
-    assert "confirm what you already know" in explanations[0]
+    assert "confirm what you know" in explanations[0]
 
 
 @pytest.mark.parametrize("level", [SelfReport.NEW, SelfReport.SOME])
@@ -364,7 +364,7 @@ def test_explanations_never_contain_a_score() -> None:
         assert "%" not in explanation
         assert not re.search(r"\d\.\d", explanation)
         assert "probab" not in explanation.lower()
-        assert re.search(r"(Still|Now): ", explanation)
+        assert re.search(r"(Still|Now)[: ]", explanation)
     assert explanations[1].startswith("You skipped a question.")
     assert "partly right" in explanations[3]
 

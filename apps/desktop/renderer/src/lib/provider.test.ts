@@ -28,7 +28,7 @@ describe('destination', () => {
   });
 
   it('names no provider while it is not known which', () => {
-    expect(destination(undefined, 'lesson')).toBe('the AI provider');
+    expect(destination(undefined, 'lesson')).toBe('your AI provider');
   });
 });
 

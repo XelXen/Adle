@@ -42,7 +42,7 @@ function concept(changes: Partial<ConceptProgress> = {}): ConceptProgress {
     title: 'Weights and bias',
     knowledge: {
       state: 'building',
-      label: 'Building understanding',
+      label: 'Learning',
       missing: [],
       answered: 2,
       self_report: null,
@@ -108,12 +108,12 @@ describe('stepAction', () => {
     for (const kind of ['create_lesson', 'another_explanation'] as const) {
       expect(stepAction(step(kind), COURSE)).toEqual({
         type: 'generate',
-        label: 'Create the lesson',
+        label: 'Create lesson',
         conceptId: 'con_00000000000000000001',
       });
       expect(stepAction(step(kind, { needs_key: true }), COURSE)).toEqual({
         type: 'navigate',
-        label: 'Set up the AI provider',
+        label: 'Set up AI provider',
         route: { name: 'settings', tab: 'ai' },
       });
     }
@@ -123,7 +123,7 @@ describe('stepAction', () => {
     expect(stepAction(step('add_concepts', { concept_id: null, lesson_id: null }), COURSE)).toEqual(
       {
         type: 'navigate',
-        label: 'Go to the curriculum',
+        label: 'Open curriculum',
         route: { name: 'course', courseId: COURSE, tab: 'curriculum' },
       },
     );
@@ -150,7 +150,7 @@ describe('formatWait', () => {
 
 describe('reviews in words', () => {
   it('says when a concept is due, or when it will be', () => {
-    expect(reviewNote(concept({ review_due: true }), NOW)).toBe('A review is due');
+    expect(reviewNote(concept({ review_due: true }), NOW)).toBe('Review due');
     const later = concept();
     later.knowledge.review_due_at = '2026-11-21T12:00:00Z';
     expect(reviewNote(later, NOW)).toBe('Next review in 2 days');
@@ -167,7 +167,7 @@ describe('reviews in words', () => {
       next_review_at: null,
     };
     expect(summarySentence(summary)).toBe(
-      '8 concepts: 1 demonstrated for now, 2 in progress, 5 not assessed yet.',
+      '8 concepts: 1 understood, 2 in progress, 5 not started.',
     );
     expect(
       summarySentence({
@@ -177,7 +177,7 @@ describe('reviews in words', () => {
         in_progress: 0,
         not_assessed: 1,
       }),
-    ).toBe('1 concept: 1 not assessed yet.');
+    ).toBe('1 concept: 1 not started.');
     expect(summarySentence({ ...summary, concepts: 0 })).toBe('This course has no concepts yet.');
     expect(summarySentence(summary)).not.toContain('%');
   });
@@ -192,10 +192,10 @@ describe('reviews in words', () => {
       next_review_at: null,
     };
     expect(reviewSentence(summary, NOW)).toBeNull();
-    expect(reviewSentence({ ...summary, reviews_due: 1 }, NOW)).toBe('1 review is due.');
-    expect(reviewSentence({ ...summary, reviews_due: 2 }, NOW)).toBe('2 reviews are due.');
+    expect(reviewSentence({ ...summary, reviews_due: 1 }, NOW)).toBe('1 review due.');
+    expect(reviewSentence({ ...summary, reviews_due: 2 }, NOW)).toBe('2 reviews due.');
     expect(reviewSentence({ ...summary, next_review_at: '2026-11-20T12:00:00Z' }, NOW)).toBe(
-      'The next review is tomorrow.',
+      'Next review tomorrow.',
     );
   });
 });
@@ -231,19 +231,19 @@ describe('the session summary in words', () => {
       '1 answer right.',
     );
     const demonstrated = shownSentence({ right: 4, right_unaided: 4, demonstrated: true });
-    expect(demonstrated).toBe('4 answers right. Demonstrated for now.');
+    expect(demonstrated).toBe('4 answers right. Understood.');
     expect(demonstrated).not.toMatch(/%|\//);
   });
 
   it('says which right answers were lighter evidence, without taking them away', () => {
     expect(shownSentence({ right: 3, right_unaided: 2, demonstrated: true })).toBe(
-      '3 answers right, 1 of them lighter evidence. Demonstrated for now.',
+      '3 answers right, 1 with help. Understood.',
     );
     expect(shownSentence({ right: 3, right_unaided: 0, demonstrated: false })).toBe(
-      '3 answers right, 3 of them lighter evidence.',
+      '3 answers right, 3 with help.',
     );
     expect(shownSentence({ right: 1, right_unaided: 0, demonstrated: false })).toBe(
-      '1 answer right, as lighter evidence.',
+      '1 answer right, with help.',
     );
   });
 
@@ -262,15 +262,15 @@ describe('the session summary in words', () => {
   it('says when a planned review comes round', () => {
     expect(reviewWhen(new Date(2026, 10, 21, 15, 0).toISOString(), now)).toBe('Review in 2 days.');
     expect(reviewWhen(new Date(2026, 10, 20, 15, 0).toISOString(), now)).toBe('Review tomorrow.');
-    expect(reviewWhen(new Date(2026, 10, 18, 15, 0).toISOString(), now)).toBe('A review is due.');
-    expect(reviewWhen('not a date', now)).toBe('A review is due.');
+    expect(reviewWhen(new Date(2026, 10, 18, 15, 0).toISOString(), now)).toBe('Review due.');
+    expect(reviewWhen('not a date', now)).toBe('Review due.');
   });
 });
 
 describe('hypothesisLabel', () => {
   it('labels a hypothesis by how far the evidence goes', () => {
     expect(hypothesisLabel(hypothesis())).toEqual({
-      status: 'Suspected, not established',
+      status: 'Suspected',
       tone: 'info',
     });
     expect(hypothesisLabel(hypothesis({ status: 'supported' })).status).toBe('Seen more than once');
@@ -296,7 +296,7 @@ describe('practice in words', () => {
   it('titles a set of questions by what it is for', () => {
     expect(practiceTitle({ purpose: 'review', concept_title: 'Weights' })).toBe('Review: Weights');
     expect(practiceTitle({ purpose: 'check', concept_title: 'Weights' })).toBe(
-      'A quick check: Weights',
+      'Quick check: Weights',
     );
     expect(practiceTitle({ purpose: 'practise', concept_title: 'Weights' })).toBe(
       'Practice: Weights',

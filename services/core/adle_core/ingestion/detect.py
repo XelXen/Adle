@@ -10,7 +10,13 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
-from adle_core.ingestion.types import DocumentKind, IngestionError, Limits, unsupported_type
+from adle_core.ingestion.types import (
+    DocumentKind,
+    IngestionError,
+    Limits,
+    too_large,
+    unsupported_type,
+)
 
 _EXTENSIONS: dict[str, DocumentKind] = {
     ".pdf": DocumentKind.PDF,
@@ -71,11 +77,7 @@ def detect_kind(path: Path, display_name: str, limits: Limits) -> DocumentKind:
     is_text_kind = claimed in (DocumentKind.TEXT, DocumentKind.MARKDOWN)
     ceiling = limits.max_text_file_bytes if is_text_kind else limits.max_file_bytes
     if size > ceiling:
-        raise IngestionError(
-            "file_too_large",
-            f"The file is larger than {ceiling // (1024 * 1024)} MB. "
-            "Split it into smaller parts and import them separately.",
-        )
+        raise too_large(ceiling)
 
     if claimed is DocumentKind.PDF:
         # The header may be preceded by a few junk bytes in files produced by old tools.

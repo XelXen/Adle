@@ -16,7 +16,12 @@ const running: CoreProcess[] = [];
 
 function createCore(
   mode: string,
-  overrides: { readyTimeoutMs?: number; restoreTimeoutMs?: number; stopTimeoutMs?: number } = {},
+  overrides: {
+    readyTimeoutMs?: number;
+    restoreTimeoutMs?: number;
+    stopTimeoutMs?: number;
+    afterReady?: (connection: { baseUrl: string; token: string }) => Promise<void>;
+  } = {},
 ) {
   const core = new CoreProcess({
     resolveSpec: () => ({ command: process.execPath, args: [FAKE_CORE, mode], cwd: directory }),
@@ -51,6 +56,54 @@ describe('CoreProcess', () => {
     expect(connection?.token).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('is not ready for anyone until it has been given what it needs', async () => {
+    let handedOver: (() => void) | undefined;
+    const given: { baseUrl: string; token: string }[] = [];
+    const core = createCore('ready', {
+      afterReady: (connection) => {
+        given.push(connection);
+        return new Promise<void>((resolve) => {
+          handedOver = resolve;
+        });
+      },
+    });
+    const statuses: CoreStatus[] = [];
+    core.on('status', (status) => statuses.push(status));
+
+    const starting = core.start();
+    await vi.waitFor(() => expect(given).toHaveLength(1));
+    // The core process is up, and what prepares it has its address. Nobody else does.
+    expect(given[0]?.baseUrl).toBe('http://127.0.0.1:4321');
+    expect(core.status.state).toBe('starting');
+    expect(core.getConnection()).toBeNull();
+    expect(statuses.map((status) => status.state)).toEqual(['starting']);
+
+    handedOver?.();
+    expect(await starting).toEqual({ state: 'ready', version: 'fake' });
+    expect(core.getConnection()).toEqual(given[0]);
+    expect(statuses.map((status) => status.state)).toEqual(['starting', 'ready']);
+  });
+
+  it('does not start at all if it could not be given what it needs', async () => {
+    const core = createCore('ready', {
+      afterReady: () => Promise.reject(new Error('the choice of provider was refused')),
+    });
+    const status = await core.start();
+    expect(status.state).toBe('failed');
+    // Said for the learner, with nothing of the error in it.
+    expect(status).toMatchObject({ message: expect.stringContaining('AI provider settings') });
+    expect(JSON.stringify(status)).not.toContain('refused');
+    expect(core.getConnection()).toBeNull();
+  });
+
+  it('prepares the core again every time it starts', async () => {
+    const afterReady = vi.fn(() => Promise.resolve());
+    const core = createCore('ready', { afterReady });
+    await core.start();
+    await core.restart();
+    expect(afterReady).toHaveBeenCalledTimes(2);
+  });
+
   it('delivers the token over stdin only, never argv or the environment', async () => {
     const core = createCore('echo-argv');
     expect(await core.start()).toEqual({ state: 'ready', version: 'fake' });
@@ -76,7 +129,7 @@ describe('CoreProcess', () => {
     const status = await core.start();
     expect(status).toEqual({
       state: 'failed',
-      message: 'The core service took too long to start.',
+      message: 'Adle took too long to start.',
     });
   });
 
@@ -197,7 +250,7 @@ describe('CoreProcess', () => {
       const impatient = createCore('ready', { readyTimeoutMs: 5000, restoreTimeoutMs: 100 });
       expect(await impatient.start({ restoreFrom: copy('slow.adle') })).toEqual({
         state: 'failed',
-        message: 'The core service took too long to start.',
+        message: 'Adle took too long to start.',
       });
       expect(impatient.lastRestore).toBeNull();
     });
@@ -251,10 +304,28 @@ describe('core client', () => {
     new Response(body === null ? null : JSON.stringify(body), { status, headers });
 
   it('builds paths and queries safely', () => {
-    expect(buildPath('/v1/courses/{course_id}', { course_id: 'a/b ../c' })).toBe(
-      '/v1/courses/a%2Fb%20..%2Fc',
+    expect(buildPath('/v1/courses/{course_id}', { course_id: 'crs_0123abc' })).toBe(
+      '/v1/courses/crs_0123abc',
     );
+    expect(buildPath('/v1/x/{a}/y/{b}', { a: 'seg_part-1', b: 7 })).toBe('/v1/x/seg_part-1/y/7');
     expect(() => buildPath('/v1/courses/{course_id}', {})).toThrow(/course_id/);
+    // Nothing that could turn one address into another once the core has decoded it.
+    for (const value of [
+      '..',
+      '.',
+      'a/b',
+      'a%2Fb',
+      'a b',
+      'a\\b',
+      'a?b',
+      'a#b',
+      '',
+      'x'.repeat(65),
+    ]) {
+      expect(() => buildPath('/v1/lessons/{lesson_id}', { lesson_id: value })).toThrow(
+        /Malformed path parameter "lesson_id"/,
+      );
+    }
     expect(buildQuery({ q: 'a b', page: 2, flag: false, skip: undefined, none: null })).toBe(
       '?q=a+b&page=2&flag=false',
     );

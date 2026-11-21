@@ -12,7 +12,14 @@ import path from 'node:path';
 
 import type { ElectronApplication, Page } from '@playwright/test';
 
-import { expect, filesContaining, launchApp, test, waitForCore } from './support/app';
+import {
+  expect,
+  expectReadyOnPage,
+  filesContaining,
+  launchApp,
+  test,
+  waitForCore,
+} from './support/app';
 import {
   chooseInFileDialog,
   createCourse,
@@ -123,7 +130,7 @@ test.describe('your data as a whole', () => {
     await button(page, 'Save a copy').click();
     const saved = outcome(page, 'Saved as Adle data 2026-11-19.adle');
     await expect(saved).toBeVisible();
-    await expect(saved).toContainText('It holds everything in Adle as it is now.');
+    await expect(saved).toContainText('It contains everything in Adle as of now.');
     expect(readdirSync(copies)).toEqual(['Adle data 2026-11-19.adle']);
     // The copy has the text of the materials in it; the key was never in the data.
     expect(filesContaining(copies, PHRASE)).toHaveLength(1);
@@ -143,16 +150,16 @@ test.describe('your data as a whole', () => {
     // ---- Restore from the copy: the course is back, with what was imported into it ----
     await openPrivacy(page);
     await restoreFrom(app, page, copy);
-    const restored = outcome(page, 'Your data was restored from the copy');
+    const restored = outcome(page, 'Data restored');
     await expect(restored).toBeVisible({ timeout: 60_000 });
-    await expect(restored).toContainText('kept as a safety copy first');
-    await expect(page.getByText('Local service ready')).toBeVisible();
+    await expect(restored).toContainText('kept as a safety copy');
+    await expectReadyOnPage(page);
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'settings-data-restored');
     // The learner's own file is untouched and still one file.
     expect(readdirSync(copies)).toEqual(['Adle data 2026-11-19.adle']);
 
-    await restored.getByRole('button', { name: 'Go to the library' }).click();
+    await restored.getByRole('button', { name: 'Open library' }).click();
     await expect(courseCard(page, 'Thermodynamics')).toContainText('1 source');
     await courseCard(page, 'Thermodynamics').click();
     await page.getByRole('tab', { name: 'Materials' }).click();
@@ -173,7 +180,7 @@ test.describe('your data as a whole', () => {
 
     // ---- A restore can be undone: the safety copy is a copy like any other ----
     await restoreFrom(app, page, path.join(safetyCopies, kept[0]!));
-    await expect(outcome(page, 'Your data was restored from the copy')).toBeVisible({
+    await expect(outcome(page, 'Data restored')).toBeVisible({
       timeout: 60_000,
     });
     await openLibrary(page);
@@ -206,8 +213,8 @@ test.describe('your data as a whole', () => {
     // ---- A copy inside the folder it is a copy of would be deleted with it ----
     await chooseInSaveDialog(app, path.join(dataDir, 'copy.adle'));
     await button(page, 'Save a copy').click();
-    const notSaved = outcome(page, 'The copy was not saved');
-    await expect(notSaved).toContainText("Choose a place outside Adle's own data folder.");
+    const notSaved = outcome(page, 'Couldn’t save the copy');
+    await expect(notSaved).toContainText('Choose a place outside Adle’s own data folder.');
     expect(existsSync(path.join(dataDir, 'copy.adle'))).toBe(false);
 
     // ---- A name typed without the ending gets it, but never over another file ----
@@ -216,7 +223,7 @@ test.describe('your data as a whole', () => {
     await expect(outcome(page, 'Saved as my copy.adle')).toBeVisible();
     expect(readdirSync(copies)).toEqual(['my copy.adle']);
     await button(page, 'Save a copy').click();
-    await expect(outcome(page, 'The copy was not saved')).toContainText(
+    await expect(outcome(page, 'Couldn’t save the copy')).toContainText(
       'There is already a file called my copy.adle there. Choose another name.',
     );
 
@@ -237,7 +244,7 @@ test.describe('your data as a whole', () => {
     );
     await expect(refused).toContainText('Your current data was not changed.');
     await waitForCore(page);
-    await expect(page.getByText('Local service ready')).toBeVisible();
+    await expectReadyOnPage(page);
 
     // ---- A document is turned away before anything is stopped ----
     await restoreFrom(app, page, doc('lecture-notes.pdf'));
@@ -253,11 +260,11 @@ test.describe('your data as a whole', () => {
     await expect(button(page, 'Delete everything')).not.toHaveAttribute('aria-busy', 'true');
     const asked = await lastQuestion(app);
     expect(asked.message).toBe('Delete everything Adle has stored on this computer?');
-    expect(asked.detail).toContain('This cannot be undone.');
-    expect(asked.detail).toContain('AI provider key');
+    expect(asked.detail).toContain('This can’t be undone.');
+    expect(asked.detail).toContain('provider keys');
     expect(asked.buttons).toEqual(['Cancel', 'Delete everything']);
     expect([asked.defaultId, asked.cancelId]).toEqual([0, 0]);
-    await expect(page.getByText('Everything was deleted')).toHaveCount(0);
+    await expect(page.getByText('Everything deleted')).toHaveCount(0);
 
     // ---- After all of that, everything is as it was, and no safety copy was needed ----
     await openLibrary(page);
@@ -290,7 +297,7 @@ test.describe('your data as a whole', () => {
     await button(page, 'Save a copy').click();
     await expect(outcome(page, 'Saved as before.adle')).toBeVisible();
     await restoreFrom(app, page, copy);
-    await expect(outcome(page, 'Your data was restored from the copy')).toBeVisible({
+    await expect(outcome(page, 'Data restored')).toBeVisible({
       timeout: 60_000,
     });
     expect(readdirSync(path.join(dataDir, 'backups'))).toHaveLength(1);
@@ -300,10 +307,10 @@ test.describe('your data as a whole', () => {
     // ---- Delete everything ----
     await answerConfirmation(app, 'delete');
     await button(page, 'Delete everything').click();
-    const erased = outcome(page, 'Everything was deleted');
+    const erased = outcome(page, 'Everything deleted');
     await expect(erased).toBeVisible({ timeout: 60_000 });
-    await expect(erased).toContainText('Your AI provider key and your appearance settings');
-    await expect(page.getByText('Local service ready')).toBeVisible();
+    await expect(erased).toContainText('Your provider keys and appearance settings');
+    await expectReadyOnPage(page);
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'settings-data-erased');
 
@@ -316,7 +323,7 @@ test.describe('your data as a whole', () => {
     // The copy the learner saved elsewhere is theirs, and is not touched.
     expect(readdirSync(copies)).toEqual(['before.adle']);
 
-    await erased.getByRole('button', { name: 'Go to the library' }).click();
+    await erased.getByRole('button', { name: 'Open library' }).click();
     await expect(page.getByRole('heading', { name: 'No courses yet' })).toBeVisible();
 
     // The key is still stored, is still nowhere in the clear, and the new core has it.

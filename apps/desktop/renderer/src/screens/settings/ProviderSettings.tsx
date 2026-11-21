@@ -61,12 +61,12 @@ export function ProviderSettings() {
   const keysKnown = keyState.resource.status === 'ready';
 
   if (provider.resource.status === 'loading') {
-    return <LoadingState title="Reading provider settings…" />;
+    return <LoadingState title="Loading provider settings…" />;
   }
   if (provider.resource.status === 'error') {
     return (
       <ErrorState
-        title="Provider settings are unavailable"
+        title="Couldn’t load provider settings"
         description={describeError(provider.resource.error)}
         actions={<Button onClick={provider.reload}>Try again</Button>}
       />
@@ -86,18 +86,16 @@ export function ProviderSettings() {
       toast.show({
         tone: 'success',
         title:
-          selection === AUTOMATIC
-            ? 'Adle now uses every provider with a key'
-            : `Now using ${chosen?.label ?? 'that provider'}`,
+          selection === AUTOMATIC ? 'Using Automatic' : `Using ${chosen?.label ?? 'that provider'}`,
         description:
           selection === AUTOMATIC || keys[selection]?.stored
             ? undefined
-            : 'Add its key below to create courses and lessons with it.',
+            : 'Add its key below to start using it.',
       });
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'The choice was not changed',
+        title: 'Couldn’t change the provider',
         description: describeError(error),
       });
     } finally {
@@ -107,26 +105,16 @@ export function ProviderSettings() {
 
   return (
     <Stack gap={6}>
-      <Callout tone="info" title="What is sent, and when">
-        <p>
-          When you ask Adle to build a course, write a lesson, or answer a question, it sends the
-          text needed for that request (for example the concept being taught and a few passages from
-          your notes) to a provider you have given a key to below, and to no other. Before each
-          request Adle says where it will go, and afterwards who wrote the answer. Your files,
-          answers, and progress are never uploaded in bulk, and nothing is sent until you ask.
-        </p>
-      </Callout>
-
       {providers.length > 1 ? (
         <Section
-          title="Which provider to use"
-          description="This is your choice, and nothing else changes it."
+          title="Provider"
+          description="Adle contacts a provider only when you ask it to create something, and says where it goes first. What is sent is listed under Privacy & data."
         >
           <Stack gap={4}>
             {couldUseBoth(status) ? (
               <Callout
                 tone="info"
-                title="You have keys for more than one provider"
+                title="You have keys for both providers"
                 actions={
                   <Button
                     size="small"
@@ -134,16 +122,16 @@ export function ProviderSettings() {
                     disabled={choosing !== null && choosing !== AUTOMATIC}
                     onClick={() => void choose(AUTOMATIC)}
                   >
-                    Use both, automatically
+                    Switch to Automatic
                   </Button>
                 }
               >
-                Adle can use each for what it is best at: the quicker one for what you are waiting
-                for, the one with more room for long work.
+                Automatic uses the faster one for what you wait on, and the roomier one for long
+                work.
               </Callout>
             ) : null}
             <ChoiceButtons
-              label="Which provider to use"
+              label="Provider"
               value={status.selection}
               pending={choosing}
               options={options.map((option) => ({
@@ -160,8 +148,8 @@ export function ProviderSettings() {
       ) : null}
 
       <Section
-        title={providers.length > 1 ? 'Providers and keys' : 'Provider and key'}
-        description="Adle works without a key: you can explore sample content and your saved courses."
+        title={providers.length > 1 ? 'Keys' : 'Key'}
+        description="A key is encrypted on this computer and sent only to its own provider. Everything except AI generation works without one."
       >
         <ul className={styles.choices} aria-label="AI providers">
           {providers.map((choice) => (
@@ -196,7 +184,7 @@ function RoutesCard({ status }: { status: ProviderStatus }) {
           <Stack direction="row" gap={2} align="center">
             <Route className={styles.leadIcon} aria-hidden="true" />
             <h3 id={heading} className={styles.rowTitle}>
-              Where requests go now
+              Current routing
             </h3>
           </Stack>
           {status.key_configured ? (
@@ -213,9 +201,9 @@ function RoutesCard({ status }: { status: ProviderStatus }) {
             </dl>
           ) : (
             <p className={styles.muted}>
-              Nowhere yet: there is no key for
-              {status.selection === AUTOMATIC ? ' any provider' : ' the provider you chose'}. Add
-              one below.
+              {status.selection === AUTOMATIC
+                ? 'No key yet. Add one below.'
+                : 'No key for this provider yet. Add one below.'}
             </p>
           )}
         </Stack>
@@ -278,7 +266,9 @@ function ProviderCard({
               </dd>
             </div>
           </dl>
-          <p className={styles.muted}>{modelOrder(choice.models)}</p>
+          {choice.models.length > 1 ? (
+            <p className={styles.muted}>{modelOrder(choice.models)}</p>
+          ) : null}
 
           <KeyControls
             // A key typed for one provider must never be saved for another.
@@ -291,7 +281,7 @@ function ProviderCard({
           />
 
           <div className={styles.usage}>
-            <h4 className={styles.usageTitle}>Sent to {choice.display_name} today</h4>
+            <h4 className={styles.usageTitle}>Usage today</h4>
             <ProgressBar
               label="Requests"
               showLabel
@@ -299,14 +289,13 @@ function ProviderCard({
               valueText={`${usage.requests_today.toLocaleString()} of ${usage.requests_per_day.toLocaleString()}`}
             />
             <ProgressBar
-              label="Tokens (words and parts of words)"
+              label="Tokens"
               showLabel
               value={usage.tokens_today / usage.tokens_per_day}
               valueText={`about ${usage.tokens_today.toLocaleString()} of ${usage.tokens_per_day.toLocaleString()}`}
             />
             <p className={styles.usageNote}>
-              {limitsNote(choice, usage, formatClockTime(usage.resets_at))} The provider keeps the
-              real total, and anything else that uses the same key counts against it too.
+              {limitsNote(choice, usage, formatClockTime(usage.resets_at))}
             </p>
           </div>
         </Stack>
@@ -350,7 +339,7 @@ function KeyControls({
   const save = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     if (!draft.trim()) {
-      setFormError('Enter your API key first.');
+      setFormError('Enter a key first.');
       return;
     }
     setSaving(true);
@@ -366,7 +355,7 @@ function KeyControls({
       toast.show({
         tone: 'success',
         title: 'Key saved',
-        description: 'It is encrypted on this computer.',
+        description: 'Encrypted on this computer.',
       });
     } catch (error) {
       setFormError(describeError(error));
@@ -384,9 +373,12 @@ function KeyControls({
       toast.show({ tone: 'success', title: 'Key removed' });
       setConfirmingRemoval(false);
     } catch (error) {
+      // The dialog goes first: what is said next would otherwise lie underneath it, where
+      // it can neither be read nor dismissed.
+      setConfirmingRemoval(false);
       toast.show({
         tone: 'danger',
-        title: 'The key could not be removed',
+        title: 'Couldn’t remove the key',
         description: describeError(error),
       });
     } finally {
@@ -412,8 +404,8 @@ function KeyControls({
   if (!info.secureStorageAvailable) {
     return (
       <Callout tone="warning" title="Secure storage is unavailable">
-        This computer does not offer encrypted credential storage, so Adle will not save a key.
-        Everything that does not need AI still works.
+        This computer has no encrypted storage, so Adle can’t save a key. Everything except AI
+        generation still works.
       </Callout>
     );
   }
@@ -437,7 +429,7 @@ function KeyControls({
           spellCheck={false}
           placeholder="Paste your key"
           error={formError}
-          description={`Stored encrypted by your operating system. It is never shown again, and it is only ever sent to ${name}, at the address above.`}
+          description={`Encrypted by your operating system, never shown again, and sent only to ${name} at the address above.`}
           trailing={
             <IconButton
               label={revealed ? `Hide the ${name} key` : `Show the ${name} key`}
@@ -457,7 +449,7 @@ function KeyControls({
               onClick={() => void startCheck()}
               aria-describedby={`${provider.provider_id}-check-note`}
             >
-              Check that it works
+              Test key
             </Button>
           ) : null}
           {stored ? (
@@ -477,8 +469,7 @@ function KeyControls({
         </Stack>
         {stored && known ? (
           <p id={`${provider.provider_id}-check-note`} className={styles.muted}>
-            A check asks {name} for one word. It counts as one of today&apos;s requests, and nothing
-            of yours is sent.
+            Sends a one-word test request to {name}. Nothing of yours is sent.
           </p>
         ) : null}
       </form>
@@ -487,7 +478,7 @@ function KeyControls({
       <div role="status" aria-live="polite">
         {checking ? (
           <p className={styles.muted}>
-            {check?.progress_message || 'Asking for one word'}…{' '}
+            {check?.progress_message || 'Testing the key'}…{' '}
             {check ? (
               <Button
                 size="small"
@@ -506,15 +497,14 @@ function KeyControls({
           <p className={styles.checkOk}>
             <CircleCheck aria-hidden="true" />
             <span>
-              {outcome.provider} answered {outcome.took}
-              {outcome.model ? ` (${outcome.model})` : ''}. The key works.
+              The key works. {outcome.model || outcome.provider} answered {outcome.took}.
               {outcome.note ? ` ${outcome.note}` : ''}
             </span>
           </p>
         ) : null}
       </div>
       {!checking && failed ? (
-        <Callout tone="danger" title={`${name} did not answer the check`} urgent>
+        <Callout tone="danger" title={`The ${name} key test failed`} urgent>
           {failed}
         </Callout>
       ) : null}
@@ -522,13 +512,13 @@ function KeyControls({
       <Dialog
         open={confirmingRemoval}
         onClose={() => setConfirmingRemoval(false)}
-        title={`Remove the saved ${name} key?`}
-        description={`Adle will stop being able to send anything to ${name} until you add a key again. Your existing courses and progress are not affected.`}
+        title={`Remove the ${name} key?`}
+        description={`Adle won’t be able to use ${name} until you add a key again. Your courses and progress stay.`}
         dismissible={!removing}
         actions={
           <>
             <Button onClick={() => setConfirmingRemoval(false)} disabled={removing}>
-              Keep key
+              Cancel
             </Button>
             <Button variant="destructive" loading={removing} onClick={() => void remove()}>
               Remove key

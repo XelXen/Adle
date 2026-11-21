@@ -189,15 +189,53 @@ def extract_python_file(text: str) -> str:
 
 # -- tidying text ----------------------------------------------------------------
 
-_PAREN_MATH = re.compile(r"\\\((.+?)\\\)|\\\[(.+?)\\\]", re.DOTALL)
+#: The two ways of writing mathematics that the lesson format does not use.
+_PAREN_MATH = (("\\(", "\\)"), ("\\[", "\\]"))
+#: Nothing a model writes for one field is longer than this; the lesson format's own limits
+#: are far below it. What is past it is not tidied, and is refused by those limits.
+MAX_TIDIED_CHARACTERS = 20_000
+_HIDDEN_MARKS = re.compile("[\u202a-\u202e\u2066-\u2069\u200e\u200f\u061c\u2060\ufeff]")
 _BOLD = re.compile(r"\*\*(.+?)\*\*|__(.+?)__")
 _CODE = re.compile(r"`([^`]+)`")
 _LIST_MARK = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
 
 
+def _dollar_math(text: str) -> str:
+    """Mathematics written as \\( ... \\) or \\[ ... \\], rewritten between dollar signs.
+
+    One pass for each pair. A pattern that looks for "an opening, anything, a closing"
+    starts over at every opening when there is no closing, and text made of openings
+    alone would keep the whole service waiting; an opening with nothing to close it
+    ends the search instead.
+    """
+    for opening, closing in _PAREN_MATH:
+        if opening not in text:
+            continue
+        out: list[str] = []
+        position = 0
+        while True:
+            start = text.find(opening, position)
+            if start < 0:
+                break
+            end = text.find(closing, start + len(opening) + 1)
+            if end < 0:
+                break
+            out.append(text[position:start])
+            out.append("$" + text[start + len(opening) : end].strip() + "$")
+            position = end + len(closing)
+        out.append(text[position:])
+        text = "".join(out)
+    return text
+
+
 def tidy(text: str) -> str:
     """Normalise the formatting habits of a model without changing what is said."""
-    text = _PAREN_MATH.sub(lambda match: f"${(match.group(1) or match.group(2)).strip()}$", text)
+    # Marks that change the direction text is drawn in, or hide in it. A model has no
+    # reason to write one, and they can make a sentence read as something it is not.
+    text = _HIDDEN_MARKS.sub("", text)
+    if len(text) > MAX_TIDIED_CHARACTERS:
+        return " ".join(text.split())
+    text = _dollar_math(text)
     text = _BOLD.sub(lambda match: match.group(1) or match.group(2), text)
     text = _CODE.sub(lambda match: match.group(1), text)
     text = _LIST_MARK.sub("", text)
@@ -439,7 +477,7 @@ def _question(
         item["required_points"] = max(1, math.ceil(len(rubric) / 2))
         item["sample_answer"] = tidy(draft.sample_answer or "")
     else:
-        problems.append(f'{where}: "{draft.form}" is not a question form Adle has')
+        problems.append(f'{where}: "{_named(draft.form)}" is not a question form Adle has')
         return None
     return item
 
@@ -483,7 +521,7 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
         elif kind == "worked_example":
             entry["problem"] = tidy(segment.problem or "")
         elif kind not in ("explanation", "visualization", "summary"):
-            problems.append(f'{where}: "{segment.type}" is not a kind of segment Adle has')
+            problems.append(f'{where}: "{_named(segment.type)}" is not a kind of segment Adle has')
             continue
 
         wants_scene = kind in ("visualization", "interaction") or (
@@ -665,6 +703,19 @@ class ProposedConcept:
             "needs": [{"index": need.index, "reason": need.reason} for need in self.needs],
             "section_ids": self.section_ids,
         }
+
+
+def _named(value: str) -> str:
+    """A model's own word for something, made fit to be quoted back to it.
+
+    What is wrong with a draft is put into the request for a second one. The name of a kind
+    is meant to be one word; whatever came in its place is cut to a few characters of plain
+    text, so that a draft cannot write its own instructions into the next request.
+    """
+    plain = "".join(
+        character if character.isalnum() or character in "_-" else " " for character in value
+    )
+    return " ".join(plain.split())[:32].strip() or "that"
 
 
 def _clip(text: str, limit: int) -> str:

@@ -256,16 +256,23 @@
   box-shadow: var(--ad-shadow-2);
 }
 
+/* What scrolls under the bar fades out before it, instead of being cut by its edge. */
+.controls::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--ad-border-width));
+  left: 0;
+  height: var(--ad-space-6);
+  background: linear-gradient(to top, var(--ad-color-page), transparent);
+  pointer-events: none;
+}
+
 .controlGroup {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--ad-space-2);
-}
-
-.status {
-  font: var(--ad-text-supporting);
-  color: var(--ad-color-muted);
 }
 
 .note {

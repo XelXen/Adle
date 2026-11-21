@@ -1,4 +1,12 @@
 /* The player frame is a bare 16:9 stage. All chrome lives in the Adle host. */
+
+/* The same schemes as the app around it. A frame whose scheme differs from its parent's is
+   given an opaque backdrop by the browser, white in a dark app, which then shows wherever
+   the picture does not reach the edge. */
+:root {
+  color-scheme: light dark;
+}
+
 html,
 body {
   margin: 0;

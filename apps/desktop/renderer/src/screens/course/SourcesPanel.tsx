@@ -103,7 +103,7 @@ export function SourcesPanel({ courseId }: { courseId: string }) {
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'The import could not start',
+        title: 'Couldn’t start the import',
         description: describeError(error),
       });
     } finally {
@@ -133,7 +133,7 @@ export function SourcesPanel({ courseId }: { courseId: string }) {
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'The source could not be removed',
+        title: 'Couldn’t remove the source',
         description: describeError(error),
       });
     } finally {
@@ -149,7 +149,7 @@ export function SourcesPanel({ courseId }: { courseId: string }) {
     <>
       <Section
         title="Course materials"
-        description="Adle reads these files on this computer to build your curriculum and to ground lessons in what your course actually says. Nothing is uploaded when you import."
+        description="Files are read on this computer to build your curriculum and ground your lessons. Importing uploads nothing."
       >
         <div
           className={cx(styles.dropzone, dragging && styles.dropzoneActive)}
@@ -208,10 +208,10 @@ export function SourcesPanel({ courseId }: { courseId: string }) {
 
       <Section title="In this course">
         {list.status === 'loading' ? (
-          <LoadingState title="Reading the course materials…" />
+          <LoadingState title="Loading materials…" />
         ) : list.status === 'error' ? (
           <ErrorState
-            title="The materials could not be listed"
+            title="Couldn’t load materials"
             description={describeError(list.error)}
             actions={<Button onClick={sources.reload}>Try again</Button>}
           />
@@ -219,7 +219,7 @@ export function SourcesPanel({ courseId }: { courseId: string }) {
           <EmptyState
             visual={<FileText />}
             title="No materials yet"
-            description="Add a syllabus, lecture notes, or readings. You can also continue without any: Adle can teach a topic from general knowledge and will say when it is doing so."
+            description="Add a syllabus, lecture notes, or readings. Or continue without: lessons will draw on general knowledge."
           />
         ) : (
           <ul className={styles.sources} aria-label="Materials in this course">
@@ -263,12 +263,12 @@ export function SourcesPanel({ courseId }: { courseId: string }) {
         open={removing !== null}
         onClose={() => setRemoving(null)}
         title={removing ? `Remove “${removing.display_name}”?` : 'Remove source?'}
-        description="Its text will no longer be available to this course. The original file on your computer is not touched."
+        description="Its text will no longer be used in this course. Your original file isn’t touched."
         dismissible={!removeBusy}
         actions={
           <>
             <Button onClick={() => setRemoving(null)} disabled={removeBusy}>
-              Keep it
+              Cancel
             </Button>
             <Button variant="destructive" loading={removeBusy} onClick={() => void removeSource()}>
               Remove source
@@ -284,7 +284,7 @@ function ImportSummary({ job, files }: { job: Job; files: ImportedFile[] }) {
   if (job.status === 'failed') {
     return (
       <Callout tone="danger" urgent title="The import stopped">
-        {job.error_message ?? 'Something went wrong. Nothing was lost; please try again.'}
+        {job.error_message ?? 'Something went wrong. Please try again.'}
       </Callout>
     );
   }
@@ -297,7 +297,7 @@ function ImportSummary({ job, files }: { job: Job; files: ImportedFile[] }) {
   const counts = [
     imported.length > 0 ? `${pluralise(imported.length, 'file')} imported` : null,
     duplicates.length > 0 ? `${duplicates.length} already in this course` : null,
-    rejected.length > 0 ? `${rejected.length} could not be imported` : null,
+    rejected.length > 0 ? `${rejected.length} couldn’t be imported` : null,
   ].filter(Boolean);
   const cancelled = job.status === 'cancelled';
   const title = [cancelled ? 'Import stopped' : null, ...counts].filter(Boolean).join(' · ');
@@ -321,7 +321,7 @@ function ImportSummary({ job, files }: { job: Job; files: ImportedFile[] }) {
           ))}
         </ul>
       ) : (
-        <p>The text was extracted and is ready to use.</p>
+        <p>Text extracted and ready to use.</p>
       )}
     </Callout>
   );
@@ -379,17 +379,14 @@ function SourceSearch({ courseId }: { courseId: string }) {
   else state = { status: 'done', query: answer.query, hits: answer.hits };
 
   return (
-    <Section
-      title="Search your materials"
-      description="Find where your sources discuss something. Each result shows the file and the place it comes from."
-    >
+    <Section title="Search your materials" description="Find where your sources discuss a topic.">
       <TextField
         label="Search your materials"
         hideLabel
         type="search"
         value={query}
         maxLength={200}
-        placeholder="For example: learning rate"
+        placeholder="e.g. learning rate"
         onChange={(event) => setQuery(event.target.value)}
         trailing={
           state.status === 'searching' ? (
@@ -405,13 +402,11 @@ function SourceSearch({ courseId }: { courseId: string }) {
       />
       <div aria-live="polite">
         {state.status === 'error' ? (
-          <Callout tone="danger" title="The search did not work">
+          <Callout tone="danger" title="Search failed">
             {state.message}
           </Callout>
         ) : state.status === 'done' && state.hits.length === 0 ? (
-          <p className={styles.noResults}>
-            Nothing in your materials matches “{state.query}”. Try a different word.
-          </p>
+          <p className={styles.noResults}>No matches for “{state.query}”. Try a different word.</p>
         ) : state.status === 'done' ? (
           <ol className={styles.hits} aria-label={`Results for ${state.query}`}>
             {state.hits.map((hit) => (

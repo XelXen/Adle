@@ -7,9 +7,10 @@
  * that every value here still equals the token it mirrors.
  *
  * The stage, its ink and its muted text have tokens of their own (`--ad-color-scene-*`).
- * These values are written into every scene file there is, in the sample course and in
- * lessons already generated on people's computers, so they stay as they are when the
- * interface around the stage is redesigned.
+ * The ink, the muted text and the accents are written into every scene file there is, in
+ * the sample course and in lessons already generated on people's computers, so they stay
+ * as they are when the interface around the stage is redesigned. The background is not in
+ * any file: the player supplies it, so it can follow the surface it lies on.
  */
 
 export interface ScenePalette {
@@ -49,7 +50,7 @@ export const SCENE_PALETTE: Record<'light' | 'dark', ScenePalette> = {
     violet: '#9178D7',
   },
   dark: {
-    background: '#18211C',
+    background: '#141414',
     ink: '#E7EFE9',
     muted: '#9DB0A5',
     green: '#3DBE7F',

@@ -80,7 +80,7 @@ test.describe('generation with the AI provider', () => {
       page.getByRole('heading', { name: 'Custom endpoint (127.0.0.1)', exact: true }),
     ).toBeVisible();
     // It is the only provider there is, so there is nothing to choose between.
-    await expect(page.getByRole('group', { name: 'Which provider to use' })).toHaveCount(0);
+    await expect(page.getByRole('group', { name: 'Provider' })).toHaveCount(0);
     await expect(page.getByText('0 of 90', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Library', exact: true }).click();
 
@@ -88,21 +88,21 @@ test.describe('generation with the AI provider', () => {
 
     // ---- Suggestions: what will be sent is said before anything is sent ----
     await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
-    const ask = page.getByRole('dialog', { name: 'Ask the AI for concepts?' });
-    await expect(ask).toContainText("this course's name, topic, and description");
+    const ask = page.getByRole('dialog', { name: 'Suggest concepts with AI?' });
+    await expect(ask).toContainText('the course name, topic, and description');
     await expect(ask).toContainText('Custom endpoint (127.0.0.1)');
-    await expect(ask).toContainText('Nothing is added to the course until you have looked');
+    await expect(ask).toContainText('Nothing is added until you review the suggestions');
     expect(provider.requests).toHaveLength(0);
-    await ask.getByRole('button', { name: 'Send and suggest' }).click();
+    await ask.getByRole('button', { name: 'Suggest concepts' }).click();
 
     // ---- The suggestions open for review; nothing is in the course yet ----
     const review = page.getByRole('dialog', { name: 'Suggested concepts' });
     await expect(review).toBeVisible({ timeout: 30_000 });
-    await expect(review).toContainText('It did not see any of your materials.');
+    await expect(review).toContainText('from your course details only');
     await expect(review.getByRole('checkbox')).toHaveCount(3);
     await expect(review.getByRole('checkbox', { name: 'Limits' })).toBeChecked();
     await expect(review).toContainText(
-      'Needs first: Limits (The derivative is defined as a limit.)',
+      'Prerequisites: Limits (The derivative is defined as a limit.)',
     );
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'generation-proposal');
@@ -110,14 +110,14 @@ test.describe('generation with the AI provider', () => {
     // Dropping a suggestion that another builds on is said, not silently repaired.
     await review.getByRole('checkbox', { name: 'The derivative as a limit' }).uncheck();
     await expect(
-      review.getByText('It builds on a suggestion you have not kept. That link will not be added.'),
+      review.getByText('Builds on a suggestion you didn’t keep, so that link won’t be added.'),
     ).toBeVisible();
     await review.getByRole('button', { name: 'Add 2 concepts' }).click();
 
     await expect(pathList(page).getByRole('listitem')).toHaveCount(2);
     await expect(page.getByRole('status').filter({ hasText: '2 concepts added' })).toBeVisible();
     await expect(pathList(page).getByRole('listitem').nth(1)).toContainText('Needs Limits');
-    await expect(detail(page, 'Limits')).toContainText('Proposed by the AI.');
+    await expect(detail(page, 'Limits')).toContainText('Suggested by AI.');
     await expect(page.getByText('Suggestions are ready')).toHaveCount(0);
 
     expect(provider.requests.map((request) => request.kind)).toEqual(['curriculum']);
@@ -127,11 +127,10 @@ test.describe('generation with the AI provider', () => {
 
     // ---- A lesson: what is sent is beside the button; progress can be watched ----
     const limits = detail(page, 'Limits');
-    await expect(limits).toContainText('No lesson has been made for this concept yet.');
+    await expect(limits).toContainText('No lessons yet.');
     await expect(limits).toContainText(
-      "Sends to Custom endpoint (127.0.0.1): this course's name, this concept and its " +
-        'objectives, where you stand on it in a few words, your preferences for pace and ' +
-        'depth, and your goal.',
+      'Sends the course name, this concept and its objectives, and your level, ' +
+        'preferences, and goal to Custom endpoint (127.0.0.1).',
     );
     await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
     await expect(limits.getByRole('progressbar')).toBeVisible();
@@ -161,21 +160,21 @@ test.describe('generation with the AI provider', () => {
     await expect(
       page.getByRole('heading', { name: 'How a neuron weighs its inputs' }),
     ).toBeVisible();
-    await expect(page.getByText('From general knowledge, not from your materials.')).toBeVisible();
+    await expect(page.getByText('From general knowledge')).toBeVisible();
     await expect(page.getByText('Part 1 of 8')).toBeVisible();
     const next = page.getByRole('button', { name: 'Continue', exact: true });
     await next.click();
     const picture = page.getByRole('figure', { name: 'The weighted sum' });
-    await expect(picture.getByText('Preparing the visualization…')).toBeHidden({ timeout: 30_000 });
-    await expect(picture.getByText('The animation could not be shown')).toHaveCount(0);
+    await expect(picture.getByText('Loading animation…')).toBeHidden({ timeout: 30_000 });
+    await expect(picture.getByText('Couldn’t show the animation')).toHaveCount(0);
     await next.click();
     await page.getByRole('radio', { name: 'The first input' }).check();
     await page.getByRole('button', { name: 'Check answer' }).click();
-    await expect(page.getByText('That is right')).toBeVisible();
+    await expect(page.getByText('Correct', { exact: true })).toBeVisible();
 
     // ---- The local count of what was sent ----
     // A lesson has the whole window; the way to the rest of the app is back through the course.
-    await page.getByRole('button', { name: 'Back to the course' }).click();
+    await page.getByRole('button', { name: 'Back to course' }).click();
     await page.getByRole('navigation').getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByText('4 of 90', { exact: true })).toBeVisible();
     await expect(page.getByText(/about 7,200 of 900,000/)).toBeVisible();
@@ -187,9 +186,9 @@ test.describe('generation with the AI provider', () => {
       .getByRole('navigation')
       .getByRole('button', { name: 'Library', exact: true })
       .click();
-    await expect(page.getByRole('heading', { name: 'Pick up where you left off' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Continue learning' })).toBeVisible();
     const pickUp = page.getByRole('region', {
-      name: 'Continue "How a neuron weighs its inputs"',
+      name: 'Continue “How a neuron weighs its inputs”',
     });
     await expect(pickUp).toContainText('Calculus refresher');
     await expect(pickUp).toContainText('Why:');
@@ -208,15 +207,15 @@ test.describe('generation with the AI provider', () => {
       .getByRole('button', { name: 'Remove lesson: How a neuron weighs its inputs' })
       .click();
     const removal = page.getByRole('dialog', { name: /^Remove “How a neuron weighs its inputs”/ });
-    await expect(removal).toContainText('What you have shown you know about the concept stays');
-    await removal.getByRole('button', { name: 'Keep it' }).click();
+    await expect(removal).toContainText('Your progress on the concept stays');
+    await removal.getByRole('button', { name: 'Cancel' }).click();
     await expect(lessons.getByRole('listitem')).toHaveCount(1);
     await limits
       .getByRole('button', { name: 'Remove lesson: How a neuron weighs its inputs' })
       .click();
     await removal.getByRole('button', { name: 'Remove lesson' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Lesson removed' })).toBeVisible();
-    await expect(limits).toContainText('No lesson has been made for this concept yet.');
+    await expect(limits).toContainText('No lessons yet.');
 
     expect(session.adle.problems).toEqual([]);
     await close(session);
@@ -232,7 +231,7 @@ test.describe('generation with the AI provider', () => {
 
     await detail(page, 'Limits').getByRole('button', { name: 'Create a lesson with AI' }).click();
     const refusal = detail(page, 'Limits').getByRole('alert');
-    await expect(refusal).toContainText('The lesson could not be made');
+    await expect(refusal).toContainText('Couldn’t create the lesson');
     await expect(refusal).toContainText('Add your AI provider key in Settings to use this.');
     expect(provider.requests).toHaveLength(0);
 
@@ -261,18 +260,16 @@ test.describe('generation with the AI provider', () => {
     await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
 
     const failure = limits.getByRole('alert');
-    await expect(failure).toContainText('The lesson could not be made', { timeout: 30_000 });
+    await expect(failure).toContainText('Couldn’t create the lesson', { timeout: 30_000 });
     // Whose words they are, the words themselves, and what they are about.
     await expect(failure).toContainText(
-      'The AI provider answered with a notice of its own instead of passing this to the model.',
+      'The AI provider returned an account notice instead of an answer.',
     );
     await expect(failure).toContainText(`It said: "${notice}"`);
-    await expect(failure).toContainText(
-      'This is about your account with the provider, not about Adle. Nothing was changed.',
-    );
+    await expect(failure).toContainText('This is about your account with the provider, not Adle.');
     // The address in it is text. Nothing in a provider's words becomes something to press.
     await expect(failure.getByRole('link')).toHaveCount(0);
-    await expect(limits).toContainText('No lesson has been made for this concept yet.');
+    await expect(limits).toContainText('No lessons yet.');
     // It was not mistaken for a bad draft and asked for again: one request, not two.
     expect(provider.requests).toHaveLength(1);
     // Asking again cannot help, so that is not what is offered.
@@ -304,9 +301,9 @@ test.describe('generation with the AI provider', () => {
     provider.queue({ status: 500 });
     await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
     const failure = limits.getByRole('alert');
-    await expect(failure).toContainText('The lesson could not be made', { timeout: 30_000 });
-    await expect(failure).toContainText('The AI provider reported a problem on its side.');
-    await expect(limits).toContainText('No lesson has been made for this concept yet.');
+    await expect(failure).toContainText('Couldn’t create the lesson', { timeout: 30_000 });
+    await expect(failure).toContainText('The AI provider had a problem on its side.');
+    await expect(limits).toContainText('No lessons yet.');
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'generation-failed-dark');
     // A failed request is not repeated by itself.
@@ -322,7 +319,7 @@ test.describe('generation with the AI provider', () => {
     // ---- Four requests in a minute is the limit Adle keeps: the fifth waits, and says so ----
     await limits.getByRole('button', { name: 'Create another lesson with AI' }).click();
     await expect(
-      limits.getByText(/Waiting about \d+ seconds to stay within the provider's rate limit/),
+      limits.getByText(/Waiting about \d+ seconds to stay under the rate limit/),
     ).toBeVisible({ timeout: 15_000 });
     expect(provider.requests).toHaveLength(4);
 
@@ -351,7 +348,7 @@ test.describe('generation with the AI provider', () => {
 
     provider.queue(HANG);
     await page.getByRole('button', { name: 'Suggest concepts with AI' }).click();
-    await page.getByRole('button', { name: 'Send and suggest' }).click();
+    await page.getByRole('button', { name: 'Suggest concepts', exact: true }).click();
     await expect(page.getByRole('progressbar')).toBeVisible();
     await expect.poll(() => provider.requests.length).toBe(1);
     // Asking again while it runs is not possible, so the same work cannot be started twice.
@@ -367,7 +364,7 @@ test.describe('generation with the AI provider', () => {
 
     const ready = page.getByRole('status').filter({ hasText: 'Suggestions are ready' });
     await expect(ready).toBeVisible({ timeout: 30_000 });
-    await expect(ready).toContainText('suggested 3 concepts for this course');
+    await expect(ready).toContainText('suggested 3 concepts. Nothing is added until you choose.');
     await expect(page.getByRole('heading', { name: 'No concepts yet' })).toBeVisible();
     await ready.getByRole('button', { name: 'Review suggestions' }).click();
 
@@ -376,7 +373,7 @@ test.describe('generation with the AI provider', () => {
     await expect(ready).toBeVisible();
 
     await ready.getByRole('button', { name: 'Review suggestions' }).click();
-    await review.getByRole('button', { name: 'Discard suggestions' }).click();
+    await review.getByRole('button', { name: 'Discard' }).click();
     await expect(page.getByText('Suggestions are ready')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'No concepts yet' })).toBeVisible();
     expect(provider.requests).toHaveLength(1);

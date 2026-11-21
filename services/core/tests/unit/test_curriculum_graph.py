@@ -133,7 +133,7 @@ def test_a_loop_is_reported_once_as_the_path_that_closes_it() -> None:
     assert [issue.code for issue in issues] == [IssueCode.CYCLE]
     assert issues[0].severity is Severity.ERROR
     assert issues[0].concept_ids == ("a", "b", "c")
-    assert '"A" needs "B" needs "C" needs "A"' in issues[0].message
+    assert "“A” needs “B” needs “C” needs “A”" in issues[0].message
     assert has_errors(issues)
     with pytest.raises(GraphError):
         learning_order(graph)

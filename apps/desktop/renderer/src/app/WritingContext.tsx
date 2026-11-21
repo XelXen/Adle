@@ -16,13 +16,18 @@ import { getBridge } from '../lib/bridge';
 import { callCore } from '../lib/core-client';
 import { jobFailure, KIND_LESSON, KIND_PROPOSAL, readLessonOutcome } from '../lib/generation';
 import { useApp } from './AppContext';
-import { useRouter } from './router';
+import { type Route, useRouter } from './router';
 
 interface WritingValue {
   /** Lessons and lists of concepts being written, in any course, oldest first. */
   jobs: readonly Job[];
-  /** The last piece of long work that finished while the app was open, until put away. */
+  /**
+   * The last piece of long work that finished while the learner was somewhere that did not
+   * show it, until they have seen it.
+   */
   finished: Job | null;
+  /** When it finished, by this computer's clock. */
+  finishedAt: number | null;
   /** Read the list again now: something was just started. */
   refresh: () => void;
   /** Put the last finished piece of work away: the learner has seen it. */
@@ -35,6 +40,28 @@ const WritingContext = createContext<WritingValue | null>(null);
 const BUSY_MS = 1500;
 const IDLE_MS = 6000;
 
+const NO_JOBS: readonly Job[] = [];
+
+/**
+ * Whether the screen the learner is on shows what became of a piece of work by itself.
+ *
+ * A break taken to wait for it does. So does the tab of its course that it changes: a
+ * lesson appears under Learn and under Curriculum, suggested concepts under Curriculum.
+ * The Materials tab shows neither.
+ */
+export function showsOutcome(here: Route, job: Pick<Job, 'kind' | 'course_id'>): boolean {
+  if (here.name === 'break') return true;
+  if (here.name !== 'course' || here.courseId !== job.course_id) return false;
+  return job.kind === KIND_LESSON ? here.tab !== 'sources' : here.tab === 'curriculum';
+}
+
+/** Whether the learner has arrived where a finished piece of work is to be found. */
+export function isWhereItIs(here: Route, job: Job): boolean {
+  if (here.name === 'course') return here.courseId === job.course_id;
+  if (here.name === 'lesson') return here.lessonId === readLessonOutcome(job)?.lessonId;
+  return false;
+}
+
 /**
  * What is being written for the learner, wherever they are in the app (ADR-026).
  *
@@ -43,15 +70,16 @@ const IDLE_MS = 6000;
  * when it arrives (or cannot be finished) the app says so, and asks the operating
  * system to say so too if Adle is not what they are looking at.
  *
- * The screen a piece of work was started from shows its progress and its outcome
- * itself; this adds nothing there, so nothing is said twice.
+ * Something that arrived is said once, unless the screen in front of the learner shows
+ * it already. Something that could not be finished is always said: the place that would
+ * show it may be a part of the page they are not looking at.
  */
 export function WritingProvider({ children }: { children: ReactNode }) {
   const { coreStatus } = useApp();
   const { route } = useRouter();
   const toast = useToast();
-  const [jobs, setJobs] = useState<readonly Job[]>([]);
-  const [finished, setFinished] = useState<Job | null>(null);
+  const [jobs, setJobs] = useState<readonly Job[]>(NO_JOBS);
+  const [arrived, setArrived] = useState<{ job: Job; at: number } | null>(null);
   const [tick, setTick] = useState(0);
   /** Where the learner is now, for the moment something finishes. */
   const where = useRef(route);
@@ -59,6 +87,10 @@ export function WritingProvider({ children }: { children: ReactNode }) {
     where.current = route;
   });
   const known = useRef<ReadonlySet<string>>(new Set());
+  /** What has been said already, so that nothing is said twice. */
+  const said = useRef(new Set<string>());
+  /** Counts the times the list has been asked for: only the latest answer is used. */
+  const asked = useRef(0);
   /** False once the app is closing. Not the same as one turn of looking being over. */
   const alive = useRef(true);
   useEffect(() => {
@@ -73,35 +105,34 @@ export function WritingProvider({ children }: { children: ReactNode }) {
 
   const announce = useCallback(
     (job: Job) => {
+      if (said.current.has(job.id)) return;
+      if (job.status !== 'succeeded' && job.status !== 'failed') return;
+      said.current.add(job.id);
       const here = where.current;
-      // The course it belongs to shows it already, and so does a break taken to wait for it.
-      const shownHere =
-        here.name === 'break' || (here.name === 'course' && here.courseId === job.course_id);
+      const lesson = job.kind === KIND_LESSON;
+      // Kept for a break to show, unless the learner is already where it is.
+      if (!isWhereItIs(here, job)) setArrived({ job, at: Date.now() });
+
       if (job.status === 'succeeded') {
-        setFinished(job);
-        const lesson = job.kind === KIND_LESSON;
         void getBridge().app.notify(lesson ? 'lesson_ready' : 'concepts_ready');
-        if (shownHere) return;
+        if (showsOutcome(here, job)) return;
         toast.show({
           tone: 'success',
           title: lesson ? 'Your lesson is ready' : 'Suggested concepts are ready',
           description: lesson
             ? (readLessonOutcome(job)?.title ?? undefined)
-            : 'Open the course to look at them.',
+            : 'Open the course to review them.',
         });
-      } else if (job.status === 'failed') {
-        setFinished(job);
-        void getBridge().app.notify('writing_stopped');
-        if (shownHere) return;
-        toast.show({
-          tone: 'danger',
-          title:
-            job.kind === KIND_LESSON
-              ? 'The lesson could not be written'
-              : 'The suggestions could not be made',
-          description: jobFailure(job)?.message,
-        });
+        return;
       }
+      void getBridge().app.notify('writing_stopped');
+      // A break shows it in full, with the way to the course beside it.
+      if (here.name === 'break') return;
+      toast.show({
+        tone: 'danger',
+        title: lesson ? 'Couldn’t write the lesson' : 'Couldn’t suggest concepts',
+        description: jobFailure(job)?.message,
+      });
     },
     [toast],
   );
@@ -110,9 +141,13 @@ export function WritingProvider({ children }: { children: ReactNode }) {
     if (!ready) return;
     let cancelled = false;
     const look = (): void => {
+      asked.current += 1;
+      const mine = asked.current;
       callCore('jobs.list_writing').then(
         (list) => {
-          if (cancelled) return;
+          // An answer that was overtaken by a later one says nothing new, and could
+          // bring back something that has finished since.
+          if (cancelled || mine !== asked.current) return;
           const now = new Set(list.jobs.map((job) => job.id));
           const gone = [...known.current].filter((id) => !now.has(id));
           known.current = now;
@@ -146,11 +181,19 @@ export function WritingProvider({ children }: { children: ReactNode }) {
   }, [ready, busy, tick, announce]);
 
   const refresh = useCallback(() => setTick((count) => count + 1), []);
-  const acknowledge = useCallback(() => setFinished(null), []);
+  const acknowledge = useCallback(() => setArrived(null), []);
 
+  // Once the learner is where it is, it has been seen: a later break has nothing to say of
+  // it. Put away while rendering, so that not one frame shows it in the wrong place.
+  if (arrived !== null && isWhereItIs(route, arrived.job)) setArrived(null);
+  const finished = arrived?.job ?? null;
+  const finishedAt = arrived?.at ?? null;
+
+  // While the core is away nothing is being written, whatever the list last said.
+  const shown = ready ? jobs : NO_JOBS;
   const value = useMemo(
-    () => ({ jobs, finished, refresh, acknowledge }),
-    [jobs, finished, refresh, acknowledge],
+    () => ({ jobs: shown, finished, finishedAt, refresh, acknowledge }),
+    [shown, finished, finishedAt, refresh, acknowledge],
   );
   return <WritingContext.Provider value={value}>{children}</WritingContext.Provider>;
 }

@@ -97,7 +97,7 @@ export function ConceptMap({
                 aria-label={
                   needs.length > 0
                     ? `${node.title}. Needs ${needs.join(', ')}.`
-                    : `${node.title}. Needs nothing first.`
+                    : `${node.title}. No prerequisites.`
                 }
                 onClick={() => onSelect(node.id)}
               >
@@ -108,7 +108,7 @@ export function ConceptMap({
         </div>
       </div>
       <p className={styles.mapCaption}>
-        Each concept sits below what it needs. Arrows point from a prerequisite to what it unlocks.
+        Each concept sits below its prerequisites. Arrows point to what it unlocks.
       </p>
     </>
   );

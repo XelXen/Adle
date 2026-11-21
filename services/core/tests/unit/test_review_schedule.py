@@ -99,7 +99,7 @@ def test_a_miss_brings_the_concept_back_tomorrow(outcome: Outcome) -> None:
     assert decision.state == ReviewState(
         interval_days=1.0, due_at=NOW + timedelta(days=1), streak=0
     )
-    assert decision.reason == "That one slipped, so it comes back tomorrow."
+    assert decision.reason == "That one slipped, so it’ll come back tomorrow."
 
 
 def test_reviews_pause_while_a_concept_is_being_relearned() -> None:
@@ -130,9 +130,7 @@ def test_repeating_something_straight_away_is_not_another_recall() -> None:
         state, outcome=Outcome.CORRECT, probability=SOLID, now=NOW + timedelta(minutes=10)
     )
     assert decision.state == state
-    assert (
-        decision.reason == "Practised again before the review was due; the schedule stays as it is."
-    )
+    assert decision.reason == "Practised before the review was due. The schedule is unchanged."
 
 
 def test_recalling_after_a_longer_gap_than_planned_earns_bounded_credit() -> None:

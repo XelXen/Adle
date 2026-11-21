@@ -10,6 +10,12 @@
   pointer-events: none;
 }
 
+/* A lesson or a round of questions has its controls along the foot of the window. A toast
+   says something about them at times, and must not lie on top of them. */
+:global(html[data-ad-focus]) .region {
+  bottom: calc(var(--ad-layout-bar-height) + var(--ad-space-7));
+}
+
 .toast {
   display: flex;
   align-items: flex-start;

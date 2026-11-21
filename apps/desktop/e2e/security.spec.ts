@@ -2,11 +2,83 @@
  * The process and origin boundaries described in SECURITY.md, checked from
  * inside the running app rather than assumed from configuration.
  */
+import dgram from 'node:dgram';
 import { existsSync } from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 
 import { expect, test, waitForCore } from './support/app';
 import { fixtureScene, mountRawPlayer } from './support/player';
+
+/** Somewhere on this computer to see whether anything arrives, by UDP or by TCP. */
+async function listeners(): Promise<{
+  udpPort: number;
+  tcpPort: number;
+  arrived: () => string[];
+  close: () => void;
+}> {
+  const seen: string[] = [];
+  const udp = dgram.createSocket('udp4');
+  udp.on('message', (message) => seen.push(`udp:${message.length}`));
+  await new Promise<void>((resolve) => udp.bind(0, '127.0.0.1', resolve));
+  const tcp = net.createServer((socket) => {
+    seen.push('tcp');
+    socket.on('error', () => undefined);
+  });
+  await new Promise<void>((resolve) => tcp.listen(0, '127.0.0.1', resolve));
+  return {
+    udpPort: udp.address().port,
+    tcpPort: (tcp.address() as net.AddressInfo).port,
+    arrived: () => [...seen],
+    close: () => {
+      udp.close();
+      tcp.close();
+    },
+  };
+}
+
+/**
+ * Runs in the page or in a player frame: reach out in the ways that are not requests, so
+ * that neither the request filter nor `connect-src` is what stops them. A peer connection
+ * sends packets of its own to the servers it is given; a hint in the document opens a
+ * connection ahead of time.
+ */
+async function reachOutWithoutARequest(ports: {
+  udpPort: number;
+  tcpPort: number;
+}): Promise<{ candidates: string[]; failed: string | null }> {
+  const candidates: string[] = [];
+  let failed: string | null = null;
+  try {
+    const peer = new RTCPeerConnection({
+      iceServers: [
+        { urls: `stun:127.0.0.1:${ports.udpPort}` },
+        {
+          urls: `turn:127.0.0.1:${ports.tcpPort}?transport=tcp`,
+          username: 'what-the-page-knows',
+          credential: 'x',
+        },
+      ],
+    });
+    peer.onicecandidate = (event) => {
+      if (event.candidate) candidates.push(event.candidate.candidate);
+    };
+    peer.createDataChannel('out');
+    await peer.setLocalDescription(await peer.createOffer());
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    peer.close();
+  } catch (error) {
+    failed = String(error);
+  }
+  for (const rel of ['preconnect', 'dns-prefetch']) {
+    const link = document.createElement('link');
+    link.rel = rel;
+    link.href = `http://127.0.0.1:${ports.tcpPort}`;
+    document.head.appendChild(link);
+  }
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  return { candidates, failed };
+}
 
 test.describe('renderer boundary', () => {
   test('the renderer has no Node access and only the documented bridge', async ({ adle }) => {
@@ -69,6 +141,23 @@ test.describe('renderer boundary', () => {
     expect(app.windows()).toHaveLength(1);
   });
 
+  test('the renderer cannot reach the network by a road that is not a request', async ({
+    adle,
+  }) => {
+    const there = await listeners();
+    try {
+      const found = await adle.page.evaluate(reachOutWithoutARequest, {
+        udpPort: there.udpPort,
+        tcpPort: there.tcpPort,
+      });
+      // No address was even gathered for a peer connection, and nothing left the page.
+      expect(found.candidates).toEqual([]);
+      expect(there.arrived()).toEqual([]);
+    } finally {
+      there.close();
+    }
+  });
+
   test('inline script is refused by the content security policy', async ({ adle }) => {
     const ran = await adle.page.evaluate(() => {
       const script = document.createElement('script');
@@ -93,6 +182,18 @@ test.describe('renderer boundary', () => {
       forgedDrop: await window.adle!.sources.importDropped('crs_00000000000000000000', [
         new File(['not on disk'], 'C:/Windows/win.ini'),
       ]),
+      // Nor is something that only looks like a list of files, with methods of its own
+      // that hand back whatever paths the page likes.
+      forgedList: await window.adle!.sources.importDropped('crs_00000000000000000000', {
+        length: 1,
+        0: 'C:/Windows/win.ini',
+        map: () => ['C:/Windows/win.ini'],
+        filter: () => ['C:/Windows/win.ini'],
+      } as never),
+      forgedPaths: await window.adle!.sources.importDropped('crs_00000000000000000000', [
+        'C:/Windows/win.ini',
+        '\\\\elsewhere\\share\\notes.txt',
+      ] as never),
       badCourse: await window.adle!.sources.importWithPicker('../../etc'),
       prototype: await window.adle!.core.invoke('constructor'),
       external: await window.adle!.app.openExternal('https://example.com/' as never).then(
@@ -109,6 +210,8 @@ test.describe('renderer boundary', () => {
     expect(results.importPaths).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     // A File made by page script has no path behind it, so there is nothing to import.
     expect(results.forgedDrop).toMatchObject({ ok: false, error: { code: 'no_files' } });
+    expect(results.forgedList).toMatchObject({ ok: false, error: { code: 'no_files' } });
+    expect(results.forgedPaths).toMatchObject({ ok: false, error: { code: 'no_files' } });
     expect(results.badCourse).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     expect(results.prototype).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     expect(results.external).toBe('refused');
@@ -198,6 +301,26 @@ test.describe('generated scene boundary', () => {
     });
     expect(page.url()).toBe('adle://app/index.html');
     expect(adle.app.windows()).toHaveLength(1);
+  });
+
+  test('script in a player frame cannot reach the network by a road that is not a request', async ({
+    adle,
+  }) => {
+    const player = await mountRawPlayer(adle.page, 'e2ewebrtc');
+    await player.waitFor(`m.type === 'ready'`);
+    const frame = adle.page.frames().find((candidate) => candidate.url().startsWith(player.origin));
+    expect(frame).toBeDefined();
+    const there = await listeners();
+    try {
+      const found = await frame!.evaluate(reachOutWithoutARequest, {
+        udpPort: there.udpPort,
+        tcpPort: there.tcpPort,
+      });
+      expect(found.candidates).toEqual([]);
+      expect(there.arrived()).toEqual([]);
+    } finally {
+      there.close();
+    }
   });
 
   test('raw JavaScript in a scene still runs only inside the sandbox', async ({ adle }) => {

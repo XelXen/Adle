@@ -170,6 +170,10 @@ def main(argv: list[str] | None = None) -> int:
         stream=sys.stderr,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    # The HTTP client writes a line for every request, with the address and whatever
+    # reason phrase the other side chose to send. Neither belongs in the log.
+    for chatty in ("httpx2", "httpcore2", "httpx", "httpcore"):
+        logging.getLogger(chatty).setLevel(logging.WARNING)
     args = _parse_args(argv)
     try:
         settings = Settings.from_environment(args.data_dir)

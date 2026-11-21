@@ -134,7 +134,65 @@ export async function settled(page: Page): Promise<void> {
   });
 }
 
-/** Fail on any WCAG 2.2 AA violation axe can detect on the current screen. */
+/**
+ * What can be pressed but lies where a press moves the window instead (ADR-030).
+ *
+ * Along its top the window is held to be moved (`WindowStrip`). The browser cuts every box
+ * that says `no-drag` out of that region, so a control there is fine exactly when it, or
+ * something around it, says so. Whether something is really drawn at a point is asked of
+ * the browser, so a control scrolled out of sight under the strip is not counted.
+ *
+ * A real press cannot be tried from here: a test's clicks do not pass through the frame of
+ * the window. This checks where things lie.
+ */
+export async function pressableUnderTheStrip(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const regionOf = (element: Element): string => {
+      const style = getComputedStyle(element) as CSSStyleDeclaration & { appRegion?: string };
+      return style.appRegion ?? style.getPropertyValue('-webkit-app-region');
+    };
+    const held = [...document.querySelectorAll('body *')]
+      .filter((element) => regionOf(element) === 'drag')
+      .map((element) => element.getBoundingClientRect())
+      .filter((box) => box.width > 0 && box.height > 0);
+    if (held.length === 0) return [];
+
+    const spared = (element: Element): boolean => {
+      for (let at: Element | null = element; at; at = at.parentElement) {
+        if (regionOf(at) === 'no-drag') return true;
+      }
+      return false;
+    };
+    const found: string[] = [];
+    const pressable = document.querySelectorAll<HTMLElement>(
+      'button, a[href], input, select, textarea, summary, [role="button"], [role="tab"], ' +
+        '[role="slider"], [role="switch"], [role="radio"], [role="checkbox"]',
+    );
+    for (const element of pressable) {
+      const box = element.getBoundingClientRect();
+      for (const strip of held) {
+        const left = Math.max(box.left, strip.left);
+        const right = Math.min(box.right, strip.right);
+        const top = Math.max(box.top, strip.top);
+        const bottom = Math.min(box.bottom, strip.bottom);
+        if (right - left < 1 || bottom - top < 1) continue;
+        // Is it drawn there at all, in front of the strip or behind it?
+        const drawn = document
+          .elementsFromPoint((left + right) / 2, (top + bottom) / 2)
+          .some((at) => at === element || element.contains(at));
+        if (!drawn || spared(element)) continue;
+        const name = element.getAttribute('aria-label') ?? element.textContent ?? '';
+        found.push(`${element.tagName.toLowerCase()} "${name.trim().slice(0, 40)}"`);
+      }
+    }
+    return found;
+  });
+}
+
+/**
+ * Fail on any WCAG 2.2 AA violation axe can detect on the current screen, and on anything
+ * that can be pressed but lies where a press would move the window.
+ */
 export async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   await settled(page);
   const axe = await new AxeBuilder({ page })
@@ -147,6 +205,7 @@ export async function expectNoAccessibilityViolations(page: Page): Promise<void>
       nodes: violation.nodes.map((node) => node.target.join(' ')),
     })),
   ).toEqual([]);
+  expect(await pressableUnderTheStrip(page), 'under the strip the window is moved by').toEqual([]);
 }
 
 /** Save a screenshot of the window for visual review (not compared against a baseline). */

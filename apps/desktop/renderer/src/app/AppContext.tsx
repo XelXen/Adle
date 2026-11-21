@@ -40,6 +40,12 @@ export function AppProvider({ initialInfo, initialCoreStatus, children }: AppPro
     return unsubscribe;
   }, []);
 
+  // The state of the app's own service, on the document itself. Nothing is drawn while all is
+  // well (see `CoreStatusIndicator`), so this is where a stylesheet or a test can read it.
+  useEffect(() => {
+    document.documentElement.dataset.core = coreStatus.state;
+  }, [coreStatus.state]);
+
   const updateUi = useCallback(async (patch: Partial<UiState>) => {
     setUi(await getBridge().app.updateUiState(patch));
   }, []);

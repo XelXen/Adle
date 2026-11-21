@@ -18,7 +18,7 @@ from adle_core.generation.drafts import (
 from adle_core.learner_model.next_step import MAX_LESSONS_PER_CONCEPT
 from adle_core.lessons.bundle import parse_bundle
 from adle_core.lessons.ir import MAX_PRACTICE_ITEMS, STRATEGIES, Lesson
-from adle_core.lessons.player import player_view
+from adle_core.lessons.player import ItemMask, player_view
 from tests.support.model import LESSON, FakeProvider
 from tests.unit.test_drafts import CONTEXT
 from tests.unit.test_generation_api import add_concept, finished, keyed, topic_course  # noqa: F401
@@ -61,7 +61,7 @@ def test_practice_questions_follow_the_same_rules_as_the_others() -> None:
 
 def test_the_player_is_not_given_the_practice_questions() -> None:
     parsed = parse_bundle(bundle(practice=[choice("q_kept_for_later")]))
-    view = player_view(parsed.lesson).model_dump(mode="json")
+    view = player_view(parsed.lesson, ItemMask(b"x" * 32)).model_dump(mode="json")
     assert "practice" not in view
     assert "q_kept_for_later" not in str(view)
 
@@ -141,7 +141,7 @@ def test_the_prompt_asks_for_practice_questions_and_names_the_way_to_teach() -> 
         title="Weights", summary="", objectives=["Compute a weighted sum."], prerequisites=[]
     )
     learner = prompts.LearnerBrief(
-        knowledge="Not assessed.", pace="moderate", explanation_density="moderate", goal=""
+        knowledge="Not started.", pace="moderate", explanation_density="moderate", goal=""
     )
     plain = prompts.lesson_request(
         course_title="Networks", concept=concept, learner=learner, passages=[]
@@ -230,7 +230,7 @@ def test_explanations_of_one_concept_are_bounded(
     assert refused.status_code == 409
     assert refused.json()["error"]["message"] == (
         f"This concept already has {MAX_LESSONS_PER_CONCEPT} lessons. "
-        "Remove one you no longer want before creating another."
+        "Remove one before creating another."
     )
     assert len(provider.requests) == sent
 

@@ -15,7 +15,7 @@ from adle_core.evaluation.scoring import (
 )
 from adle_core.learner_model.bkt import Outcome
 from adle_core.lessons.ir import AssessmentItem
-from adle_core.lessons.player import player_question
+from adle_core.lessons.player import ItemMask, player_question
 
 CONCEPT = "con_00000000000000000001"
 _ITEM = TypeAdapter(AssessmentItem)
@@ -50,6 +50,9 @@ CHOICE = item(
 )
 NUMERIC = item("numeric", expected=-0.5, tolerance=0.01, unit="V")
 SHORT = item("short_answer", accepted=["Bias", "the bias term"])
+#: What only the core has. Another installation has another.
+MASK = ItemMask(b"a secret that never leaves the core")
+
 ORDERING = item(
     "ordering",
     items=[
@@ -223,7 +226,7 @@ def test_a_response_that_does_not_fit_the_question_is_refused_not_marked_wrong(
 
 def test_the_player_never_receives_an_answer_key() -> None:
     for question in (CHOICE, NUMERIC, SHORT, ORDERING, item("true_false", correct=True)):
-        shown = player_question(question, "les_00000000000000000001").model_dump()
+        shown = player_question(question, "les_00000000000000000001", MASK).model_dump()
         assert "correct_option" not in shown
         assert "correct" not in shown
         assert "expected" not in shown
@@ -233,32 +236,77 @@ def test_the_player_never_receives_an_answer_key() -> None:
         assert "Yes, exactly." not in text
         assert "definition_confusion" not in text
         assert "the bias term" not in text
-    assert player_question(NUMERIC, "les_x").unit == "V"
+    assert player_question(NUMERIC, "les_x", MASK).unit == "V"
 
 
 def test_options_are_shuffled_the_same_way_every_time() -> None:
     lesson = "les_00000000000000000001"
-    first = [option.id for option in player_question(CHOICE, lesson).options]
+    first = [option.id for option in player_question(CHOICE, lesson, MASK).options]
     assert sorted(first) == ["a", "b", "c"]
-    assert [option.id for option in player_question(CHOICE, lesson).options] == first
+    assert [option.id for option in player_question(CHOICE, lesson, MASK).options] == first
     # A different lesson shuffles differently often enough to matter.
     orders = {
-        tuple(option.id for option in player_question(CHOICE, f"les_{index:020d}").options)
+        tuple(option.id for option in player_question(CHOICE, f"les_{index:020d}", MASK).options)
         for index in range(30)
     }
     assert len(orders) > 1
 
 
 def test_items_to_order_are_never_shown_already_in_order() -> None:
-    correct = ["a", "b", "c", "d"]
+    in_order = [entry.text for entry in ORDERING.items]
     for index in range(60):
-        shown = [option.id for option in player_question(ORDERING, f"les_{index:020d}").options]
-        assert sorted(shown) == correct
-        assert shown != correct
+        shown = player_question(ORDERING, f"les_{index:020d}", MASK).options
+        assert sorted(option.text for option in shown) == sorted(in_order)
+        assert [option.text for option in shown] != in_order
+
+
+def test_the_items_of_an_ordering_question_are_shown_under_names_that_are_not_the_answer() -> None:
+    """A lesson's own ids for them are given in the right order, so they are the answer."""
+    correct = ("a", "b", "c", "d")
+    for index in range(60):
+        lesson = f"les_{index:020d}"
+        shown = player_question(ORDERING, lesson, MASK).options
+        names = [option.id for option in shown]
+        assert not set(names) & set(correct)
+        # Sorting the names is no help: that is the order they are already shown in,
+        # and it is never the right one.
+        assert names == sorted(names)
+        assert [option.text for option in shown] != [entry.text for entry in ORDERING.items]
+        # Only the core can turn them back, to the same items every time.
+        by_text = {option.text: option.id for option in shown}
+        right = [by_text[entry.text] for entry in ORDERING.items]
+        assert MASK.real(lesson, ORDERING, right) == correct
+        assert score(ORDERING, Response(order=MASK.real(lesson, ORDERING, right))).outcome is (
+            Outcome.CORRECT
+        )
+        # The same names again after a reload.
+        assert [option.id for option in player_question(ORDERING, lesson, MASK).options] == names
+
+
+def test_an_items_own_id_or_a_name_from_elsewhere_is_not_accepted_as_its_name() -> None:
+    lesson = "les_00000000000000000001"
+    names = [option.id for option in player_question(ORDERING, lesson, MASK).options]
+    # The ids themselves, in order: what a page would send if it had read them.
+    assert MASK.real(lesson, ORDERING, ["a", "b", "c", "d"]) == ("", "", "", "")
+    with pytest.raises(MalformedResponseError):
+        score(ORDERING, Response(order=MASK.real(lesson, ORDERING, ["a", "b", "c", "d"])))
+    # Names made for another lesson, or with another installation's secret.
+    assert set(MASK.real("les_00000000000000000002", ORDERING, names)) == {""}
+    elsewhere = ItemMask(b"the secret of another installation")
+    assert set(elsewhere.real(lesson, ORDERING, names)) == {""}
+    assert not set(names) & {
+        option.id for option in player_question(ORDERING, lesson, elsewhere).options
+    }
+
+
+def test_a_mask_needs_a_real_secret_and_never_shows_it() -> None:
+    with pytest.raises(ValueError, match="too short"):
+        ItemMask(b"short")
+    assert "never leaves" not in repr(MASK)
 
 
 def test_an_explanation_question_carries_what_the_learner_compares_against() -> None:
-    shown = player_question(EXPLANATION, "les_00000000000000000001")
+    shown = player_question(EXPLANATION, "les_00000000000000000001", MASK)
     assert [point.id for point in shown.rubric] == ["sum", "bias", "act"]
     assert shown.sample_answer == "Multiply, add, add the bias, activate."
     assert shown.options == []

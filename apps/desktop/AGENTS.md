@@ -33,9 +33,11 @@ Prefer a core operation (`callCore`) over a new IPC channel whenever the work be
   carry, an address.
 - `ProviderKeyStore` keeps a key by provider **and** address and returns it only for that
   pair. Do not add a way to read "the key" without both.
-- `syncProviders` runs after every start of the core (launch, restart, restore, erase): keys
-  first, then the learner's choice (one provider, or `'auto'`). A new way of starting the
-  core must call it.
+- `syncProviders` is part of starting the core (`CoreProcess`'s `afterReady`), so it runs on
+  every start there is: the learner's choice first (one provider, or `'auto'`), then the
+  keys, and only then is anyone told the core is ready. If the choice cannot be applied no
+  key is handed over and the start fails (ADR-029). Do not hand a key over anywhere else,
+  and do not publish "ready" before it has run.
 - Only the handler of the learner's own click calls `provider.select`. Nothing may change the
   choice because something failed. "Automatic" is itself a choice the learner made.
 - Where a request will go is what the core plans (`provider.status` → `routes`): say it with
@@ -53,6 +55,10 @@ Renderer script must never be able to name a file. A path may enter the app in t
   which copy to restore (`electron/main/data.ts`);
 - files the learner dropped, turned into paths by the preload with `webUtils.getPathForFile`
   (a `File` constructed by script has no path and is rejected).
+
+The preload calls **no method** of anything the page hands it (`electron/preload/dropped.ts`):
+a value from the page can carry functions of its own, and `files.map(...)` was once a way to
+name any path. Take it apart by index and by type.
 
 Paths are validated (`parseImportPaths` in `imports.ts`; `parseSavePath` and
 `parseRestorePath` in `data-copy.ts`) and handed to an **internal** core operation or to the
@@ -87,12 +93,33 @@ most, a file's name.
 - A real renderer crash kills Playwright's handle on the page. After one, read the window
   through the main process (`reloadedPage` in `e2e/recovery.spec.ts`).
 
+## The window
+
+- The window has no title bar of the operating system's on Windows and macOS (ADR-030):
+  `titleBarStyle` hidden, the system's own buttons laid over the page in the app's colours
+  (`window.ts`). The page cannot minimise, maximise or close the window: do not add a
+  channel for it.
+- The page keeps `WindowStrip` along its top to move the window by. **Nothing that can be
+  pressed may lie in the top 40 pixels**, where a press moves the window instead. A screen
+  that draws itself outside `AppShell` leaves that much room at its top. What has to appear
+  there (a dialog, the link that skips to the content) says `app-region: no-drag`, which
+  cuts its box out of the strip. `expectNoAccessibilityViolations` fails on anything
+  pressable left under the strip, so every screen a journey checks is checked for this; a
+  test's clicks do not pass through the window's frame, so only where things lie can be
+  checked.
+- To see the window as a person does, with the system's buttons on it, draw the app's own
+  window into a picture (`PrintWindow`); a screenshot of the page has no buttons in it.
+
 ## URLs and origins
 
 - Never use `new URL(x).origin` for `adle://` URLs in main-process code: Node reports `"null"` for
   custom schemes. Use `adleOriginOf()` from `@adle/event-protocol`.
 - The Content Security Policies live in `electron/main/protocol.ts` and are asserted in
   `security-boundaries.test.ts`. Do not add `unsafe-inline` or `unsafe-eval` to the app policy.
+- **"No network" includes what is not a request** (ADR-029): no name lookups
+  (`refuseNameLookups`), a proxy that is nowhere, and no non-proxied UDP. (A `webrtc`
+  directive in the policy is not known to this Chromium and only logs an error.) `e2e/security.spec.ts` tries a peer connection and a preconnect against
+  listeners on this computer, from the page and from a player frame. Keep all of it.
 - Inline `style` props are fine (React sets them through the CSSOM); HTML strings with `style`
   attributes are not.
 
@@ -102,6 +129,9 @@ most, a file's name.
   the iframe or import Wanim.
 - A change to messages between host and frame is a change to `packages/event-protocol`: update
   both validators, both sides, and the tests in one commit.
+- A frame may send `MESSAGE_BUDGET_PER_SECOND` messages a second and no more; past that the
+  adapter ends the scene like one that hangs. A scene that needs to say something on every
+  frame is saying too much: report a change, not a state.
 - Any behaviour of Wanim you rely on must be written into
   `skills/wanim-scene-authoring/reference.md` as Verified, with a test.
 
@@ -159,8 +189,10 @@ most, a file's name.
   reading a lesson is a new `Narrator`. A break's clock is the app's (`app/BreakContext.tsx`)
   and is never part of a lesson.
 - A question the learner asks about a part (`AskDialog`, `lib/asks.ts`) is a job like any
-  other. The lesson holds the job, so the dialog can be closed while it is answered. Show the
-  learner's own words as plain text and the answer with `MathText`.
+  other. The lesson holds the job, so the dialog can be closed while it is answered, and
+  opened again to watch it or stop it; a lesson that is opened again picks up a question
+  still on its way. A failure is said where the learner is: in the dialog if it is open, as
+  a toast if not. Show the learner's own words as plain text and the answer with `MathText`.
 - A narrator calls `onWord` only if it really knows the position. Never fake word highlighting.
 - The renderer has no answer keys. Anything that needs one (what was right, why) comes back from
   `lessons.answer`. Do not add a field to the player view to "save a round trip".
@@ -204,8 +236,10 @@ most, a file's name.
   before it started, failed with what to do next, cancelled. Give it `usualSeconds` from the
   core's plan: it says how long the wait usually is and offers a break of that length.
 - Long work is watched app-wide by `WritingProvider` (the rail's "Now", the toast and the
-  notification when it is ready). A screen that shows a job's outcome itself needs nothing
-  more; do not add a second announcement.
+  notification when it is ready). Something that arrived is said once, unless the screen in
+  front of the learner shows it (`showsOutcome`); something that failed is always said. A
+  screen that starts such work calls `refresh()` (`useGeneration` does). Do not add a second
+  announcement.
 - A notification is `getBridge().app.notify(kind)`. In end-to-end tests none is shown:
   read what would have been with `adle.notices()`, and set the focus with
   `adle.setFocused(false)` first (one is only asked for while Adle is in the background).
@@ -222,6 +256,13 @@ most, a file's name.
   The app keeps its real limit of four requests a minute, so a journey that needs a fifth
   will see the app wait: test that, or stay under it.
 - A toast that reports a failure is an `alert`; one that reports a success is a `status`.
+- **Words** (ADR-028): short, plain, about the learner's task. "Couldn't save your goal",
+  "Loading library…", "Cancel" and the action by its name. Typographic quotation marks and
+  apostrophes. Nothing about the app's own workings unless the learner must act on it.
+- The rail says nothing about the app's own service while it runs. The page writes the state
+  on `<html data-core>`; a journey waits for it with `expectReadyOnPage(page)`.
+- A break knows where leaving it leads (`rest.returnVia`): back, or somewhere said, such as
+  the course after a lesson that has just been finished.
 
 ## Renderer conventions
 

@@ -26,6 +26,13 @@ html {
   text-size-adjust: 100%;
 }
 
+/* The window has no title bar of the operating system's (ADR-030). The browser says how
+   tall the strip beside the window's buttons is; it stays that tall when the text is
+   enlarged, which a length of our own would not. */
+html[data-ad-titlebar] {
+  --ad-layout-titlebar-height: env(titlebar-area-height, 2.5rem);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -99,10 +106,34 @@ kbd {
   outline: none;
 }
 
-/* Quiet scrollbars that match the surface they sit on. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--ad-color-border-control) transparent;
+/* Quiet scroll bars: a rounded bar the colour of a control's edge, with no track and no
+   arrows. Drawn with the browser's own parts, because the standard properties
+   (`scrollbar-width`, `scrollbar-color`) keep the arrows on Windows. They must stay
+   unset: where they are set, these parts are ignored. */
+::-webkit-scrollbar {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  /* The border is the space around the bar: it is drawn narrower than it can be caught. */
+  border: 0.1875rem solid transparent;
+  border-radius: var(--ad-radius-pill);
+  background-color: var(--ad-color-border-control);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ad-color-border-strong);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
 }
 
 ::selection {

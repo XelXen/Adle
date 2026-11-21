@@ -17,7 +17,7 @@ import { type Encryptor, ProviderKeyStore } from './secrets';
 const client = vi.hoisted(() => ({ callCore: vi.fn() }));
 vi.mock('./core/client', () => ({ callCore: client.callCore }));
 
-const { syncProviders } = await import('./providers');
+const { ProviderChoiceNotAppliedError, syncProviders } = await import('./providers');
 
 const AIHUBMIX = 'https://aihubmix.com/v1';
 const NVIDIA = 'https://integrate.api.nvidia.com/v1';
@@ -44,14 +44,21 @@ const sent = (): [unknown, unknown][] =>
 function coreOffers(
   providers: { provider_id: string; base_url: string }[] | null,
   selection = 'auto',
+  refusing: unknown = null,
 ): void {
   client.callCore.mockImplementation((_connection: unknown, operation: unknown) => {
+    const refused: CoreResult = {
+      ok: false,
+      error: { code: 'conflict', message: 'Something is being written right now.', status: 409 },
+    };
     const result: CoreResult =
-      operation !== OPERATIONS['provider.status']
-        ? { ok: true, data: null }
-        : providers
-          ? { ok: true, data: { providers, selection } }
-          : { ok: false, error: { code: 'core_unavailable', message: 'starting', status: 0 } };
+      operation === refusing
+        ? refused
+        : operation !== OPERATIONS['provider.status']
+          ? { ok: true, data: null }
+          : providers
+            ? { ok: true, data: { providers, selection } }
+            : { ok: false, error: { code: 'core_unavailable', message: 'starting', status: 0 } };
     return Promise.resolve(result);
   });
 }
@@ -72,7 +79,7 @@ describe('syncProviders', () => {
     { provider_id: 'nvidia', base_url: NVIDIA },
   ];
 
-  it('hands each provider its own key, named, and then the choice of provider', async () => {
+  it('hands over the choice of provider first, and then each provider its own key, named', async () => {
     keyStore.save('aihubmix', AIHUBMIX, 'sk-aihubmix-key-1111');
     keyStore.save('nvidia', NVIDIA, 'nvapi-nvidia-key-2222');
     keyStore.select('nvidia');
@@ -80,7 +87,10 @@ describe('syncProviders', () => {
 
     await syncProviders({ core, keyStore });
 
+    // A core starts on "automatic". With the keys first it would be free, for a moment,
+    // to use a provider the learner chose not to.
     expect(sent()).toEqual([
+      [OPERATIONS['provider.select'], { selection: 'nvidia' }],
       [
         OPERATIONS['provider.set_credential'],
         { api_key: 'sk-aihubmix-key-1111', provider_id: 'aihubmix' },
@@ -89,7 +99,35 @@ describe('syncProviders', () => {
         OPERATIONS['provider.set_credential'],
         { api_key: 'nvapi-nvidia-key-2222', provider_id: 'nvidia' },
       ],
-      [OPERATIONS['provider.select'], { selection: 'nvidia' }],
+    ]);
+  });
+
+  it('hands over no key at all when the choice could not be applied, and says so', async () => {
+    keyStore.save('aihubmix', AIHUBMIX, 'sk-aihubmix-key-1111');
+    keyStore.save('nvidia', NVIDIA, 'nvapi-nvidia-key-2222');
+    keyStore.select('nvidia');
+    coreOffers(both, 'auto', OPERATIONS['provider.select']);
+
+    await expect(syncProviders({ core, keyStore })).rejects.toBeInstanceOf(
+      ProviderChoiceNotAppliedError,
+    );
+
+    // The core is still on "automatic", so it is left with nothing to send anywhere.
+    expect(sent()).toEqual([[OPERATIONS['provider.select'], { selection: 'nvidia' }]]);
+  });
+
+  it('puts a core back on "automatic" when the learner never chose and it is on something else', async () => {
+    keyStore.save('aihubmix', AIHUBMIX, 'sk-aihubmix-key-1111');
+    coreOffers(both, 'nvidia');
+
+    await syncProviders({ core, keyStore });
+
+    expect(sent()).toEqual([
+      [OPERATIONS['provider.select'], { selection: 'auto' }],
+      [
+        OPERATIONS['provider.set_credential'],
+        { api_key: 'sk-aihubmix-key-1111', provider_id: 'aihubmix' },
+      ],
     ]);
   });
 
@@ -134,12 +172,16 @@ describe('syncProviders', () => {
     expect(sent()).toEqual([]);
   });
 
-  it('keeps a choice the core does not offer, and does not choose another in its place', async () => {
+  it('keeps a choice the core does not offer, and gives the core no key to use in its place', async () => {
+    keyStore.save('aihubmix', AIHUBMIX, 'sk-aihubmix-key-1111');
     keyStore.select('nvidia');
-    coreOffers([{ provider_id: 'custom', base_url: 'http://127.0.0.1:9000/v1' }]);
+    // The learner chose NVIDIA alone; this core offers only AIHubMix.
+    coreOffers([{ provider_id: 'aihubmix', base_url: AIHUBMIX }]);
 
     await syncProviders({ core, keyStore });
 
+    // Not the choice (the core does not know it), and not the key of a provider they
+    // did not choose: on "automatic" the core would use it.
     expect(sent()).toEqual([]);
     expect(keyStore.selected()).toBe('nvidia');
   });

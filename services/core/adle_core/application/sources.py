@@ -27,7 +27,13 @@ from adle_core.infrastructure.ids import new_id
 from adle_core.infrastructure.orm import Source, SourceChunk, SourceSection
 from adle_core.ingestion.chunking import chunk_document
 from adle_core.ingestion.extract import Extractor, extract_isolated
-from adle_core.ingestion.types import DEFAULT_LIMITS, ExtractedDocument, IngestionError, Limits
+from adle_core.ingestion.types import (
+    DEFAULT_LIMITS,
+    ExtractedDocument,
+    IngestionError,
+    Limits,
+    too_large,
+)
 
 MAX_FILES_PER_IMPORT = 50
 MAX_SEARCH_RESULTS = 20
@@ -288,6 +294,10 @@ class SourceService:
                     "file_unreadable",
                     "The file could not be opened. It may have been moved or deleted.",
                 )
+            # Asked before any of it is read: a file far past every limit is refused at
+            # once, not after reading all of it to see whether it is here already.
+            if path.stat().st_size > self._limits.max_file_bytes:
+                raise too_large(self._limits.max_file_bytes)
             content_hash, size = hash_file(path)
             with self._database.session() as session:
                 existing = session.scalar(

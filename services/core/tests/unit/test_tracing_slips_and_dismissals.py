@@ -68,7 +68,7 @@ def test_a_slip_counts_as_partly_right_and_says_so() -> None:
     # The same evidence as an answer that was partly right, and kinder than a plain miss.
     assert slipped.after.probability == pytest.approx(partial.after.probability)
     assert slipped.after.probability > missed.after.probability
-    assert "looks like a slip rather than a gap in understanding" in slipped.explanation
+    assert "looks like a slip, not a gap" in slipped.explanation
     assert "It counts as partly right." in slipped.explanation
     # It is still an answer that was not right: it earns no credit as a correct one.
     assert slipped.after.answered == knowledge.answered + 1
@@ -97,7 +97,7 @@ def test_a_repeat_soon_after_is_described_as_one_and_not_as_a_hint() -> None:
         repeated=True,
     )
     transition = apply(initial_knowledge(), repeated)
-    assert "You had seen its explanation a short while ago" in transition.explanation
+    assert "You’d just seen its explanation" in transition.explanation
     assert "after a hint" not in transition.explanation
     # It is recorded as an aided answer all the same.
     assert transition.after.unaided_correct == 0
@@ -130,7 +130,7 @@ def test_setting_a_suspicion_aside_is_an_observation_with_its_own_sentence() -> 
     )
     transition = apply(knowledge, dismissal)
     assert transition.explanation.startswith(
-        "You said a suspected mix-up was only a slip, so it has been set aside."
+        "You marked a suspected mix-up as a slip, so it’s set aside."
     )
     assert transition.state_before is not MasteryState.DEMONSTRATED
     assert transition.state_after is MasteryState.DEMONSTRATED
@@ -159,7 +159,7 @@ def test_what_only_the_caller_knows_is_said_between_what_happened_and_what_it_me
         answer(Outcome.INCORRECT, form="multiple_choice"),
         note="That answer could mean that two terms may be getting mixed up.",
     )
-    happened = transition.explanation.index("was not right yet")
+    happened = transition.explanation.index("wasn’t right")
     note = transition.explanation.index("That answer could mean")
     meaning = transition.explanation.index("Now: ")
     assert happened < note < meaning

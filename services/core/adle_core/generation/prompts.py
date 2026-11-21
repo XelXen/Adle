@@ -11,6 +11,7 @@ size of a request never depends on the size of a learner's library.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib import resources
@@ -81,15 +82,32 @@ class LearnerBrief:
     goal: str
 
 
+#: Anything in quoted text that could pass for the tag of a block, however it is spelt:
+#: upper case, a hyphen or a space for the underscore, spaces inside the brackets.
+_TAG_LIKE = re.compile(r"<(?=\s*/?\s*learner[\s_-]*material)", re.IGNORECASE)
+
+
 def _block(label: str, text: str) -> str:
-    # The closing tag cannot be forged from inside: the tag's name never survives in the text.
-    safe = text.replace("learner_material", "learner-material")
+    # The closing tag cannot be forged from inside: nothing that reads as the tag survives
+    # in the text, in any spelling, and neither does the tag's own name.
+    safe = _TAG_LIKE.sub("&lt;", text).replace("learner_material", "learner-material")
     return f'<learner_material kind="{label}">\n{safe}\n</learner_material>'
 
 
 def _clip(text: str, limit: int) -> str:
     text = " ".join(text.split())
     return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + " …"
+
+
+def _excerpt(passage: Passage, limit: int, number: int | None = None) -> str:
+    """One passage, quoted whole: where it comes from is the learner's text as much as it is.
+
+    A file's name and a heading are words somebody else chose, and a document can choose
+    them to read like an instruction. Only the number, which is ours, stands outside.
+    """
+    where = _clip(f"{passage.source_name}, {passage.locator}", 200)
+    numbered = f"[{number}] " if number is not None else ""
+    return numbered + _block("excerpt", f"From: {where}\n{_clip(passage.text, limit)}")
 
 
 def _passages(passages: Sequence[Passage]) -> str:
@@ -99,8 +117,7 @@ def _passages(passages: Sequence[Passage]) -> str:
             'general knowledge, and leave "sources" empty.'
         )
     blocks = [
-        f"[{number}] {passage.source_name}, {passage.locator}\n"
-        + _block("excerpt", _clip(passage.text, MAX_PASSAGE_CHARACTERS))
+        _excerpt(passage, MAX_PASSAGE_CHARACTERS, number)
         for number, passage in enumerate(passages[:MAX_PASSAGES], start=1)
     ]
     return (
@@ -412,11 +429,7 @@ def curriculum_request(
     else:
         parts.append('The learner has not imported materials. Leave every "sources" list empty.')
     if passages:
-        blocks = [
-            f"{passage.source_name}, {passage.locator}\n"
-            + _block("excerpt", _clip(passage.text, MAX_PASSAGE_CHARACTERS))
-            for passage in passages[:MAX_PASSAGES]
-        ]
+        blocks = [_excerpt(passage, MAX_PASSAGE_CHARACTERS) for passage in passages[:MAX_PASSAGES]]
         parts.append(
             "A few excerpts, to show the level and the notation:\n\n" + "\n\n".join(blocks)
         )
@@ -500,11 +513,15 @@ def ask_request(
     part_titles: Sequence[str],
     part: PartBrief,
     question: str,
-    knowledge: str = "",
     passages: Sequence[Passage] = (),
     problems: Sequence[str] = (),
 ) -> ChatRequest:
-    """The request for an answer to something the learner asked about one part of a lesson."""
+    """The request for an answer to something the learner asked about one part of a lesson.
+
+    What it carries is what the interface says it sends (`askDisclosure` in the renderer's
+    `lib/asks.ts`). Nothing about the learner's level, preferences, or goal goes with a
+    question; an argument added here is a sentence to add there first.
+    """
     system = (
         "You help one learner partway through a lesson in Adle, an app that teaches one "
         "concept at a time. They have stopped at one part of the lesson and asked a question "
@@ -554,12 +571,9 @@ def ask_request(
                 "This part asks the learner a question, and they have NOT answered it yet. Do "
                 "not give its answer or say which choice is right:\n" + _block("asked", asked)
             )
-    if knowledge.strip():
-        parts.append("What Adle has seen of the learner and this concept: " + _clip(knowledge, 300))
     if passages:
         blocks = [
-            f"[{number}] {passage.source_name}, {passage.locator}\n"
-            + _block("excerpt", _clip(passage.text, MAX_ASK_PASSAGE_CHARACTERS))
+            _excerpt(passage, MAX_ASK_PASSAGE_CHARACTERS, number)
             for number, passage in enumerate(passages[:MAX_ASK_PASSAGES], start=1)
         ]
         parts.append(

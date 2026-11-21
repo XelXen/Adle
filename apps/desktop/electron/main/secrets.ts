@@ -45,8 +45,8 @@ export function createSecureEncryptor(storage: SafeStorageLike, platform: string
 export class SecureStorageUnavailableError extends Error {
   constructor() {
     super(
-      'This computer does not offer secure credential storage, so Adle will not save the key. ' +
-        'You can still use the bundled sample course.',
+      'This computer has no secure storage, so Adle can’t save the key. ' +
+        'Everything except AI generation still works.',
     );
   }
 }

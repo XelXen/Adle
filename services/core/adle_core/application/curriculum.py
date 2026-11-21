@@ -150,7 +150,7 @@ class OutlineCandidateRecord:
 NOT_ASSESSED = KnowledgeRecord(
     state=MasteryState.NOT_ASSESSED.value,
     label=STATE_LABELS[MasteryState.NOT_ASSESSED],
-    missing=["answered questions on this concept"],
+    missing=["some answered questions"],
     answered=0,
     self_report=None,
     review_due_at=None,
@@ -255,7 +255,7 @@ class CurriculumService:
                     code="no_source_reference",
                     severity=Severity.WARNING.value,
                     concept_ids=[concept.id],
-                    message=f'"{concept.title}" is not linked to anything in your materials.',
+                    message=f"“{concept.title}” isn’t linked to anything in your materials.",
                 )
                 for concept in concepts
                 if not concept.source_refs
@@ -438,7 +438,7 @@ class CurriculumService:
             }
             if len(set(concept_ids)) != len(concept_ids) or set(concept_ids) != set(concepts):
                 raise ValidationFailedError(
-                    "That order does not list every concept exactly once. Reload and try again."
+                    "That order doesn’t list every concept exactly once. Reload and try again."
                 )
             for index, concept_id in enumerate(concept_ids):
                 concepts[concept_id].position = index
@@ -476,7 +476,7 @@ class CurriculumService:
                 objective_id not in existing for objective_id in kept_ids
             ):
                 raise ValidationFailedError(
-                    "Those objectives do not all belong to this concept. Reload and try again."
+                    "Those objectives don’t all belong to this concept. Reload and try again."
                 )
             for existing_id, objective in existing.items():
                 if existing_id not in kept_ids:
@@ -589,7 +589,7 @@ class CurriculumService:
             concept = get_concept_or_404(session, concept_id)
             course = get_course_or_404(session, concept.course_id)
             if concept_id in ids:
-                raise ValidationFailedError("A concept cannot be needed before itself.")
+                raise ValidationFailedError("A concept can’t be its own prerequisite.")
             concepts = self._concepts(session, course.id)
             known = {other.id: other for other in concepts}
             if any(prerequisite_id not in known for prerequisite_id in ids):
@@ -609,8 +609,8 @@ class CurriculumService:
                 loop = (*loops[0][start:], *loops[0][:start], concept_id)
                 chain = " needs ".join(f'"{known[step].title}"' for step in loop)
                 raise ConflictError(
-                    f"That would make a loop: {chain}. "
-                    "A concept cannot depend on something that depends on it.",
+                    f"That would make a loop: {chain}. A concept can’t depend on something that "
+                    "depends on it.",
                     code="prerequisite_loop",
                 )
 

@@ -32,8 +32,9 @@ const KEY = 'sk-e2e-not-a-real-key-7Hq2mZx94Wd1';
 const continueButton = (page: Page) => page.getByRole('button', { name: 'Continue', exact: true });
 const concepts = (page: Page) => page.getByRole('list', { name: 'Concepts, in learning order' });
 /** The suggestion on screen, found by what it says to do. */
+// The suggested step is the one region named by its title that also gives its reason.
 const suggestion = (page: Page, title: string | RegExp) =>
-  page.getByRole('region', { name: title }).filter({ hasText: 'Suggested next step' });
+  page.getByRole('region', { name: title }).filter({ hasText: 'Why:' });
 
 async function addSampleCourse(page: Page): Promise<void> {
   await waitForCore(page);
@@ -53,7 +54,7 @@ async function expectPart(page: Page, number: number): Promise<void> {
 
 async function check(form: Locator): Promise<void> {
   await form.getByRole('button', { name: 'Check answer' }).click();
-  await expect(form.getByText(/^(That is right|Partly right|Not quite)$/)).toBeVisible();
+  await expect(form.getByText(/^(Correct|Partly right|Not quite)$/)).toBeVisible();
 }
 
 /** Answer whichever of the sample concept's questions is on screen, correctly. */
@@ -69,7 +70,7 @@ async function answerCorrectly(page: Page): Promise<void> {
     await form.getByRole('button', { name: 'Compare with a good answer' }).click();
     await form.getByRole('checkbox').first().check();
     await form.getByRole('button', { name: 'Record this' }).click();
-    await expect(form.getByText('That is right')).toBeVisible();
+    await expect(form.getByText('Correct', { exact: true })).toBeVisible();
     return;
   }
   if (stem.includes('Which input has more influence')) {
@@ -90,7 +91,7 @@ async function answerCorrectly(page: Page): Promise<void> {
     throw new Error(`No answer is known for the question: ${stem}`);
   }
   await check(form);
-  await expect(form.getByText('That is right')).toBeVisible();
+  await expect(form.getByText('Correct', { exact: true })).toBeVisible();
 }
 
 /** Answer every question of a practice set correctly and open its summary. */
@@ -99,7 +100,7 @@ async function finishPractice(page: Page, questions: number): Promise<void> {
     await expect(page.getByText(`Question ${number} of ${questions}`)).toBeVisible();
     await answerCorrectly(page);
     await page
-      .getByRole('button', { name: number === questions ? 'See how it went' : 'Next question' })
+      .getByRole('button', { name: number === questions ? 'See results' : 'Next question' })
       .click();
   }
   await expect(page.getByRole('region', { name: 'Done' })).toBeVisible();
@@ -144,13 +145,13 @@ test.describe('learning', () => {
     await addSampleCourse(page);
 
     // ---- A new course: one suggestion, with its reason, and an honest picture of progress ----
-    const start = suggestion(page, `Start "${LESSON}"`);
+    const start = suggestion(page, `Start “${LESSON}”`);
     await expect(start).toContainText(
-      `Why: "${CONCEPT}" is next in your course. It needs nothing first.`,
+      `Why: “${CONCEPT}” is next in your course. It has no prerequisites.`,
     );
     await expect(concepts(page).getByRole('listitem')).toHaveCount(8);
-    await expect(page.getByText('8 concepts: 8 not assessed yet.')).toBeVisible();
-    await expect(page.getByText('they are never a grade')).toBeVisible();
+    await expect(page.getByText('8 concepts: 8 not started.')).toBeVisible();
+    await expect(page.getByText('it’s never a grade')).toBeVisible();
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'learn-first-visit');
 
@@ -167,7 +168,7 @@ test.describe('learning', () => {
     await check(question);
     await expect(question).toContainText(
       'That answer could mean that what causes what may be the other way round. ' +
-        'One answer is not enough to say',
+        'A follow-up question will check.',
     );
     await continueButton(page).click();
     await expectPart(page, 5);
@@ -192,18 +193,18 @@ test.describe('learning', () => {
     // ---- The lesson ends with what to do next: a check, not a verdict, and no pressure ----
     const finished = page.getByRole('region', { name: 'Lesson complete' });
     await expect(finished).toBeVisible();
-    const checkStep = suggestion(page, `Check "${CONCEPT}"`);
+    const checkStep = suggestion(page, `Check “${CONCEPT}”`);
     await expect(checkStep).toContainText(
-      `More than one answer on "${CONCEPT}" suggests that what causes what may be the other way round.`,
+      `More than one answer on “${CONCEPT}” suggests that what causes what may be the other way round.`,
     );
-    await expect(checkStep).toContainText('It is also fine to stop here for today.');
+    await expect(checkStep).toContainText('It’s also fine to stop for today.');
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'lesson-finished-what-next');
     await checkStep.getByRole('button', { name: 'Answer a few questions' }).click();
 
     // ---- The check asks the question that would show it ----
     await expect(
-      page.getByRole('heading', { name: `A quick check: ${CONCEPT}`, level: 1 }),
+      page.getByRole('heading', { name: `Quick check: ${CONCEPT}`, level: 1 }),
     ).toBeVisible();
     await expect(page.getByText('Why these questions:')).toBeVisible();
     await expect(page.getByText('Question 1 of 3')).toBeVisible();
@@ -212,7 +213,7 @@ test.describe('learning', () => {
     await screenshot(page, 'practice-question');
     await answerCorrectly(page);
     await expect(page.locator('form')).toContainText(
-      'This one goes against that; one more like it settles it.',
+      'This one goes against that. One more like it settles it.',
     );
     await page.getByRole('button', { name: 'Next question' }).click();
     await expect(page.getByText('Question 2 of 3')).toBeVisible();
@@ -220,22 +221,22 @@ test.describe('learning', () => {
     await page.getByRole('button', { name: 'Next question' }).click();
     await expect(page.getByText('Question 3 of 3')).toBeVisible();
     await answerCorrectly(page);
-    await page.getByRole('button', { name: 'See how it went' }).click();
+    await page.getByRole('button', { name: 'See results' }).click();
 
     const done = page.getByRole('region', { name: 'Done' });
     await expect(done).toContainText('3 of 3 answers right.');
-    await expect(done).toContainText(`Where “${CONCEPT}” stands:`);
+    await expect(done).toContainText(`Status of “${CONCEPT}”:`);
     await expect(
       done.getByRole('list', { name: 'Your answers' }).getByRole('listitem'),
     ).toHaveCount(3);
-    await expect(page.getByText('Suggested next step')).toBeVisible();
+    await expect(page.getByText('Up next')).toBeVisible();
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'practice-done');
-    await page.getByRole('button', { name: 'Back to the course' }).click();
+    await page.getByRole('button', { name: 'Back to course' }).click();
 
     // ---- The course shows what was noticed, as a hypothesis the learner can set aside ----
     const row = concepts(page).getByRole('listitem').filter({ hasText: CONCEPT }).first();
-    const noticed = page.getByRole('list', { name: `What Adle has noticed about ${CONCEPT}` });
+    const noticed = page.getByRole('list', { name: `Notes on ${CONCEPT}` });
     await expect(noticed).toContainText('Seen more than once');
     await expect(noticed).toContainText(
       'More than one answer suggests that what causes what may be the other way round.',
@@ -245,18 +246,18 @@ test.describe('learning', () => {
     // ---- This session: what it showed, as counts of what happened and never as a score ----
     const session = page.getByRole('region', { name: 'This session' });
     await expect(session).toContainText('1 lesson finished, 6 questions answered.');
-    const shown = session.getByRole('list', { name: 'What you showed' });
+    const shown = session.getByRole('list', { name: 'What you got right' });
     await expect(shown.getByRole('listitem')).toHaveCount(1);
     await expect(shown).toContainText(CONCEPT);
     // One right answer in the lesson and three in the check. The two wrong ones are not
     // mentioned: they showed nothing, and nothing is held against the learner.
     await expect(shown).toContainText('4 answers right.');
     // What is still open is said as the concept's own row says it.
-    await expect(session.getByRole('list', { name: 'Needs more evidence' })).toContainText(
+    await expect(session.getByRole('list', { name: 'Still in progress' })).toContainText(
       'Still needed: a possible misunderstanding to clear up.',
     );
-    await expect(session.getByText('Lighter evidence is')).toHaveCount(0);
-    await expect(session.getByRole('list', { name: 'Planned review' })).toContainText(
+    await expect(session.getByText('“With help” means')).toHaveCount(0);
+    await expect(session.getByRole('list', { name: 'Upcoming reviews' })).toContainText(
       'Review tomorrow.',
     );
     await expect(session).not.toContainText('%');
@@ -266,13 +267,13 @@ test.describe('learning', () => {
     await screenshot(page, 'learn-session');
     await noticed.getByRole('button', { name: 'That was a slip' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Set aside' })).toBeVisible();
-    await expect(noticed).toContainText('You said it was a slip, so it is set aside.');
+    await expect(noticed).toContainText('You marked it as a slip, so it’s set aside.');
     await expect(noticed.getByRole('button', { name: 'That was a slip' })).toHaveCount(0);
     // The button is gone; the keyboard is left on the line that says what became of it.
     await expect(noticed.getByRole('listitem').first()).toBeFocused();
     // Nothing is due yet: it was all answered a moment ago.
     await expect(row).toContainText('Next review tomorrow');
-    await expect(row.getByText('A review is due')).toHaveCount(0);
+    await expect(row.getByText('Review due')).toHaveCount(0);
 
     expect(first.problems).toEqual([]);
     await first.close();
@@ -288,22 +289,22 @@ test.describe('learning', () => {
       'true',
     );
 
-    const review = suggestion(later, `Review "${CONCEPT}"`);
+    const review = suggestion(later, `Review “${CONCEPT}”`);
     await expect(review).toContainText(
-      `Why: A review of "${CONCEPT}" was due a day ago. ` +
-        'Answering from memory after a gap is what makes it last.',
+      `Why: A review of “${CONCEPT}” was due a day ago. ` +
+        'Recalling it after a gap is what makes it stick.',
     );
     const laterRow = concepts(later).getByRole('listitem').filter({ hasText: CONCEPT }).first();
-    await expect(laterRow).toContainText('A review is due');
-    await expect(later.getByText('1 review is due.')).toBeVisible();
+    await expect(laterRow).toContainText('Review due');
+    await expect(later.getByText('1 review due.')).toBeVisible();
     // Coming back, the same sitting is "last time": a reminder of where things were left.
     const lastTime = later.getByRole('region', { name: 'Last time, 2 days ago' });
     await expect(lastTime).toContainText('1 lesson finished, 6 questions answered.');
-    await expect(lastTime.getByRole('list', { name: 'What you showed' })).toContainText(
+    await expect(lastTime.getByRole('list', { name: 'What you got right' })).toContainText(
       '4 answers right.',
     );
-    await expect(lastTime.getByRole('list', { name: 'Planned review' })).toContainText(
-      'A review is due.',
+    await expect(lastTime.getByRole('list', { name: 'Upcoming reviews' })).toContainText(
+      'Review due.',
     );
     await expect(later.getByRole('region', { name: 'This session' })).toHaveCount(0);
     await expectNoAccessibilityViolations(later);
@@ -317,31 +318,29 @@ test.describe('learning', () => {
     await expect(later.getByRole('region', { name: 'Done' })).toContainText(
       '3 of 3 answers right.',
     );
-    await later.getByRole('button', { name: 'Back to the course' }).click();
+    await later.getByRole('button', { name: 'Back to course' }).click();
 
     // ---- The review is done, and the next one is further away than the last ----
     await expect(laterRow).toContainText(/Next review in \d+ days/);
-    await expect(laterRow.getByText('A review is due')).toHaveCount(0);
+    await expect(laterRow.getByText('Review due')).toHaveCount(0);
     // A new sitting has taken the place of the old one.
     const today = later.getByRole('region', { name: 'This session' });
     await expect(today).toContainText('3 questions answered.');
     // One of the three was an explanation the learner marked themselves: still a right
     // answer, said to be lighter evidence, with what that means underneath.
-    await expect(today.getByRole('list', { name: 'What you showed' })).toContainText(
-      '3 answers right, 1 of them lighter evidence.',
+    await expect(today.getByRole('list', { name: 'What you got right' })).toContainText(
+      '3 answers right, 1 with help.',
     );
-    await expect(today).toContainText(
-      'Lighter evidence is a right answer after a hint, one you were unsure of or marked yourself',
-    );
-    await expect(today.getByRole('list', { name: 'Planned review' })).toContainText(
+    await expect(today).toContainText('“With help” means after a hint');
+    await expect(today.getByRole('list', { name: 'Upcoming reviews' })).toContainText(
       /Review in \d+ days\./,
     );
     await expect(later.getByRole('region', { name: /^Last time/ })).toHaveCount(0);
     await expectNoAccessibilityViolations(later);
     await today.scrollIntoViewIfNeeded();
     await screenshot(later, 'learn-session-dark');
-    await expect(later.getByText('1 review is due.')).toHaveCount(0);
-    await expect(suggestion(later, `Review "${CONCEPT}"`)).toHaveCount(0);
+    await expect(later.getByText('1 review due.')).toHaveCount(0);
+    await expect(suggestion(later, `Review “${CONCEPT}”`)).toHaveCount(0);
 
     expect(second.problems).toEqual([]);
     await second.close();
@@ -351,20 +350,20 @@ test.describe('learning', () => {
     test.setTimeout(120_000);
     const { page } = adle;
     await addSampleCourse(page);
-    await suggestion(page, `Start "${LESSON}"`)
+    await suggestion(page, `Start “${LESSON}”`)
       .getByRole('button', { name: 'Start lesson' })
       .click();
     await expectPart(page, 1);
 
     // ---- Saying so is taken at face value, and nothing sends the learner back ----
-    await page.getByRole('button', { name: 'This did not help' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Thanks for saying so' });
-    await expect(dialog).toContainText('That says something about the explanation, not about you.');
-    await expect(dialog).toContainText('It has been noted');
+    await page.getByRole('button', { name: 'This didn’t help' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Thanks for the feedback' });
+    await expect(dialog).toContainText('That’s about the explanation, not you.');
+    await expect(dialog).toContainText('Adle will take it into account.');
     await expect(dialog).toContainText('Go straight to the next question');
     // Without a key, another explanation is offered honestly: it needs setting up.
-    await expect(dialog).toContainText('no key is set up yet');
-    await expect(dialog.getByRole('button', { name: 'Set up the AI provider' })).toBeVisible();
+    await expect(dialog).toContainText('Needs an AI provider key.');
+    await expect(dialog.getByRole('button', { name: 'Set up AI provider' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Go to the course' })).toBeVisible();
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'lesson-did-not-help');
@@ -377,30 +376,28 @@ test.describe('learning', () => {
     const parts = page.getByRole('list', { name: 'Parts of this lesson' });
     await expect(parts.getByRole('button', { name: /^Part 2:/ })).toBeEnabled();
     // A question explains nothing, so there is nothing to report on it.
-    await expect(page.getByRole('button', { name: 'This did not help' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'This didn’t help' })).toHaveCount(0);
 
     // ---- Back in the course, the suggestion has changed ----
-    await page.getByRole('button', { name: 'Back to the course' }).click();
+    await page.getByRole('button', { name: 'Back to course' }).click();
     // Something that can be done without a key comes first, and it is not the lesson that
     // did not help: a concept that needs nothing before it.
-    await expect(suggestion(page, 'Start "Derivatives and the chain rule"')).toContainText(
-      'It needs nothing first.',
+    await expect(suggestion(page, 'Start “Derivatives and the chain rule”')).toContainText(
+      'It has no prerequisites.',
     );
     // Another explanation is offered beside it, with the reason, and with what it needs.
-    const instead = page.getByRole('region', { name: 'Or instead' });
+    const instead = page.getByRole('region', { name: 'Other options' });
     const another = instead
       .getByRole('listitem')
-      .filter({ hasText: `Try another explanation of "${CONCEPT}"` });
-    await expect(another).toContainText(`You said an explanation of "${CONCEPT}" did not help.`);
-    await expect(another).toContainText(
-      'Writing a lesson needs the AI provider, and no key is set up yet.',
-    );
+      .filter({ hasText: `Try another explanation of “${CONCEPT}”` });
+    await expect(another).toContainText(`You said an explanation of “${CONCEPT}” didn’t help.`);
+    await expect(another).toContainText('Add an AI provider key to create this lesson.');
     // The lesson is still there to continue, as the last thing offered.
-    await expect(instead.getByRole('listitem').last()).toContainText(`Continue "${LESSON}"`);
+    await expect(instead.getByRole('listitem').last()).toContainText(`Continue “${LESSON}”`);
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'learn-another-explanation');
 
-    await another.getByRole('button', { name: 'Set up the AI provider' }).click();
+    await another.getByRole('button', { name: 'Set up AI provider' }).click();
     await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
     expect(adle.problems).toEqual([]);
   });
@@ -421,38 +418,38 @@ test.describe('learning', () => {
       await page.getByRole('button', { name: 'Library', exact: true }).click();
       await addSampleCourse(page);
 
-      await suggestion(page, `Start "${LESSON}"`)
+      await suggestion(page, `Start “${LESSON}”`)
         .getByRole('button', { name: 'Start lesson' })
         .click();
       await expectPart(page, 1);
-      await page.getByRole('button', { name: 'This did not help' }).click();
-      const dialog = page.getByRole('dialog', { name: 'Thanks for saying so' });
+      await page.getByRole('button', { name: 'This didn’t help' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Thanks for the feedback' });
 
       // ---- The learner chooses the kind of explanation; what is sent is said first ----
-      const how = dialog.getByRole('combobox', { name: 'How should it explain?' });
+      const how = dialog.getByRole('combobox', { name: 'Teaching style' });
       // The lesson they are in is a visual one, so that is not offered again.
-      await expect(how.getByRole('option', { name: 'Pictures first' })).toHaveCount(0);
-      await how.selectOption({ label: 'An everyday comparison' });
+      await expect(how.getByRole('option', { name: 'Visual first' })).toHaveCount(0);
+      await how.selectOption({ label: 'Everyday analogy' });
       await expect(dialog).toContainText(
-        "Sends to Custom endpoint (127.0.0.1): this course's name, this concept and its " +
-          'objectives, where you stand on it in a few words, your preferences for pace and ' +
-          'depth, your goal, and any related passages from your materials.',
+        'Sends the course name, this concept and its objectives, and your level, ' +
+          'preferences, and goal, plus any related passages from your materials to ' +
+          'Custom endpoint (127.0.0.1).',
       );
       expect(provider.requests).toHaveLength(0);
-      await dialog.getByRole('button', { name: 'Create that lesson' }).click();
+      await dialog.getByRole('button', { name: 'Create lesson' }).click();
 
       // ---- The course shows the work, then suggests the new lesson ahead of the old one ----
       await expect(page.getByRole('tab', { name: 'Learn', exact: true })).toHaveAttribute(
         'aria-selected',
         'true',
       );
-      const fresh = suggestion(page, 'Try "How a neuron weighs its inputs"');
+      const fresh = suggestion(page, 'Try “How a neuron weighs its inputs”');
       await expect(fresh).toBeVisible({ timeout: 90_000 });
       await expect(fresh).toContainText(
-        `Why: There is another explanation of "${CONCEPT}" that you have not tried yet.`,
+        `Why: There’s another explanation of “${CONCEPT}” you haven’t tried.`,
       );
-      await expect(page.getByRole('region', { name: 'Or instead' })).toContainText(
-        `Continue "${LESSON}"`,
+      await expect(page.getByRole('region', { name: 'Other options' })).toContainText(
+        `Continue “${LESSON}”`,
       );
       await screenshot(page, 'learn-new-explanation');
 

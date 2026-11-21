@@ -61,9 +61,9 @@ const SELF_REPORTS: readonly { value: SelfReport; label: string }[] = [
 ];
 
 const ORIGIN_NOTE: Partial<Record<Concept['origin'], string>> = {
-  outline: 'Taken from a heading in your materials.',
-  model: 'Proposed by the AI. Check that it fits your course.',
-  sample: 'Part of the sample course written by Adle.',
+  outline: 'From a heading in your materials.',
+  model: 'Suggested by AI. Check that it fits.',
+  sample: 'Part of the sample course.',
 };
 
 type PassageState =
@@ -88,13 +88,13 @@ export type ConceptLessons =
 export type TeachingStrategy = NonNullable<NonNullable<LessonRequest['strategy']>>;
 
 export const STRATEGY_CHOICES: readonly { value: TeachingStrategy | ''; label: string }[] = [
-  { value: '', label: 'Let Adle choose' },
-  { value: 'visual', label: 'Pictures first' },
-  { value: 'worked_example', label: 'A worked example' },
-  { value: 'analogy', label: 'An everyday comparison' },
-  { value: 'mathematical', label: 'The mathematics, step by step' },
-  { value: 'computational', label: 'A calculation carried out by hand' },
-  { value: 'socratic', label: 'Questions that lead to the idea' },
+  { value: '', label: 'Automatic' },
+  { value: 'visual', label: 'Visual first' },
+  { value: 'worked_example', label: 'Worked example' },
+  { value: 'analogy', label: 'Everyday analogy' },
+  { value: 'mathematical', label: 'Step-by-step maths' },
+  { value: 'computational', label: 'Calculation by hand' },
+  { value: 'socratic', label: 'Guided questions' },
 ];
 
 /** Where the making of a lesson for one concept stands. */
@@ -187,7 +187,7 @@ export function ConceptDetail({
       }
       onReload();
     } catch (error) {
-      report('That could not be recorded')(error);
+      report('Couldn’t save that')(error);
     } finally {
       setRating(null);
     }
@@ -232,7 +232,7 @@ export function ConceptDetail({
         }),
       );
     } catch (error) {
-      report('The link could not be added')(error);
+      report('Couldn’t add the link')(error);
     } finally {
       setLinking(null);
     }
@@ -246,7 +246,7 @@ export function ConceptDetail({
         }),
       );
     } catch (error) {
-      report('The link could not be removed')(error);
+      report('Couldn’t remove the link')(error);
     }
   };
 
@@ -274,7 +274,7 @@ export function ConceptDetail({
       <div className={styles.block}>
         <h4 className={styles.blockTitle}>Lessons</h4>
         {lessons.status === 'loading' ? (
-          <Spinner size="small" label="Looking for lessons" />
+          <Spinner size="small" label="Loading lessons" />
         ) : lessons.status === 'error' ? (
           <div className={styles.itemRow}>
             <p className={styles.formError}>{lessons.message}</p>
@@ -283,11 +283,12 @@ export function ConceptDetail({
             </Button>
           </div>
         ) : lessons.lessons.length === 0 ? (
-          <p className={styles.muted}>No lesson has been made for this concept yet.</p>
+          <p className={styles.muted}>No lessons yet.</p>
         ) : (
           <ul className={styles.bareList} aria-label="Lessons for this concept">
             {lessons.lessons.map((lesson) => {
               const action = lessonAction(lesson.progress);
+              const removable = lessons.lessons.some((other) => other.origin === 'generated');
               return (
                 <li key={lesson.id} className={styles.itemRow}>
                   <span className={styles.itemText}>
@@ -312,6 +313,9 @@ export function ConceptDetail({
                       size="small"
                       onClick={() => onRemoveLesson(lesson)}
                     />
+                  ) : removable ? (
+                    // Its place is kept, so that every row's button stands in one column.
+                    <span className={styles.itemSpacer} aria-hidden="true" />
                   ) : null}
                 </li>
               );
@@ -323,7 +327,7 @@ export function ConceptDetail({
           starting={generation.starting}
           refusal={generation.refusal}
           subject="the lesson"
-          waitingText="Waiting for its turn"
+          waitingText="Queued"
           usualSeconds={generation.usualSeconds}
           onCancel={generation.onCancel}
           onRetry={() => generation.onCreate(strategy || null)}
@@ -342,10 +346,10 @@ export function ConceptDetail({
             {lessons.status === 'ready' && lessons.lessons.length > 0 ? (
               <div className={styles.strategy}>
                 <Select
-                  label="How should it explain?"
+                  label="Teaching style"
                   value={strategy}
                   options={STRATEGY_CHOICES}
-                  description="Left to Adle, it uses a way this concept has not been taught in yet."
+                  description="Automatic picks a style this concept hasn’t been taught in yet."
                   onValueChange={setStrategy}
                 />
               </div>
@@ -364,12 +368,10 @@ export function ConceptDetail({
             </div>
             <p className={styles.aiNote}>
               {concept.objectives.length === 0
-                ? 'Add a learning objective first, so the lesson has something to aim at.'
-                : `Sends to ${generation.destination}: ${lessonDisclosure(
-                    hasMaterials ? 'some' : 'none',
-                  )}. It usually takes three of today's requests${
-                    generation.usualWait ? `, and ${generation.usualWait}` : ''
-                  }.`}
+                ? 'Add a learning objective first.'
+                : `Sends ${lessonDisclosure(hasMaterials ? 'some' : 'none')} to ${
+                    generation.destination
+                  }.${generation.usualWait ? ` Takes ${generation.usualWait}.` : ''}`}
             </p>
           </div>
         )}
@@ -385,16 +387,16 @@ export function ConceptDetail({
           </ul>
         ) : (
           <p className={styles.muted}>
-            None yet. Add at least one so there is something to check your understanding against.
+            None yet. Add at least one to check your understanding against.
           </p>
         )}
       </div>
 
       <div className={styles.block}>
         <div className={styles.blockHeader}>
-          <h4 className={styles.blockTitle}>Needs first</h4>
+          <h4 className={styles.blockTitle}>Prerequisites</h4>
           <Button size="small" variant="tertiary" onClick={onEditPrerequisites}>
-            Change prerequisites
+            Edit prerequisites
           </Button>
         </div>
         {concept.prerequisites.length > 0 ? (
@@ -417,17 +419,17 @@ export function ConceptDetail({
             ))}
           </ul>
         ) : (
-          <p className={styles.muted}>Nothing. This can be learned straight away.</p>
+          <p className={styles.muted}>None. You can start here.</p>
         )}
         {dependents.length > 0 ? (
           <p className={styles.muted}>
-            Needed by: {dependents.map((dependent) => dependent.title).join(', ')}.
+            Required for: {dependents.map((dependent) => dependent.title).join(', ')}.
           </p>
         ) : null}
       </div>
 
       <div className={styles.block}>
-        <h4 className={styles.blockTitle}>What you have shown</h4>
+        <h4 className={styles.blockTitle}>Your progress</h4>
         <div className={styles.knowledge}>
           <div className={styles.knowledgeLine}>
             <Badge tone={KNOWLEDGE_TONE[concept.knowledge.state]}>{concept.knowledge.label}</Badge>
@@ -439,8 +441,8 @@ export function ConceptDetail({
           </div>
           <div className={styles.block}>
             <span className={styles.muted} id={`${historyId}-rate`}>
-              How well do you know this already? Your answer sets where lessons start. It is never
-              counted as proof.
+              How well do you know this already? It sets where lessons start, and never counts as
+              proof.
             </span>
             <div
               className={styles.knowledgeLine}
@@ -469,22 +471,21 @@ export function ConceptDetail({
               aria-controls={historyId}
               onClick={() => void toggleHistory()}
             >
-              {shownHistory.status === 'closed' ? 'Show the record' : 'Hide the record'}
+              {shownHistory.status === 'closed' ? 'Show history' : 'Hide history'}
             </Button>
           </div>
           <div id={historyId} aria-live="polite">
             {shownHistory.status === 'loading' ? (
-              <Spinner size="small" label="Reading the record" />
+              <Spinner size="small" label="Loading history" />
             ) : shownHistory.status === 'error' ? (
               <p className={styles.formError}>{shownHistory.message}</p>
             ) : shownHistory.status === 'ready' ? (
               shownHistory.evidence.history.length === 0 ? (
                 <p className={styles.muted}>
-                  Nothing has been recorded for this concept yet. Every answer and every change of
-                  status will be listed here, with the reason.
+                  Nothing yet. Your answers and status changes will appear here.
                 </p>
               ) : (
-                <ol className={styles.history} aria-label="Record for this concept, newest first">
+                <ol className={styles.history} aria-label="History, newest first">
                   {shownHistory.evidence.history.map((entry) => (
                     <li key={entry.id} className={styles.itemText}>
                       <span className={styles.historyWhen}>
@@ -516,7 +517,7 @@ export function ConceptDetail({
           ) : null}
         </div>
         {concept.source_refs.length > 0 ? (
-          <ul className={styles.bareList} aria-label="Places linked to this concept">
+          <ul className={styles.bareList} aria-label="Linked passages">
             {concept.source_refs.map((ref) => (
               <li key={ref.id} className={styles.itemRow}>
                 <span className={styles.itemText}>
@@ -536,19 +537,18 @@ export function ConceptDetail({
         ) : (
           <p className={styles.muted}>
             {hasMaterials
-              ? 'Not linked to anything yet. Linking a concept to your notes keeps lessons tied to what your course actually says.'
-              : 'This course has no imported materials. Lessons for this concept will come from general knowledge, and Adle will say so.'}
+              ? 'Nothing linked yet. Linking passages keeps lessons close to your course.'
+              : 'No materials imported. Lessons will draw on general knowledge.'}
           </p>
         )}
         <div aria-live="polite">
           {shownPassages.status === 'error' ? (
-            <Callout tone="danger" title="The search did not work">
+            <Callout tone="danger" title="Search failed">
               {shownPassages.message}
             </Callout>
           ) : shownPassages.status === 'ready' && shownPassages.passages.length === 0 ? (
             <p className={styles.muted}>
-              Nothing in your materials mentions the words of this concept. Try adding a description
-              or objectives that use the terms your notes use.
+              No matches. Try a description or objectives that use the terms in your notes.
             </p>
           ) : shownPassages.status === 'ready' ? (
             <ul className={styles.bareList} aria-label="Related passages">

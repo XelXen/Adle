@@ -9,7 +9,7 @@ right, and what the answer changed.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from sqlalchemy import select
@@ -43,7 +43,8 @@ from adle_core.learner_model.misconceptions import (
 )
 from adle_core.learner_model.practice import FRESH_AGAIN_AFTER
 from adle_core.learner_model.tracing import Observation, ObservationKind
-from adle_core.lessons.ir import CheckpointSegment, guess_probability
+from adle_core.lessons.ir import CheckpointSegment, OrderingItem, guess_probability
+from adle_core.lessons.player import ItemMask
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,10 +65,17 @@ class AnswerResult:
 
 
 class AssessmentService:
-    def __init__(self, database: Database, lessons: LessonService, learner: LearnerService) -> None:
+    def __init__(
+        self,
+        database: Database,
+        lessons: LessonService,
+        learner: LearnerService,
+        mask: ItemMask,
+    ) -> None:
         self._database = database
         self._lessons = lessons
         self._learner = learner
+        self._mask = mask
 
     def answer(
         self,
@@ -100,6 +108,10 @@ class AssessmentService:
         if response is None:
             result = Score(outcome=Outcome.SKIPPED)
         else:
+            if isinstance(item, OrderingItem) and response.order is not None:
+                # The page was shown names for the items, not their ids (the ids are the
+                # answer). From here on, and in what is kept, they are the ids again.
+                response = replace(response, order=self._mask.real(lesson_id, item, response.order))
             try:
                 result = score(item, response)
             except MalformedResponseError as error:
@@ -109,19 +121,19 @@ class AssessmentService:
 
         with self._database.session() as session:
             concept = get_concept_or_404(session, item.concept_id)
-            earlier = session.scalars(
+            # Every time the question was on screen and something was submitted, skips
+            # included: each of them showed the explanation.
+            seen = session.scalars(
                 select(Attempt)
-                .where(
-                    Attempt.lesson_id == lesson_id,
-                    Attempt.question_id == question_id,
-                    Attempt.outcome != Outcome.SKIPPED.value,
-                )
+                .where(Attempt.lesson_id == lesson_id, Attempt.question_id == question_id)
                 .order_by(Attempt.id)
             ).all()
-            # A little while after a first answer the learner still has its explanation in
-            # mind, so a repeat shows recall of that explanation at best. It counts as an
-            # aided answer. After a real gap, answering again is recall, and counts in full.
-            repeated = bool(earlier) and moment - earlier[-1].created_at < FRESH_AGAIN_AFTER
+            earlier = [attempt for attempt in seen if attempt.outcome != Outcome.SKIPPED.value]
+            # A little while after the explanation was shown the learner still has it in
+            # mind, so an answer shows recall of that explanation at best. It counts as an
+            # aided answer, whether what showed it was an answer or a skip. After a real
+            # gap, answering again is recall, and counts in full.
+            repeated = bool(seen) and moment - seen[-1].created_at < FRESH_AGAIN_AFTER
             # Asking Adle about the question before answering it is help, like the hint.
             # What was asked is not looked at: that it was is enough (ADR-024).
             asked = segment_id is not None and asked_since(

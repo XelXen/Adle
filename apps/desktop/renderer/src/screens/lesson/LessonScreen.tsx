@@ -27,6 +27,7 @@ import {
   IconButton,
   LoadingState,
   Page,
+  Spinner,
   useToast,
 } from '@adle/design-system';
 
@@ -52,7 +53,7 @@ import {
   SpeechNarrator,
   type Voice,
 } from '../../lesson/speech';
-import { answeredAskId, asksAbout } from '../../lib/asks';
+import { answeredAskId, asksAbout, KIND_ASK } from '../../lib/asks';
 import { USUAL_BREAK_MINUTES } from '../../lib/breaks';
 import { getBridge } from '../../lib/bridge';
 import { callCore, CoreRequestError, describeError } from '../../lib/core-client';
@@ -66,9 +67,9 @@ import styles from './Lesson.module.css';
 import { type ReportState, UnhelpfulDialog } from './UnhelpfulDialog';
 
 const GROUNDING_NOTE: Record<LessonForPlayer['lesson']['grounding'], string> = {
-  sample: 'A sample lesson written by Adle.',
-  materials: 'Based on your own materials.',
-  general_knowledge: 'From general knowledge, not from your materials.',
+  sample: 'Sample lesson',
+  materials: 'From your materials',
+  general_knowledge: 'From general knowledge',
 };
 
 /** What a lesson is read with when the learner has not said otherwise. */
@@ -155,7 +156,7 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
   const leave = (): void => navigate({ name: 'course', courseId, tab: 'learn' });
   const back = (
     <Button variant="tertiary" size="small" icon={<ArrowLeft />} onClick={leave}>
-      Back to the course
+      Back to course
     </Button>
   );
 
@@ -166,7 +167,7 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
   ) {
     return (
       <Page title="Lesson" eyebrow={back}>
-        <LoadingState title="Opening the lesson…" />
+        <LoadingState title="Opening lesson…" />
       </Page>
     );
   }
@@ -180,8 +181,8 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
             code === 'not_found'
               ? 'This lesson no longer exists'
               : code === 'lesson_outdated'
-                ? 'This lesson needs to be made again'
-                : 'The lesson could not be opened'
+                ? 'This lesson needs to be recreated'
+                : 'Couldn’t open the lesson'
           }
           description={describeError(error)}
           actions={
@@ -189,7 +190,7 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
               <Button onClick={lesson.reload}>Try again</Button>
             ) : (
               <Button variant="primary" onClick={leave}>
-                Back to the course
+                Back to course
               </Button>
             )
           }
@@ -233,7 +234,7 @@ function LessonPlayer({
     openSession(data, preferences, voices, (error) =>
       toast.show({
         tone: 'danger',
-        title: 'Your place in this lesson could not be saved',
+        title: 'Couldn’t save your place',
         description: describeError(error),
       }),
     ),
@@ -252,12 +253,25 @@ function LessonPlayer({
   /** The part the open dialog is about: it stays that part if the lesson moves on. */
   const [askingAbout, setAskingAbout] = useState<number | null>(null);
   const [askStarted, setAskStarted] = useState<Job | null>(null);
+  /** The part the question being answered was asked about, where this screen saw it asked. */
+  const [askedAbout, setAskedAbout] = useState<number | null>(null);
   const [askStarting, setAskStarting] = useState(false);
   const [askRefusal, setAskRefusal] = useState<JobFailure | null>(null);
+  /** Why "Stop" did not work. Said in the dialog: a toast would lie underneath it. */
+  const [stopProblem, setStopProblem] = useState<string | null>(null);
   /** The parts whose kept questions are unfolded. */
   const [notesOpen, setNotesOpen] = useState<ReadonlySet<string>>(new Set());
   const askJob = useJob(askStarted, (finished) => {
     asks.reload();
+    if (finished.status === 'failed' && askingAbout === null) {
+      // With the dialog open the failure is shown there. Back in the lesson nothing else
+      // would say that no answer is coming.
+      toast.show({
+        tone: 'danger',
+        title: 'Couldn’t get an answer',
+        description: jobFailure(finished)?.message,
+      });
+    }
     if (finished.status !== 'succeeded') return;
     const about =
       typeof finished.result === 'object' && finished.result !== null
@@ -271,11 +285,31 @@ function LessonPlayer({
       const index = lesson.segments.findIndex((item) => item.id === about);
       toast.show({
         tone: 'success',
-        title: 'Your question has an answer',
-        description: index >= 0 ? `It is beside part ${index + 1} of this lesson.` : undefined,
+        title: 'Your answer is ready',
+        description: index >= 0 ? `See part ${index + 1} of this lesson.` : undefined,
       });
     }
   });
+  // A question asked before the learner left this lesson may still be on its way: it is
+  // picked up again, so that its answer arrives here and it can still be stopped.
+  useEffect(() => {
+    let cancelled = false;
+    callCore('jobs.list_active', { path: { course_id: lesson.course_id } }).then(
+      (list) => {
+        if (cancelled) return;
+        const waiting = list.jobs.find(
+          (job) => job.kind === KIND_ASK && job.subject_id === lessonId,
+        );
+        if (waiting) setAskStarted((current) => current ?? waiting);
+      },
+      () => {
+        // Nothing to pick up, or not now. Asking again says so if one is still out.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [lesson.course_id, lessonId]);
   const kept: Ask[] = asks.resource.status === 'ready' ? asks.resource.data.asks : [];
   const answeredId = answeredAskId(askJob);
   const freshAnswer = kept.find((ask) => ask.id === answeredId) ?? null;
@@ -329,11 +363,17 @@ function LessonPlayer({
   const answering = askStarting || isJobActive(askJob);
   const openAsk = (): void => {
     controller.pause();
-    // A new question starts from an empty page: the last answer is beside its part already.
-    if (!answering) {
-      setAskStarted(null);
-      setAskRefusal(null);
+    setStopProblem(null);
+    const failed = askJob?.status === 'failed';
+    if (answering || failed) {
+      // Back to the question that is being answered, to watch it or to stop it; or to the
+      // one that failed while the learner was back in the lesson, to see what happened.
+      setAskingAbout(askedAbout ?? state.segmentIndex);
+      return;
     }
+    // A new question starts from an empty page: the last answer is beside its part already.
+    setAskStarted(null);
+    setAskRefusal(null);
     setAskingAbout(state.segmentIndex);
   };
   const ask = async (question: string): Promise<void> => {
@@ -342,6 +382,7 @@ function LessonPlayer({
     setAskStarting(true);
     setAskRefusal(null);
     setAskStarted(null);
+    setAskedAbout(askingAbout ?? state.segmentIndex);
     try {
       setAskStarted(
         await callCore('lessons.ask', {
@@ -357,25 +398,20 @@ function LessonPlayer({
   };
   const stopAsk = (): void => {
     if (!askJob) return;
+    setStopProblem(null);
     callCore('jobs.cancel', { path: { job_id: askJob.id } }).catch((error: unknown) => {
-      toast.show({
-        tone: 'danger',
-        title: 'It could not be stopped',
-        description: describeError(error),
-      });
+      setStopProblem(describeError(error));
     });
   };
   const removeAsk = (removed: Ask): void => {
     callCore('lessons.delete_ask', { path: { lesson_id: lessonId, ask_id: removed.id } }).then(
-      () => {
-        if (asks.resource.status !== 'ready') return;
-        const data = asks.resource.data;
-        asks.setData({ ...data, asks: data.asks.filter((item) => item.id !== removed.id) });
-      },
+      // Read again, not worked out from the list as it was when the button was pressed:
+      // two removed in quick succession would bring the first one back.
+      () => asks.reload(),
       (error: unknown) => {
         toast.show({
           tone: 'danger',
-          title: 'The question could not be removed',
+          title: 'Couldn’t remove the question',
           description: describeError(error),
         });
       },
@@ -400,7 +436,7 @@ function LessonPlayer({
           {/* Where in the learner's own materials the lesson draws from: named, never invented. */}
           {lesson.source_refs.length > 0 ? (
             <span className={styles.sources}>
-              Draws on:{' '}
+              Sources:{' '}
               {lesson.source_refs
                 .map((source) => source.source_name + ', ' + source.locator)
                 .join('; ')}
@@ -490,6 +526,14 @@ function LessonPlayer({
             ) : null}
           </div>
 
+          {asks.resource.status === 'error' ? (
+            <p className={styles.note} role="alert">
+              Couldn’t load your questions about this lesson.{' '}
+              <Button size="small" variant="tertiary" onClick={asks.reload}>
+                Try again
+              </Button>
+            </p>
+          ) : null}
           {aboutThisPart.length > 0 ? (
             <section className={styles.asked} aria-label="Your questions about this part">
               <div>
@@ -515,7 +559,7 @@ function LessonPlayer({
                     <li key={item.id} className={styles.askedItem}>
                       <AskNote ask={item} />
                       <IconButton
-                        label="Remove this question and its answer"
+                        label="Remove question"
                         icon={<Trash2 />}
                         size="small"
                         onClick={() => removeAsk(item)}
@@ -539,7 +583,7 @@ function LessonPlayer({
               </Button>
               {beats.length === 0 ? null : settled ? (
                 <Button icon={<RotateCcw />} onClick={replay}>
-                  Play again
+                  Replay
                 </Button>
               ) : (
                 <Button
@@ -570,20 +614,25 @@ function LessonPlayer({
               ) : null}
               {!spoken && preferences.narration ? (
                 <span className={styles.note}>
-                  No voice is installed on this computer, so the narration is shown as text.
+                  No voice is installed, so narration is shown as text.
                 </span>
               ) : null}
             </div>
             <div className={styles.controlGroup}>
-              {!allowed ? (
-                <span className={styles.note}>Answer or skip the question to continue.</span>
-              ) : null}
-              <Button variant="tertiary" icon={<Hand />} loading={answering} onClick={openAsk}>
+              {!allowed ? <span className={styles.note}>Answer or skip to continue.</span> : null}
+              {/* Busy, and still a button: opening it again is the way to watch the answer
+                  being written, or to stop it. */}
+              <Button
+                variant="tertiary"
+                icon={answering ? <Spinner size="small" /> : <Hand />}
+                aria-busy={answering || undefined}
+                onClick={openAsk}
+              >
                 {answering ? 'Answering' : 'Ask a question'}
               </Button>
               {explains ? (
                 <Button variant="tertiary" icon={<MessageCircleQuestion />} onClick={sayUnhelpful}>
-                  This did not help
+                  This didn’t help
                 </Button>
               ) : null}
               <Button
@@ -610,6 +659,8 @@ function LessonPlayer({
           job={askJob}
           starting={askStarting}
           failure={askRefusal ?? jobFailure(askJob)}
+          refused={askRefusal !== null}
+          stopProblem={stopProblem}
           answer={freshAnswer}
           onAsk={(question) => void ask(question)}
           onStop={stopAsk}
@@ -619,10 +670,12 @@ function LessonPlayer({
           }}
           onClose={() => {
             setAskingAbout(null);
+            setStopProblem(null);
             // An answer that has been read, or a failure that has been seen, is put away.
             if (!answering) {
               setAskStarted(null);
               setAskRefusal(null);
+              setAskedAbout(null);
             }
           }}
         />
@@ -728,7 +781,9 @@ function SegmentStage({
 
   return (
     <div className={styles.stage}>
-      {segment.type === 'interaction' ? (
+      {/* What to try is said only while there is something to try it on: a picture that
+          is not there, or did not run, is told in words below instead. */}
+      {segment.type === 'interaction' && scene && sceneStatus !== 'failed' ? (
         <Callout tone="info" title="Try it">
           <MathText text={segment.prompt} />
         </Callout>
@@ -747,6 +802,7 @@ function SegmentStage({
                 <MathText text={reference.fallback_text} />
               </p>
             }
+            onStart={waitingToStart ? () => controller.play() : undefined}
             onStatusChange={(status) => {
               setSceneStatus(status);
               cues.setHolding(segment.id, status === 'interactive');
@@ -765,7 +821,7 @@ function SegmentStage({
                   aria-expanded={describing}
                   onClick={() => setDescribing((open) => !open)}
                 >
-                  {describing ? 'Hide the description' : 'Describe this picture in words'}
+                  {describing ? 'Hide description' : 'Describe this picture'}
                 </Button>
               </div>
               {describing ? (
@@ -776,11 +832,11 @@ function SegmentStage({
             </div>
           ) : null}
           {waitingToStart && segment.type !== 'interaction' ? (
-            <p className={styles.note}>Press Start to play the animation with its narration.</p>
+            <p className={styles.note}>Press Start to play.</p>
           ) : null}
           {state.explored ? (
             <p className={styles.note} role="status">
-              You tried it. Carry on exploring, or continue when you are ready.
+              Keep exploring, or continue when you’re ready.
             </p>
           ) : null}
         </>
@@ -791,7 +847,7 @@ function SegmentStage({
             <MathText text={reference.fallback_text} />
           </p>
           <p className={styles.boardEmpty}>
-            The picture for this part is not available, so here is the same idea in words.
+            The picture isn’t available. Here’s the same idea in words.
           </p>
         </div>
       ) : null}
@@ -801,9 +857,7 @@ function SegmentStage({
           <p className={styles.prompt}>
             <MathText text={segment.prompt} />
           </p>
-          <p className={styles.boardEmpty}>
-            There is nothing to submit here. Take the time you want, then continue.
-          </p>
+          <p className={styles.boardEmpty}>Nothing to submit. Take your time, then continue.</p>
         </div>
       ) : null}
 
@@ -819,7 +873,7 @@ function SegmentStage({
           ) : (
             <p className={styles.boardEmpty}>
               {state.status === 'ready'
-                ? 'Press Start when you are ready.'
+                ? 'Press Start when you’re ready.'
                 : 'Listen, or read along in the transcript.'}
             </p>
           )}
@@ -888,31 +942,28 @@ function FinishedPanel({
       </div>
       {evidence.resource.status === 'loading' ? (
         <p className={styles.note} role="status">
-          Reading what your answers showed…
+          Updating your progress…
         </p>
       ) : evidence.resource.status === 'error' ? (
         <p className={styles.note}>
-          What your answers showed could not be read just now. It is saved, and the course page will
-          show it.
+          Couldn’t load your progress just now. It’s saved, and the course page will show it.
         </p>
       ) : knowledge ? (
         <div>
           <p className={styles.finishedLine}>
-            <span>Where this concept stands:</span>
+            <span>Status:</span>
             <Badge tone={KNOWLEDGE_TONE[knowledge.state]}>{knowledge.label}</Badge>
           </p>
           {knowledge.missing.length > 0 ? (
             <p className={styles.note}>Still needed: {knowledge.missing.join('; ')}.</p>
           ) : (
-            <p className={styles.note}>
-              Adle will check again after a while to see that it has stuck.
-            </p>
+            <p className={styles.note}>A review later will check that it stuck.</p>
           )}
         </div>
       ) : null}
       {overview.resource.status === 'loading' ? (
         <p className={styles.note} role="status">
-          Working out what to do next…
+          Planning your next step…
         </p>
       ) : overview.resource.status === 'ready' ? (
         <div className={styles.finishedNext}>
@@ -926,10 +977,10 @@ function FinishedPanel({
           variant={overview.resource.status === 'ready' ? 'secondary' : 'primary'}
           onClick={onLeave}
         >
-          Back to the course
+          Back to course
         </Button>
         <Button variant="tertiary" icon={<RotateCcw />} onClick={onReview}>
-          Go through it again
+          Replay lesson
         </Button>
         {/* The end of a lesson is a natural place to stop for a few minutes. Offered, never urged. */}
         <Button
@@ -937,6 +988,9 @@ function FinishedPanel({
           icon={<Coffee />}
           onClick={() => {
             if (!rest.times) rest.start(USUAL_BREAK_MINUTES);
+            // Not back into this lesson, which would open again at its first part: on to
+            // the course, where the next step is.
+            rest.returnVia({ name: 'course', courseId: data.lesson.course_id, tab: 'learn' });
             navigate({ name: 'break' });
           }}
         >

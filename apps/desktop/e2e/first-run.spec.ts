@@ -1,4 +1,4 @@
-import { expect, launchApp, test, waitForCore } from './support/app';
+import { expect, expectReadyOnPage, launchApp, test, waitForCore } from './support/app';
 
 test.describe('first launch without an AI key', () => {
   test('explains what stays local, then opens the library and remembers it', async ({
@@ -15,11 +15,11 @@ test.describe('first launch without an AI key', () => {
       'Learn at your own pace. Understand for real.',
     );
     // The external data path is disclosed before any AI operation is possible.
-    await expect(page.getByText('Your learning stays on this computer')).toBeVisible();
+    await expect(page.getByText('Private by default')).toBeVisible();
     // Both providers are named, and that text only goes to one the learner gave a key to.
     await expect(
       page.getByText(
-        /sends the relevant text to an AI provider you have\s+given a key to \(AIHubMix or NVIDIA NIM\), and says which before it does/,
+        /the relevant text goes to the provider you set up\s+\(AIHubMix or NVIDIA NIM\)/,
       ),
     ).toBeVisible();
     // No main navigation until the learner has seen the welcome.
@@ -31,7 +31,7 @@ test.describe('first launch without an AI key', () => {
 
     // The app is usable without a key: the core starts and reports no key configured.
     await waitForCore(page);
-    await expect(page.getByText('Local service ready')).toBeVisible();
+    await expectReadyOnPage(page);
     await expect(page.getByText('Not set up')).toBeVisible();
     expect(first.problems).toEqual([]);
     await first.close();

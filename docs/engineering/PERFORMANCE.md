@@ -4,7 +4,7 @@ What a learner waits for, how long it takes, and how that was measured. Every nu
 came from `node scripts/measure.mjs` or `node scripts/smoke-packaged.mjs` on the machine
 below. They describe that machine on that day; run the scripts again rather than quote them.
 
-- **Measured:** 2026-11-19 and 2026-11-20
+- **Measured:** 2026-11-19 to 2026-11-21 (the date of each figure is beside it where they differ)
 - **Machine:** Intel Core i9-14900HX, 32 GB memory, NVMe disk, Windows 11 Pro (10.0.26300)
 - **Build:** Electron 45.4.1, Python 3.12.11
 
@@ -15,16 +15,20 @@ hold.
 
 Five fresh starts each, on an empty profile. Median, with the slowest in brackets.
 
-| | Packaged build | Built files (development) |
+| | Packaged build (2026-11-20) | Built files (development, 2026-11-21) |
 |---|---|---|
-| Window with its first screen | 0.52 s (0.63) | 0.48 s (0.61) |
-| Local service ready, from launch | 1.34 s (1.51) | 2.84 s (2.92) |
-| Sample course added and its first suggestion shown | 0.37 s (0.39) | 0.42 s (0.44) |
-| Lesson opened | 0.10 s (0.15) | 0.33 s (0.33) |
-| Live scene: from asking for it to its first frame | 0.89 s (1.49) | 0.93 s (0.95) |
+| Window with its first screen | 0.52 s (0.63) | 0.39 s (0.43) |
+| Background service ready, from launch | 1.34 s (1.51) | 2.62 s (2.65) |
+| Sample course added and its first suggestion shown | 0.37 s (0.39) | 0.27 s (0.35) |
+| Lesson opened | 0.10 s (0.15) | 0.32 s (0.44) |
+| Live scene: from asking for it to its first frame | 0.89 s (1.49) | 0.83 s (0.84) |
 
-The window never waits for the local service: the first screen is up in about half a second
-and says "Local service starting…" until the service answers.
+The window never waits for the background service: the first screen is up in under half a
+second, and the rail says "Starting…" until the service answers. "Ready" now includes
+handing the service the learner's choice of provider and their keys before anyone is told
+(ADR-029); measured again after that change, the development build is no slower for it. The
+packaged column is from before ADR-027 to ADR-030 and is to be measured again with that
+build.
 
 The live scene figure is the whole path the plan asks to be measured separately: a new
 sandboxed frame on a fresh origin and process, the Wanim runtime loading, the scene being
@@ -97,6 +101,6 @@ that model is left alone for ten.
 
 ## The end-to-end suite as a timing check
 
-The whole suite (88 journeys) takes ten to twelve minutes against either build, with one
+The whole suite (101 journeys) takes fourteen to seventeen minutes against the development build, with one
 worker. No journey waits on a fixed delay for the app; a regression in any of the paths above
 shows up there as a slower run long before it becomes a failure.

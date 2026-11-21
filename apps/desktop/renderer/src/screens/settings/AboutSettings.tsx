@@ -33,7 +33,7 @@ export function AboutSettings() {
       const result = await getBridge().app.showLogs();
       if (!result.ok) setLogsProblem(result.error.message);
     } catch {
-      setLogsProblem('The folder could not be opened.');
+      setLogsProblem('Couldn’t open the folder.');
     }
   };
 
@@ -52,14 +52,14 @@ export function AboutSettings() {
   return (
     <Stack gap={6}>
       <Section
-        title="Local service"
-        description="The part of Adle that stores and prepares your courses."
+        title="Status"
+        description="Adle’s background service stores your courses and prepares lessons. Restart it if something seems stuck."
       >
         <Card>
           <div className={styles.statusRow}>
             <div className={styles.statusText}>
               <Stack direction="row" gap={3} align="center" wrap>
-                <span className={styles.rowTitle}>Core service</span>
+                <span className={styles.rowTitle}>Background service</span>
                 <Badge
                   tone={
                     coreStatus.state === 'ready'
@@ -79,21 +79,21 @@ export function AboutSettings() {
               ) : null}
             </div>
             <Button icon={<RotateCw />} loading={restarting} onClick={() => void restart()}>
-              Restart service
+              Restart
             </Button>
           </div>
         </Card>
       </Section>
 
       <Section
-        title="Visual runtime check"
+        title="Animation check"
         description="Runs a small interactive scene to confirm that animations work on this computer."
       >
         {checking ? (
           <Stack gap={4} className={styles.checkStage}>
             <ScenePlayer
               source={checkScene}
-              title="Runtime check: a circle that resizes with a slider"
+              title="Animation check: a circle that resizes with a slider"
               controlLabels={{ size: 'Circle radius' }}
               fallback={
                 <p>
@@ -115,8 +115,7 @@ export function AboutSettings() {
                 <>
                   <Badge tone="danger">Not working</Badge>
                   <span className={styles.muted}>
-                    The scene could not run ({failure.stage}). Lessons will use text explanations
-                    instead.
+                    Couldn’t run the scene ({failure.stage}). Lessons will use text instead.
                   </span>
                 </>
               ) : sceneWorks ? (
@@ -139,7 +138,7 @@ export function AboutSettings() {
         ) : (
           <Card>
             <div className={styles.statusRow}>
-              <p className={styles.muted}>Nothing is sent anywhere; the scene runs locally.</p>
+              <p className={styles.muted}>Runs on this computer. Nothing is sent.</p>
               <Button onClick={() => setChecking(true)}>Run check</Button>
             </div>
           </Card>
@@ -170,16 +169,15 @@ export function AboutSettings() {
       </Section>
 
       <Section
-        title="If something goes wrong"
-        description="Adle keeps a short log of its own failures on this computer. It is never sent anywhere."
+        title="Logs"
+        description="A short log of app errors, kept on this computer and never sent anywhere."
       >
         <Card>
           <div className={styles.statusRow}>
             <div className={styles.statusText}>
               <p className={styles.muted}>
-                The log says what happened to the app (a window that stopped, a service that would
-                not start), never what you typed, opened, or answered. If you ask someone for help,
-                these are the files to show them.
+                It records what went wrong in the app, never what you typed, opened, or answered.
+                Share these files if you ask someone for help.
               </p>
               {logsProblem ? (
                 <p className={styles.muted} role="alert">
@@ -188,7 +186,7 @@ export function AboutSettings() {
               ) : null}
             </div>
             <Button icon={<FolderOpen />} onClick={() => void showLogs()}>
-              Show log files
+              Open log folder
             </Button>
           </div>
         </Card>

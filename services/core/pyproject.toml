@@ -54,7 +54,7 @@ select = [
   "ASYNC",
 ]
 # Typographic characters used deliberately in prose and in section-path titles.
-allowed-confusables = ["–", "›"]
+allowed-confusables = ["–", "›", "’", "“", "”"]
 ignore = [
   "S101",   # asserts are fine in tests and for internal invariants
   "B008",   # FastAPI's Depends() in defaults is idiomatic

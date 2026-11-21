@@ -87,23 +87,16 @@ function setUp(changes: Partial<FakeCore> = {}) {
     log,
     ...changes,
   };
-  const afterStart = vi.fn(() => {
-    log.push('key handed over');
-    return Promise.resolve();
-  });
   const handlers = new Map<string, () => Promise<CoreResult<unknown>>>();
-  registerDataHandlers(
-    { core: core as unknown as CoreProcess, dataDir, afterStart },
-    (channel, handler) => {
-      handlers.set(channel, handler as () => Promise<CoreResult<unknown>>);
-    },
-  );
+  registerDataHandlers({ core: core as unknown as CoreProcess, dataDir }, (channel, handler) => {
+    handlers.set(channel, handler as () => Promise<CoreResult<unknown>>);
+  });
   const call = (channel: string): Promise<CoreResult<unknown>> => {
     const handler = handlers.get(channel);
     if (!handler) throw new Error(`No handler for ${channel}.`);
     return handler();
   };
-  return { core, afterStart, call, log };
+  return { core, call, log };
 }
 
 beforeEach(() => {
@@ -209,24 +202,22 @@ describe('restoring from a copy', () => {
     expect(core.restart).not.toHaveBeenCalled();
   });
 
-  it('restarts the core with the copy, then hands the key to the new one', async () => {
+  it('restarts the core with the copy (which is handed its keys as part of starting)', async () => {
     electron.open.mockResolvedValue({ canceled: false, filePaths: [copy()] });
     const { call, core, log } = setUp({ lastRestore: { ok: true } });
     expect(await call(IPC.dataRestoreCopy)).toEqual({ ok: true, data: { restored: true } });
     expect(core.restart).toHaveBeenCalledWith({ restoreFrom: copy() });
-    expect(log).toEqual(['restart', 'key handed over']);
+    expect(log).toEqual(['restart']);
   });
 
   it('reports the core’s reason when it refuses the copy, and the core runs on', async () => {
     electron.open.mockResolvedValue({ canceled: false, filePaths: [copy()] });
     const message = 'That file is not a copy of your data. Your current data was not changed.';
-    const { call, afterStart } = setUp({ lastRestore: { ok: false, message } });
+    const { call } = setUp({ lastRestore: { ok: false, message } });
     expect(await call(IPC.dataRestoreCopy)).toEqual({
       ok: false,
       error: { code: 'restore_refused', message, status: 0 },
     });
-    // The core started on the data as it was, so it still needs the key.
-    expect(afterStart).toHaveBeenCalledTimes(1);
   });
 
   it('does not claim a restore the core said nothing about', async () => {
@@ -234,19 +225,18 @@ describe('restoring from a copy', () => {
     const { call } = setUp({ lastRestore: null });
     expect(await call(IPC.dataRestoreCopy)).toMatchObject({
       ok: false,
-      error: { code: 'restore_failed', message: expect.stringContaining('as it was') as string },
+      error: { code: 'restore_failed', message: expect.stringContaining('unchanged') as string },
     });
   });
 
   it('says so when the core does not come back', async () => {
     electron.open.mockResolvedValue({ canceled: false, filePaths: [copy()] });
     const failed: CoreStatus = { state: 'failed', message: 'The core service took too long.' };
-    const { call, afterStart } = setUp({ restart: vi.fn(() => Promise.resolve(failed)) });
+    const { call } = setUp({ restart: vi.fn(() => Promise.resolve(failed)) });
     expect(await call(IPC.dataRestoreCopy)).toEqual({
       ok: false,
       error: { code: 'core_unavailable', message: 'The core service took too long.', status: 0 },
     });
-    expect(afterStart).not.toHaveBeenCalled();
   });
 });
 
@@ -268,8 +258,8 @@ describe('deleting everything', () => {
     const { call, log } = setUp();
     expect(await call(IPC.dataEraseAll)).toEqual({ ok: true, data: { erased: true } });
     expect(existsSync(dataDir)).toBe(false);
-    // In this order: stopped, gone before anything may start it, started, key handed over.
-    expect(log).toEqual(['stopped', 'released, folder gone', 'start', 'key handed over']);
+    // In this order: stopped, gone before anything may start it, started.
+    expect(log).toEqual(['stopped', 'released, folder gone', 'start']);
   });
 
   it('leaves everything outside the data folder alone', async () => {
@@ -289,19 +279,18 @@ describe('deleting everything', () => {
       ok: false,
       error: { code: 'erase_failed' },
     });
-    expect(log).toEqual(['stopped', 'released with the folder there', 'start', 'key handed over']);
+    expect(log).toEqual(['stopped', 'released with the folder there', 'start']);
   });
 
   it('says what happened when everything is gone but the core does not start', async () => {
     electron.confirm.mockResolvedValue({ response: 1 });
     const failed: CoreStatus = { state: 'failed', message: 'No Python was found.' };
-    const { call, afterStart } = setUp({ start: vi.fn(() => Promise.resolve(failed)) });
+    const { call } = setUp({ start: vi.fn(() => Promise.resolve(failed)) });
     expect(await call(IPC.dataEraseAll)).toEqual({
       ok: false,
       error: { code: 'core_unavailable', message: 'No Python was found.', status: 0 },
     });
     expect(existsSync(dataDir)).toBe(false);
-    expect(afterStart).not.toHaveBeenCalled();
   });
 
   it('refuses a folder that is plainly not its own, before stopping anything', async () => {

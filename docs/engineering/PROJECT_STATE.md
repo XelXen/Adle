@@ -3,7 +3,7 @@
 The single place to find out where Adle stands and what to do next. Update it at the end of every
 work session (see `AGENTS.md` → "Keeping the next agent oriented").
 
-- **Last updated:** 2026-11-20
+- **Last updated:** 2026-11-21
 - **Branch:** `dev` (all work; `main` holds only the original plan commit until the owner merges)
 - **Last commit:** see `git log -1`
 - **Active milestone:** M8 — release hardening, done as far as this machine can take it:
@@ -12,10 +12,15 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   NIM, beside AIHubMix (ADR-021), through which **a real model has written lessons for the
   first time**; and, at the owner's request on 2026-11-20: a new look (ADR-022) in Geist
   (ADR-025), both providers used together (ADR-023), questions asked during a lesson
-  (ADR-024), and a break while a lesson is written (ADR-026). What is left needs the owner;
+  (ADR-024), and a break while a lesson is written (ADR-026). Then, after the owner looked
+  at the app and asked for a review of it: neutral colours with a near-black dark theme
+  (ADR-027), every sentence rewritten short and plain (ADR-028), the findings of two reviews
+  fixed (ADR-029), and a title bar of the app's own (ADR-030). What is left needs the owner;
   see "Next actions"
-- **Commits:** every commit is GPG-signed and waits for the owner's passphrase prompt. If
-  `git log` is behind the working tree, a `pinentry` window is waiting on the desktop.
+- **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
+  `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
+  the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
+  Nothing is ever pushed.
 
 ## Milestone status
 
@@ -35,6 +40,9 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 
 - First launch → welcome with the local-first disclosure → library. Remembered across restarts.
 - Navigation rail (collapses under 960 px), light/dark/system theme applied before first paint.
+- **The window has a title bar of its own** on Windows (and, untried, macOS): the app's
+  canvas runs to the top edge, the system's buttons sit on it in the theme's colours, and the
+  window is moved by the strip along its top. Linux keeps the frame it is given.
 - **Library:** courses listed most recently used first; create a course from a topic or from
   materials; delete a course (with its files) after confirmation.
 - **Course → Materials:** import PDF, Word, Markdown, and text files with the file dialog or by
@@ -42,11 +50,11 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   rejected with a reason); extraction warnings; remove a source; search with file and page or
   section for every hit.
 - **Course → Learn** (the tab a course with concepts opens on): one suggested next step with
-  the reason for it, the alternatives ("Or instead"), a note that stopping is fine when things
+  the reason for it, the alternatives ("Other options"), a note that stopping is fine when things
   are going badly, and each concept in learning order with its state in words, what is still
   missing, when it is next reviewed, and what Adle has noticed about it.
 - **Hypotheses:** two answers pointing the same way show as "Seen more than once" with a
-  sentence; one answer shows as "Suspected, not established". "That was a slip" sets one aside.
+  sentence; one answer shows as "Suspected". "That was a slip" sets one aside.
   A slip of sign shows as a slip and is counted as partly right.
 - **Practice and review:** a few questions on one concept, with why these questions, answered
   and explained as in a lesson, then a summary and what to do next. Nothing answered in the
@@ -56,10 +64,10 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **The session summary** (Learn tab, under the suggested step): "This session" while the
   learner may still be in it, "Last time, yesterday" and the like afterwards. Lessons finished
   and questions answered; for each concept worked on, how many answers were right (with any
-  that were lighter evidence named, and one sentence saying what that means), what is still
+  that were given "with help" named, and one sentence saying what that means), what is still
   needed in the concept's own words, and when its review comes. No score, and wrong answers
   are not listed.
-- **"This did not help"** in a lesson: skip to the next question, have the concept explained
+- **"This didn't help"** in a lesson: skip to the next question, have the concept explained
   another way (a chosen way of teaching; needs a key), or go to the course. The suggestion on
   the Learn tab changes accordingly and says why.
 - **Course → Curriculum** (where a course without concepts opens, once it has a topic or materials): the
@@ -84,7 +92,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Questions:** multiple choice, true or false, numeric, short answer, ordering, and
   self-assessed explanation. Hint, "I am not sure", and Skip. The core scores, explains, records
   the attempt and the evidence, and says in words what changed. After checking, options read
-  "Your answer" / "The right answer".
+  "Your answer" / "Correct answer".
 - **Resume and review:** a lesson reopens at the part where it was left; a finished one reopens
   from the start with every part open and no question blocking. A finished lesson ends with
   what to do next.
@@ -94,8 +102,8 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   runs as a job with progress and Cancel, and ends in a review dialog where the learner picks
   what to add. Suggestions that finish while the learner is elsewhere wait to be reviewed or
   discarded. Nothing is added without the learner choosing it.
-- **Generated lessons:** "Create a lesson with AI" on a concept (and "Create the lesson" on
-  the Learn tab) says what is sent and what it costs of the day's requests, shows progress and
+- **Generated lessons:** "Create a lesson with AI" on a concept (and "Create lesson" on
+  the Learn tab) says what is sent, where, and about how long it takes, shows progress and
   Cancel, and adds a lesson that plays like any other. For another lesson on the same concept
   the learner can choose how it should explain; left alone, Adle uses a way not used yet. A
   concept has at most four lessons. No key, a rate-limit wait, a used-up day, a provider failure, and a cancelled job each
@@ -110,17 +118,17 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
 - **Narration aloud:** the lesson is read by a voice installed on the computer (never an online
   one), with "Read aloud" and "Transcript" switches in the lesson. Without a voice, or if the
   voice fails, the narration is shown as text at the learner's reading pace.
-- Settings → AI provider: **"Which provider to use": Automatic, AIHubMix only, or NVIDIA
-  NIM only.** Automatic uses every provider that has a key, each for what it is best at:
-  what is waited for (a question, a list of concepts) goes to the quick one, long work (a
-  lesson) to the roomy one once the quick one is half used for the day, and the other is
-  asked when one cannot answer. "Where requests go now" shows the plan for each kind of
-  request and the reason. The choice is changed only there, and not while something is
-  being written. Below it, a card for each provider: its address, its models in the order
-  they are asked, its key (save, replace, remove; OS-encrypted; kept for one provider at one
-  address and never sent anywhere else), **"Check that it works"** (one word from that
-  provider, nothing of the learner's sent), and how much of today's allowance is used
-  there, with a sentence saying whether the limits are the provider's or Adle's own.
+- Settings → AI provider: **"Provider": Automatic, AIHubMix only, or NVIDIA NIM only.**
+  Automatic uses every provider that has a key, each for what it is best at: what is waited
+  for (a question, a list of concepts) goes to the quick one, long work (a lesson) to the
+  roomy one once the quick one is half used for the day, and the other is asked when one
+  cannot answer. "Current routing" shows the plan for each kind of request and the reason.
+  The choice is changed only there, and not while something is being written. Below it, a
+  card for each provider: its address, its models in the order they are asked, its key
+  (save, replace, remove; OS-encrypted; kept for one provider at one address and never sent
+  anywhere else), **"Test key"** (one word from that provider, nothing of the learner's
+  sent), and "Usage today", with a sentence saying whether the limits are the provider's
+  or Adle's own.
 - **Asking a question during a lesson:** "Ask a question" in the lesson's bar pauses the
   lesson and opens a dialog: the learner's own words or a ready-made question, what will
   be sent and where, and "Ask". The answer is kept beside that part under "Your questions
@@ -135,7 +143,7 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   in the background; can be turned off in Settings → Appearance). A break is also offered
   at the end of a lesson. Nothing about breaks is counted or kept.
 - "Cancel" and "Stop" take effect at once, however silent the provider is.
-- **Library:** opens with "Pick up where you left off": the suggested next step of the
+- **Library:** opens with "Continue learning": the suggested next step of the
   course last opened, with its reason. A lesson a model wrote can be removed from its
   concept (after a confirmation that says what goes and what stays); a lesson that draws on
   the learner's materials names the passages under its title.
@@ -150,8 +158,12 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   in the operating system's own window, then removes every course, material, answer, and
   safety copy; the key and the appearance settings stay. Each works when the local service
   has failed to start, except saving.
-- Settings → About & diagnostics: core status and restart; live scene runtime check with a mirrored,
-  keyboard-operable slider; "Show log files" opens the folder of local logs.
+- Settings → About: whether Adle's background service is running, and "Restart"; an
+  animation check with a mirrored, keyboard-operable slider; "Open log folder" opens the
+  folder of local logs.
+- **Words** (ADR-028): short and plain everywhere, with nothing about the app's own workings
+  unless the learner must act on it. The rail says nothing about the background service
+  while it runs. Progress is Not started, Learning, Nearly there, Understood.
 - **When the app itself fails** (ADR-018): a page that crashes or hangs, and an error nobody
   caught in the main process, each bring a plain message from the operating system with a way
   on (reload, wait, restart, quit); a core that dies is started again, at most twice in five
@@ -162,38 +174,41 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   and a private Python for the core that takes nothing from the computer it is on. Everything
   above works in it; the end-to-end suite says so.
 
-Not present yet (do not assume): a generated lesson sat by a person in the app (see "The real
-providers"), exporting a single course to share (not planned; ADR-016), an installer, a
-signed build.
+Not present yet (do not assume): a generated lesson sat by a person (one was gone through
+by a script; see "The real providers"), exporting a single course to share (not planned;
+ADR-016), an installer, a signed build.
 
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the commits for ADR-021, on 2026-11-20.
+`node scripts/check.mjs --e2e` on the tree that became the commits for ADR-027 to ADR-030,
+on 2026-11-21.
 
 | Gate | Status | Detail |
 |---|---|---|
 | Contracts up to date (API and Lesson IR schema) | PASS | `npm run contracts:check` |
 | Scene name allowlist up to date | PASS | `npm run wanim-names:check` |
 | Packaged scene guide up to date | PASS | `npm run scene-guide:check` |
+| Nothing secret about to be committed | PASS | `npm run secrets:check` |
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 531 tests, 25 files |
+| Vitest | PASS | 647 tests, 32 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 89 source files |
-| pytest | PASS | 1130 tests |
-| Playwright + Electron (E2E) | PASS | 88 tests in 12 minutes, none flaky. 22 of them run the sample course's scenes in both themes |
-| Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 411 npm and 41 Python packages, none refused, none unstated |
-| `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-20 |
-| `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-20 (pip-audit 2.10.1) |
+| mypy (strict) | PASS | 94 source files |
+| pytest | PASS | 1268 tests |
+| Playwright + Electron (E2E) | PASS, after 4 journeys were corrected | 101 tests in 17 minutes. In the gate run 97 passed and 4 failed: they still expected two things changed on purpose ("Up next" said twice on the Learn tab; "Try it" said about a picture that is not there). Those journeys were corrected and their two files run again: 6 of 6 passed. 22 of them run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it now also checks that nothing pressable lies where the window is moved |
+| Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
+| `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
+| `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
-| Packaged build: every journey (`npm run e2e:packaged`) | PASS, one flaky | 88 tests against the rebuilt packaged app in 10 minutes. One, the pointer drag in `scene-player.spec.ts`, missed its first try and passed its retry, while a real-provider script was running on the same machine; run on its own afterwards it passed 8 times of 8 with no retries |
-| Packaged build: release start-up check (`npm run package:check`) | PASS | Fuses, will not run as Node, starts on an empty profile with a stripped environment, no orphaned core |
+| Packaged build: every journey (`npm run e2e:packaged`) | NOT RUN | for this tree. The last run was on the tree of `406a1b2` |
+| Packaged build: release start-up check (`npm run package:check`) | NOT RUN | for this tree |
 | Packaged build on a computer that never had the project | NOT RUN | Needs another machine |
 | Installer, code signing | BLOCKED | Need the owner's certificates |
-| macOS / Linux | NOT RUN | Developed on Windows only |
-| Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: two lessons with three scenes and two curricula were written through Adle's generation service on 2026-11-20, one of them by the stand-in model; see "The real providers" |
+| macOS / Linux | NOT RUN | Developed on Windows only. The window's own title bar (ADR-030) has been seen on Windows 11 only |
+| Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: lessons, curricula and answers were written through Adle's own services on 2026-11-20; tried again after the way an answer is read was changed (ADR-029): a key check in 26 seconds and an answer to a question in 88, two requests. See "The real providers" |
+| A lesson a real model wrote, in the app | PASS | By a script, 2026-11-21: a lesson written by Kimi K3.1 Pro, opened from its profile with no key, gone through in both themes from its first part to "Lesson complete", no error in the console. Not a person |
 
 ## Launch reliability (ADR-008)
 
@@ -219,6 +234,38 @@ message if the page is not painting. `retries: 1` stays on; a test reported as *
 investigated, not ignored.
 
 ## Findings worth knowing (all recorded in ADRs, nested AGENTS files, or the Wanim skill)
+
+- **A value handed over by the page can carry functions of its own** (ADR-029). The preload
+  once called `.map` on "the dropped files", and a page could have answered with any path.
+  The preload calls no method of anything from the page.
+- **"No network" is more than requests.** A peer connection reached listeners on this
+  computer by UDP and TCP with every request refused. What stops it is no name lookups, a
+  proxy that is nowhere and no UDP outside a proxy. A `webrtc` directive in the content
+  security policy is not known to this Chromium: it stops nothing and logs an error on
+  every page.
+- **Anything that can be pressed and may lie along the top of the window must say
+  `app-region: no-drag`** (ADR-030). A tall dialog reached under the strip the window is
+  moved by; a test's clicks do not pass through the window's frame, so only a check of where
+  things lie finds this.
+- **`scrollbar-width` or `scrollbar-color` anywhere switches off the `::-webkit-scrollbar`
+  parts**, and with them the look of every scroll bar.
+- **`getByRole(..., { name: 'Answer' })` also finds "Answering your question".** A journey
+  read the dialog before its answer was there. Short names take `exact: true`.
+- **When many journeys fail for one reason** (a change of wording), run the files one at a
+  time: the list reporter prints what failed only when a run ends. And look for the words a
+  journey expects in the sources before running it: two small scripts did that in seconds
+  where a run takes minutes.
+- **`set_fill` and `set_color` take their arguments in order, without names, in Wanim
+  0.1.3.** `set_fill(opacity=0.3)` stops a scene with "ManimColor only accepts ...", and
+  `set_fill(colour, opacity=0.3)` runs and leaves the shape with no fill. A lesson a real
+  model wrote lost its interactive picture to the first. The scene policy now refuses both
+  (`unreliable_call`), which gives the model one more try with the reason; the guide says
+  how to write them; `e2e/scene-player.spec.ts` reads the pixels. Found by sitting that
+  lesson in the app, not by any test: the policy cannot see what a call does when it runs.
+- **A screenshot of the page is not the window.** The system's buttons, and how a dimmed
+  page looks around them, show only in a picture of the window itself (`PrintWindow`).
+- **A shell string is no place for a backslash.** A regular expression or `\n` passed
+  through `node -e` or a here-document arrived changed, more than once. Patches are files.
 
 - **A provider's reference is not its endpoint** (ADR-021). Kimi K3.1 Pro's documented
   default for `reasoning_effort` is not what it does when the field is left out: without it
@@ -334,8 +381,13 @@ most of them small.
   on to the next model; the job saying what the model is doing.
 - GLM 5.3 Flash, the third in line, has not answered once: no line in three minutes, in
   three attempts. If the first two are both away, a request waits three minutes and fails.
-- Not done: nobody has sat one of these lessons in the app. The key has to be typed into
-  Settings by the owner; automation does not enter credentials.
+- **One of these lessons was sat in the app from start to finish on 2026-11-21, by a
+  script**: the profile the lesson was written into was opened in the app (a copy of it,
+  with no key, so nothing was asked of anyone) and gone through part by part in both
+  themes: ten parts, two questions answered and one skipped, the lesson finished, the
+  course's next step shown, no error in the console. Its first picture played. Its second,
+  the one to try, did not run: see "Findings" for why, and what now catches it. A person
+  has still not learnt from one: the key has to be typed into Settings by the owner.
 
 To do it again, from the repository root (the scripts are in the session's scratch folder,
 `tools/`; they are described here because that folder does not last):
@@ -394,21 +446,28 @@ this, and it spends real allowance.
 
 ## Next actions
 
-What remains needs the owner. In the order it matters:
+First, and not needing the owner: **the packaged builds have not been made from this tree**
+(ADR-027 to ADR-030 change the window, the session and the start of the core, all of which
+the packaged run exists to check). `npm run package:test`, `npm run e2e:packaged`,
+`npm run package`, `npm run package:check`, then `node scripts/measure.mjs --packaged` for
+the packaged column of `PERFORMANCE.md`. Then item 7 below.
+
+What else remains needs the owner. In the order it matters:
 
 1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
    They are in a transcript; treat them as used. Then type the new keys into Settings → AI
-   provider yourself, press "Check that it works" on each, leave the choice on Automatic,
-   and **sit a generated lesson from start to finish**, asking it a question on the way.
-   Expect about twelve minutes for a lesson to be written by NVIDIA; the app will offer a
-   break and tell you when it is ready.
+   provider yourself, press "Test key" on each, leave the choice on Automatic, and **sit a
+   generated lesson from start to finish**, asking it a question on the way. Expect about
+   twelve minutes for a lesson to be written by NVIDIA; the app will offer a break and tell
+   you when it is ready.
 2. **Top up the AIHubMix account** (its notice says ten tries without one), or remove its
    key: until then Automatic finds out once that it refuses and uses NVIDIA.
 3. **Push the branch** so that CI runs for the first time, on Windows and Linux (it now runs
    for `dev` too). Expect surprises on Linux: nothing has run there.
 4. **Choose a licence, get signing certificates, and add an installer** (ADR-019 says what
    and why). `docs/engineering/RELEASE_CHECKLIST.md` is the list.
-5. **Try the packaged folder on a computer that never had the project**, and on macOS.
+5. **Try the packaged folder on a computer that never had the project**, and on macOS, where
+   the window's own title bar (ADR-030) has never been seen.
 6. Decide whether GLM 5.3 Flash should stay NVIDIA's third model while it does not answer.
 7. The largest thing still not built from the plan: **opening a lesson as soon as its words
    are ready**, with the pictures arriving while the learner studies (PROMPT.md 3, PLAN 12.1).
@@ -416,12 +475,17 @@ What remains needs the owner. In the order it matters:
 8. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
    single course; a screen-reader pass by a person; showing on a lesson, not only on its
    job, which model wrote it.
+9. From the review of 2026-11-20, left by decision (ADR-029, "Not done, and why"): a release
+   build can still be started with Chromium's remote debugging switch; the page can ask for
+   the data dialogs again and again; `provider.usage` is a route the interface does not
+   call (five tests read it).
 
 ## Known gaps (tracked, not forgotten)
 
 | Gap | Planned |
 |---|---|
-| A request the learner stopped is given up at once, but its connection is only let go when the provider next says something (or its time runs out), so for a moment two may be open at one provider | By decision (ADR-023): closing a connection from another thread is not dependable across platforms |
+| A request the learner stopped is given up at once and hung up as well as that can be done from another thread; where it cannot, its connection is let go when the provider next says something (or its time runs out), so for a moment two may be open at one provider | By decision (ADR-023, ADR-029): the provider's turn is not kept waiting for a request nobody wants |
+| The window's own title bar has been seen on Windows 11 only | Needs a Mac (ADR-030); Linux keeps its usual frame |
 | A lesson appears only when all of it is written, pictures included | Not built (ADR-026, "Next actions" 7) |
 | A question asked during a lesson does not remember earlier questions | By decision (ADR-024): it is a note, not a chat |
 | AIHubMix being "the quick one" is the owner's report, not a measurement | Its model has never answered Adle; one word in its definition if it turns out otherwise |
@@ -440,8 +504,8 @@ What remains needs the owner. In the order it matters:
 
 - **Licence.** The repository is marked `UNLICENSED`. Choose a licence before publishing.
 - **Commit signing.** Git is configured to GPG-sign commits. Signing needs the key's passphrase in
-  the desktop session; agents cannot provide it. A commit made while the passphrase prompt is
-  unanswered simply waits.
+  the desktop session; agents cannot provide it. Settled on 2026-11-21: wait a few minutes for
+  the prompt to be answered, then commit unsigned.
 - **Vector search.** Not built: FTS5 covers the current need, and `sqlite-vec` plus a local
   embedding model adds packaging risk. Revisit with packaging in M8 unless retrieval quality
   proves insufficient earlier.

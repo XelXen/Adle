@@ -273,7 +273,7 @@ def ready_to_learn(nodes: Sequence[ConceptNode], supported: Collection[str]) -> 
 
 
 def _quoted(title: str) -> str:
-    return f'"{title}"'
+    return f"“{title}”"
 
 
 def _normalised_title(title: str) -> str:

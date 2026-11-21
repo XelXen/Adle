@@ -17,7 +17,7 @@ import {
 } from './recovery';
 import { syncProviders } from './providers';
 import { createSecureEncryptor, ProviderKeyStore } from './secrets';
-import { hardenSession, hardenWebContents } from './security';
+import { hardenSession, hardenWebContents, refuseNameLookups } from './security';
 import { UiStateStore } from './ui-state';
 import { createMainWindow } from './window';
 
@@ -27,6 +27,13 @@ import { createMainWindow } from './window';
  */
 const userDataOverride = process.env.ADLE_USER_DATA_DIR;
 if (userDataOverride) app.setPath('userData', userDataOverride);
+
+// Windows files a window, its taskbar button and its notifications under an application
+// identity. Without one of its own the app is filed under Electron's, and every notification
+// carries Electron's name and logo. No installer registers an identity yet (ADR-019), so the
+// executable is the identity: Windows takes the name and the icon from it. That is Adle's in
+// a packaged build; in development the executable is Electron's own, and so is the logo.
+if (process.platform === 'win32') app.setAppUserModelId(process.execPath);
 
 const isDevelopment = !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
@@ -81,6 +88,7 @@ process.on(
 process.on('unhandledRejection', (reason) => noteRejection(reason, appLog));
 
 registerSchemes();
+refuseNameLookups();
 hardenWebContents();
 
 if (!app.requestSingleInstanceLock()) {
@@ -120,6 +128,10 @@ async function start(): Promise<void> {
   installProtocolHandler();
   Menu.setApplicationMenu(buildMenu());
 
+  const keyStore = new ProviderKeyStore(
+    createSecureEncryptor(safeStorage, process.platform),
+    paths.secretsFile(),
+  );
   const core = new CoreProcess({
     resolveSpec: () =>
       resolveLaunchSpec({
@@ -130,11 +142,11 @@ async function start(): Promise<void> {
       }),
     dataDir: paths.coreDataDir(),
     logsDir: paths.logsDir(),
+    // Part of every start (launch, restart, restore, erase, after a crash): the core is
+    // given the learner's choice of provider and their keys before anything can use it.
+    afterReady: (connection) =>
+      syncProviders({ core: { getConnection: () => connection }, keyStore }),
   });
-  const keyStore = new ProviderKeyStore(
-    createSecureEncryptor(safeStorage, process.platform),
-    paths.secretsFile(),
-  );
   const uiState = new UiStateStore(paths.uiStateFile());
   // Apply the saved theme before the window exists so there is no flash of the wrong one.
   nativeTheme.themeSource = uiState.get().theme;
@@ -158,9 +170,7 @@ async function start(): Promise<void> {
     automaticRestarts.push(now);
     appLog.record('core-restarted', { attempt: automaticRestarts.length });
     setTimeout(() => {
-      void core.start().then(async (status) => {
-        if (status.state === 'ready') await syncProviders(deps);
-      });
+      void core.start();
     }, 1000);
   });
 
@@ -200,9 +210,7 @@ async function start(): Promise<void> {
   });
 
   // The window is usable (sample content, settings) while the core starts.
-  void core.start().then(async (status) => {
-    if (status.state === 'ready') await syncProviders(deps);
-  });
+  void core.start();
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();

@@ -34,35 +34,36 @@ All values live in `src/styles/tokens.css` as `--ad-*` custom properties. Nothin
 a colour (a test enforces this). Why the values are what they are:
 `docs/decisions/ADR-006-design-tokens-and-theme.md` (the first edition),
 `docs/decisions/ADR-011-brand-mark-and-colour.md` (the brand colour), and
-`docs/decisions/ADR-022-sprout-second-edition.md` (this one).
+`docs/decisions/ADR-022-sprout-second-edition.md` (the structure), and
+`docs/decisions/ADR-027-neutral-palette.md` (these colours: neutral grounds, no tint in any grey).
 
 ### Colour
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `canvas` | `#F3F4F1` | `#0C100E` | The frame of the app: the rail lies on it |
-| `page` | `#FBFBFA` | `#111614` | What content is read on: the main panel |
-| `surface` | `#FFFFFF` | `#171D1A` | A thing on the page: cards, dialogs, fields |
-| `surface-subtle` | `#F2F3F0` | `#1C2320` | Quiet regions, hover fills |
-| `surface-sunken` | `#E9EBE7` | `#090C0B` | A well: a track, the ground of a segmented control, a neutral badge |
-| `ink` | `#141B18` | `#E8EEEA` | Main text |
-| `muted` | `#55605A` | `#A2AEA7` | Secondary text |
-| `faint` | `#66706B` | `#8F9B94` | The quietest text that is still text: a count, a date, a label above a group |
-| `border` | `#E4E6E2` | `#262E2A` | Hairlines, card outlines |
-| `border-control` | `#CDD2CC` | `#3A443F` | The edge of a button, which its label already identifies |
-| `border-strong` | `#7B8780` | `#6A776F` | Boundaries of fields and switches (3:1) |
+| `canvas` | `#F3F3F3` | `#0A0A0A` | The frame of the app: the rail lies on it |
+| `page` | `#FCFCFC` | `#0E0E0E` | What content is read on: the main panel |
+| `surface` | `#FFFFFF` | `#141414` | A thing on the page: cards, dialogs, fields |
+| `surface-subtle` | `#F6F6F6` | `#1A1A1A` | Quiet regions, hover fills |
+| `surface-sunken` | `#ECECEC` | `#070707` | A well: a track, the ground of a segmented control, a neutral badge |
+| `ink` | `#171717` | `#EDEDED` | Main text |
+| `muted` | `#5C5C5C` | `#A3A3A3` | Secondary text |
+| `faint` | `#696969` | `#8C8C8C` | The quietest text that is still text: a count, a date, a label above a group |
+| `border` | `#E7E7E7` | `#232323` | Hairlines, card outlines |
+| `border-control` | `#D4D4D4` | `#383838` | The edge of a button, which its label already identifies |
+| `border-strong` | `#808080` | `#737373` | Boundaries of fields and switches (3:1) |
 | `primary` | `#167D8D` | `#3FB4C5` | The brand teal: the mark, progress, selection |
-| `primary-soft` | `#E3F1F2` | `#12292E` | Selected and highlighted backgrounds |
-| `primary-text` | `#0D6370` | `#6FD1DD` | Teal used as text or icon |
-| `action` / `-hover` / `-pressed` | `#12707E` / `#0E616D` / `#0B525C` | `#4CC0D0` / `#66CDDB` / `#80D9E5` | Filled primary buttons |
-| `on-action` | `#FFFFFF` | `#06161A` | Text on `action` |
-| `brand-ink` | `#071B2B` | `#E8EEEA` | The dark letter of the mark. Nothing else |
-| `success` / `-soft` / `-text` | `#269B62` / `#E4F3EA` / `#1B7549` | `#3DBE7F` / `#16291F` / `#6AD3A0` | Something went well: success badges, callouts, toasts |
+| `primary-soft` | `#E6F3F4` | `#0F272C` | Selected and highlighted backgrounds |
+| `primary-text` | `#0D6370` | `#5CC8D6` | Teal used as text or icon |
+| `action` / `-hover` / `-pressed` | `#12707E` / `#0E616D` / `#0B525C` | `#147989` / `#16808F` / `#106874` | Filled primary buttons: a deep fill in both themes |
+| `on-action` | `#FFFFFF` | `#FFFFFF` | Text on `action` |
+| `brand-ink` | `#071B2B` | `#EDEDED` | The dark letter of the mark. Nothing else |
+| `success` / `-soft` / `-text` | `#269B62` / `#E4F3EA` / `#1B7549` | `#3DBE7F` / `#11261A` / `#6AD3A0` | Something went well: success badges, callouts, toasts |
 | `sun`, `coral`, `blue`, `violet` | `#F2C14E` `#EF806C` `#5B8DE6` `#9178D7` | `#E9BE5A` `#F08F7D` `#7BA4EE` `#A694E3` | Accents and visualization. **Not for text.** |
 | `*-soft` / `*-text` | — | — | Tinted background and its readable text, per accent |
-| `danger` / `-soft` / `-text` | `#C84E4E` … | `#E57373` … | Errors and destructive actions |
+| `danger` / `-soft` / `-text` | `#C84E4E` … | `#C24545` … | Errors and destructive actions (a white label on the fill, in both themes) |
 | `focus` | `#1F6FD6` | `#8AB4F8` | Focus ring |
-| `scene-background` / `-ink` / `-muted` | `#FFFFFF` `#17251E` `#5F6E65` | `#18211C` `#E7EFE9` `#9DB0A5` | The stage of a scene and what is drawn on it. Frozen: see "Scenes" |
+| `scene-background` / `-ink` / `-muted` | `#FFFFFF` `#17251E` `#5F6E65` | `#141414` `#E7EFE9` `#9DB0A5` | The stage of a scene and what is drawn on it. The ink and the muted text are frozen (see "Scenes"); the background is the player's and follows `surface` |
 
 Contrast is checked by `tokens.test.ts` for both themes: text pairs ≥ 4.5:1 (ink ≥ 7:1), control
 boundaries and marks ≥ 3:1, on every ground a text colour is used on.
@@ -134,6 +135,9 @@ see "Scenes".
   shows where something went (a page settling, a dialog arriving, a line of the board being
   written); it never decorates.
 - **Focus:** one ring everywhere: `2px solid var(--ad-color-focus)`, 2 px offset.
+- **Scroll bars:** a rounded bar the colour of a control's edge, darker under the pointer,
+  with no track and no arrows (`base.css`). They are drawn with the browser's own parts;
+  do not set `scrollbar-width` or `scrollbar-color` anywhere, which would switch those off.
 
 ### Theme
 
@@ -159,11 +163,11 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 | `Callout` | Explain a state or consequence in place | `info`, `success`, `warning`, `danger`; `urgent` to announce immediately; actions |
 | `ProgressBar` | Task or content progress | Determinate, indeterminate; `showLabel`; `valueText` |
 | `Tabs` | Sections of one page | WAI-ARIA tabs; arrows, Home, End |
-| `Dialog` | A decision that must be made now | Native `<dialog>`; `dismissible={false}` while an operation must finish. Focus starts on the close button; a form marks the field to start in with `data-autofocus` |
+| `Dialog` | A decision that must be made now | Native `<dialog>`; `dismissible={false}` while an operation must finish. Focus starts on the close button; a form marks the field to start in with `data-autofocus`; focus goes back to what opened it. It keeps clear of the window's strip, and a press on it is never a hold on the window |
 | `ToastProvider` / `useToast` | Confirm something just done | `success`, `info` auto-dismiss (pause on hover/focus); `danger` stays until dismissed |
 | `EmptyState`, `LoadingState`, `ErrorState` | The three non-content states | Title, description, actions; correct live-region role each |
 | `Spinner` | Indeterminate activity | Sizes; slows instead of stopping under reduced motion |
-| `AppShell`, `NavItem`, `NavSection`, `Page`, `Section`, `Stack` | Layout | The rail lies on the canvas and the main region is a panel set into it; `focus` leaves the rail out and gives one thing the whole window (a lesson, a round of questions); `NavSection` is a labelled group in the rail (the learner's courses). Rail collapses to icons below 960 px; `Page` width `wide`/`reading`; a page's actions sit on the line of its title |
+| `AppShell`, `WindowStrip`, `NavItem`, `NavSection`, `Page`, `Section`, `Stack` | Layout | `WindowStrip` is what the window is moved by where it has no title bar of the system's (see "The window"). The rail lies on the canvas and the main region is a panel set into it; `focus` leaves the rail out and gives one thing the whole window (a lesson, a round of questions); `NavSection` is a labelled group in the rail (the learner's courses). Rail collapses to icons below 960 px; `Page` width `wide`/`reading`; a page's actions sit on the line of its title |
 | `Logo` | The mark and wordmark | `medium`/`large`; mark only |
 
 App-level components that are not in the package (they depend on app state):
@@ -206,16 +210,16 @@ render nothing while waiting.
 ### After an answer
 
 Say what happened in words, not in colour. The chosen option reads "Your answer", the correct one
-"The right answer"; the result is a `Callout` (`success` for right, `info` for anything else,
+"Correct answer" ("Your answer · correct" when they are the same); the result is a `Callout` (`success` for right, `info` for anything else,
 never `danger`) inside a live region, with the explanation and what the answer changed. A wrong
 answer is "Not quite", never "Wrong".
 
 ### What next
 
 A suggestion is shown the same way everywhere (`NextSteps`, in the app): the Learn tab, the end
-of a lesson, the end of a set of questions. One card with "Suggested next step" as an eyebrow,
+of a lesson, the end of a set of questions. One card with "Up next" as an eyebrow,
 the step as a heading in the serif, **Why:** and the reason, and one primary button. It is the
-only card with a wash of the brand colour. Under it, "Or instead": the alternatives as a quiet
+only card with a wash of the brand colour. Under it, "Other options": the alternatives as a quiet
 list, each with its own reason and a secondary button. A suggestion is never the only way
 forward and never a blocker.
 
@@ -238,8 +242,8 @@ offers the one useful next step ("Try again", "Open AI settings"), or nothing bu
 when waiting is the only remedy. Before the request: say what will be sent and to whom, in the
 words the core plans at that moment (`destination` in `lib/provider.ts`).
 
-A lesson takes minutes. So the wait is said honestly ("This usually takes about 12 minutes"),
-the learner is told they need not watch it, and the same card offers a break. What is being
+A lesson takes minutes. So the wait is said honestly ("Usually takes about 12 minutes. You'll
+be notified when it's ready."), and the same card offers a break. What is being
 written is in the rail under "Now", one click from anywhere.
 
 ### A break
@@ -259,11 +263,12 @@ It is a note in the margin, not a conversation:
 
 - **Asking** is a dialog: their own words, or one of a few ready-made questions; what will
   be sent and where; and one button. Nothing is sent before it.
-- **Waiting** is optional. The dialog says so and offers "Carry on with the lesson".
+- **Waiting** is optional. The dialog says so ("No need to wait here") and offers
+  "Continue lesson"; opened again, it shows the answer on its way, with "Stop".
 - **The note** is kept beside its part, folded away under "Your questions about this part".
   The learner's words are theirs: the sans, behind a rule, shown exactly as typed. The answer
-  is something to read: the serif, with mathematics typeset. Under it, who wrote it, and that
-  a model wrote it and can be wrong.
+  is something to read: the serif, with mathematics typeset. Under it, one line: who
+  answered, and that AI can make mistakes.
 
 **Don't** show earlier questions as a thread, give the field a "send" arrow, or put a typing
 indicator anywhere. Each question stands alone.
@@ -295,11 +300,20 @@ A lesson, and a round of questions, are one thing to attend to: the rail is left
 
 ### Writing
 
-- Plain, specific, second person. "Adle will stop being able to generate new lessons until you add
-  a key again." Not "Are you sure?"
+The rule is ADR-028: short, plain, and about the learner's task.
+
+- One sentence where one will do, the point first, in ordinary speech with contractions:
+  "Couldn't save your goal", "Key saved", "Loading library…".
+- A confirmation asks one question, says what goes and what stays, and offers "Cancel" and
+  the action by its name: "Remove the AIHubMix key?" / "Remove key". Not "Are you sure?"
 - Errors: what happened, then what to do. Never blame.
-- Learning state: *Not assessed*, *Building understanding*, *Needs more evidence*, *Demonstrated
-  for now*. Never a bare score, never "mastered" after one answer.
+- Nothing about how the app works unless the learner has to act on it. No "local service",
+  no request counts beside a button.
+- What must be said is said in one line: before sending, "Sends *what* to *where*. Takes
+  about *n* minutes."; afterwards, "Answered by *model* on *provider*. AI can make mistakes."
+- Learning state: *Not started*, *Learning*, *Nearly there*, *Understood*. Never a bare score,
+  never from one answer. A right answer that counts for less is "with help".
+- Typographic quotation marks and apostrophes; a title is quoted “like this”.
 - No exclamation-mark cheerleading, no baby talk.
 
 ### Layout
@@ -312,6 +326,23 @@ A lesson, and a round of questions, are one thing to attend to: the rail is left
   be pressed is smaller than 24 px in either direction.
 - A page's title and what can be done to the whole page share one line; a way back sits above
   them.
+
+### The window
+
+On Windows and macOS the window has no title bar of the system's (ADR-030): the app's own
+canvas runs to the top edge, and the system lays its own buttons over the corner in the
+theme's colours.
+
+- `WindowStrip` lies along the top, 40 px tall, and is what the window is moved by. It holds
+  nothing. The mark in the rail sits in it, level with the window's buttons; the main panel
+  begins below it.
+- **Nothing that can be pressed lies under the strip**: a press there moves the window. A
+  screen drawn outside `AppShell` leaves that much room. What has to appear there (the link
+  that skips to the content, a dialog) is cut out of it with `app-region: no-drag`.
+- A dialog is never taller than the window less twice the strip, so it stays clear of the
+  window's buttons as well, and it dims the page from below the strip: the strip keeps its
+  look while a dialog is open.
+- Linux keeps the frame it is given; there the strip has no height and nothing moves.
 
 ## Accessibility baseline
 
@@ -347,11 +378,12 @@ Wanim scenes have a small palette of their own (`src/scene-palette.ts`, mirrored
 and listed in `skills/wanim-scene-authoring/SKILL.md`). Its `green` is the `success` green, not
 the brand teal: inside a picture colours tell things apart, they do not carry the brand.
 
-The stage, its ink, and its muted text are the `scene-*` tokens, supplied by the player. They
+The stage, its ink, and its muted text are the `scene-*` tokens. The ink and the muted text
 are **frozen**: their values are written into every scene file there is (the sample course, the
 skill's examples, and lessons already generated on people's computers), so they did not move
 when the interface around the stage was redesigned, and must not move without rewriting those
-files. The interface's own `surface`, `ink`, and `muted` are free to change.
+files. The background is in no file: the player supplies it, so it follows `surface`
+(ADR-027). The interface's own `surface`, `ink`, and `muted` are free to change.
 
 ## Seeing it
 

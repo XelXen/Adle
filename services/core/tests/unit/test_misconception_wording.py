@@ -42,8 +42,8 @@ def test_what_one_answer_changed_is_said_no_more_strongly_than_the_evidence() ->
     nothing: dict[str, Hypothesis] = {}
     first = fold([wrong(0, "q_1")])
     assert describe_change(nothing, first) == (
-        "That answer could mean that two terms may be getting mixed up. One answer is not "
-        "enough to say, so Adle will ask a question that would show it."
+        "That answer could mean that two terms may be getting mixed up. "
+        "A follow-up question will check."
     )
 
     second = fold([wrong(0, "q_1"), wrong(5, "q_3")])
@@ -52,15 +52,15 @@ def test_what_one_answer_changed_is_said_no_more_strongly_than_the_evidence() ->
     )
 
     countered = fold([wrong(0, "q_1"), wrong(5, "q_3"), right(10, "q_4")])
-    assert "This one goes against that; one more like it settles it." in describe_change(
+    assert "This one goes against that. One more like it settles it." in describe_change(
         second, countered
     )
 
     resolved = fold([wrong(0, "q_1"), wrong(5, "q_3"), right(10, "q_4"), right(15, "q_5")])
-    assert describe_change(countered, resolved).endswith("Your recent answers show it is sorted.")
+    assert describe_change(countered, resolved).endswith("Recent answers show it’s resolved.")
 
     rejected = fold([wrong(0, "q_1"), right(5, "q_2")])
-    assert "This one shows otherwise, so that is set aside." in describe_change(first, rejected)
+    assert "This one shows otherwise, so it’s set aside." in describe_change(first, rejected)
 
 
 def test_an_answer_that_changes_nothing_adds_no_sentence() -> None:

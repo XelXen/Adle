@@ -91,7 +91,7 @@ It mirrors the Sprout design tokens (`green` is the success green, not the app's
 | `sun` | `#F2C14E` | `#E9BE5A` | Highlight (shapes only, never text) |
 | `violet` | `#9178D7` | `#A694E3` | A second series |
 
-**Never set the background.** The player supplies it (`#FFFFFF` light, `#18211C` dark). Do not
+**Never set the background.** The player supplies it (`#FFFFFF` light, `#141414` dark). Do not
 use colour as the only carrier of meaning: pair it with position, a label, or a sign.
 
 ### Layout
@@ -108,6 +108,13 @@ use colour as the only carrier of meaning: pair it with position, a label, or a 
   `Dot(color=self.coral, radius=0.12).move_to(point)`. Given its position as an argument
   (`Dot(point, color=...)`), a dot loses its colour in this runtime and is drawn white, which
   cannot be seen on the light stage. The static policy rejects that form.
+- **`set_fill` and `set_color` take their arguments in order, without names:**
+  `box.set_fill(self.blue, 0.3)`, `label.set_color(self.ink)`. To change only how solid a
+  fill is, keep its colour with `None`: `box.set_fill(None, 0.3)`. Written with names they
+  go wrong in this runtime: `set_fill(opacity=0.3)` and `set_color(color=...)` stop the
+  scene with an error, and `set_fill(self.blue, opacity=0.3)` runs and leaves the shape with
+  no fill at all. **Verified.** The static policy rejects every named form. (`set_stroke` and
+  the shapes' own `fill_opacity=` are fine with names.)
 - Words and numbers are drawn in `ink` or `muted`. The accent colours are for shapes: as text
   they are too pale to read on the light stage.
 
@@ -201,7 +208,7 @@ these rules, and the player's sandbox contains whatever gets through.
 7. The lesson segment that uses it has a text fallback that says the same thing in words.
 
 To try a scene, add it to `examples/` and run the example test, or load it through
-**Settings → About & diagnostics** in a development build:
+**Settings → About** ("Animation check") in a development build:
 
 ```bash
 npm run e2e -- scene-player.spec.ts

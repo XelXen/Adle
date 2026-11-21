@@ -42,8 +42,11 @@ export interface NextStepsProps {
    * it, such a step leads to the course page, where it can be started and followed.
    */
   renderGeneration?: (step: NextStep, conceptId: string, primary: boolean) => ReactNode;
-  /** What stands above the suggestion. On the library it names the course it is about. */
-  eyebrow?: string;
+  /**
+   * What stands above the suggestion. On the library it names the course it is about.
+   * `null` where a heading just above already says it.
+   */
+  eyebrow?: string | null;
   /** Leave out "Or instead": where the suggestion is a way in, not the place to choose. */
   withoutAlternatives?: boolean;
 }
@@ -56,7 +59,7 @@ export function NextSteps({
   plan,
   courseId,
   renderGeneration,
-  eyebrow = 'Suggested next step',
+  eyebrow = 'Up next',
   withoutAlternatives = false,
 }: NextStepsProps) {
   const titleId = useId();
@@ -66,7 +69,7 @@ export function NextSteps({
   return (
     <div className={styles.steps}>
       <section className={styles.recommended} aria-labelledby={titleId}>
-        <p className={styles.eyebrow}>{eyebrow}</p>
+        {eyebrow ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
         <h3 id={titleId} className={styles.title}>
           {step.title}
         </h3>
@@ -87,7 +90,7 @@ export function NextSteps({
       {plan.alternatives.length > 0 && !withoutAlternatives ? (
         <section className={styles.others} aria-labelledby={othersId}>
           <h3 id={othersId} className={styles.othersTitle}>
-            Or instead
+            Other options
           </h3>
           <ul className={styles.list}>
             {plan.alternatives.map((other) => (
@@ -184,9 +187,7 @@ function StepControl({
         {action.label}
       </Button>
       {needsSetup ? (
-        <span className={styles.hint}>
-          Writing a lesson needs the AI provider, and no key is set up yet.
-        </span>
+        <span className={styles.hint}>Add an AI provider key to create this lesson.</span>
       ) : null}
     </div>
   );

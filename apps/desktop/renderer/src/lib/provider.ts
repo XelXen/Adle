@@ -19,7 +19,7 @@ export const AUTOMATIC = 'auto';
  * answer, both are named: a request never goes anywhere that was not said first.
  */
 export function destination(status: ProviderStatus | undefined, work: Work): string {
-  return status?.routes[work].sentence || 'the AI provider';
+  return status?.routes[work].sentence || 'your AI provider';
 }
 
 /** A length of time as a person would say it. Never more exact than it is known. */

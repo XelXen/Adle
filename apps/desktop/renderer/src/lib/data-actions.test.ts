@@ -57,7 +57,7 @@ describe('describeOutcome', () => {
   });
 
   it('still says a copy was saved when it has no name to show', () => {
-    expect(describeOutcome({ kind: 'saved', fileName: '' }).title).toBe('A copy was saved');
+    expect(describeOutcome({ kind: 'saved', fileName: '' }).title).toBe('Copy saved');
   });
 
   it('after a restore, says what happened to the data that was replaced', () => {
@@ -69,15 +69,15 @@ describe('describeOutcome', () => {
 
   it('after deleting everything, says what was left alone', () => {
     const said = describeOutcome({ kind: 'erased' });
-    expect(said.body).toContain('AI provider key');
+    expect(said.body).toContain('provider keys');
     expect(said.offersLibrary).toBe(true);
     expect(said.offersSafetyCopies).toBe(false);
   });
 
   it.each<[DataAction, string]>([
-    ['save', 'The copy was not saved'],
+    ['save', 'Couldn’t save the copy'],
     ['restore', 'Nothing was restored'],
-    ['erase', 'Not everything could be deleted'],
+    ['erase', 'Couldn’t delete everything'],
   ])('a failed %s is titled for what did not happen and carries the reason', (action, title) => {
     const said = describeOutcome({ kind: 'failed', action, message: 'The reason, in words.' });
     expect(said).toMatchObject({ tone: 'danger', title, body: 'The reason, in words.' });

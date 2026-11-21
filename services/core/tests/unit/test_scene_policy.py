@@ -116,6 +116,9 @@ def test_allowed_standard_library_imports() -> None:
         ("busy_loop.py", "unbounded_loop"),
         ("runtime_error.py", "unknown_name"),
         ("hostile_probe.py", "unknown_name"),
+        # Run, these two go wrong in the pinned runtime: one leaves a shape empty, one stops.
+        ("fill_by_name.py", "unreliable_call"),
+        ("fill_without_colour.py", "unreliable_call"),
     ],
 )
 def test_broken_and_hostile_fixtures_are_rejected(fixture: str, expected: str) -> None:
@@ -230,10 +233,57 @@ def test_names_require_the_star_import() -> None:
         ('self.add(Dot([1, 2, 0], color="#269B62"))', "unreliable_call"),
         ('self.add(Dot(point=[1, 2, 0], color="#269B62"))', "unreliable_call"),
         ("self.add(always_redraw(lambda: Dot(ORIGIN, radius=0.1)))", "unreliable_call"),
+        # In the pinned runtime set_fill and set_color go wrong with any named argument.
+        ("box = Rectangle()\nbox.set_fill(opacity=0.5)", "unreliable_call"),
+        ('box = Rectangle()\nbox.set_fill(color="#269B62", opacity=0.5)', "unreliable_call"),
+        ('box = Rectangle()\nbox.set_fill("#269B62", opacity=0.5)', "unreliable_call"),
+        ("box = Rectangle()\nbox.set_fill(None, opacity=0.5)", "unreliable_call"),
+        ('box = Rectangle()\nbox.set_color(color="#269B62")', "unreliable_call"),
+        ("box = Rectangle()\nbox.set_fill()", "unreliable_call"),
+        # Wherever it is written: in a reaction, and on the way to an animation.
+        (
+            "box = Rectangle()\nbox.add_reaction(lambda m: m.set_fill(opacity=0.2))",
+            "unreliable_call",
+        ),
+        ("box = Rectangle()\nself.play(box.animate.set_fill(opacity=0.6))", "unreliable_call"),
     ],
 )
 def test_convention_violations(body: str, code: str) -> None:
     assert code in codes(check_scene_source(scene(body)))
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        'box.set_fill("#269B62", 0.5)',
+        "box.set_fill(None, 0.5)",
+        'box.set_fill("#269B62")',
+        'box.set_color("#269B62")',
+        # These take names without trouble, and the guide recommends the first.
+        "box.set_stroke(opacity=0.5)",
+        'box.set_stroke(color="#269B62", width=6)',
+        "box.set_opacity(0.5)",
+    ],
+)
+def test_fill_and_colour_given_in_order_are_accepted(call: str) -> None:
+    report = check_scene_source(scene(f"box = Rectangle()\n{call}\nself.add(box)"))
+    assert report.violations == ()
+
+
+def test_the_reason_given_for_a_named_fill_says_how_to_write_it() -> None:
+    """It goes into the request for a second try, so it has to be an instruction."""
+    report = check_scene_source(scene("box = Rectangle()\nbox.set_fill(opacity=0.5)"))
+    [violation] = report.violations
+    assert violation.code == "unreliable_call"
+    assert "in order, without names" in violation.message
+    assert "set_fill(self.blue, 0.3)" in violation.message
+    assert "set_fill(None, 0.3)" in violation.message
+    assert violation.line is not None
+
+
+def test_the_fill_fixture_that_is_written_properly_passes() -> None:
+    report = check_scene_source((HOSTILE / "fill_in_order.py").read_text(encoding="utf-8"))
+    assert report.violations == ()
 
 
 def test_a_dot_made_with_keywords_and_then_placed_is_accepted() -> None:
@@ -319,3 +369,10 @@ def test_event_vocabulary_matches_the_player_protocol() -> None:
     declared = re.search(r"SCENE_EVENT_NAMES = \[([^\]]+)\]", protocol)
     assert declared is not None
     assert tuple(re.findall(r"'([a-z_]+)'", declared.group(1))) == EVENT_NAMES
+
+
+def test_a_scene_nested_too_deeply_to_examine_is_refused_not_let_through() -> None:
+    deep = "x = " + "(" * 5000 + "1" + ")" * 5000 + "\n"
+    report = check_scene_source("from manim import *\n" + deep)
+    assert report.ok is False
+    assert report.violations

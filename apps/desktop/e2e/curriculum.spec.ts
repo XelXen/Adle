@@ -73,14 +73,14 @@ test.describe('curriculum', () => {
 
     // The first concept is shown, tied to the place it came from.
     const perceptron = detail(page, 'The perceptron');
-    await expect(perceptron).toContainText('Taken from a heading in your materials.');
-    const linked = perceptron.getByRole('list', { name: 'Places linked to this concept' });
+    await expect(perceptron).toContainText('From a heading in your materials.');
+    const linked = perceptron.getByRole('list', { name: 'Linked passages' });
     await expect(linked.getByRole('listitem')).toHaveCount(1);
     await expect(linked).toContainText('neural-networks-syllabus.md');
     await expect(linked).toContainText('Unit 1: The perceptron');
-    await expect(perceptron.getByText('Not assessed')).toBeVisible();
+    await expect(perceptron.getByText('Not started')).toBeVisible();
     // Nothing to check understanding against yet: flagged, not blocked.
-    await expect(page.getByText('Worth a look before you start')).toBeVisible();
+    await expect(page.getByText('Before you start')).toBeVisible();
     await expect(
       page.getByText(
         '5 concepts have no learning objective yet: The perceptron, Activation functions, Loss and 2 more.',
@@ -88,12 +88,12 @@ test.describe('curriculum', () => {
     ).toBeVisible();
 
     // ---- Refine by hand ----
-    await perceptron.getByRole('button', { name: 'Edit' }).click();
+    await perceptron.getByRole('button', { name: 'Edit', exact: true }).click();
     const edit = page.getByRole('dialog', { name: 'Edit concept' });
     await edit
       .getByRole('textbox', { name: 'Objective 1' })
       .fill('Compute the output of a perceptron by hand.');
-    await edit.getByRole('button', { name: 'Add another objective' }).click();
+    await edit.getByRole('button', { name: 'Add objective' }).click();
     await edit.getByRole('textbox', { name: 'Objective 2' }).fill('Say what the bias changes.');
     await edit.getByRole('button', { name: 'Save changes' }).click();
     await expect(perceptron.getByText('Compute the output of a perceptron by hand.')).toBeVisible();
@@ -102,7 +102,7 @@ test.describe('curriculum', () => {
     await page.getByRole('button', { name: 'Add a concept' }).click();
     const create = page.getByRole('dialog', { name: 'Add a concept' });
     await create.getByRole('button', { name: 'Add concept' }).click();
-    await expect(create.getByText('Give the concept a name.')).toBeVisible();
+    await expect(create.getByText('Enter a name.')).toBeVisible();
     await create.getByLabel('Name').fill('Chain rule');
     await create
       .getByLabel('What it covers')
@@ -117,9 +117,9 @@ test.describe('curriculum', () => {
     // ---- What needs what ----
     await selectConcept(page, 'Backpropagation');
     await detail(page, 'Backpropagation')
-      .getByRole('button', { name: 'Change prerequisites' })
+      .getByRole('button', { name: 'Edit prerequisites' })
       .click();
-    const needs = page.getByRole('dialog', { name: /What does “Backpropagation” need first/ });
+    const needs = page.getByRole('dialog', { name: 'Prerequisites for “Backpropagation”' });
     await needs.getByRole('checkbox', { name: 'Chain rule' }).check();
     await needs
       .getByLabel('Why “Chain rule” is needed')
@@ -135,14 +135,14 @@ test.describe('curriculum', () => {
 
     // A loop cannot be made: what builds on a concept cannot be put before it.
     await selectConcept(page, 'Chain rule');
-    await detail(page, 'Chain rule').getByRole('button', { name: 'Change prerequisites' }).click();
-    const chainNeeds = page.getByRole('dialog', { name: /What does “Chain rule” need first/ });
+    await detail(page, 'Chain rule').getByRole('button', { name: 'Edit prerequisites' }).click();
+    const chainNeeds = page.getByRole('dialog', { name: 'Prerequisites for “Chain rule”' });
     await expect(chainNeeds.getByRole('checkbox', { name: 'Backpropagation' })).toBeDisabled();
     await expect(
-      chainNeeds.getByText('Builds on “Chain rule”, so it cannot come first.'),
+      chainNeeds.getByText('Builds on “Chain rule”, so it can’t be a prerequisite.'),
     ).toBeVisible();
     await chainNeeds.getByRole('button', { name: 'Cancel' }).click();
-    await expect(detail(page, 'Chain rule')).toContainText('Needed by: Backpropagation.');
+    await expect(detail(page, 'Chain rule')).toContainText('Required for: Backpropagation.');
 
     // ---- Order: free where prerequisites allow, explained where they do not ----
     const before = await pathTitles(page);
@@ -153,10 +153,10 @@ test.describe('curriculum', () => {
     // Walk backpropagation up until it meets something it needs.
     for (let step = 0; step < 6; step += 1) {
       await page.getByRole('button', { name: 'Move Backpropagation earlier' }).click();
-      if (await page.getByText('“Backpropagation” stays where it is').isVisible()) break;
+      if (await page.getByText('“Backpropagation” can’t move there').isVisible()) break;
       await page.waitForTimeout(150);
     }
-    await expect(page.getByText('“Backpropagation” stays where it is')).toBeVisible();
+    await expect(page.getByText('“Backpropagation” can’t move there')).toBeVisible();
     const settled = await pathTitles(page);
     expect(settled.indexOf('Loss')).toBeLessThan(settled.indexOf('Backpropagation'));
     expect(settled.indexOf('Chain rule')).toBeLessThan(settled.indexOf('Backpropagation'));
@@ -168,14 +168,12 @@ test.describe('curriculum', () => {
       'aria-pressed',
       'true',
     );
-    await expect(pathRow(page, 'Backpropagation')).toContainText('Needs more evidence');
-    await expect(backprop).toContainText(
-      'a few answered questions to confirm what you already know',
+    await expect(pathRow(page, 'Backpropagation')).toContainText('Nearly there');
+    await expect(backprop).toContainText('a few questions to confirm what you know');
+    await backprop.getByRole('button', { name: 'Show history' }).click();
+    await expect(backprop.getByRole('list', { name: 'History, newest first' })).toContainText(
+      'You said you already know this well.',
     );
-    await backprop.getByRole('button', { name: 'Show the record' }).click();
-    await expect(
-      backprop.getByRole('list', { name: 'Record for this concept, newest first' }),
-    ).toContainText('You said you already know this well.');
 
     // ---- Linking a concept to the passage that covers it ----
     await selectConcept(page, 'Loss');
@@ -197,7 +195,7 @@ test.describe('curriculum', () => {
       .getByRole('button', { name: /^Link lecture-notes\.pdf/ })
       .click();
     await expect(fromNotes.first().getByText('Linked')).toBeVisible();
-    const places = loss.getByRole('list', { name: 'Places linked to this concept' });
+    const places = loss.getByRole('list', { name: 'Linked passages' });
     await expect(places.getByRole('listitem')).toHaveCount(2);
     await expect(places).toContainText('lecture-notes.pdf');
     await places.getByRole('button', { name: /^Unlink lecture-notes\.pdf/ }).click();
@@ -240,7 +238,7 @@ test.describe('curriculum', () => {
     await openCourseTab(second.page, 'Curriculum');
     await expect(pathList(second.page).getByRole('listitem')).toHaveCount(6);
     expect(await pathTitles(second.page)).toEqual(settled);
-    await expect(pathRow(second.page, 'Backpropagation')).toContainText('Needs more evidence');
+    await expect(pathRow(second.page, 'Backpropagation')).toContainText('Nearly there');
     await selectConcept(second.page, 'The perceptron');
     await expect(detail(second.page, 'The perceptron')).toContainText('Say what the bias changes.');
     await expectNoAccessibilityViolations(second.page);
@@ -250,7 +248,7 @@ test.describe('curriculum', () => {
     await selectConcept(second.page, 'Chain rule');
     await detail(second.page, 'Chain rule').getByRole('button', { name: 'Remove' }).click();
     const confirm = second.page.getByRole('dialog', { name: 'Remove “Chain rule”?' });
-    await expect(confirm).toContainText('Anything that needed it will simply no longer need it.');
+    await expect(confirm).toContainText('Concepts that depended on it no longer will.');
     await confirm.getByRole('button', { name: 'Remove concept' }).click();
     await expect(pathList(second.page).getByRole('listitem')).toHaveCount(5);
     await expect(pathRow(second.page, 'Backpropagation')).toContainText('Needs Loss');
@@ -287,8 +285,8 @@ test.describe('curriculum', () => {
 
     const limits = detail(page, 'Limits');
     await expect(limits).toContainText('Evaluate a limit from a table of values.');
-    await expect(limits).toContainText('This course has no imported materials.');
-    await expect(limits).toContainText('Nothing. This can be learned straight away.');
+    await expect(limits).toContainText('No materials imported.');
+    await expect(limits).toContainText('None. You can start here.');
     await expect(pathList(page).getByRole('listitem')).toHaveCount(1);
     // With one concept there is nowhere to move it.
     await expect(page.getByRole('button', { name: 'Move Limits earlier' })).toBeDisabled();

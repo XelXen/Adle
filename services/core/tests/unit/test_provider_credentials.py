@@ -94,3 +94,26 @@ def test_redaction_filter_scrubs_secrets_from_log_records(
     assert "launch-token-value" not in caplog.text
     assert caplog.text.count("[redacted]") == 2
     assert "nothing sensitive here" in caplog.text
+
+
+def test_a_key_inside_the_text_of_an_error_is_removed_from_its_traceback_too(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A traceback is formatted from the exception, after the message has been cleaned."""
+    vault = CredentialVault()
+    vault.set_api_key(API_KEY)
+    logger = logging.getLogger("adle_core.test.redaction.trace")
+    logger.addFilter(SecretRedactionFilter(vault))
+
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        try:
+            raise RuntimeError(f"401 for Authorization: Bearer {API_KEY}")
+        except RuntimeError:
+            logger.exception("a request failed")
+
+    assert API_KEY not in caplog.text
+    (record,) = caplog.records
+    assert record.exc_info is None
+    assert "RuntimeError" in (record.exc_text or "")
+    assert "[redacted]" in (record.exc_text or "")
+    assert API_KEY not in (record.exc_text or "")

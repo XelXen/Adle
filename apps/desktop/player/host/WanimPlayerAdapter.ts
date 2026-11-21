@@ -91,6 +91,14 @@ export const DEFAULT_TIMEOUTS: PlayerTimeouts = {
   unresponsiveMs: 5_000,
 };
 
+/**
+ * How many messages a frame may send in one second. A scene at work sends a handful: its
+ * state when it changes, its controls a few times a second, an event now and then; one that
+ * reports every move of the pointer sends as many as the screen has frames. Several times
+ * that is a flood, and each message is work for the page that shows the lesson.
+ */
+export const MESSAGE_BUDGET_PER_SECOND = 600;
+
 export interface WanimPlayerAdapterOptions {
   /** Accessible name of the frame. */
   title?: string;
@@ -123,6 +131,8 @@ export class WanimPlayerAdapter {
   private pingTimer: number | null = null;
   private pingNonce = 0;
   private lastPongAt = 0;
+  private budgetSecondStartedAt = 0;
+  private messagesThisSecond = 0;
   private readonly timeouts: PlayerTimeouts;
   private readonly listeners: { [K in keyof PlayerEvents]?: Set<Listener<K>> } = {};
 
@@ -217,6 +227,7 @@ export class WanimPlayerAdapter {
     this.frame = frame;
     this.frameOrigin = playerOrigin(instanceId);
     this.frameReady = false;
+    this.messagesThisSecond = 0;
     this.container.appendChild(frame);
 
     this.bootTimer = window.setTimeout(() => {
@@ -304,9 +315,25 @@ export class WanimPlayerAdapter {
   private readonly handleMessage = (event: MessageEvent<unknown>): void => {
     if (!this.frame || event.source !== this.frame.contentWindow) return;
     if (event.origin !== this.frameOrigin) return;
+    // Counted before it is read: a flood of nonsense is as much work to receive as any other.
+    if (this.overBudget()) {
+      this.fail({ stage: 'runtime', message: 'The scene sent more messages than it may.' });
+      return;
+    }
     const message = parsePlayerMessage(event.data);
     if (message) this.dispatch(message);
   };
+
+  /** Count one message from the frame; true when it is one too many for this second. */
+  private overBudget(): boolean {
+    const now = performance.now();
+    if (now - this.budgetSecondStartedAt >= 1000) {
+      this.budgetSecondStartedAt = now;
+      this.messagesThisSecond = 0;
+    }
+    this.messagesThisSecond += 1;
+    return this.messagesThisSecond > MESSAGE_BUDGET_PER_SECOND;
+  }
 
   private dispatch(message: PlayerMessage): void {
     switch (message.type) {

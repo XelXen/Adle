@@ -279,7 +279,9 @@
   border-color: var(--ad-color-border-control);
 }
 
-.choiceButton[aria-busy='true'] {
+/* As specific as the rule above, which would otherwise dim the one being chosen too. */
+.choiceButton[aria-busy='true'],
+.choiceButton[aria-busy='true'][aria-disabled='true']:not(.radioRowSelected) {
   opacity: 1;
   cursor: progress;
 }

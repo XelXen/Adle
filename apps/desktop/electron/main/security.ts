@@ -22,11 +22,31 @@ export function isAllowedRequest(rawUrl: string): boolean {
   }
 }
 
-/** Exported for unit tests. */
-export function isAllowedFrameNavigation(rawUrl: string): boolean {
-  if (rawUrl === 'about:blank') return true;
+/**
+ * Where a frame may go. The window's own document stays in the app; a frame inside it is
+ * a scene player or nothing, and is never the app itself. Exported for unit tests.
+ */
+export function isAllowedFrameNavigation(rawUrl: string, isMainFrame = false): boolean {
   const origin = adleOriginOf(rawUrl);
-  return origin !== null && (origin === APP_ORIGIN || isPlayerOrigin(origin));
+  if (isMainFrame) return origin === APP_ORIGIN;
+  if (rawUrl === 'about:blank') return true;
+  return origin !== null && isPlayerOrigin(origin);
+}
+
+/** An address on this computer where nothing listens. */
+const NOWHERE = 'http://127.0.0.1:1';
+
+/**
+ * Before the app is ready: no name is ever looked up.
+ *
+ * Refusing requests (below) does not cover what is not a request. A page can ask for a name
+ * to be resolved ahead of time, and a peer connection looks up the servers it is given;
+ * either sends the name, and whatever is written into it, to a name server. Nothing here
+ * needs a lookup: the app is served from memory, the main process reaches the core by its
+ * address, and a link opens in the learner's own browser.
+ */
+export function refuseNameLookups(): void {
+  app.commandLine.appendSwitch('host-resolver-rules', 'MAP * ~NOTFOUND');
 }
 
 /**
@@ -42,6 +62,16 @@ export async function hardenSession(): Promise<void> {
 
   defaultSession.webRequest.onBeforeRequest((details, callback) => {
     callback({ cancel: !isAllowedRequest(details.url) });
+  });
+
+  // What is not a request (a connection opened ahead of time, the TCP side of a peer
+  // connection) goes through the proxy, and the proxy is nowhere. Addresses on this
+  // computer are not let past it either.
+  await defaultSession.setProxy({ proxyRules: NOWHERE, proxyBypassRules: '<-loopback>' });
+
+  // Nothing the app shows is ever saved to a file by the browser.
+  defaultSession.on('will-download', (event) => {
+    event.preventDefault();
   });
 
   // No camera, microphone, geolocation, notifications, clipboard-read, etc.
@@ -70,6 +100,9 @@ export async function hardenSession(): Promise<void> {
 export function hardenWebContents(): void {
   app.on('web-contents-created', (_event, contents) => {
     contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    // A peer connection may not send a packet of its own: no UDP except through a proxy,
+    // and the only proxy there is leads nowhere (see `hardenSession`).
+    contents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
 
     contents.on('will-navigate', (event, url) => {
       // The top-level document never navigates away from the app shell.
@@ -77,7 +110,7 @@ export function hardenWebContents(): void {
     });
 
     contents.on('will-frame-navigate', (event) => {
-      if (!isAllowedFrameNavigation(event.url)) event.preventDefault();
+      if (!isAllowedFrameNavigation(event.url, event.isMainFrame)) event.preventDefault();
     });
 
     contents.on('will-attach-webview', (event) => {

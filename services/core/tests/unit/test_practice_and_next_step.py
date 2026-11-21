@@ -189,7 +189,7 @@ def test_a_fresh_course_starts_with_its_first_lesson_and_says_why() -> None:
         "weights",
         "les_weights",
     )
-    assert step.reason == '"Weights" is next in your course. It needs nothing first.'
+    assert step.reason == "“Weights” is next in your course. It has no prerequisites."
     # What builds on something not yet met is not offered, even as an alternative.
     assert all(other.concept_id != "activation" for other in result.alternatives)
 
@@ -214,7 +214,7 @@ def test_what_was_started_is_finished_first() -> None:
         StepKind.RESUME_LESSON,
         "les_loss",
     )
-    assert result.recommended.reason == "You stopped part-way through this lesson."
+    assert result.recommended.reason == "You stopped partway through this lesson."
     # The other unfinished lesson is the first alternative.
     assert result.alternatives[0].lesson_id == "les_activation"
 
@@ -235,7 +235,7 @@ def test_after_a_lesson_the_next_concept_is_suggested_and_names_what_it_builds_o
         StepKind.START_LESSON,
         "activation",
     )
-    assert 'It builds on "Weights", which you have worked through.' in result.recommended.reason
+    assert "It builds on “Weights”, which you’ve covered." in result.recommended.reason
     # Going through the finished lesson again is on offer, but never pushed.
     assert [other.kind for other in result.alternatives] == [StepKind.REPEAT_LESSON]
 
@@ -250,7 +250,7 @@ def test_practice_is_offered_beside_moving_on_when_there_is_something_fresh_to_a
             fresh_questions=2,
             missing=(
                 "2 more correct answers without a hint",
-                "a correct answer that applies the idea to a new situation",
+                "a correct answer in a new situation",
             ),
         ),
         concept("activation", "weights", lessons=(lesson("activation"),)),
@@ -260,8 +260,8 @@ def test_practice_is_offered_beside_moving_on_when_there_is_something_fresh_to_a
     practise = result.alternatives[0]
     assert (practise.kind, practise.concept_id) == (StepKind.PRACTISE, "weights")
     assert practise.reason == (
-        '"Weights" is at "Building understanding". Still needed: 2 more correct answers '
-        "without a hint; a correct answer that applies the idea to a new situation."
+        "“Weights” is at “Learning”. Still needed: 2 more correct answers "
+        "without a hint; a correct answer in a new situation."
     )
 
 
@@ -280,8 +280,8 @@ def test_a_review_that_is_due_comes_before_new_material() -> None:
     result = plan(order, NOW, can_generate=True)
     step = result.recommended
     assert (step.kind, step.concept_id) == (StepKind.REVIEW, "weights")
-    assert step.reason.startswith('A review of "Weights" was due 2 days ago.')
-    assert "from memory after a gap" in step.reason
+    assert step.reason.startswith("A review of “Weights” was due 2 days ago.")
+    assert "after a gap" in step.reason
     assert StepKind.START_LESSON in [other.kind for other in result.alternatives]
 
 
@@ -337,7 +337,7 @@ def test_a_suspicion_gets_a_question_not_a_verdict() -> None:
     ]
     step = plan(order, NOW, can_generate=True).recommended
     assert (step.kind, step.about) == (StepKind.CHECK, "causal_confusion")
-    assert "One answer is not enough to say" in step.reason
+    assert "will check" in step.reason
     # Without a question that could show it, nothing is claimed.
     uncheckable = [
         concept(
@@ -381,7 +381,7 @@ def test_a_supported_gap_in_what_it_builds_on_sends_the_learner_back_there() -> 
         "les_weights",
     )
     assert "suggests that something this builds on may be missing" in step.reason
-    assert '"Activation" builds on "Weights", which is not solid yet.' in step.reason
+    assert "“Activation” builds on “Weights”, which isn’t solid yet." in step.reason
 
 
 def test_a_run_of_misses_never_leads_back_into_the_same_lesson() -> None:
@@ -404,7 +404,7 @@ def test_a_run_of_misses_never_leads_back_into_the_same_lesson() -> None:
     ]
     step = plan(with_weak_base, NOW, can_generate=True).recommended
     assert (step.kind, step.concept_id) == (StepKind.REVISIT_PREREQUISITE, "weights")
-    assert 'The last few answers on "Activation" did not go well.' in step.reason
+    assert "Your last few answers on “Activation” didn’t go well." in step.reason
 
     # With a solid base: a different explanation, not more of the same.
     with_solid_base = [
@@ -421,7 +421,7 @@ def test_a_run_of_misses_never_leads_back_into_the_same_lesson() -> None:
         StepKind.ANOTHER_EXPLANATION,
         "activation",
     )
-    assert "than going through the same lesson again" in result.recommended.reason
+    assert "than repeating the same lesson" in result.recommended.reason
     every = [result.recommended, *result.alternatives]
     assert all(
         not (offered.kind is StepKind.REPEAT_LESSON and offered.concept_id == "activation")
@@ -460,7 +460,7 @@ def test_saying_an_explanation_did_not_help_leads_to_a_different_one() -> None:
     result = plan(order, NOW, can_generate=True)
     step = result.recommended
     assert (step.kind, step.concept_id) == (StepKind.ANOTHER_EXPLANATION, "weights")
-    assert step.reason.startswith('You said an explanation of "Weights" did not help.')
+    assert step.reason.startswith("You said an explanation of “Weights” didn’t help.")
     assert result.note == PAUSE_NOTE
     # The lesson they were in is still there to continue, but it is not pressed on them.
     assert [other.kind for other in result.alternatives] == [StepKind.RESUME_LESSON]
@@ -488,8 +488,8 @@ def test_an_explanation_already_there_and_not_yet_tried_is_offered_before_a_new_
     ]
     step = plan(order, NOW, can_generate=True).recommended
     assert (step.kind, step.lesson_id) == (StepKind.START_LESSON, "les_other")
-    assert step.title == 'Try "Weights, by example"'
-    assert "another explanation of it that you have not tried yet" in step.reason
+    assert step.title == "Try “Weights, by example”"
+    assert "another explanation you haven’t tried" in step.reason
 
 
 def test_explanations_of_one_concept_are_not_added_without_end() -> None:
@@ -538,9 +538,9 @@ def test_an_explanation_made_since_the_learner_left_the_old_one_comes_first() ->
     assert (step.kind, step.lesson_id, step.title) == (
         StepKind.START_LESSON,
         "les_new",
-        'Try "Weights, by example"',
+        "Try “Weights, by example”",
     )
-    assert step.reason == ('There is another explanation of "Weights" that you have not tried yet.')
+    assert step.reason == "There’s another explanation of “Weights” you haven’t tried."
     # The old one can still be continued. It is simply no longer what is suggested.
     assert [(other.kind, other.lesson_id) for other in result.alternatives] == [
         (StepKind.RESUME_LESSON, "les_old")
@@ -597,7 +597,7 @@ def test_practice_is_not_suggested_for_what_practice_cannot_supply() -> None:
     assert "needs time to settle" in result.recommended.reason
     purpose, reason = practice_purpose(waiting, NOW)
     assert purpose is PracticePurpose.PRACTISE
-    assert "can be asked again later; this is extra practice in the meantime" in reason
+    assert "can be asked again later. This is extra practice in the meantime" in reason
 
     # When something else is missing too, practice is offered for that, and only that.
     more = concept(
@@ -608,13 +608,13 @@ def test_practice_is_not_suggested_for_what_practice_cannot_supply() -> None:
         fresh_questions=2,
         hypotheses=tuple(standing),
         missing=(
-            "a correct answer to a different kind of question",
+            "a correct answer to another kind of question",
             "a possible misunderstanding to clear up",
         ),
     )
     step = plan([more], NOW, can_generate=True).recommended
     assert step.kind is StepKind.PRACTISE
-    assert step.reason.endswith("Still needed: a correct answer to a different kind of question.")
+    assert step.reason.endswith("Still needed: a correct answer to another kind of question.")
 
     # And once a question that would show it can be asked, the check is the suggestion.
     checkable = concept(
@@ -673,8 +673,8 @@ def test_someone_who_says_they_know_it_is_checked_rather_than_taught_again() -> 
     ]
     step = plan(order, NOW, can_generate=True).recommended
     assert step.kind is StepKind.PRACTISE
-    assert step.reason.startswith('You said you already know "Weights".')
-    assert "its lesson can be skipped" in step.reason
+    assert step.reason.startswith("You said you already know “Weights”.")
+    assert "you can skip the lesson" in step.reason
 
 
 def test_when_nothing_is_worth_doing_it_says_so_and_when_there_will_be() -> None:
@@ -691,7 +691,7 @@ def test_when_nothing_is_worth_doing_it_says_so_and_when_there_will_be() -> None
     result = plan(settling, NOW, can_generate=True)
     assert result.recommended.kind is StepKind.NOTHING_DUE
     assert "needs time to settle" in result.recommended.reason
-    assert 'The next review is "Weights", in a day.' in result.recommended.reason
+    assert "Next review: “Weights”, in a day." in result.recommended.reason
     assert [other.kind for other in result.alternatives] == [StepKind.REPEAT_LESSON]
 
     done = [
@@ -705,7 +705,7 @@ def test_when_nothing_is_worth_doing_it_says_so_and_when_there_will_be() -> None
     ]
     finished = plan(done, NOW, can_generate=True)
     assert finished.recommended.kind is StepKind.NOTHING_DUE
-    assert "You have shown every concept in this course, for now." in finished.recommended.reason
+    assert "You’ve covered every concept in this course for now." in finished.recommended.reason
     assert "in 5 days" in finished.recommended.reason
     assert finished.alternatives == ()
 

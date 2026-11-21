@@ -144,7 +144,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
 
   const providerStatus = provider.resource.status === 'ready' ? provider.resource.data : undefined;
   // Who to name as the author of something written before authors were recorded.
-  const providerName = providerStatus?.display_name ?? 'the AI provider';
+  const providerName = providerStatus?.display_name ?? 'your AI provider';
 
   const suggest = (): Promise<void> =>
     begin(courseId, () =>
@@ -170,12 +170,12 @@ export function CurriculumPanel({ course }: { course: Course }) {
   };
 
   if (curriculum.resource.status === 'loading') {
-    return <LoadingState title="Reading the curriculum…" />;
+    return <LoadingState title="Loading curriculum…" />;
   }
   if (curriculum.resource.status === 'error') {
     return (
       <ErrorState
-        title="The curriculum could not be read"
+        title="Couldn’t load the curriculum"
         description={describeError(curriculum.resource.error)}
         actions={<Button onClick={curriculum.reload}>Try again</Button>}
       />
@@ -254,7 +254,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
     toast.show({
       tone: 'success',
       title: `${pluralise(added.length, 'concept')} added from your materials`,
-      description: 'Add objectives and say what depends on what when you are ready.',
+      description: 'Add objectives and prerequisites when you’re ready.',
     });
   };
 
@@ -267,7 +267,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'The concept could not be removed',
+        title: 'Couldn’t remove the concept',
         description: describeError(error),
       });
     } finally {
@@ -287,7 +287,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'The lesson could not be removed',
+        title: 'Couldn’t remove the lesson',
         description: describeError(error),
       });
     } finally {
@@ -302,7 +302,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
       if (check.reason) {
         toast.show({
           tone: 'info',
-          title: `“${concept.title}” stays where it is`,
+          title: `“${concept.title}” can’t move there`,
           description: check.reason,
         });
       }
@@ -318,7 +318,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'The order could not be changed',
+        title: 'Couldn’t change the order',
         description: describeError(error),
       });
     }
@@ -355,7 +355,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
         starting={starting.has(courseId)}
         refusal={refusals.get(courseId) ?? null}
         subject="the suggestions"
-        waitingText="Waiting to ask for suggestions"
+        waitingText="Queued"
         usualSeconds={providerStatus?.routes.curriculum.wait_seconds}
         onCancel={() => cancelJob(proposalJob)}
         onRetry={() => void suggest()}
@@ -375,8 +375,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
           }
         >
           {authorName(proposal.writtenBy, providerName)} suggested{' '}
-          {pluralise(proposal.concepts.length, 'concept')} for this course. Nothing is added until
-          you choose.
+          {pluralise(proposal.concepts.length, 'concept')}. Nothing is added until you choose.
         </Callout>
       ) : null}
     </div>
@@ -400,7 +399,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
           {path.length > 0 ? (
             <div className={styles.toolbarActions}>
               <SegmentedControl<View>
-                label="Show the curriculum as"
+                label="View"
                 value={view}
                 options={VIEWS}
                 onValueChange={setView}
@@ -420,20 +419,20 @@ export function CurriculumPanel({ course }: { course: Course }) {
               candidates.length > 0
                 ? 'Start from the headings of your materials, or add concepts one at a time.'
                 : hasMaterials
-                  ? 'Your materials have no headings Adle can turn into concepts. Add them one at a time; you can still link each to a passage in your notes.'
-                  : 'Add the ideas you want to learn, one at a time. Import course materials first if you would like Adle to suggest a starting list from their headings.'
+                  ? 'Your materials have no headings to start from. Add concepts one at a time; you can still link each to a passage.'
+                  : 'Add the ideas you want to learn, or import materials to start from their headings.'
             }
             actions={actions}
           />
         ) : (
           <>
             {errors.length > 0 ? (
-              <Callout tone="danger" title="This course cannot be started yet">
+              <Callout tone="danger" title="This course isn’t ready to start">
                 <IssueList messages={summariseIssues(errors, data.concepts)} />
               </Callout>
             ) : null}
             {warnings.length > 0 ? (
-              <Callout tone="warning" title="Worth a look before you start">
+              <Callout tone="warning" title="Before you start">
                 <IssueList messages={summariseIssues(warnings, data.concepts)} />
               </Callout>
             ) : null}
@@ -464,7 +463,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
                                 <span className={styles.rowMeta}>
                                   {concept.prerequisites.length > 0
                                     ? `Needs ${concept.prerequisites.map((item) => item.title).join(', ')}`
-                                    : 'Needs nothing first'}
+                                    : 'No prerequisites'}
                                 </span>
                                 <span className={styles.rowBadge}>
                                   <Badge tone={KNOWLEDGE_TONE[concept.knowledge.state]}>
@@ -497,7 +496,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
                       })}
                     </ol>
                     <p className={styles.mapCaption}>
-                      Taught from top to bottom. Each concept comes after everything it needs.
+                      Taught top to bottom. Each concept comes after its prerequisites.
                     </p>
                   </>
                 ) : (
@@ -603,17 +602,17 @@ export function CurriculumPanel({ course }: { course: Course }) {
       <Dialog
         open={dialog?.kind === 'suggest'}
         onClose={() => setDialog(null)}
-        title="Ask the AI for concepts?"
-        description={`Adle will send this course's name, topic, and description, your goal, the names of the concepts it already has${
-          hasMaterials ? ', and the headings of your materials with a few short excerpts' : ''
-        } to ${destination(providerStatus, 'curriculum')}. It uses one of today's requests, sometimes two${
+        title="Suggest concepts with AI?"
+        description={`Sends the course name, topic, and description, your goal, and existing concept names${
+          hasMaterials ? ', plus headings and short excerpts from your materials,' : ''
+        } to ${destination(providerStatus, 'curriculum')}.${
           usualWait(providerStatus, 'curriculum')
-            ? `, and usually takes ${usualWait(providerStatus, 'curriculum')}`
+            ? ` Takes ${usualWait(providerStatus, 'curriculum')}.`
             : ''
-        }. Nothing is added to the course until you have looked at the suggestions.`}
+        } Nothing is added until you review the suggestions.`}
         actions={
           <>
-            <Button onClick={() => setDialog(null)}>Not now</Button>
+            <Button onClick={() => setDialog(null)}>Cancel</Button>
             <Button
               variant="primary"
               icon={<Sparkles />}
@@ -622,7 +621,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
                 void suggest();
               }}
             >
-              Send and suggest
+              Suggest concepts
             </Button>
           </>
         }
@@ -633,12 +632,12 @@ export function CurriculumPanel({ course }: { course: Course }) {
         title={
           dialog?.kind === 'remove-lesson' ? `Remove “${dialog.lesson.title}”?` : 'Remove lesson?'
         }
-        description="The lesson, its pictures, your place in it, and any questions you asked about it are removed. What you have shown you know about the concept stays; a suspected mix-up that rested on this lesson's questions goes with it. This cannot be undone."
+        description="This removes the lesson, your place in it, and any questions you asked about it. Your progress on the concept stays. This can’t be undone."
         dismissible={!removing}
         actions={
           <>
             <Button onClick={() => setDialog(null)} disabled={removing}>
-              Keep it
+              Cancel
             </Button>
             <Button
               variant="destructive"
@@ -656,12 +655,12 @@ export function CurriculumPanel({ course }: { course: Course }) {
         open={dialog?.kind === 'remove'}
         onClose={() => setDialog(null)}
         title={dialog?.kind === 'remove' ? `Remove “${dialog.concept.title}”?` : 'Remove concept?'}
-        description="The concept, its objectives, and what has been recorded about it are removed from this course. Anything that needed it will simply no longer need it. Your materials are not touched."
+        description="This removes the concept, its objectives, and your progress on it. Concepts that depended on it no longer will. Your materials aren’t touched."
         dismissible={!removing}
         actions={
           <>
             <Button onClick={() => setDialog(null)} disabled={removing}>
-              Keep it
+              Cancel
             </Button>
             <Button
               variant="destructive"

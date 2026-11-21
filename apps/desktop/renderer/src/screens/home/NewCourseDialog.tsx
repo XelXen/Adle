@@ -44,7 +44,7 @@ export function NewCourseDialog({ open, onClose, onCreated }: NewCourseDialogPro
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     const problems: typeof errors = {};
-    if (!title.trim()) problems.title = 'Give the course a name.';
+    if (!title.trim()) problems.title = 'Enter a course name.';
     if (origin === 'topic' && !topic.trim()) {
       problems.topic = 'Describe what you want to learn, in a sentence or two.';
     }
@@ -74,7 +74,7 @@ export function NewCourseDialog({ open, onClose, onCreated }: NewCourseDialogPro
       open={open}
       onClose={close}
       title="New course"
-      description="A course keeps your materials, the curriculum built from them, and your progress together."
+      description="A course holds your materials, curriculum, and progress."
       size="medium"
       dismissible={!creating}
     >
@@ -91,7 +91,7 @@ export function NewCourseDialog({ open, onClose, onCreated }: NewCourseDialogPro
           />
           <p className={styles.hint}>
             {origin === 'topic'
-              ? 'Adle will propose a curriculum for the topic. You can add your own materials at any time.'
+              ? 'Adle suggests a curriculum for the topic. You can add materials later.'
               : 'Add PDFs, Word documents, Markdown, or text files next. They stay on this computer.'}
           </p>
         </Stack>

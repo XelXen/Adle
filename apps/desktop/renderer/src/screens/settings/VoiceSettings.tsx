@@ -48,16 +48,15 @@ export function VoiceSettings({
   useEffect(() => () => sample.current?.cancel(), []);
 
   if (voices.resource.status === 'loading') {
-    return <Spinner size="small" label="Looking for voices on this computer" />;
+    return <Spinner size="small" label="Loading voices" />;
   }
   const installed = voices.resource.status === 'ready' ? voices.resource.data : [];
   const engine = browserSpeech();
   if (!engine || installed.length === 0) {
     return (
-      <Callout title="No voice was found on this computer">
-        Adle reads aloud with the voices installed in your operating system, and it did not find
-        one. Lessons show their narration as text instead, at a reading pace. If you install a voice
-        in your system settings, it will appear here.
+      <Callout title="No voice found">
+        Adle uses the voices installed on your computer, and found none. Narration is shown as text
+        instead. Install a voice in your system settings and it will appear here.
       </Callout>
     );
   }
@@ -86,7 +85,7 @@ export function VoiceSettings({
       <div className={styles.voiceField}>
         <Select
           label="Voice"
-          description="Voices installed on this computer. Reading aloud sends nothing anywhere."
+          description="Voices installed on this computer. Nothing is sent anywhere."
           value={
             installed.some((voice) => voice.name === preferences.voice) ? preferences.voice : ''
           }

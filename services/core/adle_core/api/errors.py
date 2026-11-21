@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from adle_core.errors import AdleError
+from adle_core.logs import where
 
 logger = logging.getLogger(__name__)
 
@@ -83,21 +84,24 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
-        code = {404: "not_found", 405: "method_not_allowed"}.get(exc.status_code, "http_error")
+        code = {404: "not_found", 405: "method_not_allowed", 413: "payload_too_large"}.get(
+            exc.status_code, "http_error"
+        )
         return _response(exc.status_code, code, str(exc.detail))
 
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
-        # Log the type and location only. Exception messages can carry user content.
+        # Log the type and location only. Exception messages can carry user content, so
+        # the traceback is written without them.
         logger.error(
-            "Unhandled %s on %s %s",
+            "Unhandled %s on %s %s\n%s",
             type(exc).__name__,
             request.method,
             request.url.path,
-            exc_info=exc,
+            where(exc),
         )
         return _response(
             500,
             "internal_error",
-            "Something went wrong inside Adle. Your progress is saved; please try again.",
+            "Something went wrong. Your progress is saved. Please try again.",
         )

@@ -34,6 +34,10 @@ supersedes the old one and update this index.
 | [024](../decisions/ADR-024-asking-during-a-lesson.md) | A question asked during a lesson is a note beside one part, not a chat: one request, kept with the part; a question the lesson is asking is never answered for the learner, and asking about it counts as help; short work has a lane of its own so it never waits behind a lesson | Accepted |
 | [025](../decisions/ADR-025-geist-typefaces.md) | Geist for all three voices: Geist Sans for what is operated, Geist Mono for what is exact, Geist Serif (one weight, kept as a file with its licence) for what is read; scenes keep Inter | Accepted |
 | [026](../decisions/ADR-026-breaks-and-being-told.md) | The wait for a lesson is said honestly and a break is offered beside it; a break is never counted; what is being written is visible from anywhere; a notification says it is ready in words fixed by its kind in the main process | Accepted |
+| [027](../decisions/ADR-027-neutral-palette.md) | The grounds and the text are neutral greys in both themes and the dark theme is near black; one deep teal action with a white label in both; the stage of a scene follows the surface it lies on |
+| [028](../decisions/ADR-028-plain-words.md) | Words are short, plain, and about the learner's task, with typographic quotation marks; what must be said (what is sent and where, who answered, why a step is suggested) stays, in fewer words; progress is Not started, Learning, Nearly there, Understood |
+| [029](../decisions/ADR-029-boundaries-after-review.md) | After a review: the page cannot name a file by any hand-over; "no network" covers peer connections and name lookups; a request is not read before its token is checked; the provider choice reaches the core before the keys and before "ready"; ordering questions are shown under names that are not their answer; logs hold no error text |
+| [030](../decisions/ADR-030-own-title-bar.md) | The window has a title bar of the app's own on Windows and macOS: the system's buttons laid over the page in the app's colours, a strip to move the window by, and nothing new across the bridge |
 
 ## Smaller standing choices (no ADR)
 

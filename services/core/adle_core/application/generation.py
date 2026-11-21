@@ -25,6 +25,7 @@ any other lesson before it is stored.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -117,16 +118,16 @@ MODEL_JOB_KINDS: tuple[str, ...] = (*LONG_JOB_KINDS, KIND_ASK, KIND_CHECK)
 
 #: Why a provider's next model, or the next provider, is being asked, in the learner's words.
 _PASSED_OVER = {
-    "gone": "is not available at the moment",
-    "failing": "is having trouble at the moment",
-    "silent": "is not answering",
-    "refused": "did not accept the request",
+    "gone": "isn’t available right now",
+    "failing": "is having trouble right now",
+    "silent": "isn’t answering",
+    "refused": "didn’t accept the request",
     "spent": "has no allowance left today",
-    "rate_limited": "is limiting requests at the moment",
-    "notice": "answered with a notice about your account there",
-    "key_rejected": "did not accept its key",
-    "unreachable": "could not be reached",
-    "unreadable": "sent an answer that could not be read",
+    "rate_limited": "is limiting requests right now",
+    "notice": "returned a notice about your account",
+    "key_rejected": "rejected its key",
+    "unreachable": "couldn’t be reached",
+    "unreadable": "sent an unreadable answer",
 }
 #: The requests one piece of work usually takes, for saying how long it will be.
 _REQUESTS_FOR = {
@@ -135,7 +136,7 @@ _REQUESTS_FOR = {
     "ask": ("ask",),
 }
 #: What a model is seen to be doing while its answer is on the way, in the learner's words.
-_STAGES = {"thinking": "thinking it through", "writing": "writing"}
+_STAGES = {"thinking": "thinking", "writing": "writing"}
 
 _PACE = {"relaxed": "unhurried", "standard": "moderate", "brisk": "brisk"}
 _DENSITY = {
@@ -314,6 +315,10 @@ class GenerationService:
         self._learner = learner
         self._retriever = retriever
         self._asks = asks
+        #: Looking for work that is under way and starting it are one step. Without this,
+        #: two requests arriving together both find nothing and both begin: the same
+        #: lesson written twice, or a provider chosen under a job that has just started.
+        self._starting = threading.Lock()
 
     # -- the one way a request is made ---------------------------------------
 
@@ -336,7 +341,7 @@ class GenerationService:
         """
 
         def busy(provider: str) -> None:
-            context.report(done, total, f"Waiting for {provider} to finish what it is writing")
+            context.report(done, total, f"Waiting for {provider} to finish another request")
 
         def at_stage(model: str, stage: str) -> None:
             context.report(done, total, f"{doing}: {model} is {_STAGES.get(stage, 'working')}")
@@ -345,8 +350,7 @@ class GenerationService:
             context.report(
                 done,
                 total,
-                f"Waiting about {max(1, round(seconds))} seconds to stay within the "
-                "provider's rate limit",
+                f"Waiting about {max(1, round(seconds))} seconds to stay under the rate limit",
             )
 
         def standing_in(unavailable: str, following: str, why: str) -> None:
@@ -382,15 +386,16 @@ class GenerationService:
         its destination named beside it, and must not finish somewhere else.
         """
         if not self._gateway.accepts(selection):
-            raise NotFoundError("Adle does not know that AI provider.")
-        if selection == self._gateway.selection:
-            return
-        if self._jobs.any_active(MODEL_JOB_KINDS):
-            raise ConflictError(
-                "Something is being written for you at the moment. Wait for it to finish, "
-                "or stop it, and then change the provider."
-            )
-        self._gateway.select(selection)
+            raise NotFoundError("Unknown AI provider.")
+        with self._starting:
+            if selection == self._gateway.selection:
+                return
+            if self._jobs.any_active(MODEL_JOB_KINDS):
+                raise ConflictError(
+                    "Something is being written right now. Wait for it to finish, or stop it, "
+                    "then change the provider."
+                )
+            self._gateway.select(selection)
 
     def _written_by(self, results: Sequence[ChatResult]) -> dict[str, Any]:
         """Who wrote something, for its record: each provider and model that answered.
@@ -413,13 +418,13 @@ class GenerationService:
         others = [name for name in providers if name != asked_first]
         if asked_first and others:
             share = "part of this" if asked_first in providers else "this"
-            notes.append(f"{asked_first} could not answer, so {_listed(others)} wrote {share}.")
+            notes.append(f"{asked_first} couldn’t answer, so {_listed(others)} wrote {share}.")
         expected = next((result.instead_of for result in results if result.instead_of), "")
         stand_ins = [name for name in models if name != expected]
         if expected and stand_ins:
             share = "part of this" if expected in models else "this"
             notes.append(
-                f"{expected} was not available, so {_listed(stand_ins)} wrote {share} in its place."
+                f"{expected} wasn’t available, so {_listed(stand_ins)} wrote {share} instead."
             )
         return {
             # The first provider that wrote any of it; all of them are in ``authors``.
@@ -458,15 +463,16 @@ class GenerationService:
         with self._database.read() as session:
             get_course_or_404(session, course_id)
         self._require_key()
-        running = self._jobs.find_active(KIND_CURRICULUM, course_id)
-        if running is not None:
-            return running
-        return self._jobs.submit(
-            KIND_CURRICULUM,
-            lambda context: self._propose(course_id, context),
-            course_id=course_id,
-            subject_id=course_id,
-        )
+        with self._starting:
+            running = self._jobs.find_active(KIND_CURRICULUM, course_id)
+            if running is not None:
+                return running
+            return self._jobs.submit(
+                KIND_CURRICULUM,
+                lambda context: self._propose(course_id, context),
+                course_id=course_id,
+                subject_id=course_id,
+            )
 
     def _propose(self, course_id: str, context: JobContext) -> dict[str, Any]:
         with self._database.read() as session:
@@ -495,11 +501,12 @@ class GenerationService:
         for attempt in (1, 2):
             context.check_cancelled()
             doing = (
-                "Asking for a list of concepts"
+                "Suggesting concepts"
                 if attempt == 1
-                else "The first answer was not usable. Asking once more"
+                else "The first answer wasn’t usable. Asking once more"
             )
-            context.report(attempt - 1, 2, doing)
+            # One request, whose length nobody knows: no share of it is ever "done".
+            context.report(0, 0, doing)
             request = prompts.curriculum_request(
                 course_title=title,
                 topic=topic,
@@ -531,8 +538,8 @@ class GenerationService:
                 "written_by": self._written_by([result]),
             }
         raise GenerationFailedError(
-            "The AI's proposal did not come out in a usable form, twice. Nothing was added. "
-            "You can try again, or add concepts by hand."
+            "The AI’s suggestions weren’t usable, twice. Nothing was added. Try again, or add "
+            "concepts by hand."
         )
 
     def latest_proposal(self, course_id: str) -> JobSnapshot | None:
@@ -550,11 +557,11 @@ class GenerationService:
             or job.course_id is None
             or not isinstance(result, dict)
         ):
-            raise NotFoundError("That proposal is no longer available. Ask for a new one.")
+            raise NotFoundError("Those suggestions are no longer available. Ask for new ones.")
         if result.get("accepted"):
-            raise ConflictError("That proposal has already been added to the course.")
+            raise ConflictError("Those suggestions were already added.")
         if result.get("dismissed"):
-            raise ConflictError("That proposal was set aside. Ask for a new one.")
+            raise ConflictError("Those suggestions were discarded. Ask for new ones.")
         return job, result
 
     def dismiss_proposal(self, job_id: str) -> JobSnapshot:
@@ -569,7 +576,7 @@ class GenerationService:
         assert job.course_id is not None
         concepts = result.get("concepts")
         if not isinstance(concepts, list):
-            raise NotFoundError("That proposal is no longer available. Ask for a new one.")
+            raise NotFoundError("Those suggestions are no longer available. Ask for new ones.")
         chosen = sorted({index for index in selected if 0 <= index < len(concepts)})
         if not chosen:
             raise ValidationFailedError("Choose at least one concept to add.")
@@ -606,32 +613,30 @@ class GenerationService:
         had yet, so that "another explanation" is never the same explanation.
         """
         if strategy is not None and strategy not in STRATEGIES:
-            raise ValidationFailedError("That is not a way of teaching Adle knows.")
+            raise ValidationFailedError("Unknown teaching style.")
         with self._database.read() as session:
             concept = get_concept_or_404(session, concept_id)
             course_id = concept.course_id
             if not concept.objectives:
-                raise ValidationFailedError(
-                    "Give this concept at least one learning objective first, "
-                    "so the lesson has something to aim at."
-                )
+                raise ValidationFailedError("Add a learning objective to this concept first.")
             existing = len(self._strategies_used(session, concept_id))
-        running = self._jobs.find_active(KIND_LESSON, concept_id)
-        if running is not None:
-            return running
-        if existing >= MAX_LESSONS_PER_CONCEPT:
-            # More explanations of one thing stop helping, and each costs requests.
-            raise ConflictError(
-                f"This concept already has {existing} lessons. "
-                "Remove one you no longer want before creating another."
+        with self._starting:
+            running = self._jobs.find_active(KIND_LESSON, concept_id)
+            if running is not None:
+                return running
+            if existing >= MAX_LESSONS_PER_CONCEPT:
+                # More explanations of one thing stop helping, and each costs requests.
+                raise ConflictError(
+                    f"This concept already has {existing} lessons. "
+                    "Remove one before creating another."
+                )
+            self._require_key()
+            return self._jobs.submit(
+                KIND_LESSON,
+                lambda context: self._write_lesson(concept_id, context, strategy),
+                course_id=course_id,
+                subject_id=concept_id,
             )
-        self._require_key()
-        return self._jobs.submit(
-            KIND_LESSON,
-            lambda context: self._write_lesson(concept_id, context, strategy),
-            course_id=course_id,
-            subject_id=concept_id,
-        )
 
     @staticmethod
     def _strategies_used(session: Session, concept_id: str) -> list[str]:
@@ -730,7 +735,7 @@ class GenerationService:
             doing = (
                 "Writing the lesson"
                 if attempt == 1
-                else "The first draft was not usable. Writing it once more"
+                else "The first draft wasn’t usable. Writing it once more"
             )
             context.report(0, planned, doing)
             request = prompts.lesson_request(
@@ -761,8 +766,7 @@ class GenerationService:
             logger.info("generation.lesson_unusable attempt=%s", attempt)
         if lesson is None:
             raise GenerationFailedError(
-                "The AI's lesson did not come out in a usable form, twice. Nothing was saved. "
-                "You can try again."
+                "The AI’s lesson wasn’t usable, twice. Nothing was saved. You can try again."
             )
 
         total = 1 + len(briefs)
@@ -785,15 +789,14 @@ class GenerationService:
             if artifact is None:
                 lesson = without_scene(lesson, brief.scene_id)
                 notes.append(
-                    f'The picture for "{brief.title}" could not be made, '
-                    "so that part is explained in words."
+                    f"The picture for “{brief.title}” couldn’t be made, so that part is explained "
+                    "in words."
                 )
                 continue
             if brief.kind == "interactive" and not artifact.interactive:
                 lesson = as_visualization(lesson, brief.scene_id)
                 notes.append(
-                    f'"{brief.title}" was meant to be something to try, '
-                    "but came out as an animation to watch."
+                    f"“{brief.title}” was meant to be interactive, but came out as an animation."
                 )
             scenes.append(
                 {"id": artifact.id, "purpose": artifact.purpose, "source": artifact.source}
@@ -827,7 +830,7 @@ class GenerationService:
         fallback: tuple[SceneArtifact | None, ChatResult | None] = (None, None)
         for attempt in (1, 2):
             context.check_cancelled()
-            doing = label if attempt == 1 else f"{label} (second and last try)"
+            doing = label if attempt == 1 else f"{label} (second try)"
             if attempt == 2:
                 context.report(done, total, doing)
             result = self._ask(
@@ -867,30 +870,30 @@ class GenerationService:
         words = " ".join(question.split())
         if not MIN_QUESTION_CHARACTERS <= len(words) <= MAX_QUESTION_CHARACTERS:
             raise ValidationFailedError(
-                f"A question is between {MIN_QUESTION_CHARACTERS} and "
-                f"{MAX_QUESTION_CHARACTERS} characters long."
+                f"A question must be {MIN_QUESTION_CHARACTERS} to {MAX_QUESTION_CHARACTERS} "
+                "characters long."
             )
         lesson = self._lessons.get_lesson(lesson_id)
         if not any(segment.id == segment_id for segment in lesson.segments):
             raise NotFoundError("That is not a part of this lesson.")
         if self._asks.count(lesson_id) >= MAX_ASKS_PER_LESSON:
             raise ConflictError(
-                f"This lesson already has {MAX_ASKS_PER_LESSON} questions kept beside it. "
-                "Remove one you no longer need before asking another."
+                f"This lesson already has {MAX_ASKS_PER_LESSON} saved questions. Remove one "
+                "before asking another."
             )
         self._require_key()
-        if self._jobs.find_active(KIND_ASK, lesson_id) is not None:
-            raise ConflictError(
-                "Your last question about this lesson is still being answered. "
-                "Wait for it, or stop it, and then ask the next."
+        with self._starting:
+            if self._jobs.find_active(KIND_ASK, lesson_id) is not None:
+                raise ConflictError(
+                    "Your last question is still being answered. Wait for it, or stop it first."
+                )
+            return self._jobs.submit(
+                KIND_ASK,
+                lambda context: self._answer(lesson_id, segment_id, words, context),
+                course_id=lesson.course_id,
+                subject_id=lesson_id,
+                lane=LANE_QUICK,
             )
-        return self._jobs.submit(
-            KIND_ASK,
-            lambda context: self._answer(lesson_id, segment_id, words, context),
-            course_id=lesson.course_id,
-            subject_id=lesson_id,
-            lane=LANE_QUICK,
-        )
 
     def _answer(
         self, lesson_id: str, segment_id: str, question: str, context: JobContext
@@ -916,10 +919,12 @@ class GenerationService:
             answered = isinstance(segment, CheckpointSegment) and (
                 session.scalars(
                     select(Attempt.id)
+                    # A skip counts: it showed the explanation, so there is nothing
+                    # left to keep from the learner (the same rule as when an answer is
+                    # judged, in `AssessmentService.answer`).
                     .where(
                         Attempt.lesson_id == lesson_id,
                         Attempt.question_id == segment.question.id,
-                        Attempt.outcome != "skipped",
                     )
                     .limit(1)
                 ).first()
@@ -952,9 +957,9 @@ class GenerationService:
             doing = (
                 "Answering your question"
                 if attempt == 1
-                else "The first answer was not usable. Asking once more"
+                else "The first answer wasn’t usable. Asking once more"
             )
-            context.report(attempt - 1, 2, doing)
+            context.report(0, 0, doing)
             request = prompts.ask_request(
                 course_title=course_title,
                 concept=concept,
@@ -993,8 +998,8 @@ class GenerationService:
                 "written_by": written_by,
             }
         raise GenerationFailedError(
-            "The answer did not come out in a usable form, twice. Nothing was kept. "
-            "You can ask again, perhaps in other words."
+            "The answer wasn’t usable, twice. Nothing was saved. Try asking again, perhaps in "
+            "other words."
         )
 
     # -- finding out whether a key works -----------------------------------------
@@ -1002,22 +1007,33 @@ class GenerationService:
     def check_provider(self, provider_id: str) -> JobSnapshot:
         """Start a job that sends one provider a request of a few words, to see it answer."""
         if not self._gateway.knows(provider_id):
-            raise NotFoundError("Adle does not know that AI provider.")
+            raise NotFoundError("Unknown AI provider.")
         if not self._gateway.has_key_for(provider_id):
             raise ProviderKeyMissingError
+        with self._starting:
+            running = self._jobs.find_active(KIND_CHECK, provider_id)
+            if running is not None:
+                return running
+            return self._jobs.submit(
+                KIND_CHECK,
+                lambda context: self._check(provider_id, context),
+                subject_id=provider_id,
+                lane=LANE_QUICK,
+            )
+
+    def key_changed(self, provider_id: str) -> None:
+        """A provider's key was set or removed: a check that is under way is about the old one.
+
+        Stopped, so that it is not taken for a check of the new key, and so that what it
+        finds is not held against the new key.
+        """
         running = self._jobs.find_active(KIND_CHECK, provider_id)
         if running is not None:
-            return running
-        return self._jobs.submit(
-            KIND_CHECK,
-            lambda context: self._check(provider_id, context),
-            subject_id=provider_id,
-            lane=LANE_QUICK,
-        )
+            self._jobs.cancel(running.id)
 
     def _check(self, provider_id: str, context: JobContext) -> dict[str, Any]:
-        doing = "Asking for one word"
-        context.report(0, 1, doing)
+        doing = "Testing the key"
+        context.report(0, 0, doing)
         began = time.monotonic()
         result = self._ask(prompts.check_request(), context, 0, 1, doing, provider_id=provider_id)
         seconds = time.monotonic() - began

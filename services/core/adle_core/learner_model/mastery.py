@@ -23,10 +23,10 @@ class MasteryState(StrEnum):
 MISUNDERSTANDING_TO_CLEAR = "a possible misunderstanding to clear up"
 
 STATE_LABELS: dict[MasteryState, str] = {
-    MasteryState.NOT_ASSESSED: "Not assessed",
-    MasteryState.BUILDING: "Building understanding",
-    MasteryState.NEEDS_EVIDENCE: "Needs more evidence",
-    MasteryState.DEMONSTRATED: "Demonstrated for now",
+    MasteryState.NOT_ASSESSED: "Not started",
+    MasteryState.BUILDING: "Learning",
+    MasteryState.NEEDS_EVIDENCE: "Nearly there",
+    MasteryState.DEMONSTRATED: "Understood",
 }
 
 
@@ -99,9 +99,9 @@ def assess(evidence: Evidence, criteria: MasteryCriteria = DEFAULT_CRITERIA) -> 
         if evidence.claims_to_know:
             return Assessment(
                 MasteryState.NEEDS_EVIDENCE,
-                ("a few answered questions to confirm what you already know",),
+                ("a few questions to confirm what you know",),
             )
-        return Assessment(MasteryState.NOT_ASSESSED, ("answered questions on this concept",))
+        return Assessment(MasteryState.NOT_ASSESSED, ("some answered questions",))
 
     missing: list[str] = []
     short_by = criteria.min_unaided_correct - evidence.unaided_correct
@@ -110,9 +110,9 @@ def assess(evidence: Evidence, criteria: MasteryCriteria = DEFAULT_CRITERIA) -> 
             _plural(short_by, "more correct answer", "more correct answers") + " without a hint"
         )
     if len(evidence.forms_correct) < criteria.min_question_forms:
-        missing.append("a correct answer to a different kind of question")
+        missing.append("a correct answer to another kind of question")
     if criteria.require_transfer and evidence.transfer_applicable and evidence.transfer_correct < 1:
-        missing.append("a correct answer that applies the idea to a new situation")
+        missing.append("a correct answer in a new situation")
     if evidence.unresolved_misconception:
         missing.append(MISUNDERSTANDING_TO_CLEAR)
     if not missing and evidence.probability < criteria.demonstrated_probability:

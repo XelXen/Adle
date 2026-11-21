@@ -48,7 +48,7 @@ def list_lessons(course_id: str, services: ServicesDep) -> schemas.LessonList:
 def get_lesson(lesson_id: str, services: ServicesDep) -> schemas.LessonForPlayer:
     loaded = services.lessons.get(lesson_id)
     return schemas.LessonForPlayer(
-        lesson=player_view(loaded.lesson),
+        lesson=player_view(loaded.lesson, services.item_mask),
         scenes=loaded.scenes,
         origin=loaded.origin,
         progress=schemas.LessonProgress.model_validate(loaded.progress),

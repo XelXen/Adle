@@ -1,7 +1,14 @@
 import { BookOpen, Coffee, Library, PenLine, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { AppShell, Logo, NavItem, NavSection, ToastProvider } from '@adle/design-system';
+import {
+  AppShell,
+  Logo,
+  NavItem,
+  NavSection,
+  ToastProvider,
+  WindowStrip,
+} from '@adle/design-system';
 
 import { useApp } from './app/AppContext';
 import { BreakProvider, useBreak } from './app/BreakContext';
@@ -61,7 +68,7 @@ function RailActivity() {
   const [first] = jobs;
   if (!rest.times && !first) return null;
   return (
-    <NavSection label="Now">
+    <NavSection label="Now" keepWhenNarrow>
       {first ? (
         <NavItem
           label={
@@ -88,7 +95,11 @@ function RailActivity() {
           label={rest.over ? 'Break over' : `On a break · ${clockText(rest.left)}`}
           icon={<Coffee />}
           current={route.name === 'break'}
-          onClick={() => navigate({ name: 'break' })}
+          onClick={() => {
+            // From the rail a break is a detour: leaving it leads back to where one was.
+            if (route.name !== 'break') rest.returnVia(null);
+            navigate({ name: 'break' });
+          }}
         />
       ) : null}
     </NavSection>
@@ -143,6 +154,7 @@ export function App() {
 
   return (
     <ToastProvider>
+      <WindowStrip />
       {ui.onboardingCompleted ? (
         <Activity>
           <AppShell

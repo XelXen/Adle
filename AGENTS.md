@@ -105,6 +105,8 @@ end-to-end suite can drive it: never hand that one to anyone.
   only through `@adle/event-protocol`. Do not add message types casually; never pass callbacks,
   URLs, or paths through it.
 - User documents and model output are data, never instructions.
+- "No network" for the page and for scenes means every road, not only requests (ADR-029).
+  The page cannot name a file, and nothing it hands over is trusted to be what it says.
 - The data as a whole (save a copy, restore, delete everything) is touched only through
   `window.adle.data`, whose functions take no arguments: the path or the confirmation comes
   from a dialog the main process opens. Restoring happens only while the core starts (ADR-016).
@@ -127,6 +129,8 @@ end-to-end suite can drive it: never hand that one to anyone.
   gets the answer to a question the lesson is asking.
 - Every animation has a text equivalent; every scene control has a keyboard-operable mirror.
 - No placeholder buttons, fake data paths, or "coming soon" in anything marked done.
+- Words are short, plain, and about the learner's task (ADR-028). Nothing about the app's
+  own workings unless the learner has to act on it.
 
 **Design** (details: `DESIGN_SYSTEM.md`)
 
@@ -137,8 +141,9 @@ end-to-end suite can drive it: never hand that one to anyone.
 account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day of its own)
 
 - Tests never call a real provider; use the fake server.
-- One request in flight at each provider, at most 4/minute there, budget 80 requests and 800k
-  tokens per day.
+- One request in flight at each provider, at most 4/minute there. When trying a real provider
+  by hand, budget 80 requests and 800k tokens per day; the app itself stops at 90 and 900k
+  for AIHubMix (ADR-012).
 - One scene = one request = one complete file. No repair loops; at most one deliberate retry.
   A question asked during a lesson is one request, two at most; a check of a key is one.
   Asking a provider's next model because the one before is away is not a retry of the answer,

@@ -178,6 +178,16 @@ def content_hash(source: str) -> str:
     return hashlib.sha256(normalise_source(source).encode("utf-8")).hexdigest()
 
 
+#: Methods that must be given their arguments in order, without names, and how to write
+#: each. Seen in Wanim 0.1.3 on 2026-11-21 (`e2e/scene-player.spec.ts` reads the pixels).
+IN_ORDER_ONLY = {
+    "set_fill": (
+        "mobject.set_fill(self.blue, 0.3), or mobject.set_fill(None, 0.3) to keep the colour it has"
+    ),
+    "set_color": "mobject.set_color(self.blue)",
+}
+
+
 class _Checker:
     def __init__(self, source: str) -> None:
         self.source = source
@@ -310,6 +320,19 @@ class _Checker:
 
     def _check_call(self, node: ast.Call) -> None:
         function = node.func
+        if isinstance(function, ast.Attribute) and function.attr in IN_ORDER_ONLY:
+            if node.keywords or not node.args:
+                # Observed in the pinned runtime. Called with names only, these take the
+                # names for the colour and fail when the scene runs. With the colour in
+                # place and the rest by name, set_fill runs and the fill is gone. A lesson
+                # a real model wrote lost its interactive picture to the first of these.
+                self.fail(
+                    "unreliable_call",
+                    f"Give {function.attr} its arguments in order, without names: "
+                    f"{IN_ORDER_ONLY[function.attr]}.",
+                    node,
+                )
+            return
         if isinstance(function, ast.Name) and function.id == "Dot":
             positioned = bool(node.args) or any(key.arg == "point" for key in node.keywords)
             if positioned:
@@ -489,7 +512,7 @@ def check_scene_source(source: object) -> SceneReport:
 
     try:
         tree = ast.parse(source, filename="scene.py", mode="exec")
-    except (SyntaxError, ValueError, RecursionError) as error:
+    except (SyntaxError, ValueError, RecursionError, MemoryError) as error:
         reason = getattr(error, "msg", None) or type(error).__name__
         violation = PolicyViolation(
             "syntax_error",
@@ -499,8 +522,14 @@ def check_scene_source(source: object) -> SceneReport:
         return SceneReport(ok=False, violations=(violation,), wanim_version=version)
 
     checker = _Checker(source)
-    checker.check_tree(tree)
-    checker.check_names()
+    try:
+        checker.check_tree(tree)
+        checker.check_names()
+    except (RecursionError, MemoryError):
+        # Nested deeper than a scene has any reason to be. What could not be looked at
+        # all the way down is not let through.
+        violation = PolicyViolation("too_large", "The scene is nested too deeply to check.")
+        return SceneReport(ok=False, violations=(violation,), wanim_version=version)
 
     first = checker.scene_classes[0] if checker.scene_classes else None
     interactive = first is not None and any(

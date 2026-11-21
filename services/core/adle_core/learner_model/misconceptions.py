@@ -119,34 +119,28 @@ class Hypothesis:
 
     @property
     def label(self) -> str:
-        return KIND_LABELS.get(self.kind, "a mistake of a kind Adle has no name for")
+        return KIND_LABELS.get(self.kind, "a mistake of an unfamiliar kind")
 
     def describe(self) -> str:
         """Where this stands, for the learner: what was noticed and what Adle will do about it."""
         if self.is_slip:
             if self.is_open:
-                return f"Noticed: {self.label}. It is treated as a slip, not as a gap."
+                return f"Noticed: {self.label}. Treated as a slip, not a gap."
             return f"Earlier: {self.label}. Not seen since."
         if self.status is Status.TENTATIVE:
-            return (
-                f"One answer suggested that {self.label}. One answer is not enough to say: "
-                "Adle will ask a question that would show it."
-            )
+            return f"One answer suggested that {self.label}. A follow-up question will check."
         if self.status is Status.SUPPORTED:
             return (
-                f"More than one answer suggests that {self.label}. The next steps come back to it."
+                f"More than one answer suggests that {self.label}. Upcoming steps will revisit it."
             )
         if self.status is Status.RESOLVED:
-            return (
-                f"Earlier answers suggested that {self.label}. "
-                "Your later answers show it is sorted."
-            )
+            return f"Earlier answers suggested that {self.label}. Later answers show it’s resolved."
         if self.dismissed_by_learner:
             return (
-                f"An answer suggested that {self.label}. "
-                "You said it was a slip, so it is set aside."
+                f"An answer suggested that {self.label}. You marked it as a slip, so it’s set "
+                "aside."
             )
-        return f"One answer suggested that {self.label}. A later question did not show it."
+        return f"One answer suggested that {self.label}. A later question didn’t show it."
 
 
 def _suggest(current: Hypothesis | None, answer: Answer, kind: str) -> Hypothesis:
@@ -264,23 +258,21 @@ def describe_change(before: Mapping[str, Hypothesis], after: Mapping[str, Hypoth
             continue
         if now.status is Status.TENTATIVE and opened:
             sentences.append(
-                f"That answer could mean that {now.label}. One answer is not enough to say, "
-                "so Adle will ask a question that would show it."
+                f"That answer could mean that {now.label}. A follow-up question will check."
             )
         elif now.status is Status.SUPPORTED and (was is None or was.status is Status.TENTATIVE):
             sentences.append(
-                f"This is the second answer suggesting that {now.label}, "
-                "so the next steps come back to it."
+                f"This is the second answer suggesting that {now.label}, so upcoming steps will "
+                "revisit it."
             )
         elif now.status is Status.REJECTED and was is not None and was.is_open:
             sentences.append(
-                f"An earlier answer suggested that {now.label}. This one shows otherwise, "
-                "so that is set aside."
+                f"An earlier answer suggested that {now.label}. This one shows otherwise, so it’s "
+                "set aside."
             )
         elif now.status is Status.RESOLVED:
             sentences.append(
-                f"Earlier answers suggested that {now.label}. "
-                "Your recent answers show it is sorted."
+                f"Earlier answers suggested that {now.label}. Recent answers show it’s resolved."
             )
         elif (
             now.status is Status.SUPPORTED
@@ -289,7 +281,7 @@ def describe_change(before: Mapping[str, Hypothesis], after: Mapping[str, Hypoth
             and now.countered > was.countered
         ):
             sentences.append(
-                f"Earlier answers suggested that {now.label}. This one goes against that; "
-                "one more like it settles it."
+                f"Earlier answers suggested that {now.label}. This one goes against that. One "
+                "more like it settles it."
             )
     return " ".join(sentences)

@@ -9,8 +9,11 @@ import {
   useState,
 } from 'react';
 
+import { useToast } from '@adle/design-system';
+
 import { adjusted, type BreakTimes, secondsLeft, shareElapsed } from '../lib/breaks';
 import { getBridge } from '../lib/bridge';
+import { type Route, useRouter } from './router';
 
 interface BreakValue {
   /** The break in progress, or the one that has just ended and has not been put away. */
@@ -21,6 +24,13 @@ interface BreakValue {
   elapsed: number;
   /** It ran to its end and is still on screen. */
   over: boolean;
+  /**
+   * Where leaving the break leads, when simply going back would not do: a lesson that has
+   * just been finished would open again at its first part. Null to go back.
+   */
+  returnTo: Route | null;
+  /** Say where leaving the break should lead from now on. */
+  returnVia: (route: Route | null) => void;
   start: (minutes: number) => void;
   /** Make it longer (or, with a negative number, shorter) by whole minutes. */
   adjust: (minutes: number) => void;
@@ -43,10 +53,18 @@ const TICK_MS = 500;
  * that is simply over.
  */
 export function BreakProvider({ children }: { children: ReactNode }) {
+  const { route } = useRouter();
+  const toast = useToast();
   const [times, setTimes] = useState<BreakTimes | null>(null);
+  const [returnTo, setReturnTo] = useState<Route | null>(null);
   const [now, setNow] = useState(() => Date.now());
   /** The break whose end has been announced, so that it is announced once. */
   const announced = useRef<BreakTimes | null>(null);
+  /** Where the learner is, for the moment the break ends. */
+  const where = useRef(route);
+  useEffect(() => {
+    where.current = route;
+  });
 
   const running = times !== null && now < times.endsAt;
   useEffect(() => {
@@ -61,7 +79,12 @@ export function BreakProvider({ children }: { children: ReactNode }) {
     announced.current = times;
     // Said by the system only if Adle is not what the learner is looking at.
     void getBridge().app.notify('break_over');
-  }, [over, times]);
+    // And by the app itself wherever the break's own screen is not what is open: a lesson
+    // or a round of questions has no rail to show that the time is up.
+    if (where.current.name !== 'break') {
+      toast.show({ tone: 'info', title: 'Your break is over', description: 'Ready when you are.' });
+    }
+  }, [over, times, toast]);
 
   const start = useCallback((minutes: number) => {
     const startedAt = Date.now();
@@ -76,6 +99,7 @@ export function BreakProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const end = useCallback(() => setTimes(null), []);
+  const returnVia = useCallback((next: Route | null) => setReturnTo(next), []);
 
   const value = useMemo<BreakValue>(
     () => ({
@@ -83,11 +107,13 @@ export function BreakProvider({ children }: { children: ReactNode }) {
       left: times ? secondsLeft(times, now) : 0,
       elapsed: times ? shareElapsed(times, now) : 0,
       over,
+      returnTo,
+      returnVia,
       start,
       adjust,
       end,
     }),
-    [times, now, over, start, adjust, end],
+    [times, now, over, returnTo, returnVia, start, adjust, end],
   );
   return <BreakContext.Provider value={value}>{children}</BreakContext.Provider>;
 }

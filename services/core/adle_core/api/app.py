@@ -8,6 +8,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from adle_core import __version__
 from adle_core.api.auth import require_launch_token
 from adle_core.api.errors import ErrorResponse, install_error_handlers
+from adle_core.api.gate import Gate
 from adle_core.api.routes import (
     courses,
     curriculum,
@@ -24,7 +25,7 @@ API_PREFIX = "/v1"
 
 # The service only ever answers on loopback. Rejecting other Host headers closes
 # the DNS-rebinding route even before the token check.
-_ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
+_ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
 def create_app(services: Services) -> FastAPI:
@@ -45,6 +46,9 @@ def create_app(services: Services) -> FastAPI:
     app.state.services = services
     app.state.launch_token = services.launch_token
 
+    # The last one added is the first a request meets: the Host header, then the token and
+    # the size of the body (before any of the body is read), then the routes.
+    app.add_middleware(Gate, token=services.launch_token)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_ALLOWED_HOSTS)
     install_error_handlers(app)
 

@@ -76,13 +76,21 @@ def _record(row: LessonAsk) -> AskRecord:
 
 
 def asked_since(session: Session, lesson_id: str, segment_id: str, since: datetime | None) -> bool:
-    """Whether the learner asked Adle about this part, after ``since`` if that is given."""
+    """Whether the learner asked Adle about this part, after ``since`` if that is given.
+
+    A note the learner has since removed still counts: they read the answer.
+    """
     statement = select(LessonAsk.id).where(
         LessonAsk.lesson_id == lesson_id, LessonAsk.segment_id == segment_id
     )
     if since is not None:
         statement = statement.where(LessonAsk.created_at > since)
     return session.scalars(statement.limit(1)).first() is not None
+
+
+#: What is left of a note the learner removed: no words, only that it was asked.
+REMOVED = ""
+_KEPT = LessonAsk.question != REMOVED
 
 
 class AskService:
@@ -92,7 +100,9 @@ class AskService:
     def count(self, lesson_id: str) -> int:
         with self._database.read() as session:
             found = session.scalar(
-                select(func.count()).select_from(LessonAsk).where(LessonAsk.lesson_id == lesson_id)
+                select(func.count())
+                .select_from(LessonAsk)
+                .where(LessonAsk.lesson_id == lesson_id, _KEPT)
             )
             return int(found or 0)
 
@@ -140,7 +150,7 @@ class AskService:
                 raise NotFoundError("That lesson no longer exists.")
             rows = session.scalars(
                 select(LessonAsk)
-                .where(LessonAsk.lesson_id == lesson_id)
+                .where(LessonAsk.lesson_id == lesson_id, _KEPT)
                 .order_by(LessonAsk.created_at, LessonAsk.id)
             )
             return [_record(row) for row in rows]
@@ -148,13 +158,18 @@ class AskService:
     def get(self, ask_id: str) -> AskRecord:
         with self._database.read() as session:
             row = session.get(LessonAsk, ask_id)
-            if row is None:
-                raise NotFoundError("That question is no longer kept.")
+            if row is None or row.question == REMOVED:
+                raise NotFoundError("That question no longer exists.")
             return _record(row)
 
     def delete(self, lesson_id: str, ask_id: str) -> None:
         with self._database.session() as session:
             row = session.get(LessonAsk, ask_id)
-            if row is None or row.lesson_id != lesson_id:
-                raise NotFoundError("That question is no longer kept.")
-            session.delete(row)
+            if row is None or row.lesson_id != lesson_id or row.question == REMOVED:
+                raise NotFoundError("That question no longer exists.")
+            # The words go: the learner's question, the answer, and who wrote it. That
+            # something was asked about this part, and when, stays, because an answer
+            # to the lesson's own question given afterwards was still an aided one.
+            row.question = REMOVED
+            row.answer = {}
+            row.written_by = {}

@@ -32,7 +32,7 @@ const ORIGIN_LABEL: Record<Course['origin'], string> = {
 
 function courseSummary(course: Course): string {
   const sources =
-    course.source_count === 0 ? 'No sources yet' : pluralise(course.source_count, 'source');
+    course.source_count === 0 ? 'No materials' : pluralise(course.source_count, 'source');
   const used = course.last_opened_at
     ? `Opened ${formatRelativeDay(course.last_opened_at).toLowerCase()}`
     : `Created ${formatRelativeDay(course.created_at).toLowerCase()}`;
@@ -76,7 +76,7 @@ export function HomeScreen() {
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'The sample course could not be added',
+        title: 'Couldn’t add the sample course',
         description: describeError(error),
       });
       setAddingSample(false);
@@ -91,7 +91,7 @@ export function HomeScreen() {
   return (
     <Page
       title="Library"
-      description="Your courses, and the place to pick up where you left off."
+      description="Your courses, and where you left off."
       actions={
         <Button variant="primary" icon={<Plus />} onClick={() => setCreating(true)}>
           New course
@@ -100,7 +100,7 @@ export function HomeScreen() {
     >
       {/* Shown once it is known; the list of courses below never waits for it. */}
       {recent && next.resource.status === 'ready' && next.resource.data ? (
-        <Section title="Pick up where you left off">
+        <Section title="Continue learning">
           <NextSteps
             plan={next.resource.data.plan}
             courseId={recent.id}
@@ -112,10 +112,10 @@ export function HomeScreen() {
 
       <Section title="Your courses">
         {list.status === 'loading' || (list.status === 'error' && starting) ? (
-          <LoadingState title="Opening your library…" />
+          <LoadingState title="Loading library…" />
         ) : list.status === 'error' ? (
           <ErrorState
-            title="Your library could not be opened"
+            title="Couldn’t load your library"
             description={describeError(list.error)}
             actions={<Button onClick={courses.reload}>Try again</Button>}
           />
@@ -123,7 +123,7 @@ export function HomeScreen() {
           <EmptyState
             visual={<Library />}
             title="No courses yet"
-            description="Create a course from a topic you want to learn, or from your own notes and readings. Or try the sample course first to see how a lesson works."
+            description="Create a course from a topic or your own notes, or try the sample course to see how lessons work."
             actions={
               <>
                 <Button variant="primary" icon={<Plus />} onClick={() => setCreating(true)}>
@@ -168,7 +168,7 @@ export function HomeScreen() {
           <ActionCard
             media={<GraduationCap />}
             title="Introduction to neural networks"
-            description="A short sample course written by Adle. Add it to try a narrated lesson with a live picture and a few questions."
+            description="A short sample course. Try a narrated lesson with interactive visuals and a few questions."
             meta={
               <>
                 <Badge tone="accent">Sample course</Badge>
@@ -186,7 +186,7 @@ export function HomeScreen() {
           <ActionCard
             media={<KeyRound />}
             title="AI provider"
-            description="Choose an AI provider and add its key to generate curricula and lessons. Your library and materials work without one."
+            description="Add a provider key to generate courses and lessons. Everything else works without one."
             meta={
               <>
                 <Badge>Not set up</Badge>

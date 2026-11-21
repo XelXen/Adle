@@ -18,6 +18,8 @@ from adle_core.ingestion.extract import extract_in_process
 from tests.support.model import FakeProvider
 
 TEST_TOKEN = "test-launch-token-0123456789abcdef0123456789"
+#: The core answers only to the loopback names; a test client says it is one of them.
+LOOPBACK = "http://127.0.0.1"
 
 
 @pytest.fixture
@@ -53,7 +55,7 @@ def services(settings: Settings, provider: FakeProvider) -> Iterator[Services]:
 @pytest.fixture
 def anonymous_client(services: Services) -> Iterator[TestClient]:
     """A client that presents no credentials."""
-    with TestClient(create_app(services)) as client:
+    with TestClient(create_app(services), base_url=LOOPBACK) as client:
         yield client
 
 
@@ -61,6 +63,8 @@ def anonymous_client(services: Services) -> Iterator[TestClient]:
 def client(services: Services) -> Iterator[TestClient]:
     """A client authenticated the way the Electron main process is."""
     with TestClient(
-        create_app(services), headers={"Authorization": f"Bearer {TEST_TOKEN}"}
+        create_app(services),
+        base_url=LOOPBACK,
+        headers={"Authorization": f"Bearer {TEST_TOKEN}"},
     ) as client:
         yield client

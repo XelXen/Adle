@@ -394,7 +394,7 @@ def test_a_model_that_is_gone_failing_or_silent_is_unavailable(
     assert raised.value.trouble == kind
     # One code for the interface, whatever the reason: nothing arrived, try again later.
     assert raised.value.code == "provider_unavailable"
-    assert "Nothing was changed" in str(raised.value)
+    assert "Try again" in str(raised.value)
     assert NVIDIA_KEY not in str(raised.value)
 
 
@@ -419,7 +419,7 @@ def test_not_reaching_the_provider_is_not_blamed_on_a_model(failure: Exception) 
         client_for(NVIDIA, Endpoint(kimi=failure)).complete(REQUEST)
     # Another model of the same provider is behind the same connection.
     assert not isinstance(raised.value, ProviderModelUnavailableError)
-    assert "could not be reached" in str(raised.value)
+    assert "Couldn’t reach the AI provider" in str(raised.value)
 
 
 def test_a_models_thinking_is_counted_and_never_taken_for_its_answer() -> None:
@@ -540,7 +540,7 @@ def test_the_time_limit_runs_while_the_model_is_only_thinking() -> None:
         client.complete(REQUEST)
     # Given up on at the second line, long before any answer: the next model's turn.
     assert raised.value.trouble == "silent"
-    assert "did not answer in time" in str(raised.value)
+    assert "took too long to answer" in str(raised.value)
 
 
 # -- the next model, when one is away -----------------------------------------------------
@@ -657,7 +657,7 @@ def test_when_no_model_answers_the_error_names_them_and_the_next_request_costs_o
         gateway.complete(REQUEST)
     assert endpoint.asked == [KIMI, MISTRAL, GLM]
     message = str(raised.value)
-    assert "None of NVIDIA NIM's models answered" in message
+    assert "None of NVIDIA NIM’s models answered" in message
     assert all(name in message for name in (KIMI_NAME, MISTRAL_NAME, GLM_NAME))
     assert raised.value.code == "provider_unavailable"
 
@@ -750,7 +750,7 @@ def test_each_provider_has_its_own_count_and_its_own_limits(services: Services) 
 
 def test_the_gateway_only_changes_provider_to_one_it_was_given(services: Services) -> None:
     gateway, _, vault = both_providers(services, Endpoint())
-    with pytest.raises(Exception, match="does not know that AI provider") as raised:
+    with pytest.raises(Exception, match="Unknown AI provider") as raised:
         gateway.select("somewhere-else")
     assert getattr(raised.value, "status_code", None) == 404
     assert vault.selection == "nvidia"
@@ -931,7 +931,7 @@ def test_the_provider_is_not_changed_while_it_is_writing_something(
         assert refused.status_code == 409
         # It says what is happening, and what to do.
         message = refused.json()["error"]["message"]
-        assert "Something is being written for you" in message
+        assert "Something is being written right now" in message
         assert "then change the provider" in message
         # Letting Adle choose is a change of provider like any other.
         assert choose(client, "auto").status_code == 409
@@ -961,7 +961,7 @@ def test_a_lesson_through_nvidia_goes_only_there_and_says_which_model_wrote_it(
     assert [body["model"] for body in provider.requests] == [KIMI, MISTRAL, MISTRAL, MISTRAL]
     assert set(provider.urls) == {NVIDIA_URL}
     assert set(provider.authorizations) == {f"Bearer {NVIDIA_KEY}"}
-    note = f"{KIMI_NAME} was not available, so {MISTRAL_NAME} wrote this in its place."
+    note = f"{KIMI_NAME} wasn’t available, so {MISTRAL_NAME} wrote this instead."
     assert job.result["written_by"] == {
         "provider": "NVIDIA NIM",
         "models": [MISTRAL_NAME],
@@ -1007,10 +1007,10 @@ def test_a_long_wait_says_what_the_model_is_doing(
     assert job.status == "succeeded", job.error_message
 
     assert said == [
-        "Asking for a list of concepts",
-        f"{KIMI_NAME} is not available at the moment. Asking {MISTRAL_NAME} instead",
-        f"Asking for a list of concepts: {MISTRAL_NAME} is thinking it through",
-        f"Asking for a list of concepts: {MISTRAL_NAME} is writing",
+        "Suggesting concepts",
+        f"{KIMI_NAME} isn’t available right now. Asking {MISTRAL_NAME} instead",
+        f"Suggesting concepts: {MISTRAL_NAME} is thinking",
+        f"Suggesting concepts: {MISTRAL_NAME} is writing",
         "Done",
     ]
 

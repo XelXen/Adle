@@ -84,13 +84,13 @@ class Plan:
         if len(self.names) == 1:
             return self.names[0]
         first, *others = self.names
-        return f"{first}, or {' or '.join(others)} if {first} cannot answer"
+        return f"{first}, then {' or '.join(others)} if needed"
 
 
 def _why_not(standing: Standing) -> str:
     if standing.spent:
         return f"{standing.name} has no allowance left today."
-    return f"{standing.name} could not answer when it was last asked."
+    return f"{standing.name} couldn’t answer earlier, so it’s paused for now."
 
 
 def _order(purpose: str, standings: Sequence[Standing]) -> tuple[list[Standing], str]:
@@ -107,7 +107,7 @@ def _order(purpose: str, standings: Sequence[Standing]) -> tuple[list[Standing],
         # Quick first, whatever is left of its day.
         first = [standing for standing in quick if standing.ready]
         if first:
-            reason = f"{first[0].name} answers quickly, and you are waiting for this."
+            reason = f"{first[0].name} is faster, and you’re waiting on this."
         elif quick:
             reason = _why_not(quick[0])
     else:
@@ -119,17 +119,19 @@ def _order(purpose: str, standings: Sequence[Standing]) -> tuple[list[Standing],
             if standing.ready and (not standing.limited or standing.used < HEAVY_WORK_SHARE)
         ]
         if first:
-            reason = f"{first[0].name} is quicker, and most of today's allowance there is unused."
+            reason = f"{first[0].name} is faster, and has plenty of allowance left today."
         else:
             first = [standing for standing in roomy if standing.ready]
             kept = next((standing for standing in quick if standing.limited), None)
-            if first and kept is not None and kept.ready:
-                reason = (
-                    f"This is long work, and what is left of today's allowance at "
-                    f"{kept.name} is kept for what you wait for."
-                )
-            elif kept is not None:
+            if kept is not None and not kept.ready:
                 reason = _why_not(kept)
+            elif first and kept is not None:
+                reason = f"{kept.name}’s remaining allowance is saved for what you wait on."
+            elif not first and roomy:
+                # The one with room cannot be asked just now, so the quick one is asked
+                # after all. The reason given is about the one that is away, not about
+                # the one that is being used.
+                reason = _why_not(roomy[0])
 
     chosen = first[:1]
     # Then everything else that can still be asked today, with what is resting last: a

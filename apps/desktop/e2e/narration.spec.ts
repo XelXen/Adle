@@ -76,12 +76,10 @@ test.describe('narration aloud', () => {
 
     if (voices.length === 0) {
       // No voice here: said plainly, and lessons still work, as text.
-      await expect(page.getByText('No voice was found on this computer')).toBeVisible();
+      await expect(page.getByText('No voice found')).toBeVisible();
       await openSampleLesson(page);
       await expect(
-        page.getByText(
-          'No voice is installed on this computer, so the narration is shown as text.',
-        ),
+        page.getByText('No voice is installed, so narration is shown as text.'),
       ).toBeVisible();
       await expect(page.getByRole('button', { name: 'Read aloud' })).toHaveCount(0);
       await page.getByRole('button', { name: 'Start', exact: true }).click();
@@ -93,7 +91,7 @@ test.describe('narration aloud', () => {
     const voice = page.getByRole('combobox', { name: 'Voice' });
     await expect(voice).toBeVisible();
     await expect(voice.getByRole('option')).toHaveCount(voices.length + 1);
-    await expect(page.getByText('Reading aloud sends nothing anywhere.')).toBeVisible();
+    await expect(page.getByText('Nothing is sent anywhere.')).toBeVisible();
 
     // Silent for the rest of this test: the voice still speaks, nothing is heard.
     const volume = page.getByRole('slider', { name: 'Volume' });
@@ -154,7 +152,7 @@ test.describe('narration aloud', () => {
     // Leaving a lesson never leaves a voice talking.
     await aloud.click();
     await expect.poll(() => page.evaluate(() => speechSynthesis.speaking)).toBe(true);
-    await page.getByRole('button', { name: 'Back to the course' }).click();
+    await page.getByRole('button', { name: 'Back to course' }).click();
     await expect.poll(() => page.evaluate(() => speechSynthesis.speaking)).toBe(false);
 
     await page.getByRole('button', { name: 'Settings' }).click();

@@ -21,7 +21,18 @@ export interface CoreProcessOptions {
   /** How long a start may take when it has a copy to restore first. */
   restoreTimeoutMs?: number;
   stopTimeoutMs?: number;
+  /**
+   * What a core that has just come up must be given before anything else may use it (the
+   * learner's choice of provider and their keys). It runs on every start, before "ready"
+   * is said to anyone, so no request can reach a core that does not have them yet. If it
+   * fails, so does the start.
+   */
+  afterReady?: (connection: CoreConnection) => Promise<void>;
 }
+
+const NOT_PREPARED =
+  'Adle couldn’t give its background service your AI provider settings, so it was not started. ' +
+  'Restart it from Settings, under About.';
 
 const DEFAULT_READY_TIMEOUT_MS = 30_000;
 /** A start that first restores a copy checks, copies, and upgrades a whole database. */
@@ -199,7 +210,8 @@ export class CoreProcess extends EventEmitter<{
       mkdirSync(this.options.dataDir, { recursive: true });
       this.logStream = this.openLog();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'The core service could not start.';
+      const message =
+        error instanceof Error ? error.message : 'Adle’s background service couldn’t start.';
       this.setStatus({ state: 'failed', message });
       return Promise.resolve(this.currentStatus);
     }
@@ -235,7 +247,7 @@ export class CoreProcess extends EventEmitter<{
         ? (this.options.restoreTimeoutMs ?? DEFAULT_RESTORE_TIMEOUT_MS)
         : (this.options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS);
       const readyTimer = setTimeout(() => {
-        settle({ state: 'failed', message: 'The core service took too long to start.' });
+        settle({ state: 'failed', message: 'Adle took too long to start.' });
         child.kill();
       }, patience);
 
@@ -251,8 +263,22 @@ export class CoreProcess extends EventEmitter<{
           const event = parseProtocolLine(line);
           if (event?.event === 'ready') {
             this.restoreReport = event.restore;
-            this.connection = { baseUrl: `http://127.0.0.1:${event.port}`, token };
-            settle({ state: 'ready', version: event.version });
+            const connection = { baseUrl: `http://127.0.0.1:${event.port}`, token };
+            const version = event.version;
+            void (async () => {
+              try {
+                await this.options.afterReady?.(connection);
+              } catch {
+                if (settled) return;
+                settle({ state: 'failed', message: NOT_PREPARED });
+                child.kill();
+                return;
+              }
+              // It may have given up or gone meanwhile; then it is not ready after all.
+              if (settled) return;
+              this.connection = connection;
+              settle({ state: 'ready', version });
+            })();
           } else if (event?.event === 'fatal') {
             settle({ state: 'failed', message: event.message });
           }
@@ -262,7 +288,7 @@ export class CoreProcess extends EventEmitter<{
       child.once('error', (error) => {
         settle({
           state: 'failed',
-          message: `The core service could not be started (${error.name}).`,
+          message: `Adle’s background service couldn’t start (${error.name}).`,
         });
       });
 
@@ -274,12 +300,12 @@ export class CoreProcess extends EventEmitter<{
         if (!settled) {
           settle({
             state: 'failed',
-            message: `The core service stopped while starting (exit code ${code ?? 'unknown'}).`,
+            message: `Adle’s background service stopped while starting (exit code ${code ?? 'unknown'}).`,
           });
         } else if (!this.stopping && this.currentStatus.state === 'ready') {
           this.setStatus({
             state: 'failed',
-            message: 'The core service stopped unexpectedly. Your saved progress is safe.',
+            message: 'Adle’s background service stopped unexpectedly. Your saved progress is safe.',
           });
           // Nobody asked it to stop. Whoever supervises may want to start it again.
           this.emit('stopped-unexpectedly');

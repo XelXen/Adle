@@ -37,9 +37,9 @@ import {
   parseImportPaths,
   SOURCE_FILE_EXTENSIONS,
 } from './imports';
-import { noticeFor, parseNoticeKind, shouldNotify } from './notices';
+import { noticeFor, NoticePace, parseNoticeKind, shouldNotify } from './notices';
 import { paths } from './paths';
-import { type KnownProvider, readProviders, syncProviders } from './providers';
+import { type KnownProvider, readProviders } from './providers';
 import {
   parseProviderId,
   type ProviderKeyStore,
@@ -188,14 +188,14 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     try {
       mkdirSync(deps.logsDir, { recursive: true });
     } catch {
-      return failure('not_opened', 'The folder could not be opened.');
+      return failure('not_opened', 'Couldn’t open the folder.');
     }
     const problem = await shell.openPath(deps.logsDir);
-    return problem
-      ? failure('not_opened', 'The folder could not be opened.')
-      : { ok: true, data: null };
+    return problem ? failure('not_opened', 'Couldn’t open the folder.') : { ok: true, data: null };
   });
 
+  const noticePace = new NoticePace();
+  const openNotices = new Set<Notification>();
   handle(IPC.appNotify, (candidate: unknown): boolean => {
     // The page says what kind of thing happened. The words are chosen here.
     const kind = parseNoticeKind(candidate);
@@ -206,10 +206,16 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       enabled: uiState.get().notifications,
       supported: Notification.isSupported(),
       focused: open && window.isFocused(),
+      justShown: noticePace.justShown(kind),
     });
     if (!show) return false;
     const notice = new Notification({ ...noticeFor(kind), icon: paths.windowIcon });
+    // Held until it is gone: a notification nothing refers to can be cleared away
+    // together with what happens when it is clicked.
+    openNotices.add(notice);
+    notice.on('close', () => openNotices.delete(notice));
     notice.on('click', () => {
+      openNotices.delete(notice);
       // Bring back the window the learner already has; never open a second one.
       const current = deps.getWindow();
       if (!current || current.isDestroyed()) return;
@@ -217,15 +223,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       current.focus();
     });
     notice.show();
+    noticePace.shown(kind);
     return true;
   });
 
   handle(IPC.coreStatus, () => core.status);
-  handle(IPC.coreRestart, async () => {
-    const status = await core.restart();
-    if (status.state === 'ready') await syncProviders(deps);
-    return status;
-  });
+  handle(IPC.coreRestart, () => core.restart());
 
   handle(IPC.coreInvoke, async (operation: unknown, params: unknown): Promise<CoreResult> => {
     const request = parseInvokeRequest(operation, params);
@@ -256,7 +259,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     if (!id) {
       return {
         ok: false,
-        error: failure('invalid_request', 'Adle does not know that AI provider.'),
+        error: failure('invalid_request', 'Unknown AI provider.'),
       };
     }
     const all = (await readProviders(core))?.providers;
@@ -266,8 +269,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         ok: false,
         error: failure(
           'provider_unknown',
-          'Adle could not check which AI provider that is, so nothing was changed. ' +
-            'Try again in a moment.',
+          'Couldn’t check that AI provider, so nothing changed. Try again in a moment.',
         ),
       };
     }
@@ -297,7 +299,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         if (error instanceof SecureStorageUnavailableError) {
           return failure('secure_storage_unavailable', error.message);
         }
-        return failure('key_not_saved', 'The key could not be saved on this computer.');
+        return failure('key_not_saved', 'Couldn’t save the key on this computer.');
       }
       const pushed = await callCore(core.getConnection(), OPERATIONS['provider.set_credential'], {
         body: { api_key: apiKey, provider_id: provider.id },
@@ -308,10 +310,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   );
 
   registerImportHandlers(core, handle);
-  registerDataHandlers(
-    { core, dataDir: deps.dataDir, afterStart: () => syncProviders(deps) },
-    handle,
-  );
+  registerDataHandlers({ core, dataDir: deps.dataDir }, handle);
 
   handle(
     IPC.providerClearApiKey,
@@ -360,7 +359,7 @@ async function startImport(
   candidatePaths: unknown,
 ): Promise<CoreResult<ImportJob>> {
   const id = parseCourseId(courseId);
-  if (!id) return failure('invalid_request', 'That course could not be found.');
+  if (!id) return failure('invalid_request', 'Couldn’t find that course.');
   const parsed = parseImportPaths(candidatePaths);
   if (!parsed.ok) return failure(parsed.code, parsed.message);
   const result = await callCore(core.getConnection(), OPERATIONS['sources.import_paths'], {
@@ -380,8 +379,7 @@ function registerImportHandlers(
   handle(
     IPC.sourcesImportWithPicker,
     async (courseId: unknown): Promise<CoreResult<ImportJob | null>> => {
-      if (!parseCourseId(courseId))
-        return failure('invalid_request', 'That course could not be found.');
+      if (!parseCourseId(courseId)) return failure('invalid_request', 'Couldn’t find that course.');
       const owner = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = {
         title: 'Add course materials',

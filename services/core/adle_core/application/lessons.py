@@ -108,8 +108,8 @@ def _read_lesson(row: StoredLesson) -> Lesson:
         return Lesson.model_validate(row.document)
     except ValueError as error:  # includes pydantic's ValidationError
         raise LessonOutdatedError(
-            "This lesson was made by a different version of Adle and cannot be "
-            "played as it is. Create it again to continue."
+            "This lesson was made by a different version of Adle and can’t be played. Create it "
+            "again to continue."
         ) from error
 
 
@@ -118,7 +118,8 @@ def _read_scene(row: StoredScene) -> SceneArtifact | None:
     document = row.document
     try:
         return inspect_scene(row.scene_id, document["purpose"], document["source"])
-    except (KeyError, TypeError, ValueError, SceneRejectedError):
+    except (KeyError, TypeError, ValueError, SceneRejectedError, RecursionError, MemoryError):
+        # A stored scene that cannot even be examined is withheld like one that may not run.
         return None
 
 

@@ -50,15 +50,29 @@ export async function readProviders(
   return status.ok ? parseProviders(status.data) : null;
 }
 
+/** The learner's choice of provider could not be given to the core, so no key was either. */
+export class ProviderChoiceNotAppliedError extends Error {
+  constructor() {
+    super('The choice of AI provider could not be handed to the core.');
+    this.name = 'ProviderChoiceNotAppliedError';
+  }
+}
+
 /**
- * Give a freshly started core what it does not keep itself: the key stored for each of
- * its providers, and what the learner chose.
+ * Give a freshly started core what it does not keep itself: what the learner chose, and
+ * the key stored for each of its providers.
+ *
+ * The choice goes first, and a key only once the core has it. A core starts on
+ * "automatic"; handed the keys first, it would for a moment be free to use every provider
+ * the learner has a key for, whatever they chose, and for good if the choice then failed
+ * to arrive. So: no choice applied, no keys, and the caller is told (it throws).
  *
  * A key is handed over only for the provider and the address it was stored for, so the
- * core is never given a key for somewhere else. A choice of one provider is handed over
- * only if the core offers that provider; it is never replaced by another because of
- * that. A learner who has never chosen is left with what the core starts with:
- * "automatic", which with one key is simply that provider.
+ * core is never given a key for somewhere else. A choice of one provider that the core
+ * does not offer (a developer's other endpoint) is kept and never replaced by another:
+ * the core is then given no key at all, since any key would be used in its place. A
+ * learner who has never chosen has "automatic", which with one key is simply that
+ * provider.
  */
 export async function syncProviders(deps: {
   core: Pick<CoreProcess, 'getConnection'>;
@@ -67,21 +81,21 @@ export async function syncProviders(deps: {
   const known = await readProviders(deps.core);
   if (!known) return;
   const { providers } = known;
+  const chosen = deps.keyStore.selected() ?? PROVIDER_AUTOMATIC;
+  const offered =
+    chosen === PROVIDER_AUTOMATIC || providers.some((provider) => provider.id === chosen);
+  if (!offered) return;
+  if (chosen !== known.selection) {
+    const applied = await callCore(deps.core.getConnection(), OPERATIONS['provider.select'], {
+      body: { selection: chosen },
+    });
+    if (!applied.ok) throw new ProviderChoiceNotAppliedError();
+  }
   for (const provider of providers) {
     const key = deps.keyStore.load(provider.id, provider.address);
     if (!key) continue;
     await callCore(deps.core.getConnection(), OPERATIONS['provider.set_credential'], {
       body: { api_key: key, provider_id: provider.id },
-    });
-  }
-  const chosen = deps.keyStore.selected();
-  if (!chosen || chosen === known.selection) return;
-  // A choice the core does not offer (a developer's other endpoint) is kept, and not used.
-  const offered =
-    chosen === PROVIDER_AUTOMATIC || providers.some((provider) => provider.id === chosen);
-  if (offered) {
-    await callCore(deps.core.getConnection(), OPERATIONS['provider.select'], {
-      body: { selection: chosen },
     });
   }
 }

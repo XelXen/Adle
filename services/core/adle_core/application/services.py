@@ -6,7 +6,10 @@ Built once at startup and attached to the FastAPI app. Handlers receive it via
 
 from __future__ import annotations
 
+import contextlib
+import secrets
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx2 as httpx
 from fastapi import Request
@@ -33,6 +36,7 @@ from adle_core.infrastructure.asset_store import AssetStore
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.migrate import MigrationOutcome, migrate
 from adle_core.ingestion.extract import Extractor, extract_isolated
+from adle_core.lessons.player import ItemMask
 
 
 @dataclass(slots=True)
@@ -50,6 +54,9 @@ class Services:
     learner: LearnerService
     lessons: LessonService
     asks: AskService
+    #: Names the items of an ordering question so that their ids, which are its answer,
+    #: are never shown.
+    item_mask: ItemMask
     assessment: AssessmentService
     learning: LearningService
     sample_course: SampleCourseService
@@ -63,6 +70,25 @@ class Services:
         for client in self.provider_clients:
             client.close()
         self.database.dispose()
+
+
+def _installation_secret(path: Path) -> bytes:
+    """Thirty-two random bytes that stay the same for this installation.
+
+    Kept beside the database so that a lesson left open keeps working when the service
+    starts again. It protects nothing worth more than the answer to a question, so a
+    folder that cannot be written to is not an error: the secret then lasts for this run.
+    """
+    try:
+        found = path.read_bytes()
+        if len(found) >= 32:
+            return found
+    except OSError:
+        pass
+    made = secrets.token_bytes(32)
+    with contextlib.suppress(OSError):
+        path.write_bytes(made)
+    return made
 
 
 def build_services(
@@ -95,6 +121,7 @@ def build_services(
     lessons = LessonService(database)
     asks = AskService(database)
     learner = LearnerService(database)
+    item_mask = ItemMask(_installation_secret(settings.item_key_path))
     # One vault, and one client for each provider. A client asks the vault for its own
     # provider's key and for no other, and only ever talks to its own address. The
     # learner's choice starts as "automatic": whichever providers they give a key to.
@@ -120,8 +147,9 @@ def build_services(
         learner=learner,
         lessons=lessons,
         asks=asks,
-        assessment=AssessmentService(database, lessons, learner),
-        learning=LearningService(database, curriculum, learner, credentials),
+        item_mask=item_mask,
+        assessment=AssessmentService(database, lessons, learner, item_mask),
+        learning=LearningService(database, curriculum, learner, credentials, item_mask),
         sample_course=SampleCourseService(database, courses, curriculum, lessons),
         provider_clients=provider_clients,
         gateway=gateway,

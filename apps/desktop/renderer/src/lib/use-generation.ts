@@ -4,6 +4,7 @@ import type { Job } from '@adle/contracts';
 import { useToast } from '@adle/design-system';
 
 import { callCore, describeError } from './core-client';
+import { useWriting } from '../app/WritingContext';
 import { type JobFailure, refusalOf } from './generation';
 import { type CourseJobs, useCourseJobs } from './use-course-jobs';
 
@@ -28,6 +29,7 @@ export interface Generation {
 export function useGeneration(courseId: string, onFinished: (job: Job) => void): Generation {
   const toast = useToast();
   const jobs = useCourseJobs(courseId, onFinished);
+  const { refresh } = useWriting();
   const [starting, setStarting] = useState<ReadonlySet<string>>(new Set());
   const [refusals, setRefusals] = useState<ReadonlyMap<string, JobFailure>>(new Map());
   const { track, forget } = jobs;
@@ -47,6 +49,9 @@ export function useGeneration(courseId: string, onFinished: (job: Job) => void):
       setStarting((current) => new Set(current).add(subject));
       try {
         track(await start());
+        // The app-wide watch learns of it now, not at its next look: work that fails within
+        // seconds, after the learner has gone elsewhere, is then still said.
+        refresh();
       } catch (error) {
         setRefusals((current) => new Map(current).set(subject, refusalOf(error)));
       } finally {
@@ -57,7 +62,7 @@ export function useGeneration(courseId: string, onFinished: (job: Job) => void):
         });
       }
     },
-    [clearRefusal, track],
+    [clearRefusal, track, refresh],
   );
 
   const putAway = useCallback(
@@ -74,7 +79,7 @@ export function useGeneration(courseId: string, onFinished: (job: Job) => void):
       callCore('jobs.cancel', { path: { job_id: job.id } }).catch((error: unknown) => {
         toast.show({
           tone: 'danger',
-          title: 'It could not be cancelled',
+          title: 'Couldn’t cancel',
           description: describeError(error),
         });
       });

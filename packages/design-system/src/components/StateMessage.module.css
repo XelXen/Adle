@@ -24,7 +24,9 @@
   box-shadow: var(--ad-shadow-1);
 }
 
-.visual svg {
+/* Only an icon placed straight into the emblem is sized here. A spinner brings its own size,
+   and resizing the drawing inside it would push it out of the middle. */
+.visual > svg {
   width: 1.375rem;
   height: 1.375rem;
   stroke-width: 1.5;

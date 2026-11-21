@@ -42,7 +42,7 @@ export function parseImportPaths(value: unknown): ImportPathsResult {
       entry.includes('\0') ||
       !path.isAbsolute(entry)
     ) {
-      return { ok: false, code: 'invalid_request', message: 'One of the files could not be used.' };
+      return { ok: false, code: 'invalid_request', message: 'One of the files can’t be used.' };
     }
     paths.push(entry);
   }

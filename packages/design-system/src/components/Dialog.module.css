@@ -1,6 +1,16 @@
 .dialog {
   width: min(28rem, calc(100vw - var(--ad-space-6)));
-  max-height: calc(100vh - var(--ad-space-6));
+
+  /* A dialog is centred, so what it leaves free is shared above and below it: twice the
+     window's strip keeps its top clear of where the window is moved and of the window's
+     own buttons. */
+  max-height: calc(
+    100vh - max(var(--ad-space-6), 2 * var(--ad-layout-titlebar-height) + var(--ad-space-3))
+  );
+
+  /* And wherever it lies, a press on it is a press on it, never a hold on the window. */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
   padding: 0;
   border: var(--ad-border-width) solid var(--ad-color-border);
   border-radius: var(--ad-radius-large);
@@ -14,6 +24,11 @@
 }
 
 .dialog::backdrop {
+  /* The dimming starts below the strip the window is moved by. That strip and the window's
+     own buttons in it belong to the window: dimmed around them, the buttons stood out as a
+     bright block in the corner. A hair more than the strip (and still nothing where there
+     is no strip): at some display scales the buttons are drawn a pixel taller than it. */
+  top: calc(var(--ad-layout-titlebar-height) * 1.03);
   background: var(--ad-color-overlay);
   backdrop-filter: blur(3px);
 }

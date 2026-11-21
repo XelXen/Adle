@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type HostMessage, isPlayerOrigin, type PlayerMessage } from '@adle/event-protocol';
 
-import { type PlayerStatus, WanimPlayerAdapter } from './WanimPlayerAdapter';
+import {
+  MESSAGE_BUDGET_PER_SECOND,
+  type PlayerStatus,
+  WanimPlayerAdapter,
+} from './WanimPlayerAdapter';
 
 /**
  * The real frame needs Electron's custom protocol, so these tests stand in for
@@ -266,6 +270,74 @@ describe('WanimPlayerAdapter', () => {
     const loads = h.sent.filter((message) => message.type === 'load');
     expect(loads).toHaveLength(2);
     expect(loads[1]).toMatchObject({ theme: 'dark' });
+  });
+
+  it('ends a scene that floods it with messages, and lets a busy one be', () => {
+    const h = harness();
+    const failures: { stage: string }[] = [];
+    const events: unknown[] = [];
+    h.adapter.on('failure', (failure) => failures.push(failure));
+    h.adapter.on('scene-event', (event) => events.push(event));
+    h.adapter.load(SCENE);
+    h.hook();
+    h.ready();
+    const event = { type: 'scene-event', runId: h.runId(), name: 'explored', value: 1 };
+
+    // As many as a scene could have reason to send, second after second: nothing happens.
+    for (let second = 0; second < 3; second += 1) {
+      for (let sent = 0; sent < MESSAGE_BUDGET_PER_SECOND - 1; sent += 1) h.player(event);
+      vi.advanceTimersByTime(1000);
+    }
+    expect(failures).toEqual([]);
+    expect(events).toHaveLength(3 * (MESSAGE_BUDGET_PER_SECOND - 1));
+
+    // A flood, of nonsense as much as of anything else: the scene is ended, once.
+    const element = h.frame();
+    const origin = new URL(element.src).protocol + '//' + new URL(element.src).host;
+    const flood = (data: unknown): void => {
+      window.dispatchEvent(
+        new MessageEvent('message', { data, origin, source: element.contentWindow }),
+      );
+    };
+    for (let sent = 0; sent < MESSAGE_BUDGET_PER_SECOND + 50; sent += 1) flood('nonsense');
+    expect(failures).toEqual([{ stage: 'runtime', message: expect.stringContaining('messages') }]);
+    expect(h.adapter.status).toBe('failed');
+    expect(h.container.querySelector('iframe')).toBeNull();
+
+    // Somebody else's flood is not held against a scene.
+    const other = harness();
+    other.adapter.on('failure', (failure) => failures.push(failure));
+    other.adapter.load(SCENE);
+    other.hook();
+    other.ready();
+    for (let sent = 0; sent < MESSAGE_BUDGET_PER_SECOND + 50; sent += 1) {
+      other.fromPlayer('nonsense', { origin: 'https://evil.example' });
+      other.fromPlayer('nonsense', { source: window });
+    }
+    expect(failures).toHaveLength(1);
+    expect(other.adapter.status).toBe('loading');
+  });
+
+  it('gives the next scene a second of its own', () => {
+    const h = harness();
+    h.adapter.load(SCENE);
+    h.hook();
+    h.ready();
+    const first = h.frame();
+    const origin = new URL(first.src).protocol + '//' + new URL(first.src).host;
+    for (let sent = 0; sent < MESSAGE_BUDGET_PER_SECOND + 1; sent += 1) {
+      window.dispatchEvent(
+        new MessageEvent('message', { data: 'x', origin, source: first.contentWindow }),
+      );
+    }
+    expect(h.adapter.status).toBe('failed');
+
+    // Straight away, in the same second: the count does not come along.
+    h.adapter.load(SCENE);
+    h.hook();
+    h.ready();
+    h.player({ type: 'loaded', runId: h.runId(), sceneName: 'Demo', loadMs: 10 });
+    expect(h.adapter.status).toBe('playing');
   });
 
   it('removes the frame and goes quiet on dispose', () => {

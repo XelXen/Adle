@@ -61,13 +61,13 @@ export type ParsedSavePath =
 /** Check where a copy is to be saved, as the save dialog returned it. */
 export function parseSavePath(candidate: unknown, dataDir: string): ParsedSavePath {
   const chosen = usablePath(candidate);
-  if (!chosen) return { ok: false, message: 'That file name cannot be used.' };
+  if (!chosen) return { ok: false, message: 'That file name can’t be used.' };
   // Not every save dialog adds the extension of its filter (GTK's does not).
   const amended = path.extname(chosen).toLowerCase() !== `.${COPY_EXTENSION}`;
   const target = amended ? `${chosen}.${COPY_EXTENSION}` : chosen;
   // A copy kept inside the folder it is a copy of would be deleted or replaced with it.
   if (isInside(dataDir, target)) {
-    return { ok: false, message: "Choose a place outside Adle's own data folder." };
+    return { ok: false, message: 'Choose a place outside Adle’s own data folder.' };
   }
   return { ok: true, path: target, amended };
 }
@@ -81,7 +81,7 @@ export type ParsedRestorePath = { ok: true; path: string } | { ok: false; messag
  */
 export function parseRestorePath(candidate: unknown): ParsedRestorePath {
   const chosen = usablePath(candidate);
-  if (!chosen) return { ok: false, message: 'That file cannot be used.' };
+  if (!chosen) return { ok: false, message: 'That file can’t be used.' };
   const extension = path.extname(chosen).toLowerCase();
   if (extension !== `.${COPY_EXTENSION}` && extension !== `.${SAFETY_COPY_EXTENSION}`) {
     return {

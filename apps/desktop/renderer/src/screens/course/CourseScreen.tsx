@@ -59,7 +59,7 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
   if (course.resource.status === 'loading') {
     return (
       <Page title="Course" eyebrow={backToLibrary}>
-        <LoadingState title="Opening the course…" />
+        <LoadingState title="Opening course…" />
       </Page>
     );
   }
@@ -71,12 +71,12 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
     return (
       <Page title="Course" eyebrow={backToLibrary}>
         <ErrorState
-          title={missing ? 'This course no longer exists' : 'The course could not be opened'}
+          title={missing ? 'This course no longer exists' : 'Couldn’t open the course'}
           description={missing ? 'It may have been deleted.' : describeError(course.resource.error)}
           actions={
             missing ? (
               <Button variant="primary" onClick={() => navigate({ name: 'home' })}>
-                Back to the library
+                Back to library
               </Button>
             ) : (
               <Button onClick={course.reload}>Try again</Button>
@@ -98,7 +98,7 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
     } catch (error) {
       toast.show({
         tone: 'danger',
-        title: 'The course could not be deleted',
+        title: 'Couldn’t delete the course',
         description: describeError(error),
       });
       setDeleting(false);
@@ -152,12 +152,12 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
         open={confirmingDelete}
         onClose={() => setConfirmingDelete(false)}
         title={`Delete “${data.title}”?`}
-        description="This permanently removes the course, its imported materials, and your progress in it from this computer. The original files you imported from are not touched. This cannot be undone."
+        description="This permanently removes the course, its materials, and your progress. Your original files aren’t touched."
         dismissible={!deleting}
         actions={
           <>
             <Button onClick={() => setConfirmingDelete(false)} disabled={deleting}>
-              Keep course
+              Cancel
             </Button>
             <Button variant="destructive" loading={deleting} onClick={() => void deleteCourse()}>
               Delete course

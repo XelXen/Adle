@@ -83,7 +83,7 @@ export const REST_IDEAS: readonly string[] = [
   'Get a glass of water.',
   'Take five slow breaths.',
   'Walk to a window and back.',
-  'Close your eyes for a moment, and say the last idea you learned in one sentence.',
+  'Close your eyes and sum up the last idea in one sentence.',
 ];
 
 /** One idea for each minute of a break, in turn, starting anywhere. */

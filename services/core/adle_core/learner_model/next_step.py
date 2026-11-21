@@ -43,10 +43,7 @@ MAX_ALTERNATIVES = 3
 MAX_LESSONS_PER_CONCEPT = 4
 
 #: Said beside any suggestion that comes from things going badly.
-PAUSE_NOTE = (
-    "It is also fine to stop here for today. Coming back after a break often helps more "
-    "than pushing on."
-)
+PAUSE_NOTE = "It’s also fine to stop for today. A break often helps more than pushing on."
 
 
 class StepKind(StrEnum):
@@ -162,7 +159,7 @@ def _days(span: timedelta) -> str:
 
 
 def _names(concepts: Sequence[ConceptStatus]) -> str:
-    titles = [f'"{concept.title}"' for concept in concepts]
+    titles = [f"“{concept.title}”" for concept in concepts]
     if len(titles) <= 2:
         return " and ".join(titles)
     return ", ".join(titles[:-1]) + f", and {titles[-1]}"
@@ -197,18 +194,18 @@ def _revisit(concept: ConceptStatus, weak: Sequence[ConceptStatus], why: str) ->
         if lesson is not None:
             return Step(
                 kind=StepKind.REVISIT_PREREQUISITE,
-                title=f'Go back to "{needed.title}"',
-                reason=f'{why} "{concept.title}" builds on "{needed.title}", '
-                "which is not solid yet. That is the place to look first.",
+                title=f"Revisit “{needed.title}”",
+                reason=f"{why} “{concept.title}” builds on “{needed.title}”, which isn’t solid "
+                "yet. Start there.",
                 concept_id=needed.id,
                 lesson_id=lesson.id,
             )
         if needed.fresh_questions > 0:
             return Step(
                 kind=StepKind.PRACTISE,
-                title=f'Practise "{needed.title}"',
-                reason=f'{why} "{concept.title}" builds on "{needed.title}", '
-                "which is not solid yet. A few questions on it come first.",
+                title=f"Practise “{needed.title}”",
+                reason=f"{why} “{concept.title}” builds on “{needed.title}”, which isn’t solid "
+                "yet. A few questions on it come first.",
                 concept_id=needed.id,
             )
     return None
@@ -220,17 +217,16 @@ def _another_way(concept: ConceptStatus, why: str, can_generate: bool) -> Step |
     if untried and concept.lesson_completed:
         return Step(
             kind=StepKind.START_LESSON,
-            title=f'Try "{untried[0].title}"',
-            reason=f"{why} There is another explanation of it that you have not tried yet.",
+            title=f"Try “{untried[0].title}”",
+            reason=f"{why} There’s another explanation you haven’t tried.",
             concept_id=concept.id,
             lesson_id=untried[0].id,
         )
     if concept.can_add_lesson:
         return Step(
             kind=StepKind.ANOTHER_EXPLANATION,
-            title=f'Try another explanation of "{concept.title}"',
-            reason=f"{why} A different way of explaining it may suit better "
-            "than going through the same lesson again.",
+            title=f"Try another explanation of “{concept.title}”",
+            reason=f"{why} A different explanation may work better than repeating the same lesson.",
             concept_id=concept.id,
             needs_key=not can_generate,
         )
@@ -256,8 +252,8 @@ def _untried(concept: ConceptStatus) -> tuple[Step, bool] | None:
     )
     step = Step(
         kind=StepKind.START_LESSON,
-        title=f'Try "{newest.title}"',
-        reason=f'There is another explanation of "{concept.title}" that you have not tried yet.',
+        title=f"Try “{newest.title}”",
+        reason=f"There’s another explanation of “{concept.title}” you haven’t tried.",
         concept_id=concept.id,
         lesson_id=newest.id,
     )
@@ -274,7 +270,7 @@ def _trouble(
     if concept.asked_for_another and not concept.demonstrated:
         # The learner asked. That comes before anything Adle infers.
         step = _another_way(
-            concept, f'You said an explanation of "{concept.title}" did not help.', can_generate
+            concept, f"You said an explanation of “{concept.title}” didn’t help.", can_generate
         )
         if step is not None:
             steps.append(step)
@@ -282,7 +278,7 @@ def _trouble(
     for hypothesis in concept.hypotheses:
         if not hypothesis.blocks_mastery:
             continue
-        why = f'More than one answer on "{concept.title}" suggests that {hypothesis.label}.'
+        why = f"More than one answer on “{concept.title}” suggests that {hypothesis.label}."
         if hypothesis.kind == "prerequisite_gap":
             revisit = _revisit(concept, weak, why)
             if revisit is not None:
@@ -292,7 +288,7 @@ def _trouble(
             steps.append(
                 Step(
                     kind=StepKind.CHECK,
-                    title=f'Check "{concept.title}"',
+                    title=f"Check “{concept.title}”",
                     reason=f"{why} A few questions will show whether it still holds.",
                     concept_id=concept.id,
                     about=hypothesis.kind,
@@ -300,7 +296,7 @@ def _trouble(
             )
 
     if concept.struggling and not concept.demonstrated:
-        why = f'The last few answers on "{concept.title}" did not go well.'
+        why = f"Your last few answers on “{concept.title}” didn’t go well."
         # More of the same lesson is the one thing not to suggest here.
         step = _revisit(concept, weak, why) or _another_way(concept, why, can_generate)
         if step is not None:
@@ -316,9 +312,9 @@ def _review(concept: ConceptStatus, now: datetime) -> Step | None:
     when = "is due today" if overdue < timedelta(days=1) else f"was due {_days(overdue)} ago"
     return Step(
         kind=StepKind.REVIEW,
-        title=f'Review "{concept.title}"',
-        reason=f'A review of "{concept.title}" {when}. Answering from memory after a gap '
-        "is what makes it last.",
+        title=f"Review “{concept.title}”",
+        reason=f"A review of “{concept.title}” {when}. Recalling it after a gap is what makes it "
+        "stick.",
         concept_id=concept.id,
     )
 
@@ -332,9 +328,9 @@ def _suspicion(concept: ConceptStatus) -> Step | None:
         ):
             return Step(
                 kind=StepKind.CHECK,
-                title=f'Check "{concept.title}"',
-                reason=f'One answer on "{concept.title}" suggested that {hypothesis.label}. '
-                "One answer is not enough to say; a question or two would show it.",
+                title=f"Check “{concept.title}”",
+                reason=f"One answer on “{concept.title}” suggested that {hypothesis.label}. A "
+                "question or two will check.",
                 concept_id=concept.id,
                 about=hypothesis.kind,
             )
@@ -365,8 +361,8 @@ def _practise(concept: ConceptStatus) -> Step | None:
     needed = "; ".join(within_reach)
     return Step(
         kind=StepKind.PRACTISE,
-        title=f'Practise "{concept.title}"',
-        reason=f'"{concept.title}" is at "{STATE_LABELS[concept.state]}".'
+        title=f"Practise “{concept.title}”",
+        reason=f"“{concept.title}” is at “{STATE_LABELS[concept.state]}”."
         + (f" Still needed: {needed}." if needed else ""),
         concept_id=concept.id,
     )
@@ -390,32 +386,32 @@ def _advance(
         # The earlier concept will be suggested in its own right; this one waits.
         return None
     builds_on = (
-        f"It builds on {_names(needs)}, which you have worked through."
+        f"It builds on {_names(needs)}, which you’ve covered."
         if needs
-        else "It needs nothing first."
+        else "It has no prerequisites."
     )
     if concept.claims_familiarity and concept.answered == 0 and concept.fresh_questions > 0:
         # They say they know it. Checking is quicker than teaching it again, and kinder.
         return Step(
             kind=StepKind.PRACTISE,
-            title=f'Check what you know of "{concept.title}"',
-            reason=f'You said you already know "{concept.title}". A few questions will show '
-            "it, and then its lesson can be skipped.",
+            title=f"Check what you know about “{concept.title}”",
+            reason=f"You said you already know “{concept.title}”. A few questions will confirm "
+            "it, and then you can skip the lesson.",
             concept_id=concept.id,
         )
     lesson = _lesson_for(concept)
     if lesson is None:
         return Step(
             kind=StepKind.CREATE_LESSON,
-            title=f'Create a lesson for "{concept.title}"',
-            reason=f'"{concept.title}" is next in your course and has no lesson yet. {builds_on}',
+            title=f"Create a lesson for “{concept.title}”",
+            reason=f"“{concept.title}” is next in your course and has no lesson yet. {builds_on}",
             concept_id=concept.id,
             needs_key=not can_generate,
         )
     return Step(
         kind=StepKind.START_LESSON,
-        title=f'Start "{lesson.title}"',
-        reason=f'"{concept.title}" is next in your course. {builds_on}',
+        title=f"Start “{lesson.title}”",
+        reason=f"“{concept.title}” is next in your course. {builds_on}",
         concept_id=concept.id,
         lesson_id=lesson.id,
     )
@@ -427,16 +423,13 @@ def _nothing(order: Sequence[ConceptStatus], now: datetime) -> Step:
         key=lambda concept: concept.review_due_at or now,
     )
     if all(concept.demonstrated for concept in order):
-        reason = "You have shown every concept in this course, for now."
+        reason = "You’ve covered every concept in this course for now."
     else:
-        reason = (
-            "Nothing here is worth doing right now: "
-            "what you answered recently needs time to settle."
-        )
+        reason = "Nothing to do right now. What you answered recently needs time to settle."
     if upcoming:
         first = upcoming[0]
         wait = (first.review_due_at or now) - now
-        reason += f' The next review is "{first.title}", in {_days(wait)}.'
+        reason += f" Next review: “{first.title}”, in {_days(wait)}."
     return Step(kind=StepKind.NOTHING_DUE, title="Nothing is due", reason=reason)
 
 
@@ -447,7 +440,7 @@ def plan(order: Sequence[ConceptStatus], now: datetime, *, can_generate: bool) -
             Step(
                 kind=StepKind.ADD_CONCEPTS,
                 title="Add concepts",
-                reason="This course has no concepts yet, so there is nothing to learn in it.",
+                reason="This course has no concepts yet.",
             )
         )
     by_id = {concept.id: concept for concept in order}
@@ -474,8 +467,8 @@ def plan(order: Sequence[ConceptStatus], now: datetime, *, can_generate: bool) -
     for lesson, concept in in_progress:
         resume = Step(
             kind=StepKind.RESUME_LESSON,
-            title=f'Continue "{lesson.title}"',
-            reason="You stopped part-way through this lesson.",
+            title=f"Continue “{lesson.title}”",
+            reason="You stopped partway through this lesson.",
             concept_id=concept.id,
             lesson_id=lesson.id,
         )
@@ -517,8 +510,8 @@ def plan(order: Sequence[ConceptStatus], now: datetime, *, can_generate: bool) -
                 Step(
                     kind=StepKind.REPEAT_LESSON,
                     title=f'Go through "{finished[-1].title}" again',
-                    reason=f'You have finished this lesson, and "{concept.title}" is at '
-                    f'"{STATE_LABELS[concept.state]}".',
+                    reason=f"You’ve finished this lesson, and “{concept.title}” is at "
+                    f"“{STATE_LABELS[concept.state]}”.",
                     concept_id=concept.id,
                     lesson_id=finished[-1].id,
                 )
@@ -579,33 +572,33 @@ def practice_purpose(
         if target.status is Status.SUPPORTED:
             return (
                 PracticePurpose.CHECK,
-                f'More than one answer on "{concept.title}" suggests that {target.label}. '
-                "These questions will show whether it still holds.",
+                f"More than one answer on “{concept.title}” suggests that {target.label}. These "
+                "questions will show whether it still holds.",
             )
         return (
             PracticePurpose.CHECK,
-            f'One answer on "{concept.title}" suggested that {target.label}. '
-            "One answer is not enough to say; these questions would show it.",
+            f"One answer on “{concept.title}” suggested that {target.label}. These questions will "
+            "check.",
         )
     if concept.claims_familiarity and concept.answered == 0:
         return (
             PracticePurpose.PRACTISE,
-            f'You said you already know "{concept.title}". These questions will show it.',
+            f"You said you already know “{concept.title}”. These questions will confirm it.",
         )
     label = STATE_LABELS[concept.state]
     if concept.demonstrated:
         return (
             PracticePurpose.PRACTISE,
-            f'"{concept.title}" is at "{label}". This is extra practice.',
+            f"“{concept.title}” is at “{label}”. This is extra practice.",
         )
     needed = "; ".join(_within_reach(concept))
     if concept.missing and not needed:
         return (
             PracticePurpose.PRACTISE,
-            f'"{concept.title}" is at "{label}". The question that would settle it can be '
-            "asked again later; this is extra practice in the meantime.",
+            f"“{concept.title}” is at “{label}”. The question that would settle it can be asked "
+            "again later. This is extra practice in the meantime.",
         )
     return (
         PracticePurpose.PRACTISE,
-        f'"{concept.title}" is at "{label}".' + (f" Still needed: {needed}." if needed else ""),
+        f"“{concept.title}” is at “{label}”." + (f" Still needed: {needed}." if needed else ""),
     )

@@ -65,17 +65,17 @@ export function stepAction(step: NextStep, courseId: string): StepAction {
       if (step.needs_key) {
         return {
           type: 'navigate',
-          label: 'Set up the AI provider',
+          label: 'Set up AI provider',
           route: { name: 'settings', tab: 'ai' },
         };
       }
       return step.concept_id
-        ? { type: 'generate', label: 'Create the lesson', conceptId: step.concept_id }
+        ? { type: 'generate', label: 'Create lesson', conceptId: step.concept_id }
         : { type: 'none' };
     case 'add_concepts':
       return {
         type: 'navigate',
-        label: 'Go to the curriculum',
+        label: 'Open curriculum',
         route: { name: 'course', courseId, tab: 'curriculum' },
       };
     case 'nothing_due':
@@ -100,7 +100,7 @@ export function formatWait(iso: string, now: Date = new Date()): string {
 
 /** When a concept is next worth reviewing, if a review is planned. */
 export function reviewNote(concept: ConceptProgress, now: Date = new Date()): string | null {
-  if (concept.review_due) return 'A review is due';
+  if (concept.review_due) return 'Review due';
   const due = concept.knowledge.review_due_at;
   return due ? `Next review ${formatWait(due, now)}` : null;
 }
@@ -109,9 +109,9 @@ export function reviewNote(concept: ConceptProgress, now: Date = new Date()): st
 export function summarySentence(summary: ProgressSummary): string {
   if (summary.concepts === 0) return 'This course has no concepts yet.';
   const parts = [
-    summary.demonstrated > 0 ? `${summary.demonstrated} demonstrated for now` : null,
+    summary.demonstrated > 0 ? `${summary.demonstrated} understood` : null,
     summary.in_progress > 0 ? `${summary.in_progress} in progress` : null,
-    summary.not_assessed > 0 ? `${summary.not_assessed} not assessed yet` : null,
+    summary.not_assessed > 0 ? `${summary.not_assessed} not started` : null,
   ].filter((part): part is string => part !== null);
   return `${pluralise(summary.concepts, 'concept')}: ${parts.join(', ')}.`;
 }
@@ -119,13 +119,9 @@ export function summarySentence(summary: ProgressSummary): string {
 /** What is due, or when something will be. Null when no review is planned at all. */
 export function reviewSentence(summary: ProgressSummary, now: Date = new Date()): string | null {
   if (summary.reviews_due > 0) {
-    return summary.reviews_due === 1
-      ? '1 review is due.'
-      : `${summary.reviews_due} reviews are due.`;
+    return summary.reviews_due === 1 ? '1 review due.' : `${summary.reviews_due} reviews due.`;
   }
-  return summary.next_review_at
-    ? `The next review is ${formatWait(summary.next_review_at, now)}.`
-    : null;
+  return summary.next_review_at ? `Next review ${formatWait(summary.next_review_at, now)}.` : null;
 }
 
 /**
@@ -168,9 +164,9 @@ export function shownSentence(
   const lighter = Math.max(0, line.right - line.right_unaided);
   let answers = `${pluralise(line.right, 'answer')} right`;
   if (lighter > 0) {
-    answers += line.right === 1 ? ', as lighter evidence' : `, ${lighter} of them lighter evidence`;
+    answers += line.right === 1 ? ', with help' : `, ${lighter} with help`;
   }
-  return line.demonstrated ? `${answers}. Demonstrated for now.` : `${answers}.`;
+  return line.demonstrated ? `${answers}. Understood.` : `${answers}.`;
 }
 
 /** Whether any line needs "lighter evidence" explained beneath it. */
@@ -181,13 +177,13 @@ export function hasLighterEvidence(
 }
 
 export const LIGHTER_EVIDENCE =
-  'Lighter evidence is a right answer after a hint, one you were unsure of or marked ' +
-  'yourself, or one to a question you had just seen explained. It still counts, for a little less.';
+  '“With help” means after a hint, when you weren’t sure, self-marked, or just after seeing ' +
+  'the explanation. It still counts, a little less.';
 
 /** When a planned review comes round, as a sentence. */
 export function reviewWhen(dueAt: string, now: Date = new Date()): string {
   const wait = formatWait(dueAt, now);
-  return wait === '' || wait === 'now' ? 'A review is due.' : `Review ${wait}.`;
+  return wait === '' || wait === 'now' ? 'Review due.' : `Review ${wait}.`;
 }
 
 export interface HypothesisLabel {
@@ -203,7 +199,7 @@ export function hypothesisLabel(hypothesis: Hypothesis): HypothesisLabel {
   }
   switch (hypothesis.status) {
     case 'tentative':
-      return { status: 'Suspected, not established', tone: 'info' };
+      return { status: 'Suspected', tone: 'info' };
     case 'supported':
       return { status: 'Seen more than once', tone: 'warning' };
     case 'resolved':
@@ -215,7 +211,7 @@ export function hypothesisLabel(hypothesis: Hypothesis): HypothesisLabel {
 
 const PURPOSE_TITLE: Record<PracticeSet['purpose'], string> = {
   review: 'Review',
-  check: 'A quick check',
+  check: 'Quick check',
   practise: 'Practice',
 };
 

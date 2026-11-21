@@ -9,7 +9,8 @@ export const KIND_PROPOSAL = 'curriculum_proposal';
 export const KIND_LESSON = 'lesson_generation';
 
 /**
- * Everything a request for a lesson contains, as a list to put after "Sends to <provider>:".
+ * Everything a request for a lesson contains, as a list to put between "Sends" and
+ * "to <provider>".
  *
  * This is a promise to the learner, made before anything is sent. Keep it in step with
  * `lesson_request` in the core (`generation/prompts.py`): if the request gains something,
@@ -19,15 +20,10 @@ export const KIND_LESSON = 'lesson_generation';
  */
 export function lessonDisclosure(materials: 'some' | 'none' | 'unknown'): string {
   const always =
-    "this course's name, this concept and its objectives, where you stand on it in a few " +
-    'words, your preferences for pace and depth';
-  if (materials === 'some') {
-    return `${always}, your goal, and a few related passages from your materials`;
-  }
-  if (materials === 'unknown') {
-    return `${always}, your goal, and any related passages from your materials`;
-  }
-  return `${always}, and your goal`;
+    'the course name, this concept and its objectives, and your level, preferences, and goal';
+  if (materials === 'some') return `${always}, plus a few passages from your materials`;
+  if (materials === 'unknown') return `${always}, plus any related passages from your materials`;
+  return always;
 }
 
 export interface ProposedNeed {
@@ -162,7 +158,7 @@ export interface JobFailure {
   remedy: 'settings' | 'retry' | 'wait';
 }
 
-const FALLBACK = 'Something went wrong. Nothing was changed; you can try again.';
+const FALLBACK = 'Something went wrong. Please try again.';
 
 function failure(code: string | null | undefined, message: string | null | undefined): JobFailure {
   const text = message || FALLBACK;

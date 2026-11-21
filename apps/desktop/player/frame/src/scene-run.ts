@@ -72,7 +72,7 @@ const QUALITY_FLAGS: Record<SceneQuality, string> = { low: '-ql', medium: '-qm',
  * Stage background per theme (the Sprout `surface` token). The host supplies it so
  * scenes never choose their own backdrop; they only pick foreground colours.
  */
-const STAGE_BACKGROUND = { light: '#FFFFFF', dark: '#18211C' } as const;
+const STAGE_BACKGROUND = { light: '#FFFFFF', dark: '#141414' } as const;
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 /** How often control values are compared and reported, at most. */
 const CONTROL_REPORT_INTERVAL_MS = 120;

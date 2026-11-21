@@ -37,7 +37,7 @@ None of these is done. Each needs something only the owner has.
 | A licence for the project | The repository is marked `UNLICENSED` |
 | A build and a test run on macOS and on Linux | The script has the paths for both and has run on neither |
 | A run on a computer that has never had the project on it | Step 8 strips the environment, which is not the same thing |
-| A generated lesson sat by a person, from start to finish, in the app | A real model has written lessons (Kimi K3.1 Pro through NVIDIA NIM, 2026-11-20), and they were checked by a script and by looking at them. Nobody has yet learnt from one. The owner's key has to be typed in by the owner |
+| A generated lesson sat by a person, from start to finish, in the app | A real model has written lessons (Kimi K3.1 Pro through NVIDIA NIM, 2026-11-20), and one was gone through in the app from its first part to "Lesson complete" by a script, in both themes (2026-11-21), which found a picture that did not run and led to a rule that now catches it. Nobody has yet learnt from one. The owner's key has to be typed in by the owner |
 
 ## The acceptance list (PLAN.md section 17)
 
@@ -57,9 +57,9 @@ None of these is done. Each needs something only the owner has.
 | Retrieval practice exists and persists | PASS | `test_review_schedule`, `e2e/learning` (two days pass; the review is due, done, and rescheduled further away) |
 | Quota exhaustion, network loss, TTS failure, Wanim failure, and malformed model output are recoverable | PASS | `e2e/generation` (no key, rate limit, used-up day, provider failure, cancel), `test_model_gateway`, `test_drafts`; `e2e/narration` (no voice); `e2e/lesson` and `e2e/scene-player` (scenes that break or are withheld) |
 | Data export, deletion, backup, and restore are tested | PASS | `e2e/data`, `test_data_copy`, `test_database`, `test_process_lifecycle`. "Export" is a copy of everything; one course alone cannot be exported (ADR-016) |
-| Light and dark themes, accessibility, and reduced motion are tested | PASS, with a gap | `e2e/appearance-a11y` (both themes, axe on every screen, reduced motion in the shell); axe on each state in the other specs. Not tested with a screen reader by a person |
+| Light and dark themes, accessibility, and reduced motion are tested | PASS, with a gap | `e2e/appearance-a11y` (both themes, axe on every screen, reduced motion in the shell, the window's own title bar); axe on each state in the other specs, and with it that nothing pressable lies where the window is moved. Not tested with a screen reader by a person |
 | CI, unit, integration, E2E, security, and packaging checks pass | PASS locally; CI NOT RUN | The gates above on this machine. The workflow in `.github/` has never run: the repository has no remote |
-| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-021 |
+| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-030 |
 | Git history is coherent, atomic, and honest | PASS | One Conventional Commit per slice on `dev`, each with its gate results, all signed; nothing pushed |
 
 ## Known limitations
@@ -76,8 +76,8 @@ None of these is done. Each needs something only the owner has.
   (ADR-021), and can change. When it does, a model stops finishing or refuses its request;
   Adle then asks the provider's next model and says so. The settings that work are written
   beside each model in `services/core/adle_core/generation/provider.py`, with the date.
-- **No person has sat a generated lesson yet.** Two were generated and inspected; see
-  `PROJECT_STATE.md`.
+- **No person has sat a generated lesson yet.** Lessons were generated and inspected, and one
+  was gone through in the app by a script; see `PROJECT_STATE.md`.
 - **Narration and animation are synchronised per part of a lesson**, not per sentence.
 - **PDFs are read with `pypdf`.** Columns, tables, and equations come out as that library
   gives them. Scanned pages are flagged, not read.
@@ -86,6 +86,7 @@ None of these is done. Each needs something only the owner has.
 - **Open answers are marked by the learner** against a list of points, and count as lighter
   evidence. The model does not grade.
 - **No installer, no signature, no automatic update.**
-- **Windows only, so far.** Nothing has been run on macOS or Linux.
+- **Windows only, so far.** Nothing has been run on macOS or Linux. The window's own title
+  bar (ADR-030) in particular has only been seen on Windows 11; Linux keeps its usual frame.
 - **Failures are not reported to anyone.** If something breaks on a learner's computer, the
   only record is the log on that computer.

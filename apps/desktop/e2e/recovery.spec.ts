@@ -97,7 +97,8 @@ test.describe('when the app itself fails', () => {
       .poll(async () => (await reloadedPage(app))?.text ?? '', { timeout: 10_000 })
       .toContain('Still here after a crash');
     const after = await reloadedPage(app);
-    expect(after?.text).toContain('Local service ready');
+    // While all is well the rail says nothing about the app's own service.
+    expect(after?.text).not.toContain('Adle has stopped');
     // The core was never touched: it is the page that failed.
     expect(after?.core).toMatchObject({ state: 'ready' });
     // One crash, one question: the reload did not set off another.
@@ -130,14 +131,12 @@ test.describe('when the app itself fails', () => {
     });
 
     await page.getByRole('navigation').getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('tab', { name: 'About & diagnostics' }).click();
+    await page.getByRole('tab', { name: 'About' }).click();
     const section = page.getByRole('tabpanel');
-    await expect(
-      section.getByRole('heading', { name: 'If something goes wrong', level: 2 }),
-    ).toBeVisible();
-    await expect(section).toContainText('It is never sent anywhere.');
+    await expect(section.getByRole('heading', { name: 'Logs', level: 2 })).toBeVisible();
+    await expect(section).toContainText('never sent anywhere');
     await expect(section).toContainText('never what you typed, opened, or answered');
-    await section.getByRole('button', { name: 'Show log files' }).click();
+    await section.getByRole('button', { name: 'Open log folder' }).click();
 
     await expect
       .poll(() => app.evaluate(() => (globalThis as Record<string, unknown>).adleOpened))

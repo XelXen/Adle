@@ -18,9 +18,9 @@ export type DataOutcome =
   | { kind: 'failed'; action: DataAction; message: string };
 
 const FAILED: Record<DataAction, string> = {
-  save: 'The copy was not saved',
+  save: 'Couldn’t save the copy',
   restore: 'Nothing was restored',
-  erase: 'Not everything could be deleted',
+  erase: 'Couldn’t delete everything',
 };
 
 /**
@@ -52,24 +52,24 @@ export function describeOutcome(outcome: DataOutcome): OutcomeMessage {
     case 'saved':
       return {
         tone: 'success',
-        title: outcome.fileName ? `Saved as ${outcome.fileName}` : 'A copy was saved',
-        body: 'It holds everything in Adle as it is now. Keep it somewhere safe; to use it, choose "Restore from a copy" here or on another computer.',
+        title: outcome.fileName ? `Saved as ${outcome.fileName}` : 'Copy saved',
+        body: 'It contains everything in Adle as of now. To use it, choose “Restore from a copy” here or on another computer.',
         offersLibrary: false,
         offersSafetyCopies: false,
       };
     case 'restored':
       return {
         tone: 'success',
-        title: 'Your data was restored from the copy',
-        body: 'What was here before was not thrown away: it was kept as a safety copy first, and can be restored in the same way.',
+        title: 'Data restored',
+        body: 'Your previous data was kept as a safety copy. You can restore it the same way.',
         offersLibrary: true,
         offersSafetyCopies: true,
       };
     case 'erased':
       return {
         tone: 'success',
-        title: 'Everything was deleted',
-        body: 'Adle holds no courses, materials, answers, or safety copies now. Your AI provider key and your appearance settings were left as they were.',
+        title: 'Everything deleted',
+        body: 'All courses, materials, answers, and safety copies are gone. Your provider keys and appearance settings were kept.',
         offersLibrary: true,
         offersSafetyCopies: false,
       };

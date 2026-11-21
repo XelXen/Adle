@@ -16,6 +16,9 @@ vi.mock('electron', () => ({
     }
     once = vi.fn();
     loadURL = vi.fn(async () => undefined);
+    isDestroyed = () => false;
+    setBackgroundColor = vi.fn();
+    setTitleBarOverlay = vi.fn();
   },
   app: {
     getPath: () => '/tmp/adle-test',
@@ -27,14 +30,14 @@ vi.mock('electron', () => ({
   session: { defaultSession: {} },
   shell: { openExternal: vi.fn() },
   ipcMain: { handle: vi.fn() },
-  nativeTheme: { themeSource: 'system', shouldUseDarkColors: false },
+  nativeTheme: { themeSource: 'system', shouldUseDarkColors: false, on: vi.fn(), off: vi.fn() },
   safeStorage: { isEncryptionAvailable: () => true },
 }));
 
 const { isTrustedSender, parseInvokeRequest } = await import('./ipc');
 const { APP_CSP, PLAYER_CSP, resolveStaticPath, siteForHost } = await import('./protocol');
 const { isAllowedFrameNavigation, isAllowedRequest } = await import('./security');
-const { createMainWindow } = await import('./window');
+const { createMainWindow, ownsTitleBar, TITLE_BAR_HEIGHT } = await import('./window');
 
 describe('main window', () => {
   it('is created with the hardened web preferences', () => {
@@ -52,8 +55,10 @@ describe('main window', () => {
       devTools: false,
     });
     // No remote module, no extra preloads, nothing that widens the renderer.
+    // (`backgroundThrottling` is about timers keeping their pace, not about what a page may do.)
     expect(Object.keys(options.webPreferences).sort()).toEqual([
       'allowRunningInsecureContent',
+      'backgroundThrottling',
       'contextIsolation',
       'devTools',
       'nodeIntegration',
@@ -67,12 +72,35 @@ describe('main window', () => {
     ]);
   });
 
+  it('has a title bar of its own where the window can still be moved by it', () => {
+    expect(ownsTitleBar('win32')).toBe(true);
+    expect(ownsTitleBar('darwin')).toBe(true);
+    // Not tried there: a window that cannot be moved is worse than a plain one.
+    expect(ownsTitleBar('linux')).toBe(false);
+
+    createMainWindow({ showDevTools: false });
+    const options = createdWindows.at(-1) as {
+      titleBarStyle?: string;
+      titleBarOverlay?: { color?: string; symbolColor?: string; height?: number };
+    };
+    if (!ownsTitleBar()) {
+      expect(options.titleBarStyle).toBeUndefined();
+      return;
+    }
+    expect(options.titleBarStyle).toBe(process.platform === 'darwin' ? 'hiddenInset' : 'hidden');
+    expect(options.titleBarOverlay?.height).toBe(TITLE_BAR_HEIGHT);
+    if (process.platform === 'win32') {
+      // The window's buttons sit on the canvas, in the ink of the theme.
+      expect(options.titleBarOverlay).toMatchObject({ color: '#F3F3F3', symbolColor: '#171717' });
+    }
+  });
+
   it('is visible from the start, painted in the canvas colour', () => {
     createMainWindow({ showDevTools: false });
     const options = createdWindows.at(-1) as { show: boolean; backgroundColor: string };
     // Not hidden until `ready-to-show`: see the note in window.ts.
     expect(options.show).toBe(true);
-    expect(options.backgroundColor).toBe('#F3F4F1');
+    expect(options.backgroundColor).toBe('#F3F3F3');
   });
 
   it('carries the app icon, which exists in the repository', () => {
@@ -133,12 +161,16 @@ describe('content security policies', () => {
     expect(APP_CSP).toContain("default-src 'none'");
     expect(APP_CSP).toContain("frame-ancestors 'none'");
     expect(APP_CSP).toContain('frame-src adle://*.player');
+    // Nothing the browser does not know: an unknown directive is an error in the console
+    // of every page, and stops nothing.
+    expect(APP_CSP).not.toContain('webrtc');
   });
 
   it('confines the player to its own origin and forbids embedding elsewhere', () => {
     expect(PLAYER_CSP).toContain("connect-src 'self'");
     expect(PLAYER_CSP).toContain('frame-ancestors adle://app');
     expect(PLAYER_CSP).toContain('sandbox allow-scripts allow-same-origin');
+    expect(PLAYER_CSP).not.toContain('webrtc');
     for (const forbidden of [
       'allow-popups',
       'allow-top-navigation',
@@ -168,13 +200,20 @@ describe('request and navigation filters', () => {
     }
   });
 
-  it('lets frames navigate only within the app and player origins', () => {
-    expect(isAllowedFrameNavigation('adle://app/index.html')).toBe(true);
+  it('lets a frame inside the window be a scene player or nothing, never the app', () => {
     expect(isAllowedFrameNavigation('adle://ab12cd.player/index.html')).toBe(true);
     expect(isAllowedFrameNavigation('about:blank')).toBe(true);
+    expect(isAllowedFrameNavigation('adle://app/index.html')).toBe(false);
     expect(isAllowedFrameNavigation('adle://other/index.html')).toBe(false);
     expect(isAllowedFrameNavigation('https://example.com/')).toBe(false);
     expect(isAllowedFrameNavigation('javascript:alert(1)')).toBe(false);
+  });
+
+  it('keeps the window itself in the app', () => {
+    expect(isAllowedFrameNavigation('adle://app/index.html', true)).toBe(true);
+    expect(isAllowedFrameNavigation('adle://ab12cd.player/index.html', true)).toBe(false);
+    expect(isAllowedFrameNavigation('about:blank', true)).toBe(false);
+    expect(isAllowedFrameNavigation('https://example.com/', true)).toBe(false);
   });
 });
 

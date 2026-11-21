@@ -118,4 +118,15 @@ class SecretRedactionFilter(logging.Filter):
         if redacted != message:
             record.msg = redacted
             record.args = None
+        # A traceback is formatted from the exception later, where this filter cannot
+        # reach it. Format it now and keep only the cleaned text.
+        if record.exc_info and record.exc_info[1] is not None:
+            trace = logging.Formatter().formatException(record.exc_info)
+            for secret in secrets:
+                trace = trace.replace(secret, self.PLACEHOLDER)
+            record.exc_text = trace
+            record.exc_info = None
+        if record.exc_text:
+            for secret in secrets:
+                record.exc_text = record.exc_text.replace(secret, self.PLACEHOLDER)
         return True

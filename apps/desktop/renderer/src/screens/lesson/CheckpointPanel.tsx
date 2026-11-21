@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Lightbulb } from 'lucide-react';
-import { type FormEvent, useId, useState } from 'react';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 
 import type { AnswerResult, PlayerQuestion } from '@adle/contracts';
 import {
@@ -19,7 +19,7 @@ import { type AnswerDraft, buildAnswer, emptyDraft, moved } from '../../lesson/a
 import styles from './Lesson.module.css';
 
 const OUTCOME: Record<AnswerResult['outcome'], { title: string; tone: CalloutTone }> = {
-  correct: { title: 'That is right', tone: 'success' },
+  correct: { title: 'Correct', tone: 'success' },
   partial: { title: 'Partly right', tone: 'info' },
   incorrect: { title: 'Not quite', tone: 'info' },
   skipped: { title: 'Skipped', tone: 'info' },
@@ -48,6 +48,14 @@ export function CheckpointPanel({
   const [problem, setProblem] = useState<string>();
   const [busy, setBusy] = useState<'answer' | 'skip' | null>(null);
   const [result, setResult] = useState<AnswerResult | null>(null);
+  const said = useRef<HTMLDivElement>(null);
+
+  // What is said about an answer appears below the question, where the lesson's controls
+  // may lie over it. It is brought into view, as far as the scroll padding of the page.
+  const answered = result !== null;
+  useEffect(() => {
+    if (answered) said.current?.scrollIntoView({ block: 'nearest' });
+  }, [answered]);
 
   const locked = result !== null || busy !== null;
   const options = question.options ?? [];
@@ -59,7 +67,7 @@ export function CheckpointPanel({
     if (result === null || result.outcome === 'skipped') return undefined;
     const chosen = optionId === draft.choice;
     if (optionId === result.correct_option) {
-      return chosen ? 'Your answer, and the right one' : 'The right answer';
+      return chosen ? 'Your answer · correct' : 'Correct answer';
     }
     return chosen ? 'Your answer' : undefined;
   };
@@ -94,7 +102,7 @@ export function CheckpointPanel({
   const submit = (event: FormEvent): void => {
     event.preventDefault();
     if (isExplanation && !comparing) {
-      if (written.trim() === '') setProblem('Write your explanation first, in your own words.');
+      if (written.trim() === '') setProblem('Write your explanation first.');
       else {
         setProblem(undefined);
         setComparing(true);
@@ -192,13 +200,13 @@ export function CheckpointPanel({
             rows={4}
             maxLength={2000}
             disabled={locked || comparing}
-            description="Write it as you would say it to a friend. It stays on this computer."
+            description="Explain it as you would to a friend. It stays on this computer."
             onChange={(event) => setWritten(event.target.value)}
           />
           {comparing ? (
             <div className={styles.compare}>
               <div>
-                <p className={styles.compareTitle}>One good answer</p>
+                <p className={styles.compareTitle}>A good answer</p>
                 <p>
                   <MathText text={question.sample_answer ?? ''} />
                 </p>
@@ -235,9 +243,7 @@ export function CheckpointPanel({
             <p>
               <MathText text={question.hint} />
             </p>
-            <p className={styles.change}>
-              A right answer after a hint still counts, just for a little less.
-            </p>
+            <p className={styles.change}>A correct answer after a hint counts a little less.</p>
           </div>
         </Callout>
       ) : null}
@@ -252,8 +258,8 @@ export function CheckpointPanel({
         <>
           {!isExplanation ? (
             <Checkbox
-              label="I am not sure about this answer"
-              description="Saying so is useful: Adle will check this idea again rather than assume it."
+              label="I’m not sure about this answer"
+              description="Adle will check this idea again later."
               checked={unsure}
               disabled={locked}
               onCheckedChange={setUnsure}
@@ -288,14 +294,14 @@ export function CheckpointPanel({
               disabled={busy === 'answer'}
               onClick={() => void send('skip')}
             >
-              Skip this question
+              Skip question
             </Button>
           </div>
         </>
       ) : null}
 
       {/* Present from the start, so that what arrives in it is announced. */}
-      <div role="status">
+      <div role="status" ref={said}>
         {result !== null ? (
           <Callout tone={OUTCOME[result.outcome].tone} title={OUTCOME[result.outcome].title}>
             <div className={styles.result}>

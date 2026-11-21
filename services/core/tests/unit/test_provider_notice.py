@@ -129,9 +129,8 @@ def test_a_notice_from_the_provider_is_not_taken_for_the_models_answer(
     assert error.notice == NOTICE
     # The learner is told whose words these are, what they are about, and that nothing changed.
     assert error.message == (
-        "The AI provider answered with a notice of its own instead of passing this to the "
-        f'model. It said: "{NOTICE}" This is about your account with the provider, not about '
-        "Adle. Nothing was changed."
+        "The AI provider returned an account notice instead of an answer. "
+        f'It said: "{NOTICE}" This is about your account with the provider, not Adle.'
     )
 
 
@@ -187,7 +186,7 @@ def test_a_notice_with_no_words_still_says_what_happened() -> None:
         ask(document("   \n "))
     assert raised.value.notice == ""
     assert "It said" not in raised.value.message
-    assert "instead of passing this to the model." in raised.value.message
+    assert "instead of an answer." in raised.value.message
 
 
 # -- a job ---------------------------------------------------------------------------

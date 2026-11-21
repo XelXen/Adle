@@ -32,7 +32,7 @@ test.describe('course materials', () => {
     await expect(page.getByText('From your materials')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'No materials yet' })).toBeVisible();
     // The local-only promise is stated where the import happens.
-    await expect(page.getByText('Nothing is uploaded when you import.')).toBeVisible();
+    await expect(page.getByText('Importing uploads nothing.')).toBeVisible();
 
     await importWithDialog(app, page, [
       'neural-networks-syllabus.md',
@@ -43,7 +43,7 @@ test.describe('course materials', () => {
 
     // One summary says what happened to every file, including the one that failed and why.
     const summary = page.getByRole('status').filter({ hasText: 'imported' });
-    await expect(summary).toContainText('3 files imported · 1 could not be imported', {
+    await expect(summary).toContainText('3 files imported · 1 couldn’t be imported', {
       timeout: 30_000,
     });
     await expect(summary).toContainText('scanned-handout.pdf');
@@ -75,7 +75,7 @@ test.describe('course materials', () => {
     await expect(results.getByRole('listitem').first()).toContainText('Weights and bias');
 
     await search.fill('xylophone');
-    await expect(page.getByText('Nothing in your materials matches “xylophone”.')).toBeVisible();
+    await expect(page.getByText('No matches for “xylophone”.')).toBeVisible();
 
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'course-materials');
@@ -112,8 +112,8 @@ test.describe('course materials', () => {
     // Remove one source: confirmation first, and cancel does nothing.
     await page.getByRole('button', { name: 'Remove study-notes.txt' }).click();
     const removal = page.getByRole('dialog', { name: /Remove “study-notes.txt”/ });
-    await expect(removal).toContainText('original file on your computer is not touched');
-    await removal.getByRole('button', { name: 'Keep it' }).click();
+    await expect(removal).toContainText('Your original file isn’t touched');
+    await removal.getByRole('button', { name: 'Cancel' }).click();
     await expect(sourceRow(page, 'study-notes.txt')).toBeVisible();
 
     await page.getByRole('button', { name: 'Remove study-notes.txt' }).click();
@@ -124,8 +124,10 @@ test.describe('course materials', () => {
     // Delete the course: explicit about what goes and what is untouched.
     await page.getByRole('button', { name: 'Delete course' }).click();
     const deletion = page.getByRole('dialog', { name: /Delete “Persistent course”/ });
-    await expect(deletion).toContainText('cannot be undone');
-    await expect(deletion).toContainText('original files you imported from are not touched');
+    await expect(deletion).toContainText(
+      'This permanently removes the course, its materials, and your progress.',
+    );
+    await expect(deletion).toContainText('Your original files aren’t touched');
     await deletion.getByRole('button', { name: 'Delete course' }).click();
     await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'No courses yet' })).toBeVisible();
@@ -179,7 +181,7 @@ test.describe('course materials', () => {
     // Dismissing the file dialog is not an error and changes nothing.
     await chooseInFileDialog(app, null);
     await page.getByRole('button', { name: 'Choose files' }).click();
-    await expect(page.getByText('The import could not start')).toHaveCount(0);
+    await expect(page.getByText('Couldn’t start the import')).toHaveCount(0);
     await expect(sourceList(page).getByRole('listitem')).toHaveCount(2);
   });
 
@@ -192,7 +194,7 @@ test.describe('course materials', () => {
     const dialog = page.getByRole('dialog', { name: 'New course' });
 
     await dialog.getByRole('button', { name: 'Create course' }).click();
-    await expect(dialog.getByText('Give the course a name.')).toBeVisible();
+    await expect(dialog.getByText('Enter a course name.')).toBeVisible();
     await expect(dialog.getByText('Describe what you want to learn')).toBeVisible();
     await expect(dialog.getByLabel('Course name')).toHaveAttribute('aria-invalid', 'true');
 
@@ -204,10 +206,10 @@ test.describe('course materials', () => {
     await expect(page.getByText('From a topic')).toBeVisible();
     await expect(page.getByText('Limits and derivatives.')).toBeVisible();
 
-    // Back to the library with the page's own back control (the navigation rail has
+    // Back to library with the page's own back control (the navigation rail has
     // a button of the same name); the course is listed.
     await page.getByRole('main').getByRole('button', { name: 'Library', exact: true }).click();
-    await expect(courseCard(page, /Calculus refresher/)).toContainText('No sources yet');
+    await expect(courseCard(page, /Calculus refresher/)).toContainText('No materials');
   });
 
   test('a course that no longer exists says so and offers a way back', async ({ adle }) => {
@@ -226,7 +228,7 @@ test.describe('course materials', () => {
     });
     await page.reload();
     await expect(page.getByRole('heading', { name: 'This course no longer exists' })).toBeVisible();
-    await page.getByRole('button', { name: 'Back to the library' }).click();
+    await page.getByRole('button', { name: 'Back to library' }).click();
     await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible();
   });
 });

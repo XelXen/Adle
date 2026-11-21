@@ -19,12 +19,10 @@ export function modelOrder(models: readonly { name: string }[]): string {
   const names = models.map((model) => model.name);
   const [first, ...others] = names;
   if (first === undefined) return '';
-  if (others.length === 0) return `Every request here goes to ${first}.`;
-  return (
-    `Requests here go to ${first}. While it is not available, ${listed(others)} ` +
-    `${others.length === 1 ? 'stands' : 'stand'} in, in that order, and Adle tells you when ` +
-    'that happened.'
-  );
+  if (others.length === 0) return '';
+  return `Uses ${first}. If it is unavailable, ${listed(others)} ${
+    others.length === 1 ? 'stands' : 'stand'
+  } in, and Adle says so.`;
 }
 
 /** The page where a key for a provider is made, where Adle knows one. */
@@ -49,7 +47,7 @@ export function keyBadge(state: ProviderKeyState | undefined): {
 } {
   return state?.stored
     ? { text: `Key saved · ends in ${state.hint ?? '…'}`, tone: 'success' }
-    : { text: 'No key yet', tone: undefined };
+    : { text: 'No key', tone: undefined };
 }
 
 /** What kind of provider this is, in a sentence: what "automatic" goes by. */
@@ -57,13 +55,11 @@ export function providerCharacter(
   choice: Pick<ProviderChoice, 'quick' | 'limits_published'>,
 ): string {
   if (choice.quick) {
-    return choice.limits_published
-      ? 'Quick to answer. Its daily allowance is small, so Adle counts what it sends.'
-      : 'Quick to answer.';
+    return choice.limits_published ? 'Fast, with a small daily allowance.' : 'Fast.';
   }
   return choice.limits_published
-    ? 'Slower to answer: its models think before they write.'
-    : 'Slower to answer: its models think before they write. Room for many lessons a day.';
+    ? 'Slower: its models reason before they answer.'
+    : 'Slower, with room for many lessons a day.';
 }
 
 /**
@@ -77,18 +73,12 @@ export function limitsNote(
   usage: Pick<ProviderUsage, 'limits_published' | 'requests_per_minute'>,
   resetsAt: string,
 ): string {
-  const pace =
-    `Adle sends it one request at a time, and never more than ${usage.requests_per_minute} a ` +
-    'minute: it waits instead.';
-  const reset = resetsAt ? ` The count starts again at ${resetsAt}.` : '';
+  const pace = `At most ${usage.requests_per_minute} requests a minute, one at a time.`;
+  const reset = resetsAt ? ` Resets at ${resetsAt}.` : '';
   if (usage.limits_published) {
-    return `Adle's own count, kept a little short of the provider's daily limit. ${pace}${reset}`;
+    return `Adle’s own count, kept just under the provider’s daily limit. ${pace}${reset}`;
   }
-  return (
-    `${provider.display_name} does not publish a daily limit for these models, so these are ` +
-    `Adle's own: room for many lessons a day, and a stop if something goes wrong. ` +
-    `${pace}${reset}`
-  );
+  return `${provider.display_name} publishes no daily limit, so this is Adle’s own cap. ${pace}${reset}`;
 }
 
 export interface SelectionOption {
@@ -113,16 +103,14 @@ export function selectionOptions(
       value: AUTOMATIC,
       label: 'Automatic',
       description:
-        'Use every provider you have given a key to, each for what it is best at. What you ' +
-        'are waiting for goes to the quicker one; long work goes to the one with more room ' +
-        'once the quicker one is half used for the day. If one cannot answer, the other is ' +
-        'asked, and Adle tells you.',
+        'Uses each provider you have a key for, for what it does best. If one can’t answer, ' +
+        'the other is asked, and Adle says so.',
       recommended: true,
     },
     ...providers.map((provider) => ({
       value: provider.provider_id,
       label: `${provider.display_name} only`,
-      description: `Every request goes to ${provider.display_name} and nowhere else, whatever happens.`,
+      description: `Only ${provider.display_name} is used. Nothing ever goes elsewhere.`,
       recommended: false,
     })),
   ];
@@ -139,9 +127,9 @@ export interface RouteLine {
 }
 
 const WORK_LABELS: Record<Work, string> = {
-  ask: 'A question during a lesson',
-  curriculum: 'A list of suggested concepts',
-  lesson: 'A lesson and its pictures',
+  ask: 'Questions',
+  curriculum: 'Suggested concepts',
+  lesson: 'Lessons',
 };
 
 /** Where each kind of request would go at this moment, as the core says. */

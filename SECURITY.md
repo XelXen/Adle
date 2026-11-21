@@ -29,11 +29,14 @@ Full diagram: `docs/architecture/overview.md`.
 |---|---|---|
 | No Node, no `require`, no `process` | `contextIsolation`, `sandbox`, `nodeIntegration: false` in `electron/main/window.ts` | `security-boundaries.test.ts` (window options); `e2e/security.spec.ts` (globals) |
 | Only the documented bridge | `electron/preload/index.ts` exposes fixed functions; no `ipcRenderer`, no channel names | `e2e/security.spec.ts` asserts the exact surface |
-| No network | CSP `connect-src 'self'`; session `onBeforeRequest` cancels every non-`adle:` request | `e2e/security.spec.ts` (https and loopback both blocked) |
+| No network, by a request | CSP `connect-src 'self'`; session `onBeforeRequest` cancels every non-`adle:` request | `e2e/security.spec.ts` (https and loopback both blocked) |
+| No network, by any other road | A peer connection and a connection opened ahead of time are not requests, and no policy of the page governs them here. No name is ever looked up (`refuseNameLookups`); a proxy that is nowhere, loopback included; no UDP outside a proxy (`security.ts`, ADR-029) | `e2e/security.spec.ts` (a peer connection and a preconnect against UDP and TCP listeners on this computer: nothing arrives) |
+| Nothing is downloaded | `will-download` is refused | `security.ts` |
 | No inline or evaluated script | CSP `script-src 'self'` sent as a response header | `e2e/security.spec.ts` (inline script does not run) |
-| Cannot navigate away or open windows | `will-navigate`, `will-frame-navigate`, `setWindowOpenHandler` in `security.ts` | `e2e/security.spec.ts` |
+| Cannot navigate away or open windows | `will-navigate`, `will-frame-navigate`, `setWindowOpenHandler` in `security.ts`. A frame inside the window may be a scene player or nothing, never the app | `e2e/security.spec.ts`; `security-boundaries.test.ts` |
 | No device permissions | Permission request, check, and device handlers all deny | `security.ts` |
 | Only fixed external links can be opened | `EXTERNAL_LINKS` allowlist; ids, not URLs, cross the bridge | `e2e/security.spec.ts` |
+| Cannot name a file | Paths come from a dialog of the operating system, or from files the learner dropped. The preload calls no method of what the page hands it: a real list, each entry a real `File`, the path asked of the browser (`preload/dropped.ts`) | `dropped.test.ts`; `e2e/security.spec.ts` (a script-made file, a list of strings, and something list-like with methods of its own are all refused) |
 
 ### Main process
 
@@ -46,6 +49,14 @@ Full diagram: `docs/architecture/overview.md`.
   (`security-boundaries.test.ts`, `e2e/security.spec.ts`)
 - Static files are served only from inside the build directories (`resolveStaticPath`), with a
   fixed MIME table. (`security-boundaries.test.ts`)
+- A value put into an address of the core is an identifier and nothing else: letters, digits,
+  `_` and `-`. Anything that could turn one address into another once decoded is refused
+  (`buildPath`; `core.test.ts`).
+- A core that has just come up is given the learner's choice of provider, then their keys,
+  and only then is anyone told it is ready (`CoreProcess` `afterReady`, `syncProviders`). A
+  choice that cannot be applied means no key is handed over and the start fails, so a core
+  never runs on "automatic" with the keys of a learner who chose one provider
+  (`providers.test.ts`, `core.test.ts`).
 
 ### Core (Python, loopback)
 
@@ -53,10 +64,12 @@ Full diagram: `docs/architecture/overview.md`.
 |---|---|---|
 | Loopback only, OS-assigned port | `__main__.py` binds `127.0.0.1:0` | `tests/integration/test_process_lifecycle.py` |
 | Every route needs the per-launch token | App-wide dependency `require_launch_token`, constant-time comparison | `tests/unit/test_api_boundary.py` |
+| Nothing of a request is read before it is known to be ours, and no body is larger than the app's own | `api/gate.py`, in front of all routing: the token, then a two-megabyte bound, before any of the body is read | `test_api_boundary.py` (the body of a request without the token is never read; a declared or an undeclared oversize is refused) |
 | Token never in argv, environment, or logs | Delivered over stdin | `core.test.ts` (fake core checks argv and env); `test_process_lifecycle.py` (stderr) |
 | A file to restore from is named the same way, and never logged | `restore_from` in the handshake line; `_restore` logs the outcome only | `core.test.ts` (fake core checks argv and env); `test_process_lifecycle.py` (the folder's name is not in stderr) |
 | No orphaned backend | Core exits on stdin EOF | `test_process_lifecycle.py`; `core.test.ts` |
-| DNS rebinding closed | `TrustedHostMiddleware` | `test_api_boundary.py` |
+| DNS rebinding closed | `TrustedHostMiddleware`: `127.0.0.1` and `localhost`, and no other name | `test_api_boundary.py` |
+| The log holds no text of an error | An error is logged by its kind and where it happened (`logs.where`); the database keeps a statement's values out of its errors; the HTTP client's own lines are not written; a key in a traceback is removed like one in a message | `test_jobs.py`, `test_database.py`, `test_provider_credentials.py` |
 | No CORS, no interactive docs | Not configured; `docs_url=None` | `test_api_boundary.py` |
 | Errors do not echo input | `_summarise_validation_errors` | `test_api_boundary.py` |
 
@@ -140,7 +153,10 @@ material. The full reasoning is in `docs/decisions/ADR-004-scene-isolation.md`.
    `parsePlayerMessage`: known types, exact keys, bounded sizes, primitive values. The host also
    checks the sending window, the exact origin, and the run id.
 5. **Liveness and fallback.** A scene that errors, times out, or stops answering pings is
-   discarded with its process, and the lesson shows the segment's text explanation.
+   discarded with its process, and the lesson shows the segment's text explanation. So is one
+   that sends more messages in a second than a scene has reason to (`MESSAGE_BUDGET_PER_SECOND`
+   in `WanimPlayerAdapter`): each message is work for the page that shows the lesson, and
+   they are counted before they are read.
 
 **Deliberate relaxations**, each confined to player origins:
 
@@ -164,15 +180,15 @@ A learner's file is untrusted input to parsers written by third parties. Details
 
 | Guarantee | Implementation | Verified by |
 |---|---|---|
-| Renderer script cannot name a file path | `sources.import_paths` is an internal operation. Paths come from the OS file dialog, or from dropped `File` objects resolved by the preload with `webUtils.getPathForFile` | `e2e/security.spec.ts` (internal operation refused; a `File` built by script is rejected); `test_courses_and_sources.py` (route marked internal) |
+| Renderer script cannot name a file path | `sources.import_paths` is an internal operation. Paths come from the OS file dialog, or from dropped `File` objects resolved by the preload with `webUtils.getPathForFile`, which calls no method of what the page handed it (`preload/dropped.ts`) | `e2e/security.spec.ts` (internal operation refused; a `File` built by script is rejected); `test_courses_and_sources.py` (route marked internal) |
 | Import requests are well-formed and bounded | `parseCourseId`, `parseImportPaths`: absolute paths, no NUL, at most 50; the core validates again | `electron/main/imports.test.ts`; `test_courses_and_sources.py` |
 | Type is decided by content, not only by name | `ingestion/detect.py` | `tests/unit/test_ingestion.py` |
-| Size, page, and text limits; a time limit per file | `ingestion/types.py` (`Limits`); the worker is killed on timeout | `test_ingestion.py`; `tests/integration/test_isolated_extraction.py` |
+| Size, page, and text limits; a time limit per file | `ingestion/types.py` (`Limits`); the worker is killed on timeout. A file over the largest limit is refused before any of it is read (`SourceService.import_file`) | `test_ingestion.py`; `test_courses_and_sources.py`; `tests/integration/test_isolated_extraction.py` |
 | A hostile file cannot take the service down | Each parse runs in a short-lived child process with its own pipes | `test_isolated_extraction.py` |
 | A subverted parser cannot run code in the service | The reply is JSON, type-checked and bounded (`document_from_json`); pickle is never used | `test_ingestion.py` |
 | Stored files stay inside the data directory | Copied under the generated source id; the display name is never used as a path | `test_courses_and_sources.py` |
 | Search input is never query syntax | Terms are extracted and quoted by code (`build_match_query`) | `test_courses_and_sources.py` |
-| Error messages do not quote documents | Only an error code and a fixed message cross the worker boundary | `test_ingestion.py` |
+| Error messages do not quote documents | Only an error code and a fixed message cross the worker boundary. The service shows what a worker says only if the code is one a parser has, as one plain line of limited length (`_refusal` in `ingestion/extract.py`); anything else is treated as a worker that broke | `test_ingestion.py` |
 | Nothing is uploaded to import | Parsers are local; there is no OCR service; the session blocks all network requests | `e2e/security.spec.ts`; design |
 
 Document content is data. Nothing in a file is executed, followed, or treated as an instruction.
@@ -225,7 +241,7 @@ Details and reasoning: `docs/decisions/ADR-010-lesson-ir-and-playback.md`.
 | A lesson reaches the database only in a validated form | `lessons.bundle.parse_bundle`: strict models, unknown fields refused, every scene through the static policy, descriptions of scenes computed from their source | `test_lesson_ir.py`, `test_lessons_api.py` |
 | Lesson text cannot carry links, markup, paths, or control characters | Text validators in `lessons/ir.py` | `test_lesson_ir.py` |
 | A lesson cannot cite something that is not in the learner's materials | `LessonService.store` resolves every cited section inside the course | `test_lessons_api.py` |
-| The renderer never holds an answer key | `lessons.get` returns the player view; scoring happens in the core | `test_lesson_ir.py` (field by field, and by searching the output); `test_answers_api.py` |
+| The renderer never holds an answer key | `lessons.get` returns the player view; scoring happens in the core. An id can be a key too: the items of an ordering question are shown under names made with a secret of the installation, in the order of those names (`ItemMask`), and their own ids are not accepted back | `test_lesson_ir.py` (field by field, and by searching the output); `test_answers_api.py`; `test_scoring.py`, `test_lessons_api.py` (the ids in order are refused) |
 | A stored scene is not trusted because it is stored | `LessonService.get` re-runs the policy and withholds what fails | `test_lessons_api.py`; `e2e/lesson.spec.ts` |
 | Mathematics is rendered without HTML strings | `MathText`: `katex.render` into DOM nodes, `trust` off, bounded expansion | `MathText.test.tsx`; the app CSP has no `unsafe-inline` |
 | No asset is loaded from a `data:` URI | Builds set `assetsInlineLimit: 0`; the CSP refuses `data:` fonts | `e2e/lesson.spec.ts` (no console errors while mathematics is on screen) |
@@ -249,7 +265,7 @@ of a lesson, when they press "Ask" (ADR-024).
 | What is sent is said first, and nothing is sent before "Ask" | The dialog names the destination and lists what goes: the question, the part, the lesson's outline, the course and concept, related passages | `e2e/ask.spec.ts` (no request before the button; the request itself is read) |
 | The learner's words cannot instruct the model | The question is placed in a quoted block whose closing tag cannot be forged, and the system prompt says it is something to answer, never an instruction | `test_asks.py` (a question that tries to close its block and speak as Adle) |
 | A question the lesson is asking is never answered for the learner | The request carries the stem and the choices only: never which is right, accepted answers, the expected number, the rubric, the hint, or per-choice feedback; ordering items are sent sorted | `test_asks.py`; `e2e/ask.spec.ts` |
-| Asking about an open question counts as help | The core records the next answer on that part as aided, like one given after the hint | `test_asks.py`; `e2e/ask.spec.ts` (read from the database) |
+| Asking about an open question counts as help | The core records the next answer on that part as aided, like one given after the hint. Removing the note takes its words and leaves the fact; skipping the question shows its explanation, so the answer that follows a skip is an aided one as well | `test_asks.py`; `e2e/ask.spec.ts` (read from the database) |
 | An answer cannot carry a link, markup, or a path, and cannot invent a source | Read strictly into one to four paragraphs of display text; a source is a number the prompt offered, or it is dropped | `test_asks.py` |
 | The learner's own words are shown as text | Rendered as plain text, never as mathematics or markup | `e2e/ask.spec.ts` |
 | A question costs a bounded number of requests | One, a second only if the first answer was unusable; one question per lesson at a time; 30 kept per lesson | `test_asks.py` |
@@ -264,10 +280,11 @@ Details and reasoning: `docs/decisions/ADR-012-provider-quota-and-generation.md`
 | The key is in one header and nowhere else | Read from the vault per request; redirects not followed; environment proxy and `.netrc` not used | `test_provider_client.py` |
 | Nothing sent or received is logged | Log lines carry a purpose and a status code only | `test_provider_client.py` (bodies and prompts absent from the log) |
 | Nothing is sent that the learner did not start | Requests are made only inside a job the learner started; the suggestion dialog says what will be sent first; the lesson button says it beside itself | `test_generation_api.py`; `e2e/generation.spec.ts` |
-| A learner's document cannot instruct the model through Adle | Learner text is quoted inside marked blocks whose closing tag cannot be forged; the standing rule is in the system prompt; the model has no tools | `test_generation_api.py` (hostile document) |
+| A learner's document cannot instruct the model through Adle | Learner text is quoted inside marked blocks whose closing tag cannot be forged; the standing rule is in the system prompt; the model has no tools. What a document is called (its file name, a heading) is quoted inside the block with the excerpt, and nothing in quoted text that could pass for the tag survives, in any spelling | `test_generation_api.py` (hostile document); `test_prompt_quoting.py` |
 | Model output cannot enter the database unchecked | Draft parsed leniently, compiled deterministically, then `parse_bundle` (ADR-010); scenes through the static policy | `test_drafts.py`, `test_generation_api.py` |
 | A model cannot invent an identifier or a citation | Identifiers are assigned by the core; a citation is a number the prompt offered, or it is dropped | `test_drafts.py` |
 | A model cannot make Adle loop | A fixed number of requests per job; one request in flight at each provider; local limits under the provider's | `test_model_gateway.py`, `test_generation_api.py`, `test_provider_routing.py` |
+| A provider's answer cannot fill the memory or hold the service up | Read with a bound on a line and on the whole, asked for uncompressed, with "Stop" and the time limit asked on everything that arrives; a document that is not a stream meets the same limits; text is tidied in one pass; "Stop" closes the answer | `test_provider_client.py` (a line that never ends, a stream of nothing, a document dripped slowly, a hang-up on stop); `test_drafts.py` |
 | A notice the provider sends in the model's place is not taken for the model's answer, and its words cannot do anything | Recognised by the client (ADR-020) and raised as `provider_notice`; the words are made one line, cut at 300 characters, cleared of control and text-reordering characters, quoted, and shown as text with no link; never logged, never followed, never retried | `test_provider_notice.py`; `e2e/generation.spec.ts` (no link in the message; one request sent) |
 
 **Residual risks, accepted**
@@ -277,6 +294,12 @@ Details and reasoning: `docs/decisions/ADR-012-provider-quota-and-generation.md`
   learner typed about a lesson) leaves the computer for a provider once the learner asks.
   With "automatic" that may be either provider they gave a key to. The providers' handling
   of it is outside Adle's control; the first-run screen and the settings say so.
+- The choice of provider is changed by a call from the page, with no question asked outside
+  it. A page that had been taken over could move a learner from one provider to "automatic".
+  It could also read every course through the core, so this is not where that is stopped;
+  the keys it would use are ones the learner gave (ADR-029).
+- The ids of the options of a multiple-choice question follow the order the model wrote
+  them in. They carry no key, only whatever habit a model has.
 - A model can write a lesson that is valid and wrong. Validation checks form, not truth. The
   lesson says where it came from ("From general knowledge", or the passages it cites).
 

@@ -418,3 +418,35 @@ def test_deleting_a_course_or_a_concept_removes_its_lessons(
     assert again["id"] != course["id"]
     lessons = client.get(f"/v1/courses/{again['id']}/lessons").json()["lessons"]
     assert len(lessons) == SAMPLE_LESSONS
+
+
+def test_an_ordering_question_is_shown_without_its_answer_and_answered_by_the_names_shown(
+    client: TestClient, services: Services
+) -> None:
+    """Its items' own ids are given in the right order: what the page gets says nothing of it."""
+    course = install(client)
+    lessons = client.get(f"/v1/courses/{course['id']}/lessons").json()["lessons"]
+    seen = 0
+    for summary in lessons:
+        shown = client.get(f"/v1/lessons/{summary['id']}").json()["lesson"]
+        stored = services.lessons.get(summary["id"]).lesson
+        for segment in shown["segments"]:
+            if segment["type"] != "checkpoint" or segment["question"]["form"] != "ordering":
+                continue
+            seen += 1
+            question = segment["question"]
+            item = next(q for q in stored.all_questions() if q.id == question["id"])
+            own_ids = [entry.id for entry in item.items]  # type: ignore[union-attr]
+            in_order = [entry.text for entry in item.items]  # type: ignore[union-attr]
+            names = [option["id"] for option in question["options"]]
+            # Neither the ids, nor the names sorted, nor the order shown, is the answer.
+            assert not set(names) & set(own_ids)
+            assert [option["text"] for option in question["options"]] != in_order
+            by_text = {option["text"]: option["id"] for option in question["options"]}
+            url = f"/v1/lessons/{summary['id']}/questions/{question['id']}/answer"
+            # A page that had read the ids could have sent them in order. They are not accepted.
+            assert client.post(url, json={"order": own_ids}).status_code == 422
+            right = client.post(url, json={"order": [by_text[text] for text in in_order]})
+            assert right.status_code == 200, right.text
+            assert right.json()["outcome"] == "correct"
+    assert seen >= 1

@@ -44,7 +44,13 @@ const MIME_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-/** Renderer policy: no inline or evaluated script, no network, frames only from a player. */
+/**
+ * Renderer policy: no inline or evaluated script, no network, frames only from a player.
+ *
+ * A policy governs requests. What is not a request (a peer connection, a connection opened
+ * ahead of time) is stopped in `security.ts`; the `webrtc` directive that would say so here
+ * is not one this Chromium knows, and naming it only writes an error to the console.
+ */
 export const APP_CSP = [
   "default-src 'none'",
   "script-src 'self'",

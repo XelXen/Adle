@@ -103,8 +103,8 @@ def test_concepts_are_added_in_order_with_their_objectives(client: TestClient) -
     ]
     assert first["knowledge"] == {
         "state": "not_assessed",
-        "label": "Not assessed",
-        "missing": ["answered questions on this concept"],
+        "label": "Not started",
+        "missing": ["some answered questions"],
         "answered": 0,
         "self_report": None,
         "review_due_at": None,
@@ -308,7 +308,7 @@ def test_other_impossible_prerequisites_are_refused(client: TestClient) -> None:
 
     itself = needs(client, loss, loss)
     assert itself.status_code == 422
-    assert "before itself" in itself.json()["error"]["message"]
+    assert "its own prerequisite" in itself.json()["error"]["message"]
 
     twice = needs(client, loss, weights, weights)
     assert twice.status_code == 422
@@ -498,7 +498,7 @@ def test_removing_a_source_keeps_the_concept_and_says_it_lost_its_grounding(
     assert titles(body) == ["The perceptron"]
     assert body["concepts"][0]["source_refs"] == []
     assert "no_source_reference" in [issue["code"] for issue in body["issues"]]
-    assert '"The perceptron" is not linked to anything in your materials.' in [
+    assert "“The perceptron” isn’t linked to anything in your materials." in [
         issue["message"] for issue in body["issues"]
     ]
 

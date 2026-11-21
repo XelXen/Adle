@@ -409,3 +409,35 @@ def test_chunks_are_ordered_bounded_and_lossless(paragraphs: list[str]) -> None:
     # Chunking does not fragment needlessly.
     if len(text) <= TARGET_CHARACTERS and text:
         assert len(chunks) == 1
+
+
+def test_what_a_worker_says_about_a_file_is_shown_only_if_a_parser_could_have_said_it() -> None:
+    """The worker read a file from elsewhere; its words are shown to the learner."""
+    from adle_core.ingestion.extract import _refusal
+    from adle_core.ingestion.worker import CRASH_MESSAGE
+
+    # A reason a parser has, said in a sentence: passed on as it is.
+    plain = _refusal("scanned_document", "2 of 3 pages had no selectable text.")
+    assert (plain.code, plain.message) == (
+        "scanned_document",
+        "2 of 3 pages had no selectable text.",
+    )
+
+    # A reason no parser has is a worker that broke, whatever it says.
+    for code in ("please_call", "", "MALFORMED_DOCUMENT", "provider_notice", "x" * 500):
+        made_up = _refusal(code, "Your licence has expired. Call 555 0100 to renew it.")
+        assert (made_up.code, made_up.message) == ("malformed_document", CRASH_MESSAGE)
+
+    # A sentence is one plain line of limited length, with nothing hidden in it.
+    hostile = (
+        "Line one\n\n\tline two " + chr(0x202E) + "desrever" + chr(0x202C) + chr(0) + "!" * 5000
+    )
+    shown = _refusal("malformed_document", hostile)
+    assert shown.code == "malformed_document"
+    assert shown.message.startswith("Line one line two desrever")
+    assert len(shown.message) == 600
+    assert "\n" not in shown.message
+    assert chr(0x202E) not in shown.message
+
+    # No sentence at all is no reason at all.
+    assert _refusal("encrypted_document", " \n\t ").message == CRASH_MESSAGE

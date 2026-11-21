@@ -27,7 +27,7 @@ const ask = (changes: Partial<Ask>): Ask => ({
 describe('suggestedQuestions', () => {
   it('offers the usual ways of having something explained again', () => {
     const offered = suggestedQuestions('explanation', false);
-    expect(offered).toContain('Say this more simply.');
+    expect(offered).toContain('Explain this more simply.');
     expect(offered).toContain('Give me an example.');
     expect(offered).toContain('Show the mathematics behind this.');
     // The same for any part that is not a question of the lesson's.
@@ -40,7 +40,7 @@ describe('suggestedQuestions', () => {
     for (const suggestion of open) {
       expect(suggestion.toLowerCase()).not.toMatch(/what is the answer|right answer|which option/);
     }
-    expect(open[0]).toContain('without giving the answer');
+    expect(open[0]).toContain('not the answer');
     // Once it has been answered, why it is right is a fair question.
     expect(suggestedQuestions('checkpoint', false)).toContain('Why is that the right answer?');
   });
@@ -58,8 +58,8 @@ describe('suggestedQuestions', () => {
 
 describe('questionProblem', () => {
   it('asks for something to be typed, and for it to be one question long', () => {
-    expect(questionProblem('')).toContain('Type your question');
-    expect(questionProblem('   ')).toContain('Type your question');
+    expect(questionProblem('')).toContain('Type a question');
+    expect(questionProblem('   ')).toContain('Type a question');
     expect(questionProblem('ab')).toContain('too short');
     expect(questionProblem('x'.repeat(MAX_QUESTION_CHARACTERS + 1))).toContain('under 500');
     expect(questionProblem('  Why is the bias added last?  ')).toBeNull();
@@ -70,7 +70,15 @@ describe('questionProblem', () => {
 describe('askDisclosure', () => {
   it('names everything a question sends', () => {
     const said = askDisclosure();
-    for (const part of ['your question', 'this part of the lesson', 'outline', 'your materials']) {
+    // One for each thing `ask_request` in the core puts into the request.
+    for (const part of [
+      'your question',
+      'this part of the lesson',
+      'the lesson outline',
+      'the course name',
+      'this concept',
+      'your materials',
+    ]) {
       expect(said).toContain(part);
     }
   });
@@ -107,7 +115,7 @@ describe('answeredBy', () => {
     expect(answeredBy(ask({ written_by: { ...written, models: [] } }))).toBe('NVIDIA NIM');
     expect(
       answeredBy(ask({ written_by: { provider: '', models: [], authors: [], note: '' } })),
-    ).toBe('a model');
+    ).toBe('AI');
   });
 });
 

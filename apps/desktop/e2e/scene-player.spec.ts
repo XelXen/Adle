@@ -6,8 +6,29 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import type { ElectronApplication } from '@playwright/test';
+
 import { desktopDir, expect, repoRoot, test } from './support/app';
 import { exampleScene, fixtureScene, mountRawPlayer, worldToPage } from './support/player';
+
+/** The colour the window really shows at a point of the page, read by the main process. */
+async function shownAt(
+  app: ElectronApplication,
+  point: { x: number; y: number },
+): Promise<number[]> {
+  const encoded = await app.evaluate(async ({ BrowserWindow }, { x, y }): Promise<string> => {
+    const image = await BrowserWindow.getAllWindows()[0]!.webContents.capturePage({
+      x: Math.round(x),
+      y: Math.round(y),
+      width: 1,
+      height: 1,
+    });
+    return image.toBitmap().toString('base64');
+  }, point);
+  // One pixel, as the window holds it: blue, green, red, alpha.
+  const [blue = 0, green = 0, red = 0] = [...Buffer.from(encoded, 'base64')];
+  return [red, green, blue];
+}
 
 test.describe('scene player frame', () => {
   test('renders an animation-only scene from a complete Python file', async ({ adle }) => {
@@ -161,22 +182,8 @@ test.describe('scene player frame', () => {
     await player.waitFor(`m.type === 'ready'`);
     const box = await player.canvasBox();
 
-    /** The colour the window really shows at a point of the scene, read by the main process. */
-    const colourAt = async (worldX: number, worldY: number): Promise<number[]> => {
-      const point = worldToPage(box, worldX, worldY);
-      const encoded = await app.evaluate(async ({ BrowserWindow }, { x, y }): Promise<string> => {
-        const image = await BrowserWindow.getAllWindows()[0]!.webContents.capturePage({
-          x: Math.round(x),
-          y: Math.round(y),
-          width: 1,
-          height: 1,
-        });
-        return image.toBitmap().toString('base64');
-      }, point);
-      // One pixel, as the window holds it: blue, green, red, alpha.
-      const [blue = 0, green = 0, red = 0] = [...Buffer.from(encoded, 'base64')];
-      return [red, green, blue];
-    };
+    const colourAt = (worldX: number, worldY: number): Promise<number[]> =>
+      shownAt(app, worldToPage(box, worldX, worldY));
     const finishedRuns = async (): Promise<number> =>
       (await player.messages()).filter((message) => message.type === 'finished').length;
 
@@ -199,6 +206,41 @@ test.describe('scene player frame', () => {
     expect(filled).not.toEqual(background);
     // It is the curve's own blue: more blue than red.
     expect(filled[2]!).toBeGreaterThan(filled[0]! + 40);
+  });
+
+  test('a fill given in order is drawn; given by name it is lost, or stops the scene', async ({
+    adle,
+  }) => {
+    const { app, page } = adle;
+    const player = await mountRawPlayer(page, 'e2efill');
+    await player.waitFor(`m.type === 'ready'`);
+    const box = await player.canvasBox();
+    const colourAt = (worldX: number, worldY: number): Promise<number[]> =>
+      shownAt(app, worldToPage(box, worldX, worldY));
+    const finishedRuns = async (): Promise<number> =>
+      (await player.messages()).filter((message) => message.type === 'finished').length;
+    const middle: [number, number] = [0, 0];
+    const emptyCorner: [number, number] = [-6.5, 3.5];
+
+    await player.load(fixtureScene('fill_in_order.py'), { theme: 'light' });
+    await expect.poll(finishedRuns, { timeout: 20_000 }).toBe(1);
+    const background = await colourAt(...emptyCorner);
+    const filled = await colourAt(...middle);
+    expect(filled).not.toEqual(background);
+    // It is the box's own blue: more blue than red.
+    expect(filled[2]!).toBeGreaterThan(filled[0]! + 40);
+
+    // How solid it is, given by name: the scene runs to its end and the box is empty.
+    await player.load(fixtureScene('fill_by_name.py'), { theme: 'light' });
+    await expect.poll(finishedRuns, { timeout: 20_000 }).toBe(2);
+    expect(await colourAt(...middle)).toEqual(background);
+
+    // With nothing in first place the names are taken for the colour, and the scene stops.
+    // A lesson a real model wrote lost its interactive picture to this (2026-11-21).
+    await player.load(fixtureScene('fill_without_colour.py'), { theme: 'light' });
+    const stopped = await player.waitFor(`m.type === 'error' && m.stage === 'runtime'`, 20_000);
+    expect(String(stopped?.message)).toMatch(/ManimColor/);
+    expect(await finishedRuns()).toBe(2);
   });
 
   for (const [file, stage, pattern] of [
@@ -338,13 +380,13 @@ for (const set of sceneSets) {
   });
 }
 
-test.describe('scene player in the app (Settings → About & diagnostics)', () => {
+test.describe('scene player in the app (Settings → About)', () => {
   test('the runtime check renders and its mirrored slider drives the scene by keyboard', async ({
     adle,
   }) => {
     const { page } = adle;
     await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('tab', { name: 'About & diagnostics' }).click();
+    await page.getByRole('tab', { name: 'About' }).click();
     await page.getByRole('button', { name: 'Run check' }).click();
 
     await expect(page.getByText('Rendering works')).toBeVisible({ timeout: 20_000 });
@@ -352,7 +394,7 @@ test.describe('scene player in the app (Settings → About & diagnostics)', () =
     // The frame is isolated: sandboxed, on its own origin, with an accessible name.
     const frame = page.locator('iframe');
     await expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin');
-    await expect(frame).toHaveAttribute('title', /Runtime check/);
+    await expect(frame).toHaveAttribute('title', /Animation check/);
     expect(await frame.getAttribute('src')).toMatch(/^adle:\/\/[0-9a-f]{16}\.player\/index\.html$/);
 
     // The scene's slider is mirrored as a native control that works without a mouse.

@@ -67,7 +67,7 @@ UNTOUCHED = ConceptNow(
     id="loss",
     title="Loss",
     state=MasteryState.NOT_ASSESSED,
-    missing=("answered questions on this concept",),
+    missing=("some answered questions",),
 )
 COURSE = [BUILDING, DEMONSTRATED, UNTOUCHED]
 
@@ -218,7 +218,7 @@ def test_a_lesson_finished_with_every_question_skipped_shows_nothing_and_needs_a
         id="loss",
         title="Loss",
         state=MasteryState.NOT_ASSESSED,
-        missing=("answered questions on this concept",),
+        missing=("some answered questions",),
     )
     sitting = latest_sitting(
         [skipped("loss", minutes=9), skipped("loss", minutes=8), finished("loss", minutes=7)],
@@ -228,9 +228,7 @@ def test_a_lesson_finished_with_every_question_skipped_shows_nothing_and_needs_a
     assert sitting is not None
     assert (sitting.answered, sitting.lessons_completed) == (0, 1)
     assert sitting.shown == ()
-    assert [line.missing for line in sitting.still_needed] == [
-        ("answered questions on this concept",)
-    ]
+    assert [line.missing for line in sitting.still_needed] == [("some answered questions",)]
     assert sitting.reviews == ()
 
 

@@ -20,7 +20,7 @@ export function AppearanceSettings() {
 
   return (
     <Stack gap={6}>
-      <Section title="Theme" description="Choose how Adle looks. System follows your computer.">
+      <Section title="Theme" description="System follows your computer’s setting.">
         <Card>
           <SegmentedControl<ThemePreference>
             label="Theme"
@@ -33,12 +33,12 @@ export function AppearanceSettings() {
 
       <Section
         title="Notifications"
-        description="A lesson can take minutes to write, and you do not have to watch it happen."
+        description="Lessons take a few minutes to write. Get notified instead of waiting."
       >
         <Card>
           <Switch
-            label="Tell me when something is ready"
-            description="A notification from your computer when a lesson, suggested concepts, or an answer to your question is ready, or a break is over. Only while Adle is in the background, and never with anything from your lessons in it: just that it is ready."
+            label="Notify me when something is ready"
+            description="For lessons, suggestions, answers, and breaks. Only while Adle is in the background, and never with any lesson content."
             checked={ui.notifications}
             onCheckedChange={(notifications) => void updateUi({ notifications })}
           />
@@ -50,12 +50,9 @@ export function AppearanceSettings() {
           <Stack gap={3}>
             <p>
               Reduced motion is <strong>{reducedMotion ? 'on' : 'off'}</strong>. Adle follows your
-              system setting: with it on, interface transitions are removed and lessons avoid
-              unnecessary movement.
+              system setting.
             </p>
-            <p className={styles.muted}>
-              To change text size, use the View menu or press Ctrl (⌘ on Mac) with + or −.
-            </p>
+            <p className={styles.muted}>To change text size, press Ctrl (⌘ on Mac) with + or −.</p>
           </Stack>
         </Card>
       </Section>

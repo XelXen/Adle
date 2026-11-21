@@ -13,10 +13,8 @@ import {
 } from './provider-model';
 
 describe('modelOrder', () => {
-  it('says where every request goes when there is one model', () => {
-    expect(modelOrder([{ name: 'Coding Kimi K3 (free)' }])).toBe(
-      'Every request here goes to Coding Kimi K3 (free).',
-    );
+  it('has nothing to add when there is one model: its name is already beside it', () => {
+    expect(modelOrder([{ name: 'Coding Kimi K3 (free)' }])).toBe('');
   });
 
   it('names the stand-ins in order, and promises to say when one was used', () => {
@@ -26,8 +24,8 @@ describe('modelOrder', () => {
       { name: 'GLM 5.3 Flash' },
     ]);
     expect(said).toBe(
-      'Requests here go to Kimi K3.1 Pro. While it is not available, Mistral Large 4 and GLM ' +
-        '5.3 Flash stand in, in that order, and Adle tells you when that happened.',
+      'Uses Kimi K3.1 Pro. If it is unavailable, Mistral Large 4 and GLM 5.3 Flash stand in, ' +
+        'and Adle says so.',
     );
     // The first is never listed among its own stand-ins.
     expect(said.indexOf('Kimi K3.1 Pro')).toBe(said.lastIndexOf('Kimi K3.1 Pro'));
@@ -72,21 +70,21 @@ describe('keyBadge', () => {
 
   it('says so when there is no key, or nothing is known yet', () => {
     expect(keyBadge({ stored: false, hint: null })).toEqual({
-      text: 'No key yet',
+      text: 'No key',
       tone: undefined,
     });
-    expect(keyBadge(undefined)).toEqual({ text: 'No key yet', tone: undefined });
+    expect(keyBadge(undefined)).toEqual({ text: 'No key', tone: undefined });
   });
 });
 
 describe('providerCharacter', () => {
   it('describes a provider by the two things automatic goes by', () => {
     const quickAndSmall = providerCharacter({ quick: true, limits_published: true });
-    expect(quickAndSmall).toContain('Quick to answer');
-    expect(quickAndSmall).toContain('allowance is small');
+    expect(quickAndSmall).toContain('Fast');
+    expect(quickAndSmall).toContain('small daily allowance');
     const slowAndRoomy = providerCharacter({ quick: false, limits_published: false });
-    expect(slowAndRoomy).toContain('Slower to answer');
-    expect(slowAndRoomy).toContain('Room for many lessons');
+    expect(slowAndRoomy).toContain('Slower');
+    expect(slowAndRoomy).toContain('room for many lessons');
     // It never promises a speed.
     for (const text of [quickAndSmall, slowAndRoomy]) expect(text).not.toMatch(/\d/);
   });
@@ -101,17 +99,17 @@ describe('limitsNote', () => {
       { limits_published: true, requests_per_minute: 4 },
       '7:00 PM',
     );
-    expect(published).toContain("a little short of the provider's daily limit");
-    expect(published).toContain('never more than 4 a minute');
-    expect(published).toContain('The count starts again at 7:00 PM.');
+    expect(published).toContain('just under the provider’s daily limit');
+    expect(published).toContain('At most 4 requests a minute');
+    expect(published).toContain('Resets at 7:00 PM.');
   });
 
   it("says the limits are Adle's own where the provider publishes none", () => {
     const own = limitsNote(nvidia, { limits_published: false, requests_per_minute: 4 }, '7:00 PM');
-    expect(own).toContain('NVIDIA NIM does not publish a daily limit');
-    expect(own).toContain("Adle's own");
-    expect(own).not.toContain("the provider's daily limit");
-    expect(own).toContain('never more than 4 a minute');
+    expect(own).toContain('NVIDIA NIM publishes no daily limit');
+    expect(own).toContain('Adle’s own');
+    expect(own).not.toContain('the provider’s daily limit');
+    expect(own).toContain('At most 4 requests a minute');
   });
 
   it('leaves out the time when it is not known', () => {
@@ -138,11 +136,9 @@ describe('selectionOptions', () => {
 
   it('says of automatic that it only uses providers with a key, and that a stand-in is told', () => {
     const [automatic, alone] = selectionOptions(providers);
-    expect(automatic?.description).toContain('every provider you have given a key to');
-    expect(automatic?.description).toContain('Adle tells you');
-    expect(alone?.description).toBe(
-      'Every request goes to AIHubMix and nowhere else, whatever happens.',
-    );
+    expect(automatic?.description).toContain('each provider you have a key for');
+    expect(automatic?.description).toContain('Adle says so');
+    expect(alone?.description).toBe('Only AIHubMix is used. Nothing ever goes elsewhere.');
   });
 });
 
@@ -166,12 +162,12 @@ describe('routeLines', () => {
     });
     expect(lines.map((line) => line.work)).toEqual(['ask', 'curriculum', 'lesson']);
     expect(lines[0]).toMatchObject({
-      label: 'A question during a lesson',
+      label: 'Questions',
       destination: 'AIHubMix, or NVIDIA NIM if AIHubMix cannot answer',
       reason: 'It answers quickly.',
     });
     expect(lines[2]).toMatchObject({
-      label: 'A lesson and its pictures',
+      label: 'Lessons',
       reason: 'This is long work.',
     });
   });
