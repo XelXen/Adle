@@ -4,7 +4,7 @@ Two parts: what to do each time a build is made for someone else, and where Adle
 against the acceptance list in `PLAN.md` section 17. A status is one of `PASS`, `FAIL`,
 `NOT RUN`, or `BLOCKED`, and each has the evidence beside it. Nothing is inferred.
 
-- **Last filled in:** 2026-11-20, on Windows 11, for the tree described in `PROJECT_STATE.md`.
+- **Last filled in:** 2026-11-21, on Windows 11, for the tree described in `PROJECT_STATE.md`.
 
 ## Making a build
 
@@ -37,7 +37,7 @@ None of these is done. Each needs something only the owner has.
 | A licence for the project | The repository is marked `UNLICENSED` |
 | A build and a test run on macOS and on Linux | The script has the paths for both and has run on neither |
 | A run on a computer that has never had the project on it | Step 8 strips the environment, which is not the same thing |
-| A generated lesson sat by a person, from start to finish, in the app | A real model has written lessons (Kimi K3.1 Pro through NVIDIA NIM, 2026-11-20), and one was gone through in the app from its first part to "Lesson complete" by a script, in both themes (2026-11-21), which found a picture that did not run and led to a rule that now catches it. Nobody has yet learnt from one. The owner's key has to be typed in by the owner |
+| A generated lesson sat by a person, from start to finish, in the app | A real model has written lessons (Kimi K3.1 Pro through NVIDIA NIM, 2026-11-20), and one was gone through in the app from its first part to "Lesson complete" by a script, in both themes (2026-11-21), which found a picture that did not run and led to a rule that now catches it. A second was written the same day with the lesson opening as soon as its text was ready (ADR-031) and gone through the same way; its interactive picture ran, and it showed a formula without its minus sign at the size a lesson shows pictures, which is mended (ADR-032). Nobody has yet learnt from one. The owner's key has to be typed in by the owner |
 
 ## The acceptance list (PLAN.md section 17)
 
@@ -59,7 +59,7 @@ None of these is done. Each needs something only the owner has.
 | Data export, deletion, backup, and restore are tested | PASS | `e2e/data`, `test_data_copy`, `test_database`, `test_process_lifecycle`. "Export" is a copy of everything; one course alone cannot be exported (ADR-016) |
 | Light and dark themes, accessibility, and reduced motion are tested | PASS, with a gap | `e2e/appearance-a11y` (both themes, axe on every screen, reduced motion in the shell, the window's own title bar); axe on each state in the other specs, and with it that nothing pressable lies where the window is moved. Not tested with a screen reader by a person |
 | CI, unit, integration, E2E, security, and packaging checks pass | PASS locally; CI NOT RUN | The gates above on this machine. The workflow in `.github/` has never run: the repository has no remote |
-| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-031 |
+| `AGENTS.md`, `PROJECT_STATE.md`, ADRs, README, and developer docs are current | PASS | Updated with each commit; ADR-001 to ADR-032 |
 | Git history is coherent, atomic, and honest | PASS | One Conventional Commit per slice on `dev`, each with its gate results, all signed; nothing pushed |
 
 ## Known limitations
@@ -71,7 +71,9 @@ None of these is done. Each needs something only the owner has.
   (ADR-021).
 - **Generation through NVIDIA is slow.** Its models think before they write: about six
   minutes for a lesson's text and two to three for each picture with Kimi K3.1 Pro, on
-  2026-11-20. Adle says what the model is doing and stays usable meanwhile.
+  2026-11-20. Adle says what the model is doing and stays usable meanwhile, and the lesson
+  can be started as soon as its text is written (ADR-031): after 298 seconds in a run on
+  2026-11-21, with its picture arriving at 541.
 - **What a provider documents and what its endpoint does differ**, in both directions
   (ADR-021), and can change. When it does, a model stops finishing or refuses its request;
   Adle then asks the provider's next model and says so. The settings that work are written

@@ -48,7 +48,7 @@ browser bundle. `preload_submodules('fonts')` is the working call.
 
 | Option | Adle passes | Notes |
 |---|---|---|
-| `quality` | `-ql` / `-qm` / `-qh` | 854×480, 1280×720, 1920×1080. Default `-qm`. Verified. |
+| `quality` | `-ql` / `-qm` / `-qh` | 854×480, 1280×720, 1920×1080. The adapter asks for the one that suits the frame (`qualityForWidth`): under 640 pixels of the display wide the small one, over 1408 the large one. The browser scales the canvas to the frame, and shrunk by more than two a stroke one pixel thick is dropped, not thinned: a minus sign went missing from a formula (ADR-032). Verified: `scene-player.spec.ts` (26 small minus signs, all still there drawn 854 wide and shown 565 wide), `lesson.spec.ts` (a lesson's picture is drawn 854 wide). |
 | `mode` | `'normal'` | Only interactive pages pause. `slides`, `two-view`, `animation` are documented upstream and unused. |
 | `theme` | `'light'` / `'dark'` | Read by the scene as `self.theme` in `setup()`. Wanim never repaints for a theme change; Adle reloads the scene. Verified. |
 | `background` | The Sprout surface colour | CSS hex override of the stage background. Verified. |

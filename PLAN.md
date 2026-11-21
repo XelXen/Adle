@@ -1007,6 +1007,12 @@ provider that works today. Evidence: `test_lesson_before_pictures`, the renderer
 journeys in `e2e/generation` (a lesson taken while its pictures are held back, each arriving
 in its turn; the pictures stopped; the lesson removed while they are drawn).
 
+Sitting the lesson a real model wrote that day showed a formula without its minus sign: a
+picture drawn 1280 wide and shown 565 wide loses its thinnest strokes on a display with one
+pixel to the point. The player now asks for a drawing to suit its frame (ADR-032). Evidence:
+`WanimPlayerAdapter.test.ts`, `e2e/scene-player` (26 small minus signs, read off the
+window), `e2e/lesson`.
+
 ### Deviations from this plan (each has an ADR)
 
 - **Colours** (section 7): the palette is neutral greys with the mark's teal as the one

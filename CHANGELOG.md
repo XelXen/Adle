@@ -76,6 +76,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A small formula in a picture no longer loses a minus sign, or one bar of an equals sign,
+  on a display set to 100% scaling. Pictures are now drawn at a size that suits the space
+  they are shown in.
 - Removing a lesson or a course now stops any work still under way for it, at once.
   Before, a request already on its way to the provider ran to its end.
 - "Create a lesson with AI" no longer shows for a moment, with the wrong wording, while a

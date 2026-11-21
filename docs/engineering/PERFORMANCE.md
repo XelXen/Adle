@@ -15,20 +15,21 @@ hold.
 
 Five fresh starts each, on an empty profile. Median, with the slowest in brackets.
 
-| | Packaged build (2026-11-20) | Built files (development, 2026-11-21) |
+| | Packaged build (2026-11-21) | Built files (development, 2026-11-21) |
 |---|---|---|
-| Window with its first screen | 0.52 s (0.63) | 0.39 s (0.43) |
-| Background service ready, from launch | 1.34 s (1.51) | 2.62 s (2.65) |
-| Sample course added and its first suggestion shown | 0.37 s (0.39) | 0.27 s (0.35) |
-| Lesson opened | 0.10 s (0.15) | 0.32 s (0.44) |
-| Live scene: from asking for it to its first frame | 0.89 s (1.49) | 0.83 s (0.84) |
+| Window with its first screen | 0.41 s (0.49) | 0.39 s (0.43) |
+| Background service ready, from launch | 1.24 s (1.50) | 2.62 s (2.65) |
+| Sample course added and its first suggestion shown | 0.31 s (0.36) | 0.27 s (0.35) |
+| Lesson opened | 0.31 s (0.42) | 0.32 s (0.44) |
+| Live scene: from asking for it to its first frame | 0.84 s (0.86) | 0.83 s (0.84) |
 
 The window never waits for the background service: the first screen is up in under half a
 second, and the rail says "Starting…" until the service answers. "Ready" now includes
 handing the service the learner's choice of provider and their keys before anyone is told
-(ADR-029); measured again after that change, the development build is no slower for it. The
-packaged column is from before ADR-027 to ADR-030 and is to be measured again with that
-build.
+(ADR-029); measured again after that change, neither build is slower for it. The packaged
+column is from the build made of the tree of ADR-032; the development column was measured
+before ADR-031 and ADR-032, which change nothing on these paths except the size a scene is
+drawn at.
 
 The live scene figure is the whole path the plan asks to be measured separately: a new
 sandboxed frame on a fresh origin and process, the Wanim runtime loading, the scene being
@@ -55,7 +56,7 @@ development run does both.
 
 | | |
 |---|---|
-| Packaged folder | 459 MB (the sum of its files; about 10 MB more on disk) |
+| Packaged folder | 460 MB (the sum of its files; about 10 MB more on disk) |
 | of which Electron and Chromium | about 357 MB |
 | of which the core: Python, its packages, the service | 93 MB |
 | of which the app itself (`app.asar`) | 9 MB |
@@ -103,6 +104,6 @@ that model is left alone for ten.
 
 ## The end-to-end suite as a timing check
 
-The whole suite (101 journeys) takes fourteen to seventeen minutes against the development build, with one
+The whole suite (106 journeys) takes fourteen to seventeen minutes against the development build, with one
 worker. No journey waits on a fixed delay for the app; a regression in any of the paths above
 shows up there as a slower run long before it becomes a failure.

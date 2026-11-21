@@ -134,6 +134,10 @@ most, a file's name.
   frame is saying too much: report a change, not a state.
 - Any behaviour of Wanim you rely on must be written into
   `skills/wanim-scene-authoring/reference.md` as Verified, with a test.
+- **The adapter chooses the size a scene is drawn at** from the width of its frame
+  (`qualityForWidth`, ADR-032). Do not pass `quality` to make a picture "sharper": drawn
+  more than twice as wide as it is shown, a picture loses its thinnest strokes when the
+  browser shrinks it. The frame's canvas fills the frame at any drawing size.
 
 ## Build and run
 
@@ -179,6 +183,10 @@ most, a file's name.
 - `getByLabel` also matches `aria-label`s that contain the text ("Objective 1" matches "Remove
   objective 1"). Ask for the role: `getByRole('textbox', { name: 'Objective 1' })`.
 - Never call `show()` on the app window from a test (ADR-008).
+- **The window's pixels and a picture of the page are not the same.** A page under test is
+  laid out at one pixel to the point; the window is shown at the display's own scale, and
+  `capturePage` reads that. A journey whose answer depends on how many pixels there are
+  fixes the scale: `launchApp(dir, { displayScale: 1 })`.
 
 ## Lessons
 

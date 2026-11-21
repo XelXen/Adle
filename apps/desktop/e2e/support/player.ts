@@ -27,7 +27,12 @@ export interface RawPlayer {
   messages: () => Promise<RecordedMessage[]>;
   load: (
     source: string,
-    options?: { theme?: 'light' | 'dark'; autoplay?: boolean },
+    options?: {
+      theme?: 'light' | 'dark';
+      autoplay?: boolean;
+      /** The size the scene is drawn at. The adapter chooses one to suit the frame. */
+      quality?: 'low' | 'medium' | 'high';
+    },
   ) => Promise<void>;
   remove: () => Promise<void>;
   /** Bounding box of the 16:9 canvas inside the frame, in page coordinates. */
@@ -36,12 +41,18 @@ export interface RawPlayer {
 
 /**
  * Mount a player frame directly, bypassing the adapter, to test the frame and
- * the wire protocol themselves. The frame covers the whole window.
+ * the wire protocol themselves. The frame covers the whole window, or, given a
+ * `size`, sits in its top left corner at that size: a lesson shows a picture
+ * much smaller than the window.
  */
-export async function mountRawPlayer(page: Page, instance: string): Promise<RawPlayer> {
+export async function mountRawPlayer(
+  page: Page,
+  instance: string,
+  size?: { width: number; height: number },
+): Promise<RawPlayer> {
   const origin = `adle://${instance}.player`;
   await page.evaluate(
-    ({ instance, origin }) => {
+    ({ instance, origin, size }) => {
       interface Slot {
         frame: HTMLIFrameElement;
         messages: Record<string, unknown>[];
@@ -51,8 +62,9 @@ export async function mountRawPlayer(page: Page, instance: string): Promise<RawP
       const frame = document.createElement('iframe');
       frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
       frame.title = 'Test player';
-      frame.style.cssText =
-        'position:fixed;inset:0;width:100vw;height:100vh;border:0;z-index:9999;background:white';
+      frame.style.cssText = size
+        ? `position:fixed;left:0;top:0;width:${size.width}px;height:${size.height}px;border:0;z-index:9999;background:white`
+        : 'position:fixed;inset:0;width:100vw;height:100vh;border:0;z-index:9999;background:white';
       frame.src = `${origin}/index.html`;
       const messages: Record<string, unknown>[] = [];
       const mountedAt = performance.now();
@@ -67,7 +79,7 @@ export async function mountRawPlayer(page: Page, instance: string): Promise<RawP
       document.body.appendChild(frame);
       registry[instance] = { frame, messages };
     },
-    { instance, origin },
+    { instance, origin, size: size ?? null },
   );
 
   const waitFor: RawPlayer['waitFor'] = (predicate, timeoutMs = 15_000) =>
@@ -122,7 +134,7 @@ export async function mountRawPlayer(page: Page, instance: string): Promise<RawP
         source,
         sceneName: null,
         theme: options.theme ?? 'light',
-        quality: 'medium',
+        quality: options.quality ?? 'medium',
         autoplay: options.autoplay ?? true,
       }),
     remove: () =>
@@ -132,10 +144,10 @@ export async function mountRawPlayer(page: Page, instance: string): Promise<RawP
         ).__players[instance]!.frame.remove();
       }, instance),
     canvasBox: async () => {
-      const viewport = page.viewportSize() ?? { width: 1280, height: 832 };
-      const width = Math.min(viewport.width, (viewport.height * 16) / 9);
+      const frame = size ?? page.viewportSize() ?? { width: 1280, height: 832 };
+      const width = Math.min(frame.width, (frame.height * 16) / 9);
       const height = (width * 9) / 16;
-      return { x: (viewport.width - width) / 2, y: (viewport.height - height) / 2, width, height };
+      return { x: (frame.width - width) / 2, y: (frame.height - height) / 2, width, height };
     },
   };
 }

@@ -8,7 +8,7 @@ import path from 'node:path';
 
 import type { ElectronApplication } from '@playwright/test';
 
-import { desktopDir, expect, repoRoot, test } from './support/app';
+import { desktopDir, expect, launchApp, repoRoot, test } from './support/app';
 import { exampleScene, fixtureScene, mountRawPlayer, worldToPage } from './support/player';
 
 /** The colour the window really shows at a point of the page, read by the main process. */
@@ -28,6 +28,36 @@ async function shownAt(
   // One pixel, as the window holds it: blue, green, red, alpha.
   const [blue = 0, green = 0, red = 0] = [...Buffer.from(encoded, 'base64')];
   return [red, green, blue];
+}
+
+/**
+ * How bright the window really is down one column of the page, read by the main process:
+ * one value from 0 to 255 for each pixel of the display, which on a scaled display is
+ * more than one for each pixel of the page. `scale` says how many.
+ */
+async function columnShown(
+  app: ElectronApplication,
+  column: { x: number; y: number; height: number },
+): Promise<{ scale: number; rows: number[] }> {
+  const asked = {
+    x: Math.round(column.x),
+    y: Math.round(column.y),
+    width: 1,
+    height: Math.round(column.height),
+  };
+  const encoded = await app.evaluate(async ({ BrowserWindow }, rect): Promise<string> => {
+    const image = await BrowserWindow.getAllWindows()[0]!.webContents.capturePage(rect);
+    return image.toBitmap().toString('base64');
+  }, asked);
+  // Blue, green, red, alpha for each pixel; as many pixels across as the display has for one
+  // of the page's, and so as many times more down.
+  const bytes = Buffer.from(encoded, 'base64');
+  const across = Math.max(1, Math.round(Math.sqrt(bytes.length / 4 / asked.height)));
+  const rows: number[] = [];
+  for (let at = 0; at + 3 < bytes.length; at += across * 4) {
+    rows.push(Math.round((bytes[at]! + bytes[at + 1]! + bytes[at + 2]!) / 3));
+  }
+  return { scale: rows.length / asked.height, rows };
 }
 
 test.describe('scene player frame', () => {
@@ -206,6 +236,129 @@ test.describe('scene player frame', () => {
     expect(filled).not.toEqual(background);
     // It is the curve's own blue: more blue than red.
     expect(filled[2]!).toBeGreaterThan(filled[0]! + 40);
+  });
+
+  test('a picture shown small keeps its thinnest strokes when it is drawn at a size to suit', async ({
+    profileDir,
+  }) => {
+    // On a display with one pixel to the point, whatever this computer's is: that is where
+    // a lesson's picture has the fewest pixels, and where strokes went missing.
+    const adle = await launchApp(profileDir, { onboarded: true, displayScale: 1 });
+    const { app, page } = adle;
+    expect(await page.evaluate(() => Math.round(window.devicePixelRatio * 100))).toBe(100);
+    // The size a lesson shows a picture at in a window of the usual size.
+    const size = { width: 565, height: 318 };
+    // What the adapter asks for at that size (`qualityForWidth`, which has its own tests):
+    // the small drawing, 854 wide, which the browser shrinks by less than two. A lesson a
+    // real model wrote showed "(w 2)" for "(w - 2)" when it was drawn 1280 wide (2026-11-21).
+    const quality = 'low';
+    const player = await mountRawPlayer(page, 'e2esmall', size);
+    await player.waitFor(`m.type === 'ready'`);
+    const box = await player.canvasBox();
+
+    await player.load(fixtureScene('small_minus_signs.py'), { theme: 'light', quality });
+    expect(
+      await player.waitFor(`m.type === 'finished' || m.type === 'error'`, 20_000),
+    ).toMatchObject({ type: 'finished' });
+    await page.waitForTimeout(300);
+
+    // The fixture's two columns of signs, each on its own row of the 1280-wide drawing.
+    const faintest: number[] = [];
+    for (const [column, first, step] of [
+      [-2.0, 90, 46],
+      [2.0, 93, 47],
+    ] as const) {
+      const strip = await columnShown(app, {
+        x: worldToPage(box, column, 0).x,
+        y: box.y,
+        height: box.height,
+      });
+      const ground = Math.max(...strip.rows);
+      const reach = Math.ceil(2 * strip.scale);
+      for (let index = 0; index < 13; index += 1) {
+        const world = (360 - (first + step * index) - 0.5) / 90;
+        const at = Math.round((worldToPage(box, column, world).y - box.y) * strip.scale);
+        const near = strip.rows.slice(Math.max(0, at - reach), at + reach + 1);
+        faintest.push(ground - Math.min(...near));
+      }
+    }
+    // Every sign is there: each is plainly darker than the stage it is drawn on. (Seen on
+    // 2026-11-21: 31 or more for each of them drawn 854 wide. Drawn 1280 wide, two were not
+    // there at all and two more were under 16.)
+    expect(faintest).toHaveLength(26);
+    expect(
+      Math.min(...faintest),
+      `how much darker each sign is: ${faintest.join(' ')}`,
+    ).toBeGreaterThan(15);
+    expect(adle.problems).toEqual([]);
+    await adle.close();
+  });
+
+  test('a scene is drawn at each of the three sizes, and fills its frame at each', async ({
+    adle,
+  }) => {
+    const size = { width: 640, height: 360 };
+    for (const [quality, drawn] of [
+      ['low', 854],
+      ['medium', 1280],
+      ['high', 1920],
+    ] as const) {
+      const player = await mountRawPlayer(adle.page, `e2esize${quality}`, size);
+      await player.waitFor(`m.type === 'ready'`);
+      await player.load(exampleScene('weighted_sum.py'), { quality });
+      expect(
+        await player.waitFor(`m.type === 'finished' || m.type === 'error'`, 30_000),
+      ).toMatchObject({ type: 'finished' });
+      const frame = adle.page
+        .frames()
+        .find((candidate) => candidate.url().startsWith(player.origin));
+      const canvas = await frame!.evaluate(() => {
+        const element = document.getElementById('scene-canvas') as HTMLCanvasElement;
+        const shown = element.getBoundingClientRect();
+        return {
+          drawn: element.width,
+          wide: Math.round(shown.width),
+          tall: Math.round(shown.height),
+        };
+      });
+      // Whatever it is drawn at, the picture is as large as its frame: a small drawing is
+      // not left small in the middle, and a large one is not cut off.
+      expect(canvas).toEqual({ drawn, wide: size.width, tall: size.height });
+      await player.remove();
+    }
+    expect(adle.problems).toEqual([]);
+  });
+
+  test('the pointer lands where it points on a picture shown smaller than it is drawn', async ({
+    adle,
+  }) => {
+    const { page } = adle;
+    // As in a lesson: a frame 565 wide, and the small drawing, 854 wide, fitted into it.
+    const player = await mountRawPlayer(page, 'e2esmallpointer', { width: 565, height: 318 });
+    await player.waitFor(`m.type === 'ready'`);
+    await player.load(exampleScene('neuron_weight.py'), { quality: 'low' });
+    expect(await player.waitFor(`m.type === 'state' && m.state.interactive`)).not.toBeNull();
+    expect(await player.waitFor(`m.type === 'controls' && m.controls.length === 2`)).toMatchObject({
+      controls: [{ name: 'weight', value: 0.5 }, { name: 'bias_on' }],
+    });
+
+    // Drag the slider's knob on the canvas from w = 0.5 to w = -1.
+    const box = await player.canvasBox();
+    const knobAt = (weight: number) => worldToPage(box, -5 + ((weight + 2) / 4) * 5.5, -2.7);
+    const from = knobAt(0.5);
+    const to = knobAt(-1);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move((from.x + to.x) / 2, to.y, { steps: 6 });
+    await page.mouse.move(to.x, to.y, { steps: 6 });
+    await page.mouse.up();
+    expect(
+      await player.waitFor(
+        `m.type === 'controls' && Math.abs(m.controls[0].value + 1) < 0.15`,
+        3000,
+      ),
+    ).not.toBeNull();
+    expect(adle.problems).toEqual([]);
   });
 
   test('a fill given in order is drawn; given by name it is lost, or stops the scene', async ({

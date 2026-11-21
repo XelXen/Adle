@@ -84,6 +84,9 @@ use colour as the only carrier of meaning: pair it with position, a label, or a 
   (`font_size=24–26`, `muted`) placed with `next_to(control, UP, buff=0.3)`.
 - **Body text and labels** `font_size=24–32`; **formulas** `MathTex(..., font_size=40–48)`;
   **key numbers** `DecimalNumber(..., font_size=40–56)`.
+- **No `MathTex` below `font_size=32`**, not even a small label. A lesson shows the picture
+  at under half the size it is drawn, and a formula's thin strokes (a minus sign, the bars
+  of an equals sign) are the first thing to fade.
 - At most about seven distinct visual elements. If it needs a legend, it is too dense.
 - **A `Dot` is created with keywords and then placed:**
   `Dot(color=self.coral, radius=0.12).move_to(point)`. Given its position as an argument

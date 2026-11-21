@@ -17,8 +17,9 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   (ADR-027), every sentence rewritten short and plain (ADR-028), the findings of two reviews
   fixed (ADR-029), and a title bar of the app's own (ADR-030). And then the largest thing
   that was left from the plan: **a lesson opens as soon as its words are written**, and its
-  pictures arrive while the learner studies (ADR-031). What is left needs the owner; see
-  "Next actions"
+  pictures arrive while the learner studies (ADR-031). Sitting a lesson written that way
+  showed a formula without its minus sign, and so: a picture is drawn at a size that suits
+  the frame it is shown in (ADR-032). What is left needs the owner; see "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -100,6 +101,8 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   what to do next.
 - **When a scene cannot run:** if it fails in the player, or the core withholds it, the part
   shows its description in words and the lesson goes on.
+- **A picture is drawn at a size that suits the space it is shown in** (ADR-032), so that a
+  small picture keeps its thinnest strokes on a display with one pixel to the point.
 - **Suggested concepts:** "Suggest concepts with AI" on the curriculum says what will be sent,
   runs as a job with progress and Cancel, and ends in a review dialog where the learner picks
   what to add. Suggestions that finish while the learner is elsewhere wait to be reviewed or
@@ -192,8 +195,9 @@ ADR-016), an installer, a signed build.
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the commits for ADR-027 to ADR-030,
-on 2026-11-21.
+`node scripts/check.mjs --e2e` on the tree that became the commit for ADR-032, on
+2026-11-21, followed from the same tree by both packaged builds, every journey against the
+packaged app, the start-up check of the release build, and the timings.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -204,22 +208,22 @@ on 2026-11-21.
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 666 tests, 33 files |
+| Vitest | PASS | 671 tests, 33 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 95 source files |
 | pytest | PASS | 1280 tests |
-| Playwright + Electron (E2E) | PASS | 103 tests in 15 minutes, in one run of the gate for ADR-031 with no retry (two comments and the documents were edited after it). 22 of them run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it now also checks that nothing pressable lies where the window is moved |
+| Playwright + Electron (E2E) | PASS | 106 tests in 15 minutes, in one run with no retry. 22 of them run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it now also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
 | GitHub Actions CI | NOT RUN | Workflow exists; repository has no remote |
-| Packaged build: every journey (`npm run e2e:packaged`) | NOT RUN | for this tree (ADR-031). On the tree of `f68bdc8`, 2026-11-21: 100 passed and 1 passed on its second try, the race described under Findings |
-| Packaged build: release start-up check (`npm run package:check`) | NOT RUN | for this tree |
+| Packaged build: every journey (`npm run e2e:packaged`) | PASS | On this tree, 2026-11-21: 105 journeys in 13 minutes, of which 104 passed and 1 passed on its second try. That one told whether a scene was still from two pictures of the page (see Findings); it now compares the scene's own canvas. Its file and the player's, with one journey added, were then run again against the same build: 48 of 48 passed with no retry |
+| Packaged build: release start-up check (`npm run package:check`) | PASS | 2026-11-21: fuses set, will not run as Node, starts on an empty profile with the core up after 3.6 s, nothing in the log of failures, no service left behind |
 | Packaged build on a computer that never had the project | NOT RUN | Needs another machine |
 | Installer, code signing | BLOCKED | Need the owner's certificates |
 | macOS / Linux | NOT RUN | Developed on Windows only. The window's own title bar (ADR-030) has been seen on Windows 11 only |
 | Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: lessons, curricula and answers were written through Adle's own services on 2026-11-20; tried again after the way an answer is read was changed (ADR-029): a key check in 26 seconds and an answer to a question in 88, two requests. See "The real providers" |
-| A lesson a real model wrote, in the app | PASS | By a script, 2026-11-21: a lesson written by Kimi K3.1 Pro, opened from its profile with no key, gone through in both themes from its first part to "Lesson complete", no error in the console. Not a person |
+| A lesson a real model wrote, in the app | PASS | By a script, 2026-11-21, twice: a lesson written by Kimi K3.1 Pro, opened from its profile with no key, gone through in both themes from its first part to "Lesson complete", no error in the console. The second was written with the lesson opening when its text was ready (usable after 298 s, its one picture after 541 s); its interactive picture ran, and its formula is whole since ADR-032. Not a person |
 
 ## Launch reliability (ADR-008)
 
@@ -280,6 +284,24 @@ investigated, not ignored.
 - **A journey that misses once in a hundred is a race in the app as often as in the test.**
   One pressed "anything that says lesson" before a concept's lessons had loaded, and so
   pressed "Create a lesson with AI". The button no longer shows until the list is known.
+- **A picture shrunk by more than two loses strokes, it does not thin them.** The runtime
+  drew every scene 1280 wide; a lesson shows it 565 wide. A minus sign that fell on the
+  wrong row of pixels was not there (ADR-032). It showed only in pictures of the page,
+  which are taken at one pixel to the point: this computer's own display has one and a
+  half, and there nothing was lost. Found by sitting a lesson a real model wrote.
+- **The window's pixels and a picture of the page are different pictures.** A page under
+  test is laid out at one pixel to the point whatever the display; the window is shown at
+  the display's scale, and `capturePage` reads that. A journey that reads the window and
+  depends on how many pixels there are fixes the scale (`displayScale`). The first
+  version of the journey for the above passed for either drawing size for this reason.
+- **A picture of the page is not a picture of the scene.** A journey that told whether a
+  scene was still by comparing two pictures of the page where it is passed a hundred times,
+  then missed once in the packaged run and twice in a row in a full run. Two things change
+  there with the scene quite still: about forty pixels at the stage's rounded edge, by one
+  level of 255, seconds after loading; and the mark that offers to start the lesson, which
+  lies over the stage and answers to a pointer, the real one included when it rests on a
+  test's window. The journey now compares the scene's own canvas, and keeps both pictures
+  with the report if they ever differ.
 - **A screenshot of the page is not the window.** The system's buttons, and how a dimmed
   page looks around them, show only in a picture of the window itself (`PrintWindow`).
 - **A shell string is no place for a backslash.** A regular expression or `\n` passed
@@ -464,26 +486,7 @@ this, and it spends real allowance.
 
 ## Next actions
 
-First, and not needing the owner:
-
-- **The packaged builds have not been made from this tree** (ADR-031). `npm run package:test`,
-  `npm run e2e:packaged`, `npm run package`, `npm run package:check`, then
-  `node scripts/measure.mjs --packaged` for `PERFORMANCE.md`. (On the tree of `f68bdc8` the
-  packaged build measured 0.37 s to the first screen, 1.15 s to the service, 0.31 s to open
-  a lesson and 0.84 s to a scene's first frame; `PERFORMANCE.md` still shows the older
-  figures.)
-- **A picture shown small loses thin strokes.** Found on 2026-11-21 in a lesson Kimi K3.1
-  Pro wrote (usable after 298 s, its one picture after 541 s; sat by a script in both themes
-  with no error): `MathTex(r"L(w)=(w-2)^2", font_size=32)` showed as "(w 2)". The runtime
-  draws every scene 1280 pixels wide and the browser shrinks the canvas to the 565 a lesson
-  shows; shrunk by more than two, a thin stroke is dropped, not thinned. The fix that was
-  begun and not finished or tested: `WanimPlayerAdapter` asks for a size to suit the frame
-  (`-ql` under 640 device pixels wide, `-qh` over 1408, else `-qm`), and the frame's canvas
-  fills the frame at any of them (`width: min(100vw, calc(100vh * 16 / 9))` in
-  `player.css`). It needs unit tests, a journey that reads the pixels of thin lines at 565
-  pixels, and a look at the sample scenes.
-
-What else remains needs the owner. In the order it matters:
+What remains needs the owner. In the order it matters:
 
 1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
    They are in a transcript; treat them as used. Then type the new keys into Settings → AI
@@ -519,6 +522,7 @@ What else remains needs the owner. In the order it matters:
 | The window's own title bar has been seen on Windows 11 only | Needs a Mac (ADR-030); Linux keeps its usual frame |
 | A lesson's text is one request and arrives whole; the wait before a learner can begin is that request | By decision (ADR-012, ADR-031); "Next actions" 7 |
 | A picture that arrives while a lesson is open is found by looking every three seconds, not by being told | By decision (ADR-031): nothing new crosses the bridge for it |
+| A picture keeps the size it was drawn at if the window is made much larger or smaller while it is on screen | By decision (ADR-032): the next picture is drawn to suit; loading it again would start it again |
 | A question asked during a lesson does not remember earlier questions | By decision (ADR-024): it is a note, not a chat |
 | AIHubMix being "the quick one" is the owner's report, not a measurement | Its model has never answered Adle; one word in its definition if it turns out otherwise |
 | GLM 5.3 Flash, NVIDIA's third model, has never answered | The owner's choice of order (ADR-021) |

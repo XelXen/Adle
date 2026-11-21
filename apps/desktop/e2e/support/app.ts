@@ -51,6 +51,12 @@ export interface LaunchOptions {
   onboarded?: boolean;
   /** Extra environment for the app, for example the address of the fake AI provider. */
   env?: Record<string, string>;
+  /**
+   * How many pixels of the display there are for each pixel of the page, whatever the
+   * computer's own setting. For a journey that reads the window's own pixels and whose
+   * answer depends on how many there are; the others take the display as it is.
+   */
+  displayScale?: number;
 }
 
 /**
@@ -145,10 +151,14 @@ export async function launchApp(
       JSON.stringify({ theme: options.theme, onboardingCompleted: false }),
     );
   }
+  const switches = [
+    ...ALWAYS_PAINT_SWITCHES,
+    ...(options.displayScale ? [`--force-device-scale-factor=${options.displayScale}`] : []),
+  ];
   const app = await electron.launch({
     ...(packagedExecutable
-      ? { executablePath: packagedExecutable, args: [...ALWAYS_PAINT_SWITCHES] }
-      : { args: [desktopDir, ...ALWAYS_PAINT_SWITCHES] }),
+      ? { executablePath: packagedExecutable, args: switches }
+      : { args: [desktopDir, ...switches] }),
     env: { ...process.env, ...options.env, ADLE_USER_DATA_DIR: profileDir },
     // Playwright forces a light colour scheme by default, which would mask the
     // app's own theme handling. `null` leaves the media query to the app.

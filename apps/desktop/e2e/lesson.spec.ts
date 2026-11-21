@@ -47,6 +47,24 @@ async function sceneSettled(figure: Locator): Promise<void> {
   await expect(figure.getByText('Loading animation…')).toBeHidden({ timeout: 30_000 });
 }
 
+/**
+ * What a scene has drawn: its own canvas, as a picture, with nothing of the page that is
+ * around it or over it.
+ *
+ * A picture of the page where the stage is will not do for telling whether a scene is
+ * still. Where the page is drawn against the stage a pixel can change by one level of 255
+ * seconds after loading with nothing having moved, and the mark that offers to start the
+ * lesson lies over the stage and answers to a pointer. Two such pictures of a still scene
+ * differed once in the packaged run and twice in a row in a full run (2026-11-21).
+ */
+async function drawnBy(stage: Locator): Promise<Buffer> {
+  const picture = await stage
+    .contentFrame()
+    .locator('#scene-canvas')
+    .evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL('image/png'));
+  return Buffer.from(picture.split(',')[1] ?? '', 'base64');
+}
+
 /** Replace a stored scene's source, as a restored or hand-edited database would. */
 function replaceSceneSource(profileDir: string, sceneId: string, source: string): void {
   const database = new DatabaseSync(path.join(profileDir, 'data', 'adle.db'));
@@ -205,6 +223,18 @@ test.describe('lesson', () => {
     const picture = page.getByRole('figure', { name: 'The weighted sum' });
     await sceneSettled(picture);
     await expect(picture.getByText('Couldn’t show the animation')).toHaveCount(0);
+    // The picture is drawn at a size that suits the frame it is shown in: this small, 854
+    // wide. Shrunk by more than two, a formula's thin strokes go missing (a minus sign did,
+    // in a lesson a real model wrote).
+    const stageFrame = picture.locator('iframe');
+    const shownWide = (await stageFrame.boundingBox())?.width ?? 0;
+    const drawnWide = await stageFrame
+      .contentFrame()
+      .locator('#scene-canvas')
+      .evaluate((canvas) => (canvas as HTMLCanvasElement).width);
+    expect(shownWide).toBeGreaterThan(400);
+    expect(drawnWide).toBe(shownWide < 640 ? 854 : 1280);
+    expect(drawnWide / shownWide).toBeLessThanOrEqual(2);
     // Having pressed Start once, later parts begin by themselves.
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
     await page.getByRole('button', { name: 'Describe this picture' }).click();
@@ -329,7 +359,7 @@ test.describe('lesson', () => {
 
   test('a lesson resumes where it was left, and survives scenes that cannot run', async ({
     profileDir,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(180_000);
     const first = await launchApp(profileDir, { onboarded: true, theme: 'light' });
     await addSampleCourse(first.page);
@@ -344,19 +374,25 @@ test.describe('lesson', () => {
     const picture = first.page.getByRole('figure', { name: 'The weighted sum' });
     await sceneSettled(picture);
     await expect(first.page.getByText('Press Start to play.')).toBeVisible();
-    // The stage itself, not the figure around it: the bar of controls floats over the
-    // page, and where it lies over the figure depends on how far the page has scrolled.
+    // What the scene itself has drawn, not a picture of the page where it is.
     const stage = picture.locator('iframe');
     await stage.scrollIntoViewIfNeeded();
     await first.page.waitForTimeout(800);
-    const held = await stage.screenshot();
+    const held = await drawnBy(stage);
+    expect(held.byteLength).toBeGreaterThan(500);
     await first.page.waitForTimeout(1200);
-    expect(Buffer.compare(held, await stage.screenshot())).toBe(0);
+    const later = await drawnBy(stage);
+    if (Buffer.compare(held, later) !== 0) {
+      // Kept with the report: two pictures of a scene that should not have moved.
+      await testInfo.attach('held', { body: held, contentType: 'image/png' });
+      await testInfo.attach('later', { body: later, contentType: 'image/png' });
+    }
+    expect(Buffer.compare(held, later)).toBe(0);
 
     await first.page.getByRole('button', { name: 'Start', exact: true }).click();
     await expect(first.page.getByRole('button', { name: 'Pause' })).toBeVisible();
     await first.page.waitForTimeout(5000);
-    expect(Buffer.compare(held, await stage.screenshot())).not.toBe(0);
+    expect(Buffer.compare(held, await drawnBy(stage))).not.toBe(0);
 
     await first.page.getByRole('button', { name: 'Back to course' }).click();
     await openCourseTab(first.page, 'Curriculum');

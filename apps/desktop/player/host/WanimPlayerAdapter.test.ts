@@ -5,6 +5,7 @@ import { type HostMessage, isPlayerOrigin, type PlayerMessage } from '@adle/even
 import {
   MESSAGE_BUDGET_PER_SECOND,
   type PlayerStatus,
+  qualityForWidth,
   WanimPlayerAdapter,
 } from './WanimPlayerAdapter';
 
@@ -69,7 +70,77 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
+describe('qualityForWidth', () => {
+  /** How wide the runtime draws at each size. */
+  const DRAWN = { low: 854, medium: 1280, high: 1920 } as const;
+
+  it('draws a small frame small, and only a wide one large', () => {
+    // A lesson's picture in a window of the usual size.
+    expect(qualityForWidth(565)).toBe('low');
+    expect(qualityForWidth(639)).toBe('low');
+    expect(qualityForWidth(640)).toBe('medium');
+    // The same picture on a display with one and a half pixels to the point.
+    expect(qualityForWidth(565 * 1.5)).toBe('medium');
+    expect(qualityForWidth(1280)).toBe('medium');
+    expect(qualityForWidth(1408)).toBe('medium');
+    expect(qualityForWidth(1409)).toBe('high');
+    expect(qualityForWidth(3840)).toBe('high');
+  });
+
+  it('never has the browser shrink a drawing by more than two', () => {
+    // Below 427 pixels even the smallest drawing is more than twice the frame.
+    for (let shown = 427; shown <= 4000; shown += 1) {
+      expect(DRAWN[qualityForWidth(shown)] / shown).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('never has the browser stretch a drawing by much either', () => {
+    for (let shown = 1; shown <= 1920; shown += 1) {
+      expect(shown / DRAWN[qualityForWidth(shown)]).toBeLessThanOrEqual(1.1);
+    }
+  });
+
+  it('uses the middle size while a frame has no size yet', () => {
+    for (const width of [0, -20, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(qualityForWidth(width)).toBe('medium');
+    }
+  });
+});
+
 describe('WanimPlayerAdapter', () => {
+  it('asks for a drawing to suit the frame, unless it is told which', () => {
+    const sizes = (width: number, ratio: number): void => {
+      vi.spyOn(HTMLIFrameElement.prototype, 'getBoundingClientRect').mockReturnValue({
+        width,
+        height: (width * 9) / 16,
+      } as DOMRect);
+      vi.stubGlobal('devicePixelRatio', ratio);
+    };
+    const asked = (options: Parameters<WanimPlayerAdapter['load']>[0]): unknown => {
+      const h = harness();
+      h.adapter.load(options);
+      h.hook();
+      h.ready();
+      const load = h.sent[0];
+      return load?.type === 'load' ? load.quality : null;
+    };
+    try {
+      sizes(565, 1);
+      expect(asked(SCENE)).toBe('low');
+      // The same frame on a display with twice the pixels.
+      sizes(565, 2);
+      expect(asked(SCENE)).toBe('medium');
+      sizes(1100, 2);
+      expect(asked(SCENE)).toBe('high');
+      // Whoever says which size is listened to.
+      sizes(565, 1);
+      expect(asked({ ...SCENE, quality: 'high' })).toBe('high');
+    } finally {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('mounts a sandboxed frame on a unique player origin', () => {
     const { adapter, frame } = harness();
     adapter.load(SCENE);

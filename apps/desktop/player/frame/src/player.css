@@ -25,10 +25,15 @@ body {
   justify-content: center;
 }
 
+/*
+ * As large as the frame allows at 16:9, whatever size the scene is drawn at: the host asks
+ * for a size to suit the frame, and the picture must fill the frame at each of them. The
+ * box is the picture exactly, so a pointer on the canvas is a pointer on the scene.
+ */
 #scene-canvas {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: auto;
   aspect-ratio: 16 / 9;
   touch-action: none;
 }

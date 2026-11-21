@@ -99,6 +99,23 @@ export const DEFAULT_TIMEOUTS: PlayerTimeouts = {
  */
 export const MESSAGE_BUDGET_PER_SECOND = 600;
 
+/**
+ * The size to draw a scene at for a frame shown this many device pixels wide.
+ *
+ * The runtime draws at one of three sizes (854, 1280 or 1920 pixels wide) and the browser
+ * scales the canvas to the frame. Scaled down by more than two, a thin stroke is not made
+ * thinner but dropped: a minus sign, or one bar of an equals sign, is simply not there. A
+ * lesson shows a picture about 565 pixels wide in a window of the usual size, and a lesson
+ * a real model wrote showed "(w 2)" for "(w - 2)" there (2026-11-21). So a small frame is
+ * drawn small, which also costs less, and only a frame wider than the middle size is drawn
+ * at the largest.
+ */
+export function qualityForWidth(devicePixels: number): SceneQuality {
+  if (!Number.isFinite(devicePixels) || devicePixels <= 0) return 'medium';
+  if (devicePixels < 640) return 'low';
+  return devicePixels > 1408 ? 'high' : 'medium';
+}
+
 export interface WanimPlayerAdapterOptions {
   /** Accessible name of the frame. */
   title?: string;
@@ -261,13 +278,19 @@ export class WanimPlayerAdapter {
       source: options.source,
       sceneName: options.sceneName ?? null,
       theme: options.theme,
-      quality: options.quality ?? 'medium',
+      quality: options.quality ?? this.suitableQuality(),
       autoplay: options.autoplay ?? true,
     });
     this.loadTimer = window.setTimeout(() => {
       this.fail({ stage: 'timeout', message: 'The scene took too long to prepare.' });
     }, this.timeouts.loadMs);
     this.startWatchdog();
+  }
+
+  /** The size to draw at for the frame as it is laid out now (`qualityForWidth`). */
+  private suitableQuality(): SceneQuality {
+    const width = this.frame?.getBoundingClientRect().width ?? 0;
+    return qualityForWidth(width * (window.devicePixelRatio || 1));
   }
 
   private sendForRun(type: 'play' | 'pause' | 'next'): void {
