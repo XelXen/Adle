@@ -27,7 +27,11 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.1`. After looking at it the owner
   asked for eight things, and each was built that day (ADR-035 to ADR-042), the last of
   them a natural voice on the learner's own computer (ADR-042); and for one branch, with a
-  release made by a commit (ADR-043). What is left to them is under "Next actions"
+  release made by a commit (ADR-043). **0.1.0-alpha.2 carries all of it**: published from
+  the release commit `622b396` on 2026-11-22,
+  `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.2`. Since then, at the owner's word,
+  what a learner reads is in American English (ADR-044), for the next release. What is
+  left to them is under "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -212,13 +216,12 @@ on Linux (GitHub's machines build it, install it and start it there; nobody has 
 
 ## Test results
 
-Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. One run of
-`node scripts/check.mjs --e2e` on the tree that became the commit for the licence and the
-installers (`e9e5b81`), on 2026-11-21, and the fast gates again on every commit after it.
-The rows about the packaged app are from the tree of ADR-032 where they do not say
-otherwise: the release folder was not built again on this computer, because the owner had
-Adle open from it (the build for tests was, and passed its start-up check). What GitHub's
-machines ran is in the rows that name them.
+Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. The whole end-to-end suite on
+the tree that became the natural voice's commits (`f3a75e6`), on 2026-11-21, and the fast
+gates on every commit after it, the last on the tree of ADR-044. The release folder was not
+built again on this computer, because the owner had Adle open from it; the build for tests
+was, and passed its start-up check. What GitHub's machines ran is in the rows that name
+them.
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -229,20 +232,20 @@ machines ran is in the rows that name them.
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 673 tests, 34 files |
+| Vitest | PASS | 728 tests, 41 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 95 source files |
-| pytest | PASS | 1280 tests |
-| Playwright + Electron (E2E) | PASS | 107 tests in 15 minutes, in one run with no retry. 22 of them run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it now also checks that nothing pressable lies where the window is moved |
+| mypy (strict) | PASS | 106 source files |
+| pytest | PASS | 1356 tests |
+| Playwright + Electron (E2E) | PASS | 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
-| GitHub Actions CI | PASS | Run on `a812d34`, 2026-11-21, eleven jobs: the gates and unit tests on Linux; every journey on Linux (107 of 107 in 14 minutes) and on Windows (107 in 17 minutes, one of them at its second try: a window that did not paint, which the launch helper is there to catch); and the four installers, each built, installed, started and removed on the machine that built it and again on a machine that did not |
+| GitHub Actions CI | PASS | Runs on `f3a75e6` and on the release commit `622b396`, 2026-11-22: the gates, unit tests and three audits (npm, the core's Python, and the programs a natural voice is set up with) on Linux; every journey on Linux and on Windows (116 of 116 on each, none retried, on `f3a75e6`); and the four installers, each built, installed, started and removed on the machine that built it and again on a machine that did not, each check now also having the installed app's Python make an environment with pip in it |
 | Packaged build: every journey (`npm run e2e:packaged`) | PASS | On this tree, 2026-11-21: 105 journeys in 13 minutes, of which 104 passed and 1 passed on its second try. That one told whether a scene was still from two pictures of the page (see Findings); it now compares the scene's own canvas. Its file and the player's, with one journey added, were then run again against the same build: 48 of 48 passed with no retry |
-| Packaged build: release start-up check (`npm run package:check`) | PASS | 2026-11-21: fuses set, will not run as Node, starts on an empty profile with the core up after 3.6 s, nothing in the log of failures, no service left behind |
+| Packaged build: release start-up check (`npm run package:check`) | PASS | The build for tests on this computer, 2026-11-21: fuses set, the core's Python makes an environment with pip in it (it did not before `python.exe` was kept beside `adle-core.exe`), starts on an empty profile with the core up after 6.8 s, nothing in the log of failures, no service left behind. The release build: on GitHub's machines, every push |
 | Packaged build on a computer that never had the project | PASS | On GitHub's machines, `a812d34`: each installer was handed to a second machine of its system that has Node, the scripts that do the trying and nothing else of the project, and was installed, started (the core up within 1.7 to 3.0 s) and removed there. Such a machine still carries more than a new computer does, so on Windows the package's 73 programs and libraries were also read for a runtime library they ask for and do not bring (none). A person installing a release on their own computer: NOT RUN |
 | Installers | PASS | Made, installed, started and removed on GitHub's machines (`a812d34`): `…-windows-x64-setup.exe`, 133 MB; `…-macos-arm64.dmg`, 151 MB, and `…-macos-x64.dmg`, 156 MB; `…-linux-x64.deb`, 126 MB, and `…-linux-x64.tar.gz`, 171 MB. Not on this computer, which has no Inno Setup. On Ubuntu the tarball is unpacked and not started, because Ubuntu keeps an unpacked app from building its sandbox; the folder it holds is started there by the check of the release build |
-| The release itself | PASS | `release.yml` on the tag `v0.1.0-alpha.1` (`c320bd7`), 2026-11-21: the tag is the version and the changelog has it; the four builds made again from the tag, each installer installed, started and removed where it was built and on a machine that did not build it; published as a pre-release with five installers and `SHA256SUMS.txt`, whose sums are the ones GitHub computed for the files. Nobody has installed one by hand yet |
+| The release itself | PASS | **0.1.0-alpha.2** from the release commit `622b396` (ADR-043), 2026-11-22: its notes job found the version in `package.json` and the changelog and not yet released; every check passed; the installers made and tried in that run were published as a pre-release, tagged `v0.1.0-alpha.2` at that commit by GitHub, with five installers and `SHA256SUMS.txt`. Before it, 0.1.0-alpha.1 by `release.yml` on the tag `v0.1.0-alpha.1` (`c320bd7`), 2026-11-21: the tag is the version and the changelog has it; the four builds made again from the tag, each installer installed, started and removed where it was built and on a machine that did not build it; published as a pre-release with five installers and `SHA256SUMS.txt`, whose sums are the ones GitHub computed for the files. Nobody has installed one by hand yet |
 | Code signing | NOT RUN | Not done, by the owner's decision (ADR-034). Windows and macOS say so to whoever opens a build |
 | macOS / Linux | PASS (machines); NOT RUN (a person) | Linux: every journey passes on GitHub's Ubuntu machine, and the `.deb` installs and starts on Ubuntu as it ships. macOS: built, signed ad hoc, installed from its disk image and started, on Apple's and on Intel's processors; no journey runs there. Nobody has looked at Adle on either. The window's own title bar (ADR-030) has been seen on Windows 11 only |
 | Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: lessons, curricula and answers were written through Adle's own services on 2026-11-20; tried again after the way an answer is read was changed (ADR-029): a key check in 26 seconds and an answer to a question in 88, two requests. See "The real providers" |
@@ -532,8 +535,8 @@ this, and it spends real allowance.
 
 ## Next actions
 
-**Asked for by the owner on 2026-11-21, after looking at 0.1.0-alpha.1: done, not yet
-released.** Each is on `main` with its decision: the theme's lists and the sections' spacing,
+**Asked for by the owner on 2026-11-21, after looking at 0.1.0-alpha.1: done, and released
+in 0.1.0-alpha.2.** Each is on `main` with its decision: the theme's lists and the sections' spacing,
 and far fewer sentences (ADR-036); a lesson watched on one screen (ADR-035); a lesson seen
 taking shape (ADR-037); pictures tried before they are shown (ADR-038); each request to the
 model measured best for it (ADR-039); pictures drawn happening (ADR-040); more of a Word
@@ -546,10 +549,10 @@ Settings before it is used, and the voices tried by hand on Linux and a Mac (ADR
 
 What remains needs the owner. In the order it matters:
 
-0. **Say when to publish 0.1.0-alpha.2**: a commit `release: 0.1.0-alpha.2` with the
-   version set and its changelog section (`CONTRIBUTING.md` → Releasing) publishes it once
-   every check has passed. And try a natural voice: Settings → Learning → Voice, "Set up"
-   on the one marked best for this computer.
+0. **Try 0.1.0-alpha.2**, installed from its release, and a natural voice in it:
+   Settings → Learning → Voice, "Set up" on the one marked best for this computer. Say when
+   the next version should be published (a commit `release: <version>`, `CONTRIBUTING.md` →
+   Releasing): it would carry American English (ADR-044).
 1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
    They are in a transcript; treat them as used. The owner will, later (said 2026-11-21).
 2. **Sit a generated lesson from start to finish**, asking it a question on the way. Install
