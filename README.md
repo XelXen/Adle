@@ -158,7 +158,8 @@ never used. Zip the folder to move it; run `Adle` inside it to start.
 Windows (it needs [Inno Setup](https://jrsoftware.org/isinfo.php)), a disk image on macOS,
 a `.deb` and a tarball on Linux. Nothing is signed. The installers of a release are not
 made by hand: GitHub builds them on each system, tries each one out there, and publishes
-them when a version is tagged. How, and what is still missing:
+them from a commit that says it is a release (ADR-043). Between releases, the newest Adle
+is the one you build from the source. How, and what is still missing:
 [`docs/engineering/RELEASE_CHECKLIST.md`](docs/engineering/RELEASE_CHECKLIST.md).
 
 ## Configuration

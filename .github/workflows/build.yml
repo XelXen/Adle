@@ -3,8 +3,8 @@ name: Build installers
 # Makes what a person downloads, on each system it is for, and tries it out there: the
 # installer puts the app on the machine, the app is started from outside, and it is taken
 # away again. Then the same files are tried once more on a machine that did not build them.
-# Called by CI, so that packaging stays honest on every system with every push, and by
-# Release, which publishes what this makes.
+# Called by CI, so that packaging stays honest on every system with every push. What it
+# makes for a release commit is what CI publishes (ADR-043).
 
 on:
   workflow_call:

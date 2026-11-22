@@ -8,14 +8,14 @@ stands against the acceptance list in `PLAN.md` section 17. A status is one of `
 
 ## Publishing a version
 
-GitHub does it, from a tag (ADR-034; the steps for a person are in `CONTRIBUTING.md` →
-Releasing). Nothing is built or uploaded by hand.
+GitHub does it, from a release commit on `main` (ADR-043; the steps for a person are in
+`CONTRIBUTING.md` → Releasing). Nothing is built, tagged or uploaded by hand.
 
 | Step | Where | What it proves |
 |---|---|---|
-| 1. The version, its section in the changelog, and green CI on `dev` | `npm run release:notes`; the CI run of that commit | The notes exist; every journey passed on Windows and on Linux; every installer was built and tried out on its own system, where it was built and where it was not |
-| 2. `main` moved forward to that commit, and a tag `v<version>` pushed | `git push origin main`, `git push origin v<version>` | What is released is a commit anyone can read |
-| 3. The Release workflow | `.github/workflows/release.yml` | The tag is the version and the changelog has it; the installers are built again from the tag and tried out again; checksums are written; the release is published (as a pre-release when the version has a hyphen) |
+| 1. The version and its section in the changelog | `npm run release:notes` | The notes exist |
+| 2. A commit `release: <version>`, pushed to `main` on its own | `git push origin main` | What is released is a commit anyone can read |
+| 3. CI for that commit | `.github/workflows/ci.yml` | The subject names an alpha or a stable version that `package.json` and the changelog have, not released from another commit; every journey passed on Windows and on Linux; every installer was built and tried out on its own system, where it was built and where it was not; then those installers are published with their checksums, tagged at that commit (as a pre-release for an alpha) |
 | 4. Download one and open it | The release page | A person has looked at what people will get |
 
 ## Making a build by hand

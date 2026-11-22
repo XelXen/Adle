@@ -1,16 +1,25 @@
 name: CI
 
+# Every push to main is checked whole: the gates and unit tests, every journey on Windows and
+# on Linux, and the installers built and tried out on each system. Nothing of that is
+# published: the latest commit is had by building it from the source.
+#
+# A release is a commit of its own (ADR-043): "release: <version>", the version that
+# package.json and the changelog have, pushed to main. When everything here has passed for
+# it, the installers made and tried for that commit are published as that version, tagged at
+# that commit: a pre-release for an alpha ("0.2.0-alpha.1"), the latest release otherwise.
+
 on:
   push:
-    # Work happens on dev; main is what has been released.
-    branches: [main, dev]
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A newer push stops the checks of an older one, but never a release.
+  group: "ci-${{ github.ref }}-${{ startsWith(github.event.head_commit.message, 'release: ') && github.sha || 'latest' }}"
   cancel-in-progress: true
 
 env:
@@ -18,6 +27,47 @@ env:
   UV_PYTHON_PREFERENCE: only-managed
 
 jobs:
+  release:
+    # Only for a release commit. Said at once if it is not one that can be published, before
+    # anything is built for it.
+    name: Release notes
+    if: "github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: ')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: The commit names this version, it is not released yet, and the changelog has it
+        id: version
+        env:
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          subject=$(printf '%s\n' "$MESSAGE" | head -n 1)
+          version=${subject#release: }
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-alpha\.[0-9]+)?$'; then
+            echo "A release commit says \"release: <version>\", for an alpha (0.2.0-alpha.1) or a stable version (0.2.0). This one says \"$subject\"." >&2
+            exit 1
+          fi
+          released=$(git ls-remote --tags origin "refs/tags/v$version" | cut -f1)
+          if [ -n "$released" ] && [ "$released" != "$GITHUB_SHA" ]; then
+            echo "$version was released already, from $released." >&2
+            exit 1
+          fi
+          node scripts/release-notes.mjs --tag="v$version" > release-notes.md
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+          retention-days: 14
+
   checks:
     name: Static checks and unit tests
     runs-on: ubuntu-latest
@@ -45,6 +95,23 @@ jobs:
         run: |
           uv export --directory services/core --frozen --no-emit-project --no-hashes --format requirements-txt --quiet --output-file requirements-audit.txt
           uv tool run pip-audit -r services/core/requirements-audit.txt --disable-pip --no-deps
+      - name: Dependency audit (Python, the programs a natural voice is set up with)
+        # Downloaded at the learner's word and never shipped (ADR-042). The advisories set
+        # aside here were each read: every one needs a model file or repository Adle did not
+        # pin, or a part of a library the voice never runs (training, converting or saving a
+        # model, building a package, compiling a script). ADR-042 lists them. A new one
+        # fails this step.
+        run: |
+          for lock in services/core/adle_core/voice/data/*.txt; do
+            echo "$lock"
+            uv tool run pip-audit -r "$lock" --disable-pip --no-deps \
+              --ignore-vuln PYSEC-2025-194 \
+              --ignore-vuln PYSEC-2026-3447 --ignore-vuln GHSA-xmj3-9gf7-h52w \
+              --ignore-vuln PYSEC-2026-3804 \
+              --ignore-vuln PYSEC-2025-217 --ignore-vuln PYSEC-2026-2288 \
+              --ignore-vuln PYSEC-2026-2289 --ignore-vuln PYSEC-2026-2290 \
+              --ignore-vuln PYSEC-2026-3929 --ignore-vuln PYSEC-2026-4174
+          done
 
   e2e:
     name: End-to-end (${{ matrix.os }})
@@ -117,3 +184,52 @@ jobs:
     name: Installers
     needs: checks
     uses: ./.github/workflows/build.yml
+    with:
+      # Made for the check and kept a day for it, except a release's: those are published.
+      keep-days: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: ') && 14 || 1 }}"
+
+  publish:
+    # A release commit, once every check above has passed for it: the installers made and
+    # tried for this commit, with their checksums, as the version it names.
+    name: Publish the release
+    needs: [release, checks, e2e, installers]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # To tag the release commit and make the release. Nothing else in CI can write.
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: installer-*
+          merge-multiple: true
+          path: release
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+      - name: Checksums
+        working-directory: release
+        run: |
+          sha256sum Adle-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          # An alpha is a pre-release; any other version is the latest release.
+          kind=(--latest)
+          case "$VERSION" in *-alpha.*) kind=(--prerelease) ;; esac
+          if gh release view "$tag" > /dev/null 2>&1; then
+            # Run again for the same commit (the notes job saw to that): its files are replaced.
+            gh release upload "$tag" release/* --clobber
+            gh release edit "$tag" --notes-file release-notes.md "${kind[@]}"
+          else
+            gh release create "$tag" release/* \
+              --target "$GITHUB_SHA" \
+              --title "Adle $VERSION" \
+              --notes-file release-notes.md \
+              "${kind[@]}"
+          fi

@@ -24,8 +24,9 @@ Installs JavaScript dependencies (`npm ci`), the pinned Electron binary, and the
 
 ## Branches and commits
 
-- Work on `dev` in small commits, or on a short-lived branch `type/short-description` off it.
-  `main` is what was last released: it only ever moves forward to a commit of `dev`.
+- There is one branch, `main` (ADR-043). Work lands there in small commits, or on a
+  short-lived branch `type/short-description` off it that is merged back. Which commits were
+  released is said by the releases, each tagged at its commit.
 - [Conventional Commits](https://www.conventionalcommits.org/):
   `feat(scope): …`, `fix(scope): …`, `test(scope): …`, `docs(scope): …`, `refactor(scope): …`,
   `chore(scope): …`. Scopes in use: `desktop`, `renderer`, `player`, `core`, `generation`,
@@ -43,9 +44,18 @@ places; review `git status` and `git diff --staged` anyway.
 
 ## Releasing
 
-A version is published by GitHub, from a tag (ADR-034). By hand you only say which commit.
+A version is published by GitHub, from a commit that says it is a release (ADR-043). By
+hand you only make that commit. There are three kinds of build:
 
-1. On `dev`, with everything green: set the version.
+| Build | What it is | Where to get it |
+|---|---|---|
+| Canary | Whatever `main` has now | Built from the source (`README.md` → Run from source) |
+| Alpha | A pre-release of a version: `0.2.0-alpha.1` | The releases page, marked pre-release |
+| Stable | A version: `0.2.0` | The releases page, as the latest release |
+
+To publish an alpha or a stable version:
+
+1. On `main`, with everything green, set the version.
    `npm version <version> --workspaces --include-workspace-root --no-git-tag-version`, the
    same in `services/core/pyproject.toml` (as Python writes it: `0.2.0a1` for
    `0.2.0-alpha.1`) followed by `uv lock --project services/core`, and in
@@ -53,15 +63,15 @@ A version is published by GitHub, from a tag (ADR-034). By hand you only say whi
 2. In `CHANGELOG.md`, give the version its own heading with the date, and under it a few
    lines that open the release: they become the top of the release's notes.
    `npm run release:notes` shows what will be published.
-3. `node scripts/check.mjs --e2e`, commit, push `dev`, and wait for CI: it builds the
-   installers on every system and tries each one out, there and on a machine that did not
-   build it.
-4. Move `main` forward to that commit and push it, then tag and push the tag:
-   `git tag v<version>` and `git push origin v<version>`.
-5. The Release workflow builds the installers again from the tag and publishes them with
-   their checksums. A version with a hyphen in it is published as a pre-release. If the tag
-   is not the version in `package.json`, or the changelog does not have it, nothing is
-   published.
+3. `node scripts/check.mjs --e2e`, then commit exactly that, with the subject
+   `release: <version>` and nothing after it, and push it on its own: CI looks at the commit
+   at the head of the push.
+4. CI checks everything for that commit, as for any push. If the subject names a version
+   that `package.json` and the changelog have and that has not been released from another
+   commit, the installers it made and tried are published with their checksums, tagged
+   `v<version>` at that commit: as a pre-release for an alpha, as the latest release
+   otherwise. A failed check publishes nothing; fix it in a new commit and make the release
+   commit again.
 
 ## Code standards
 
