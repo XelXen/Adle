@@ -554,20 +554,21 @@ class _GrowingLesson:
             drawn_on = self._compiler.lesson(late)
             cited = {"source_refs": drawn_on["source_refs"], "grounding": drawn_on["grounding"]}
         lessons = self._service._lessons
-        try:
-            lessons.extend(
-                self.stored_id,
-                [],
-                writing=False,
-                practice=compile_practice(practice, self._lesson_context),
-                **cited,
-            )
-        except (ValidationError, LessonInvalidError):
-            # Its parts are whole without them: only its writing ends.
-            with contextlib.suppress(AdleError):
-                lessons.extend(self.stored_id, [], writing=False)
-        except NotFoundError:
-            return
+        questions = compile_practice(practice, self._lesson_context)
+        # Its parts are whole without the rest: what cannot be taken is left, and its
+        # writing ends whatever else does not.
+        endings: list[dict[str, Any]] = [{"practice": questions, **cited}]
+        if cited:
+            endings.append({"practice": questions})
+        endings.append({})
+        for fields in endings:
+            try:
+                lessons.extend(self.stored_id, [], writing=False, **fields)
+                break
+            except (ValidationError, LessonInvalidError, ValidationFailedError):
+                continue
+            except NotFoundError:
+                return
         if self._service._on_stored is not None:
             self._service._on_stored(self.stored_id)
 

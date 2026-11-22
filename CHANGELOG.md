@@ -46,9 +46,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
   broken; they are shown as meant.
 - Mathematics written in its own symbols (σ, ≤, ∫) in what is read aloud is said in words.
 - Pictures the AI described in ways Adle didn't take are drawn: a formula with words beside
-  it, a function given in up to eight steps, two or three marks on one graph, a choice
-  written as in code (`x >= 0 ? 1 : 0`), and a curve that is flat over most of its range.
-  Words in a picture's labels are set as words, not as a row of italic letters.
+  it, a function given in up to ten steps, a table of up to eight rows, two or three marks
+  on one graph, tanh and erf, a choice written as in code (`x >= 0 ? 1 : 0`), and a curve
+  that is flat over most of its range. Words in a picture's labels are set as words, not
+  as a row of italic letters.
+- A probability shaded as the area under a cumulative curve, which is wrong, is drawn as
+  how much the curve rises, and described that way.
+- A lesson is no longer written twice because one line of its board left its mathematics
+  open: that line is left off.
 - The installer check on Linux could find the app's folder recreated by a process that
   was still ending; it waits for them first.
 

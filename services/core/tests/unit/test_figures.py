@@ -75,6 +75,9 @@ def test_the_figures_the_player_runs_are_what_the_module_writes() -> None:
         ("sqrt(x) + abs(-x)", 4, 6),
         ("ln(e)", 0, 1),
         ("1e-3 * x", 1000, 1),
+        ("tanh(x)", 0, 0),
+        ("0.5 * (1 + erf(x / sqrt(2)))", 0, 0.5),
+        ("log10(x) + log2(x)", 100, 2 + math.log2(100)),
         ("-x", 2, -2),
     ],
 )
@@ -131,7 +134,7 @@ def test_a_curve_without_a_value_where_it_is_drawn_is_refused() -> None:
         {"steps": [r"\def\x{1} \x", "y"]},
         {"steps": ["{x", "y"]},
         {"steps": ["x % comment", "y"]},
-        {"steps": ["a"] * 9},
+        {"steps": ["a"] * 11},
     ],
 )
 def test_an_equation_that_could_not_be_drawn_safely_is_refused(change: dict[str, Any]) -> None:
@@ -459,3 +462,36 @@ def test_a_label_may_say_something_in_words_beside_its_formula() -> None:
     }
     described = compile_figure(figure, beat_seconds=BEATS).described
     assert r"$f(x) = 1/2 \text{ on [0, 2]}$" in described
+
+
+def test_an_area_shaded_under_a_cumulative_curve_is_drawn_as_how_much_it_rises() -> None:
+    """A lesson written without thinking shaded the area under F(x) and called it a
+    probability (2026-11-22). Under a curve the figure calls cumulative, a probability is
+    how much it rises: that is what is drawn, and what is said of it."""
+    cdf = {
+        "kind": "graph",
+        "x": [-1, 11],
+        "curves": [{"f": "(x >= 0 && x <= 10) ? x/10 : (x < 0 ? 0 : 1)", "label": "F_X(x)"}],
+        "shade": {"from": 2, "to": 7, "label": r"P(2 \le X \le 7)"},
+    }
+    compiled = compile_figure(cdf, beat_seconds=BEATS)
+    assert compiled.mended
+    assert assigned(compiled.source, "shade") is None
+    assert [rise[:3] for rise in assigned(compiled.source, "rises")] == [[0, 2.0, 7.0]]
+    assert "how much it rises from $2$ to $7$ marked" in compiled.described
+    # Under a density the area is the probability, and it stays as written.
+    density = {**cdf, "curves": [{"f": "(x >= 0 && x <= 10) ? 0.1 : 0", "label": "f_X(x)"}]}
+    kept = compile_figure(density, beat_seconds=BEATS)
+    assert not kept.mended
+    assert assigned(kept.source, "shade")[1:3] == [2.0, 7.0]
+    # Called cumulative, but falling: not one, and left as written.
+    falling = {**cdf, "x": [0, 10], "curves": [{"f": "1 - x/10", "label": "F(x)"}]}
+    assert not compile_figure(falling, beat_seconds=BEATS).mended
+
+
+def test_a_table_may_have_eight_rows_and_no_more() -> None:
+    """A real lesson's table of a network's values had seven rows (2026-11-22)."""
+    eight = {**EXAMPLES["table"], "rows": [["1", "2", "3"]] * 8, "highlight": [8]}
+    assert compile_figure(eight, beat_seconds=BEATS).kind == "table"
+    with pytest.raises(FigureError, match="rows"):
+        compile_figure({**eight, "rows": [["1", "2", "3"]] * 9}, beat_seconds=BEATS)

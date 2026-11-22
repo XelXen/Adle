@@ -154,6 +154,26 @@ def test_a_figure_the_model_did_not_describe_is_described_by_adle(
     assert said[4] == "A table with the columns input, weight and product, and 2 rows."
 
 
+def test_a_figure_drawn_otherwise_than_written_is_described_by_adle(
+    keyed: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    """A shade under a cumulative curve is drawn as a rise (ADR-045): the model's own
+    words describe a shaded area that is not shown, so Adle's are used."""
+    cdf = {
+        "kind": "graph",
+        "x": [-1, 11],
+        "curves": [{"f": "(x >= 0 && x <= 10) * x / 10 + (x > 10) * 1", "label": "F(x)"}],
+        "shade": {"from": 2, "to": 7, "label": "P(2 < X < 7)"},
+        "description": "The area under the curve between 2 and 7 is shaded.",
+    }
+    provider.queue(drafted(explanation=cdf))
+    result = written(keyed, services)
+    loaded = keyed.get(f"/v1/lessons/{result['lesson_id']}").json()
+    said = loaded["lesson"]["segments"][0]["scene"]["fallback_text"]
+    assert "shaded" not in said
+    assert "how much it rises from $2$ to $7$ marked" in said
+
+
 def test_an_interaction_whose_figure_has_nothing_to_move_is_watched(
     keyed: TestClient, services: Services, provider: FakeProvider
 ) -> None:

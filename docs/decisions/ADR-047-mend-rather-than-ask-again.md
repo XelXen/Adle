@@ -48,6 +48,10 @@ in the workflow: two to two and a half minutes, which can fail somewhere else.
   halved. TeX written once is left as it is.
 - **Everything else that does not hold together is still the one retry**, told what was
   wrong: a missing question, a link, too few parts, a question that checks no objective.
+- **Added the same day:** a line of the board whose mathematics is left open (an odd
+  number of dollar signs), or that is too long to show, is left off; what is said over it
+  stays. A lesson was written twice for one such line (ADR-048's measurements). A link or
+  markup on the board is still refused.
 - **A natural voice begins on a lesson as soon as its words are stored**, in the voice lane,
   when a natural voice reads the lessons (`NarrationService.record_ahead`). It used to begin
   when the lesson was opened, so its first lines were read in the computer's voice while

@@ -790,3 +790,35 @@ def test_the_provider_cannot_be_changed_in_the_moment_a_job_is_starting(
         for job in keyed.get(f"/v1/courses/{course['id']}/jobs").json()["jobs"]:
             services.jobs.cancel(job["id"])
             services.jobs.wait(job["id"], timeout=30)
+
+
+def test_passages_named_after_the_parts_are_not_cited_once_their_source_is_gone(
+    keyed: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    """A source removed while the lesson was written: the passages named after its parts
+    are checked as any are, and the lesson ends without them rather than citing nothing."""
+    from tests.unit.test_lesson_part_by_part import Partway, begun, running
+
+    course = keyed.post(
+        "/v1/courses", json={"title": "Neural networks", "origin": "materials"}
+    ).json()
+    imported = services.sources.start_import(course["id"], [DOCUMENTS / "lecture-notes.pdf"])
+    services.jobs.wait(imported.id, timeout=30)
+    concept = add_concept(keyed, course["id"], "Loss")
+    fields = {key: value for key, value in LESSON.items() if key != "sources"}
+    answer = Partway({**fields, "sources": [1]})
+    provider.queue(answer)
+    job_id = keyed.post(f"/v1/concepts/{concept}/lessons").json()["id"]
+    try:
+        assert answer.waiting.wait(20)
+        running(services, job_id, begun)
+        sources = keyed.get(f"/v1/courses/{course['id']}/sources").json()["sources"]
+        assert keyed.delete(f"/v1/sources/{sources[0]['id']}").status_code == 204
+    finally:
+        answer.go_on.set()
+    done = services.jobs.wait(job_id, timeout=60)
+    assert done.status == "succeeded", done.error_message
+    loaded = keyed.get(f"/v1/lessons/{done.result['lesson_id']}").json()
+    assert loaded["writing"] is False
+    assert loaded["lesson"]["source_refs"] == []
+    assert loaded["lesson"]["grounding"] == "general_knowledge"

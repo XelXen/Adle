@@ -184,7 +184,7 @@ who cannot see it (may contain $math$)}}. TeX below means TeX without dollar sig
 - "equation": "steps", 2 to 8 TeX formulas, each rewritten into the next.
 - "graph": "x": [from, to]; "curves", 1 to 3 of {{"f": a formula in x, "label": TeX,
   optional "from" and "to"}}. A formula uses numbers, x, + - * / ^, brackets, pi, e, and
-  sin cos tan exp log sqrt abs: "exp(-x^2/2)/sqrt(2pi)"; a comparison is 1 where it holds
+  sin cos tan exp log sqrt abs tanh erf: "exp(-x^2/2)/sqrt(2pi)"; a comparison is 1 where it holds
   and 0 where not, for a curve in pieces: "(x >= 0) * exp(-x)". Optional: "y": [from, to],
   "x_label" and "y_label" (TeX), "shade": {{"from", "to", "label"}} (the area under the
   first curve; "curve": 2 for another), "rise": [{{"from", "to", "label"}}] (up to three: how

@@ -260,8 +260,9 @@ everything and decides nothing.
 - **What can be mended in a lesson's answer is mended, not asked for again** (ADR-047):
   notation in narration is said in words (`generation/speech.py`, pure; a line with a link
   or markup is left as it is, to be refused); a practice question that is not whole is left
-  out (`LessonDraft`); a figure that cannot be drawn is told in words. Anything else that
-  does not validate is still the one retry, told what was wrong.
+  out (`LessonDraft`); a board line left open is left off; a figure that cannot be drawn is
+  told in words, and a shade under a cumulative curve is drawn as its rise. Anything else
+  that does not validate is still the one retry, told what was wrong.
 - **A natural voice begins on a lesson as soon as its words are stored**
   (`NarrationService.record_ahead`, which `build_services` gives `GenerationService` as
   `on_stored`). It does nothing when no voice is chosen. What is said never changes after

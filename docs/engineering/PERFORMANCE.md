@@ -173,6 +173,33 @@ choice written `a ? b : c`, and a label with words beside its formula. Each is n
 the model meant it (ADR-045), and the figures of every lesson the model wrote that day are
 drawn: fifty of fifty, in nine answers. Eight requests for these runs.
 
+Run 8 went the whole way again with every fix in: the plan in 81 s, the lesson begun at
+205 s and whole at 245 s, its pictures all there at 472 s (one was an interaction, a scene
+Kimi K3.1 Pro wrote in 228 s), a question in 10 s. The model thought for 30,000 characters
+at "medium" this time, as long as at "high": how long it thinks varies from one request
+to the next by ten times, and nothing Adle sends changes that.
+
+So the one setting below "medium" that the model's reference lists, "none", was measured
+too, by hand, on a copy of the code, and not kept:
+
+| | The chapter's first concept | Backpropagation | Derivatives and the chain rule |
+|---|---|---|---|
+| Thinking | none | none | none |
+| A lesson, until it can be started | **5.5 s** | | |
+| Every part of it written | 44 s | 80 s | 59 s, refused; written again in 51 s |
+| Its figures | 5 of 5 (one area under a cumulative curve) | 4 of 6 | 4 of 5 |
+| What was wrong in it | an area shaded under F(x) | nothing found: every number of its worked example checks out | its first answer left a line of the board open; the second has a question whose answer key, 880, is not what its own explanation works out (292,820), and the explanation has the model's second thoughts in it ("Wait… Let me recheck") |
+
+A learner who answered that question right would be told they were wrong. Without
+thinking first, the model does its working out in the answer itself, and an answer key
+that disagrees with its explanation is not something Adle can mend. A lesson is asked at
+"medium" (ADR-048). The rest of what these answers showed is mended for every setting
+(ADR-045, ADR-047): the area under a curve the figure calls cumulative is drawn as how
+much it rises (three answers at "high" had done the same), tanh and erf are read, a table
+may have eight rows and an equation ten steps, and a board line left open is left off.
+Across every answer the model wrote that day, fourteen, 74 figures of 75 are drawn; the
+one left is a flow of eight steps, which is told in words. Nine more requests.
+
 ## A natural voice (2026-11-21)
 
 On the development machine (an RTX 4080 Laptop GPU with 12 GB, Windows 11), with the voices

@@ -211,9 +211,9 @@ class _Spec(BaseModel):
 
 class EquationFigure(_Spec):
     kind: Literal["equation"]
-    # One step on the stage at a time: eight is a long derivation, or a function given
+    # One step on the stage at a time: ten is a long derivation, or a function given
     # piece by piece, and still a step for each sentence said over it.
-    steps: list[Tex] = Field(min_length=2, max_length=8)
+    steps: list[Tex] = Field(min_length=2, max_length=10)
 
 
 class Curve(_Spec):
@@ -252,7 +252,10 @@ class Rise(_Spec):
 
 
 #: Names a slider cannot have: a formula already means something by them.
-_TAKEN = {"e", "pi", "and", "or", "sin", "cos", "tan", "exp", "log", "ln", "sqrt", "abs"}
+_TAKEN = {
+    "e", "pi", "and", "or", "sin", "cos", "tan", "exp", "log", "ln", "sqrt", "abs", "tanh",
+    "sinh", "cosh", "atan", "erf", "log10", "log2",
+}  # fmt: skip
 
 
 def _slider_name(name: str) -> str:
@@ -347,7 +350,8 @@ Cell = Annotated[str, StringConstraints(max_length=90)]
 class TableFigure(_Spec):
     kind: Literal["table"]
     header: list[Cell] = Field(min_length=1, max_length=4)
-    rows: list[list[Cell]] = Field(min_length=1, max_length=6)
+    # Each row is as tall as the stage has room for (``_table``): eight still read.
+    rows: list[list[Cell]] = Field(min_length=1, max_length=8)
     highlight: list[int] = Field(default_factory=list, max_length=6)
 
 
@@ -415,6 +419,9 @@ class CompiledFigure:
     #: What it shows, in words, said by Adle from its data: for a figure the model did not
     #: describe, so that it still has a text to stand for it (``describe``).
     described: str
+    #: Drawn otherwise than written (``_rise_for_shade``): the model's own words for it
+    #: describe what is not drawn, and Adle's are used instead.
+    mended: bool = False
 
 
 def _without_blanks(value: Any) -> Any:
@@ -449,9 +456,69 @@ def read_figure(raw: object) -> Any:
         raise FigureError(problems[:8]) from error
 
 
+#: A curve named as a cumulative one: F(x), F_X(x), a CDF. A density is f, in lower case.
+_NAMED_CUMULATIVE = re.compile(r"(?<![A-Za-z\\])F\s*(?:_|\(|\\left\()")
+_SAID_CUMULATIVE = re.compile(r"\bCDF\b|cumulative", re.IGNORECASE)
+
+
+def _is_cumulative(figure: GraphFigure, index: int) -> bool:
+    """Whether a curve of a graph is a cumulative distribution: named as one, never falling,
+    and running between 0 and 1."""
+    if not 0 <= index < len(figure.curves):
+        return False
+    curve = figure.curves[index]
+    words = " ".join(text for text in (curve.label, figure.y_label) if text)
+    if not (_NAMED_CUMULATIVE.search(words) or _SAID_CUMULATIVE.search(words)):
+        return False
+    slider = figure.slider if figure.slider is not None and figure.slider.name != "x" else None
+    x0, x1 = sorted(figure.x)
+    start = x0 if curve.start is None else max(x0, curve.start)
+    end = x1 if curve.end is None else min(x1, curve.end)
+    try:
+        value = _function(_python_expression(curve.f, slider.name if slider else None))
+        heights = [value(x, slider.value if slider else 0.0) for x in _samples(start, end)]
+    except (FigureError, ValueError, ZeroDivisionError, OverflowError):
+        return False
+    if not all(math.isfinite(height) for height in heights):
+        return False
+    rising = all(after >= before - 1e-9 for before, after in itertools.pairwise(heights))
+    low, high = min(heights), max(heights)
+    return rising and low >= -0.02 and high <= 1.02 and high - low >= 0.3
+
+
+def _rise_for_shade(figure: GraphFigure) -> tuple[GraphFigure, bool]:
+    """A probability is the area under a density; on a cumulative curve it is how much the
+    curve rises. A model that shades under a curve it calls cumulative means the rise, and
+    the area would be a wrong picture of it: it is drawn as the rise (ADR-045). Whether it
+    was."""
+    shade = figure.shade
+    if shade is None or len(figure.rise) >= 3:
+        return figure, False
+    items: list[Shade | Rise | GraphPoint] = [shade, *figure.rise, *figure.points]
+    named = [item for item in items if "curve" in item.model_fields_set]
+    first = 0 if any(item.curve == 0 for item in named) else 1
+    index = shade.curve - first if "curve" in shade.model_fields_set else 0
+    try:
+        ends = [float(shade.start), float(shade.end)]
+    except ValueError:
+        return figure, False  # an end follows the slider: a rise cannot
+    if not _is_cumulative(figure, index):
+        return figure, False
+    written: dict[str, Any] = {"from": ends[0], "to": ends[1]}
+    if shade.label:
+        written["label"] = shade.label
+    if "curve" in shade.model_fields_set:
+        written["curve"] = shade.curve
+    rise = Rise.model_validate(written)
+    return figure.model_copy(update={"shade": None, "rise": [*figure.rise, rise]}), True
+
+
 def compile_figure(raw: object, *, beat_seconds: Sequence[float]) -> CompiledFigure:
     """The scene file for a figure, paced to the beats said over it."""
     figure = read_figure(raw)
+    mended = False
+    if isinstance(figure, GraphFigure):
+        figure, mended = _rise_for_shade(figure)
     beats = [max(1.5, float(seconds)) for seconds in beat_seconds] or [6.0]
     writers: dict[str, Callable[[Any, list[float]], tuple[str, bool]]] = {
         "equation": _equation,
@@ -467,7 +534,11 @@ def compile_figure(raw: object, *, beat_seconds: Sequence[float]) -> CompiledFig
     }
     source, interactive = writers[figure.kind](figure, beats)
     return CompiledFigure(
-        kind=figure.kind, source=source, interactive=interactive, described=describe(figure)
+        kind=figure.kind,
+        source=source,
+        interactive=interactive,
+        described=describe(figure),
+        mended=mended,
     )
 
 
@@ -759,6 +830,15 @@ _FUNCTIONS = {
     "ln": "math.log",
     "sqrt": "math.sqrt",
     "abs": "abs",
+    # A network's activation, and a normal distribution's cumulative curve: the player's
+    # own math has each of these, as Python's does.
+    "tanh": "math.tanh",
+    "sinh": "math.sinh",
+    "cosh": "math.cosh",
+    "atan": "math.atan",
+    "erf": "math.erf",
+    "log10": "math.log10",
+    "log2": "math.log2",
 }
 _CONSTANTS = {"pi": "math.pi", "e": "math.e"}
 _TOKEN = re.compile(

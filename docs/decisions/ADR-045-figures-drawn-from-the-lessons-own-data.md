@@ -106,6 +106,15 @@ lines, reliably; writing the program that draws it is where the time and the fai
   samples far larger than the curve's range is looked at closely, so that only a pole (1/x
   across 0) is refused, never a step or a steep climb on a curve that is flat elsewhere.
   Measured on every lesson the model wrote that day: fifty figures of fifty are drawn.
+- **Added the same day, from lessons written with and without thinking:** an area shaded
+  under a curve the figure calls cumulative (named F or a CDF, never falling, between 0
+  and 1) is drawn as how much the curve rises between the same two values, and described
+  as such by Adle, since the model's own words describe what is not drawn
+  (`CompiledFigure.mended`). Four answers did this, three of them at "high". A formula may
+  also use tanh, sinh, cosh, atan, erf, log10 and log2, which the player's math has; a
+  table may have eight rows and an equation ten steps. A flow stays at six steps: eight
+  leave no room for the arrows between them. Across fourteen answers, 74 figures of 75
+  are drawn (`scripts/dev/figure_census.py`).
 
 ## Consequences
 

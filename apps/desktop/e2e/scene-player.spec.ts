@@ -517,7 +517,7 @@ const sceneSets = [
     name: 'figures',
     directory: path.join(desktopDir, 'e2e', 'fixtures', 'figures'),
     prefix: 'fg',
-    atLeast: 16,
+    atLeast: 17,
   },
 ] as const;
 

@@ -72,6 +72,15 @@ EXAMPLES: dict[str, dict[str, Any]] = {
             {"from": 5, "to": 8, "label": r"P(5 < X \le 8)"},
         ],
     },
+    "graph_functions": {
+        "kind": "graph",
+        "x": [-3, 3],
+        "x_label": "x",
+        "curves": [
+            {"f": "tanh(x)", "label": r"\tanh x"},
+            {"f": "0.5 * (1 + erf(x / sqrt(2)))", "label": r"\Phi(x)"},
+        ],
+    },
     "bars": {
         "kind": "bars",
         "labels": ["0", "1", "2"],

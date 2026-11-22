@@ -78,6 +78,9 @@ it in front of a bar. Two things made it long.
   (`ModelSpec.reasoning_for`), checked against the real endpoint by hand. Every other kind
   of request is sent nothing new: a course plan was no quicker at "medium" (62 seconds,
   against 18 to 52 at the default), and a question during a lesson is already quick.
+  "none", the one setting below, was measured and not kept: a lesson could be begun at 5.5
+  seconds, but one lesson of four had a question whose answer key contradicted its own
+  explanation, which held the model's second thoughts (PERFORMANCE.md). Accuracy first.
 
 ## Consequences
 

@@ -610,3 +610,19 @@ def test_what_a_draft_called_something_is_quoted_back_short_and_plain() -> None:
 )
 def test_tex_escaped_twice_is_shown_as_it_was_meant(written: str, meant: str | None) -> None:
     assert tidy(written) == (meant if meant is not None else written)
+
+
+def test_a_line_of_the_board_left_open_is_left_off_and_the_lesson_kept() -> None:
+    """A real lesson was written twice for one board line whose mathematics was not
+    closed (2026-11-22). The line is left off; what is said over it stays."""
+    draft = copy.deepcopy(LESSON)
+    beat = draft["segments"][0]["beats"][0]
+    beat["show"] = r"$\frac{dL}{dw} = \frac{dL}{dy} \cdot \frac{dy}{dw}"
+    lesson = Lesson.model_validate(compile_lesson(parse_lesson_draft(draft), CONTEXT).lesson)
+    first = lesson.segments[0].narration[0]
+    assert first.show is None
+    assert first.text
+    # A line that is whole is shown as it was written.
+    beat["show"] = "$y = wx + b$"
+    whole = Lesson.model_validate(compile_lesson(parse_lesson_draft(draft), CONTEXT).lesson)
+    assert whole.segments[0].narration[0].show == "$y = wx + b$"

@@ -448,13 +448,20 @@ def parse_lesson_draft(data: dict[str, Any]) -> LessonDraft:
 _SECONDS_FOR = {"checkpoint": 45, "interaction": 60, "reflection": 25}
 
 
+#: The most a line on the board may hold (``Display`` in the Lesson IR).
+MAX_BOARD_CHARACTERS = 600
+
+
 def _narration(beats: list[BeatDraft]) -> list[dict[str, Any]]:
     narration = []
     for beat in beats[:MAX_BEATS]:
         # Narration is read aloud: notation in it is said in words (generation/speech.py).
         entry: dict[str, Any] = {"text": spoken(tidy(beat.say))}
         shown = _text(beat.show)
-        if shown:
+        # A line on the board whose mathematics is not closed, or that is too long to show,
+        # is left off: the words said over it stay, and a lesson is not written again for
+        # one line of its board (ADR-047). Anything else wrong with it is still refused.
+        if shown and shown.count("$") % 2 == 0 and len(shown) <= MAX_BOARD_CHARACTERS:
             entry["show"] = shown
         narration.append(entry)
     return narration
@@ -788,6 +795,9 @@ def _figure(raw: dict[str, Any], narration: list[dict[str, Any]]) -> Any:
     except FigureError:
         return None
     try:
+        if drawn.mended:
+            # Drawn otherwise than the model wrote it: its words describe what is not shown.
+            raise ValidationError.from_exception_data("mended", [])
         described = _LONG_DISPLAY.validate_python(tidy(str(raw.get("description") or "")))
     except ValidationError:
         # The model said nothing usable of it (nothing at all, or a link): Adle says what

@@ -328,6 +328,9 @@ class LessonService:
             bundle = parse_bundle(
                 {"lesson": document, "scenes": scenes, "pending_scene_ids": coming}
             )
+            if source_refs is not None:
+                # What it cites must still be in its course, as when a lesson is stored.
+                self._check_references(session, bundle.lesson)
             row.document = bundle.lesson.model_dump(mode="json")
             row.pending_scenes = coming
             row.estimated_minutes = bundle.lesson.estimated_minutes
