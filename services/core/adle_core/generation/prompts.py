@@ -142,15 +142,15 @@ def _passages(passages: Sequence[Passage]) -> str:
 # -- a lesson ---------------------------------------------------------------------
 
 _LESSON_FORMAT = f"""\
-The JSON object:
+The JSON object, its keys in this order:
 
 {{
   "title": "short title of the lesson",
   "strategy": one of {", ".join(f'"{name}"' for name in STRATEGIES)},
   "sources": [numbers of the excerpts used, or empty],
+  "voice": "one sentence: how the narrator of this lesson sounds",
   "segments": [ 7 to 10 segments, in teaching order ],
-  "practice": [ 3 more questions, in the same form as a checkpoint's "question" ],
-  "voice": "one sentence: how the narrator of this lesson sounds"
+  "practice": [ 3 more questions, in the same form as a checkpoint's "question" ]
 }}
 
 "voice" is read by a speech model that designs the narrator's voice from it: its warmth,

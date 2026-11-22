@@ -379,6 +379,27 @@ def test_a_lesson_cites_only_passages_it_was_given(
     assert lesson["source_refs"][0]["locator"].startswith("page ")
 
 
+def test_passages_named_only_after_a_lessons_parts_are_still_cited(
+    keyed: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    """A lesson begun at its first part (ADR-048) is stored before the end of its answer:
+    the passages it draws on, written after its parts, are added when the answer ends."""
+    course = keyed.post(
+        "/v1/courses", json={"title": "Neural networks", "origin": "materials"}
+    ).json()
+    imported = services.sources.start_import(course["id"], [DOCUMENTS / "lecture-notes.pdf"])
+    services.jobs.wait(imported.id, timeout=30)
+    concept = add_concept(keyed, course["id"], "Loss")
+    answer = {key: value for key, value in LESSON.items() if key != "sources"}
+    provider.queue({**answer, "sources": [1]})
+
+    job = finished(services, keyed.post(f"/v1/concepts/{concept}/lessons"))
+    assert job["status"] == "succeeded", job
+    lesson = keyed.get(f"/v1/lessons/{job['result']['lesson_id']}").json()["lesson"]
+    assert lesson["grounding"] == "materials"
+    assert [ref["source_name"] for ref in lesson["source_refs"]] == ["lecture-notes.pdf"]
+
+
 def test_text_in_a_document_cannot_close_its_block_or_pose_as_adle(
     keyed: TestClient, services: Services, provider: FakeProvider, tmp_path: Path
 ) -> None:

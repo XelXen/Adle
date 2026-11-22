@@ -87,7 +87,6 @@ from adle_core.generation.drafts import (
     extract_python_file,
     mend_backslashes,
     parse_lesson_draft,
-    voice_description,
 )
 from adle_core.generation.provider import (
     ChatRequest,
@@ -119,6 +118,7 @@ from adle_core.lessons.ir import (
     SceneRef,
     TrueFalseItem,
 )
+from adle_core.logs import where
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +257,11 @@ def _header_of(text: str) -> LessonHeaderDraft | None:
 FIGURE_WAIT_WHILE_WRITING = 15.0
 
 
+class _LessonBegunError(Exception):
+    """The model writing a lesson that has begun stopped, and another would be asked to
+    write the whole of it again from its first word: it is not (ADR-048)."""
+
+
 class _GrowingLesson:
     """A lesson begun at its first part while the model writes the rest, and grown by each
     part as it is finished (ADR-048).
@@ -274,7 +279,8 @@ class _GrowingLesson:
         self._service = service
         self._lesson_context = lesson_context
         self._job = job
-        self._lock = threading.Lock()
+        # Re-entrant: what is read under it (``begun``) is read inside it too.
+        self._lock = threading.RLock()
         self._stream = PartStream()
         self._header: LessonHeaderDraft | None = None
         self._compiler = LessonCompiler(lesson_context)
@@ -284,8 +290,10 @@ class _GrowingLesson:
         #: Who is writing the answer, as its answer will say once it has ended.
         self._writer: ChatResult | None = None
         self._left_out = 0
-        #: Why it ended before all of its parts came: "stopped", "failed", or "another"
-        #: when another model began the answer again after the lesson had begun.
+        #: Figures said in words: neither drawn nor still to come.
+        self._unmade = 0
+        #: Why it ended before all of its parts came: "stopped" by the learner, "failed"
+        #: when the answer stopped short, or "another" when another model began it again.
         self._cut: str | None = None
         self.stored_id: str | None = None
         self.title = ""
@@ -295,12 +303,15 @@ class _GrowingLesson:
 
     @property
     def begun(self) -> bool:
-        return self.stored_id is not None
+        with self._lock:
+            return self.stored_id is not None
 
     @property
     def doing(self) -> str | None:
         """What the job is doing once the lesson can be taken."""
-        return "Writing the rest of the lesson" if self.begun and not self._closed else None
+        with self._lock:
+            writing = self.stored_id is not None and not self._closed
+        return "Writing the rest of the lesson" if writing else None
 
     # -- what the request is told -----------------------------------------------------------
 
@@ -339,18 +350,26 @@ class _GrowingLesson:
                 self._closed = True
                 self._cut = "another"
 
+    def close(self) -> bool:
+        """Take nothing more from this answer, once a part being taken is done: a request
+        can end while its own thread is still storing one. Whether the lesson has begun."""
+        with self._lock:
+            self._closed = True
+            return self.stored_id is not None
+
     # -- after the answer -------------------------------------------------------------------
 
-    def finish(self, answer: str) -> None:
-        """The whole answer has come: any parts not taken yet, the questions kept for
-        practice and the narrator's voice, and the lesson's writing ends."""
+    def finish(self, result: ChatResult) -> None:
+        """The whole answer has come: any parts not taken yet, and the questions kept for
+        practice; then the lesson's writing ends. An answer that stopped before its list of
+        parts closed (it ran out of room, or its stream ended early) is said to have."""
         with self._lock:
             if self.stored_id is None:
                 return
             practice: list[QuestionDraft] = []
-            voice: str | None = None
+            late: LessonHeaderDraft | None = None
             try:
-                whole = extract_json_object(answer)
+                whole = extract_json_object(result.text)
             except DraftError:
                 whole = {}
             if not self._closed:
@@ -360,18 +379,21 @@ class _GrowingLesson:
                         if self._ended():
                             break
                         self._take(json.dumps(raw))
-                for item in whole.get("practice") or []:
+                elif not self._stream.finished_parts:
+                    self._cut = self._cut or "failed"
+                extras = whole.get("practice")
+                for item in extras if isinstance(extras, list) else []:
                     try:
                         practice.append(QuestionDraft.model_validate(item))
                     except ValidationError:
                         continue
-                if isinstance(whole.get("voice"), str):
-                    voice = whole["voice"]
-            self._end(practice, voice)
+                # What a model wrote about the lesson after its parts, when not before.
+                late = _header_of(json.dumps({**whole, "segments": []})) if whole else None
+            self._end(practice, late)
 
     def cut_short(self, *, stopped: bool) -> None:
-        """The answer ended before its parts did: stopped by the learner, or the provider
-        failed. The lesson keeps the parts it has."""
+        """The answer ended before its parts did: stopped by the learner, or anything else
+        that ended it. The lesson keeps the parts it has."""
         with self._lock:
             if self.stored_id is None:
                 return
@@ -388,18 +410,19 @@ class _GrowingLesson:
             return self._writer if self._writer is not None else result
 
     def work(self) -> _LessonWork:
-        assert self.stored_id is not None
-        return _LessonWork(
-            stored_id=self.stored_id,
-            title=self.title,
-            figures=[],
-            briefs=[] if self._cut == "stopped" else list(self._briefs),
-            planned=self.planned + len(self._briefs),
-            made=self.made,
-            notes=list(self.notes),
-            begun_early=True,
-            stopped=self._cut == "stopped",
-        )
+        with self._lock:
+            assert self.stored_id is not None
+            return _LessonWork(
+                stored_id=self.stored_id,
+                title=self.title,
+                figures=[],
+                briefs=[] if self._cut == "stopped" else list(self._briefs),
+                planned=self.planned + len(self._briefs),
+                made=self.made,
+                notes=list(self.notes),
+                begun_early=True,
+                stopped=self._cut == "stopped",
+            )
 
     # -- internals --------------------------------------------------------------------------
 
@@ -413,6 +436,7 @@ class _GrowingLesson:
             self._closed = True
             return False
         figures, briefs = len(self._compiler.figures), len(self._compiler.scenes)
+        kept = len(self._compiler.segments)
         try:
             problems = self._compiler.add(
                 SegmentDraft.model_validate(json.loads(mend_backslashes(text)))
@@ -427,12 +451,17 @@ class _GrowingLesson:
                 self._left_out += 1
                 logger.info("generation.part_left_out")
             return False
+        if len(self._compiler.segments) == kept:
+            # Past the most parts a lesson has: passed over, as in a lesson taken whole.
+            return False
         new_figures = self._compiler.figures[figures:]
         new_briefs = self._compiler.scenes[briefs:]
         pending = [item.scene_id for item in new_figures] + [b.scene_id for b in new_briefs]
         lessons = self._service._lessons
         if self.stored_id is None:
-            lesson = self._compiler.lesson(self._header)
+            # The narrator's voice is the one known now, and it stays: what the lesson
+            # sounds like does not change while someone is listening.
+            lesson = self._compiler.lesson(self._header, voice=self._header.voice)
             try:
                 Lesson.model_validate(lesson)
                 bundle = parse_bundle(
@@ -494,13 +523,14 @@ class _GrowingLesson:
             if taken:
                 self.made += 1
             else:
+                self._unmade += 1
                 self.notes.append(
                     f"The picture for “{figure.title}” couldn’t be shown, so that part is "
                     "explained in words."
                 )
             self._publish()
 
-    def _end(self, practice: Sequence[QuestionDraft], voice: str | None) -> None:
+    def _end(self, practice: Sequence[QuestionDraft], late: LessonHeaderDraft | None) -> None:
         assert self.stored_id is not None
         self._closed = True
         if self._compiler.dropped:
@@ -518,6 +548,11 @@ class _GrowingLesson:
             )
         elif self._cut is not None:
             self.notes.append("The AI stopped partway through this lesson, so it ends early.")
+        # The passages it draws on, where the answer named them only after its parts.
+        cited: dict[str, Any] = {}
+        if late is not None and late.sources and self._header and not self._header.sources:
+            drawn_on = self._compiler.lesson(late)
+            cited = {"source_refs": drawn_on["source_refs"], "grounding": drawn_on["grounding"]}
         lessons = self._service._lessons
         try:
             lessons.extend(
@@ -525,7 +560,7 @@ class _GrowingLesson:
                 [],
                 writing=False,
                 practice=compile_practice(practice, self._lesson_context),
-                voice=voice_description(voice),
+                **cited,
             )
         except (ValidationError, LessonInvalidError):
             # Its parts are whole without them: only its writing ends.
@@ -547,7 +582,7 @@ class _GrowingLesson:
                 self.title,
                 self.planned + len(self._briefs),
                 self.made,
-                self.planned - self.made + len(self._briefs),
+                self.planned - self.made - self._unmade + len(self._briefs),
                 self.notes,
                 self._writers(),
             )
@@ -816,6 +851,10 @@ class GenerationService:
             )
 
         def standing_in(unavailable: str, following: str, why: str) -> None:
+            if parts is not None and parts.begun:
+                # The learner may be in the lesson already: no other model is asked to
+                # write the whole of it again (ADR-048). It ends where it is.
+                raise _LessonBegunError
             # Said while it happens, so that a longer wait has its reason beside it.
             if outline is not None:
                 outline.start_again()
@@ -1247,26 +1286,44 @@ class GenerationService:
                 earlier=inputs.earlier,
             )
             growing = _GrowingLesson(self, inputs.context, context)
-            result: ChatResult | None
+            result: ChatResult | None = None
             try:
-                result = self._ask(
-                    request, context, 0, planned, doing, outline=Outline(named=True), parts=growing
-                )
-            except (JobCancelledError, ProviderError) as error:
-                if not growing.begun:
-                    raise
-                # Stopped, or the provider failed, once the learner could begin: the lesson
-                # keeps the parts it has and ends there, never written again (ADR-048).
-                growing.cut_short(stopped=isinstance(error, JobCancelledError))
-                result = None
-            if growing.begun:
-                if result is not None:
-                    growing.finish(result.text)
-                author = growing.author(result)
-                if author is not None:
-                    answers.append(author)
-                work = growing.work()
-                break
+                try:
+                    result = self._ask(
+                        request,
+                        context,
+                        0,
+                        planned,
+                        doing,
+                        outline=Outline(named=True),
+                        parts=growing,
+                    )
+                except Exception as error:
+                    # The request's own thread may still be storing a part: wait for it,
+                    # and take nothing more.
+                    if not growing.close():
+                        raise
+                    # Whatever ended the answer once the learner could begin, the lesson
+                    # keeps the parts it has and ends there, never written again (ADR-048).
+                    stopped = isinstance(error, JobCancelledError)
+                    if not isinstance(error, JobCancelledError | ProviderError | _LessonBegunError):
+                        logger.info("generation.lesson_cut_short\n%s", where(error))
+                    growing.cut_short(stopped=stopped)
+                    result = None
+                if growing.begun:
+                    if result is not None:
+                        growing.finish(result)
+                    author = growing.author(result)
+                    if author is not None:
+                        answers.append(author)
+                    work = growing.work()
+                    break
+            except BaseException:
+                if growing.stored_id is not None:
+                    # Nothing may be left being written, however this ended.
+                    with contextlib.suppress(Exception):
+                        self._lessons.settle_unfinished(growing.stored_id)
+                raise
             assert result is not None
             try:
                 compiled = compile_lesson(

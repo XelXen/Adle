@@ -337,14 +337,14 @@ class LessonHeaderDraft(_Draft):
     strategy: str = "visual"
     #: The numbers of the supplied passages the lesson draws on.
     sources: list[int] = Field(default_factory=list)
+    #: How the narrator sounds, in a sentence. A lesson without one is read in Adle's own.
+    voice: str | None = None
 
 
 class LessonDraft(LessonHeaderDraft):
     segments: list[SegmentDraft] = Field(min_length=1)
     #: Questions that are not part of the lesson's flow, kept for practice and review.
     practice: list[QuestionDraft] = Field(default_factory=list)
-    #: How the narrator sounds, in a sentence. A lesson without one is read in Adle's own.
-    voice: str | None = None
 
     @field_validator("practice", mode="before")
     @classmethod

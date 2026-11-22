@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import type { RecordedNarrator } from '../lesson/recorded';
 import { callCore } from './core-client';
@@ -32,17 +32,31 @@ function soundOf(clip: { mime: string; data: string }): string {
  * already recorded are handed to the narrator as the lesson opens; if some are not, the
  * lesson is recorded, in the background, and each line is handed over as it is done. A line
  * not yet recorded is read as before: nothing waits for a recording.
+ *
+ * A lesson still being written has more lines as its parts come (ADR-048): those are looked
+ * for too, and what was handed over already stays with the narrator, which plays it by its
+ * address. The sounds are let go only when the lesson or the narrator changes.
  */
 export function useRecordedNarration(
   lessonId: string,
   narrator: RecordedNarrator | null,
   lines: number,
 ): void {
+  const given = useRef<{ urls: string[]; handed: Set<string> }>({ urls: [], handed: new Set() });
+
+  useEffect(() => {
+    const held = given.current;
+    return () => {
+      for (const url of held.urls) URL.revokeObjectURL(url);
+      held.urls.length = 0;
+      held.handed.clear();
+    };
+  }, [lessonId, narrator]);
+
   useEffect(() => {
     if (!narrator) return;
     let stopped = false;
-    const urls: string[] = [];
-    const handed = new Set<string>();
+    const { urls, handed } = given.current;
 
     const take = async (): Promise<{ lines: number; recording: boolean }> => {
       const narration = await callCore('narration.get', { path: { lesson_id: lessonId } });
@@ -79,7 +93,6 @@ export function useRecordedNarration(
 
     return () => {
       stopped = true;
-      for (const url of urls) URL.revokeObjectURL(url);
     };
   }, [lessonId, narrator, lines]);
 }

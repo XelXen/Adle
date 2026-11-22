@@ -186,8 +186,9 @@ everything and decides nothing.
   its first whole part with `writing` set, then adds each later whole part after the last
   with `LessonService.extend`, which puts the whole lesson through `parse_bundle` again.
   A part already stored is never changed; a later part that cannot be used is left out
-  and said; once begun the lesson is never written again (no retry), and a stop or a
-  failing provider keeps what there is. Until the first part is whole the whole answer
+  and said; once begun the lesson is never written again (no retry, and no other model
+  stood in: `_LessonBegunError` ends the answer instead), and whatever ends the answer
+  keeps what there is and ends the writing (`close`, then `cut_short`). Until the first part is whole the whole answer
   decides, with its one retry, as it always did. Each figure is tried and settled as its
   part is stored; the job reports the `drawing` stage once every word is written. Who
   writes it is stored with its first part (`on_writer`).

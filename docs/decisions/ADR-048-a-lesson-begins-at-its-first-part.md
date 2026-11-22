@@ -39,9 +39,13 @@ it in front of a bar. Two things made it long.
 - **Until the first part is whole, the whole answer decides**, as before: a first part
   that cannot be used means nothing is stored, and the one retry is told what was wrong.
   **Once a lesson has begun, it is never written again.** A later part that cannot be used
-  is left out, and the lesson says so at its end; stopped by the learner, or the provider
-  failing, it keeps the parts it has and says it ends early. Another model that starts
-  the answer again after a fallback is not mixed into a lesson already begun.
+  is left out, and the lesson says so at its end. No other model is asked to write it
+  again: where the gateway would stand another model in, the answer ends instead, since
+  the whole of the other's answer would be thrown away. Whatever ends the answer once
+  the lesson has begun (the learner's stop, a provider that fails, an answer that runs
+  out of room before its list of parts closes, anything else) ends the lesson's writing
+  there: it keeps the parts it has and says it ends early. A stop that comes while the
+  first part is being stored waits for that part, and takes no more.
 - **Each figure is tried and taken in as soon as its part is stored** (ADR-045, ADR-038):
   the learner may be about to begin that part. Its trial is waited for 15 seconds at most
   (`FIGURE_WAIT_WHILE_WRITING`), since the parts after it are not read meanwhile; one that
@@ -49,12 +53,19 @@ it in front of a bar. Two things made it long.
   asked for once every word is written, as before: one request at a time at a provider.
 - **Who writes it is kept from its first part**: the gateway says who is writing when a
   model begins to write (`on_writer`), as the answer will say at its end.
+- **What the lesson is comes before its parts**: the prompt asks for its keys in order,
+  title, strategy, sources and the narrator's voice first. The voice known when the lesson
+  begins is its voice: one written only after the parts is not used, since what the lesson
+  sounds like does not change while someone listens (and a natural voice would record
+  every line again). Passages named only after the parts are added when the answer ends:
+  they change no part.
 - **The core says when the words are all written**: the job reports the `drawing` stage
   before it says anything more about the lesson, so nothing reads the lesson as still
   being written once only its pictures are left.
 - **In the lesson** the parts grow at the end (`LessonController.extend`, found by
   `useLessonUpdates`): "Part 1 of 2 so far", and a bar in the list of parts for those still
-  to come. At the end of what is written the learner waits there ("The next part is being
+  to come. A natural voice's recordings stay with the narrator as the lesson grows; only
+  the new lines are fetched. At the end of what is written the learner waits there ("The next part is being
   written. It starts when it's ready."), and goes on into the next part by itself when it
   comes. The last part so far is not the last: it never says "Finish lesson" while more
   are coming, and "About N minutes" is not said for a lesson opened before its length was

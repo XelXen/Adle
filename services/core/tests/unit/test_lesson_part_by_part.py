@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import json
 import threading
+import time
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -321,3 +322,176 @@ def test_a_model_that_fails_before_its_first_part_is_passed_over_as_before(
     provider.queue(ProviderUnavailableError())
     job = services.jobs.wait(keyed.post(f"/v1/concepts/{concept}/lessons").json()["id"], timeout=30)
     assert job.status == "failed"
+
+
+# -- what ends an answer once the lesson has begun (a review, 2026-11-22) -----------------------
+
+NVIDIA_KEY = "nvapi-test-0123456789abcdefghijkl"
+
+
+def nvidia(client: TestClient) -> None:
+    """NVIDIA chosen: a provider with other models to stand in for a lesson's (ADR-039)."""
+    chosen = client.put(
+        "/v1/provider/credential", json={"api_key": NVIDIA_KEY, "provider_id": "nvidia"}
+    )
+    assert chosen.status_code == 204
+    assert client.put("/v1/provider/selection", json={"selection": "nvidia"}).status_code == 204
+
+
+def stream(*events: dict[str, Any], done: bool = True) -> httpx.Response:
+    body = "".join(f"data: {json.dumps(item)}\n\n" for item in events)
+    return httpx.Response(
+        200,
+        headers={"content-type": "text/event-stream"},
+        text=body + ("data: [DONE]\n\n" if done else ""),
+    )
+
+
+def first_parts(count: int, lesson: dict[str, Any] = LESSON) -> dict[str, Any]:
+    """The answer as far as the end of its first ``count`` parts, as one piece."""
+    text = json.dumps(lesson)
+    return {"choices": [{"delta": {"content": text[: until_parts(text, count)]}}]}
+
+
+ENDS_EARLY = "The AI stopped partway through this lesson, so it ends early."
+
+
+def test_no_other_model_is_asked_to_write_a_lesson_that_has_begun(
+    client: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    """A model that fails partway once the learner could begin ends the lesson there. The
+    next model is not asked for the whole lesson again, only to have it thrown away."""
+    nvidia(client)
+    _, concept = a_concept(client)
+    provider.queue(stream(first_parts(2), {"error": {"message": "upstream went away"}}, done=False))
+    job_id = client.post(f"/v1/concepts/{concept}/lessons").json()["id"]
+    done = services.jobs.wait(job_id, timeout=60)
+    assert done.status == "succeeded", done.error_message
+    assert provider.kinds().count("lesson") == 1
+    loaded = client.get(f"/v1/lessons/{done.result['lesson_id']}").json()
+    assert loaded["writing"] is False
+    assert len(loaded["lesson"]["segments"]) == 2
+    assert ENDS_EARLY in done.result["notes"]
+
+
+def test_whatever_ends_the_answer_once_begun_ends_the_lessons_writing(
+    keyed: TestClient, services: Services, provider: FakeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Not only a stop or a provider's failure: anything that ends the answer once the
+    learner could begin ends the lesson's writing, and the lesson is kept as it is."""
+    _, concept = a_concept(keyed)
+    lessons = services.generation._lessons
+    real = lessons.extend
+    calls = {"made": 0}
+
+    def extend(*args: Any, **kwargs: Any) -> None:
+        calls["made"] += 1
+        if calls["made"] == 2:
+            raise RuntimeError("something nobody expected")
+        real(*args, **kwargs)
+
+    monkeypatch.setattr(lessons, "extend", extend)
+    provider.queue(LESSON)
+    job_id = keyed.post(f"/v1/concepts/{concept}/lessons").json()["id"]
+    done = services.jobs.wait(job_id, timeout=60)
+    assert done.status == "succeeded", done.error_message
+    loaded = keyed.get(f"/v1/lessons/{done.result['lesson_id']}").json()
+    assert loaded["writing"] is False
+    assert 1 <= len(loaded["lesson"]["segments"]) < len(LESSON["segments"])
+    assert ENDS_EARLY in done.result["notes"]
+
+
+def test_an_answer_that_stops_before_its_parts_close_says_the_lesson_ends_early(
+    keyed: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    """Out of room, or a stream that ends early: the parts there are make the lesson, and
+    the learner is told it ends early, as when the provider fails."""
+    _, concept = a_concept(keyed)
+    provider.queue(stream(first_parts(3), {"choices": [{"delta": {}, "finish_reason": "length"}]}))
+    job_id = keyed.post(f"/v1/concepts/{concept}/lessons").json()["id"]
+    done = services.jobs.wait(job_id, timeout=60)
+    assert done.status == "succeeded", done.error_message
+    loaded = keyed.get(f"/v1/lessons/{done.result['lesson_id']}").json()
+    assert loaded["writing"] is False
+    assert len(loaded["lesson"]["segments"]) == 3
+    assert ENDS_EARLY in done.result["notes"]
+
+
+def test_a_stop_while_the_first_part_is_being_stored_ends_the_lesson_it_makes(
+    keyed: TestClient, services: Services, provider: FakeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The request ends at once when it is stopped, while its own thread may still be
+    storing the first part. The job waits for that part, takes no more, and ends the
+    lesson's writing: no lesson is left being written behind a stopped job."""
+    course, concept = a_concept(keyed)
+    lessons = services.generation._lessons
+    real = lessons.store
+    storing = threading.Event()
+
+    def store(*args: Any, **kwargs: Any) -> Any:
+        storing.set()
+        time.sleep(1.0)  # the write lock was busy for a moment
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(lessons, "store", store)
+    answer = Partway(LESSON)
+    provider.queue(answer)
+    job_id = keyed.post(f"/v1/concepts/{concept}/lessons").json()["id"]
+    try:
+        assert storing.wait(20)
+        assert keyed.post(f"/v1/jobs/{job_id}/cancel").status_code == 200
+        done = services.jobs.wait(job_id, timeout=30)
+    finally:
+        answer.go_on.set()
+    assert done.status == "succeeded", done
+    assert (
+        "You stopped this lesson while it was being written, so it ends early."
+        in (done.result["notes"])
+    )
+    listed = keyed.get(f"/v1/courses/{course}/lessons").json()["lessons"]
+    assert [(item["writing"], item["segment_count"]) for item in listed] == [(False, 1)]
+
+
+VOICE = "A warm, unhurried voice, mid-pitched and clear."
+
+
+def test_the_narrators_voice_is_the_one_known_when_the_lesson_begins(
+    keyed: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    """Asked for before the parts, the voice is there as the lesson begins, and it is
+    never changed while the lesson is written: what it sounds like stays as it was."""
+    _, concept = a_concept(keyed)
+    first = {key: LESSON[key] for key in ("title", "strategy", "sources")}
+    answer = Partway({**first, "voice": VOICE, "segments": LESSON["segments"]})
+    provider.queue(answer)
+    job_id = keyed.post(f"/v1/concepts/{concept}/lessons").json()["id"]
+    try:
+        assert answer.waiting.wait(20)
+        lesson_id = running(services, job_id, begun).result["lesson_id"]
+        assert services.lessons.get_lesson(lesson_id).voice == VOICE
+    finally:
+        answer.go_on.set()
+    assert services.jobs.wait(job_id, timeout=60).status == "succeeded"
+    assert services.lessons.get_lesson(lesson_id).voice == VOICE
+
+    # Written only after the parts, it would change the voice partway: it is not used.
+    _, other = a_concept(keyed)
+    provider.queue({**LESSON, "voice": VOICE})
+    done = services.jobs.wait(keyed.post(f"/v1/concepts/{other}/lessons").json()["id"], 60)
+    assert done.status == "succeeded", done.error_message
+    assert services.lessons.get_lesson(done.result["lesson_id"]).voice is None
+
+
+def test_parts_past_the_most_a_lesson_has_are_passed_over_and_not_called_unusable(
+    keyed: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    _, concept = a_concept(keyed)
+    many = [copy.deepcopy(LESSON["segments"][0]) for _ in range(20)]
+    for number, part in enumerate(many, start=1):
+        part["title"] = f"Part {number}"
+    provider.queue({**LESSON, "segments": many})
+    done = services.jobs.wait(keyed.post(f"/v1/concepts/{concept}/lessons").json()["id"], 60)
+    assert done.status == "succeeded", done.error_message
+    loaded = keyed.get(f"/v1/lessons/{done.result['lesson_id']}").json()
+    assert len(loaded["lesson"]["segments"]) == 14
+    assert not any("couldn’t be used" in note for note in done.result["notes"])

@@ -295,13 +295,15 @@ class LessonService:
         *,
         writing: bool,
         practice: Sequence[Mapping[str, Any]] | None = None,
-        voice: str | None = None,
+        source_refs: Sequence[Mapping[str, Any]] | None = None,
+        grounding: str | None = None,
     ) -> None:
         """Add parts of a lesson that is still being written, after the parts it has
         (ADR-048), with the pictures they are waiting for. A part already there never
-        changes: the learner may be in it. The whole lesson goes through the gate again,
-        as when a picture joins it. ``writing`` false ends its writing; the questions kept
-        for practice and the narrator's voice, which are written last, come with that.
+        changes: the learner may be in it, and nor does its narrator's voice. The whole
+        lesson goes through the gate again, as when a picture joins it. ``writing`` false
+        ends its writing; the questions kept for practice come with that, which are written
+        last, and the passages it draws on where they were named only after its parts.
         """
         with self._database.session() as session:
             row = _get_or_404(session, lesson_id)
@@ -310,8 +312,10 @@ class LessonService:
             document["estimated_minutes"] = minutes_for(document["segments"])
             if practice is not None:
                 document["practice"] = list(practice)
-            if voice is not None:
-                document["voice"] = voice
+            if source_refs is not None:
+                document["source_refs"] = list(source_refs)
+            if grounding is not None:
+                document["grounding"] = grounding
             scenes = [
                 {
                     "id": stored.scene_id,
