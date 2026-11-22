@@ -42,8 +42,13 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   cumulative curve drawn as its rise among them (ADR-045's addenda). Each was measured on
   the owner's own chapter with the real provider ("The real providers" below). **All of it
   is in 0.1.0-alpha.3**, published from the release commit `3eddd4a` on 2026-11-22,
-  `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.3`. What is left to them is under
-  "Next actions"
+  `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.3`. Then, after the owner watched real
+  lessons and asked for pictures that carry the idea: **a lesson is a slideshow**, every
+  part that teaches a slide Adle draws from what the lesson scripts, a step at each phrase
+  its narration marks, and a lesson begun about twelve seconds after it is asked for
+  (ADR-049). **That is in 0.1.0-alpha.4**, published from the release commit `fd2c524` on
+  2026-11-22, `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.4`. What is left to them
+  is under "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -231,8 +236,9 @@ on Linux (GitHub's machines build it, install it and start it there; nobody has 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. Every gate, the whole
 end-to-end suite included, on the tree of ADR-049 (a lesson as a slideshow), 2026-11-22: 190
 journeys of 190 in 32.9 minutes, none retried, among them every slide example stepped
-through in both themes and a generated lesson whose slide steps on as its words are read.
-Before: on `13e5f99` (ADR-048, a lesson begun at its first part, with
+through in both themes and a generated lesson whose slide steps on as its words are read;
+and again on the release commit `fd2c524`, which only sets the version: 190 of 190 in 32.7
+minutes, none retried. Before: on `13e5f99` (ADR-048, a lesson begun at its first part, with
 the review's fixes and the last mends), on 2026-11-22; the release commit `3eddd4a` only
 sets the version, and GitHub checked everything again for it. Before: the figures' commits
 (ADR-045 to ADR-047), and `f3a75e6`. The release folder was not
@@ -252,17 +258,17 @@ them.
 | Vitest | PASS | 755 tests, 43 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 113 source files |
-| pytest | PASS | 1616 tests. One, `test_only_the_newest_copies_of_replaced_data_are_kept`, failed in two whole runs by the gate script and passed in every run after (two whole runs, twelve of its own file): see Known gaps |
-| Playwright + Electron (E2E) | PASS | 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
+| pytest | PASS | 1616 tests. One, `test_only_the_newest_copies_of_replaced_data_are_kept`, failed in two whole runs by the gate script and passed in every run after (three whole runs, twelve of its own file): see Known gaps |
+| Playwright + Electron (E2E) | PASS | 190 of 190 in 32.7 minutes on the release commit `fd2c524`, and in 32.9 minutes on the tree of `449dcf3`, none retried; among them the seventeen slide examples stepped through cue by cue in both themes, and a generated lesson whose slide steps on as its words are read. Before: 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
-| GitHub Actions CI | PASS | Run 45015241700 on `13e5f99` and the run on the release commit `3eddd4a`, 2026-11-22, the Linux installer check among them again (it waits for the app's processes before removing its profile now). Before: runs on `f3a75e6` and on the release commit `622b396`, 2026-11-22: the gates, unit tests and three audits (npm, the core's Python, and the programs a natural voice is set up with) on Linux; every journey on Linux and on Windows (116 of 116 on each, none retried, on `f3a75e6`); and the four installers, each built, installed, started and removed on the machine that built it and again on a machine that did not, each check now also having the installed app's Python make an environment with pip in it |
+| GitHub Actions CI | PASS | Run 45060012402 on `449dcf3` and run 45077644773 on the release commit `fd2c524`, 2026-11-22: every job, both end-to-end suites and every installer where it was built and where it was not. Before: run 45015241700 on `13e5f99` and the run on the release commit `3eddd4a`, 2026-11-22, the Linux installer check among them again (it waits for the app's processes before removing its profile now). Before: runs on `f3a75e6` and on the release commit `622b396`, 2026-11-22: the gates, unit tests and three audits (npm, the core's Python, and the programs a natural voice is set up with) on Linux; every journey on Linux and on Windows (116 of 116 on each, none retried, on `f3a75e6`); and the four installers, each built, installed, started and removed on the machine that built it and again on a machine that did not, each check now also having the installed app's Python make an environment with pip in it |
 | Packaged build: every journey (`npm run e2e:packaged`) | PASS | On this tree, 2026-11-21: 105 journeys in 13 minutes, of which 104 passed and 1 passed on its second try. That one told whether a scene was still from two pictures of the page (see Findings); it now compares the scene's own canvas. Its file and the player's, with one journey added, were then run again against the same build: 48 of 48 passed with no retry |
 | Packaged build: release start-up check (`npm run package:check`) | PASS | The build for tests on this computer, 2026-11-21: fuses set, the core's Python makes an environment with pip in it (it did not before `python.exe` was kept beside `adle-core.exe`), starts on an empty profile with the core up after 6.8 s, nothing in the log of failures, no service left behind. The release build: on GitHub's machines, every push |
 | Packaged build on a computer that never had the project | PASS | On GitHub's machines, `a812d34`: each installer was handed to a second machine of its system that has Node, the scripts that do the trying and nothing else of the project, and was installed, started (the core up within 1.7 to 3.0 s) and removed there. Such a machine still carries more than a new computer does, so on Windows the package's 73 programs and libraries were also read for a runtime library they ask for and do not bring (none). A person installing a release on their own computer: NOT RUN |
-| Installers | PASS | Made, installed, started and removed on GitHub's machines (`a812d34`): `…-windows-x64-setup.exe`, 133 MB; `…-macos-arm64.dmg`, 151 MB, and `…-macos-x64.dmg`, 156 MB; `…-linux-x64.deb`, 126 MB, and `…-linux-x64.tar.gz`, 171 MB. Not on this computer, which has no Inno Setup. On Ubuntu the tarball is unpacked and not started, because Ubuntu keeps an unpacked app from building its sandbox; the folder it holds is started there by the check of the release build |
-| The release itself | PASS | **0.1.0-alpha.3** from the release commit `3eddd4a` (ADR-043), 2026-11-22, published as a pre-release with its installers and checksums. **0.1.0-alpha.2** from the release commit `622b396` (ADR-043), 2026-11-22: its notes job found the version in `package.json` and the changelog and not yet released; every check passed; the installers made and tried in that run were published as a pre-release, tagged `v0.1.0-alpha.2` at that commit by GitHub, with five installers and `SHA256SUMS.txt`. Before it, 0.1.0-alpha.1 by `release.yml` on the tag `v0.1.0-alpha.1` (`c320bd7`), 2026-11-21: the tag is the version and the changelog has it; the four builds made again from the tag, each installer installed, started and removed where it was built and on a machine that did not build it; published as a pre-release with five installers and `SHA256SUMS.txt`, whose sums are the ones GitHub computed for the files. Nobody has installed one by hand yet |
+| Installers | PASS | Made, installed, started and removed on GitHub's machines (`a812d34`): `…-windows-x64-setup.exe`, 133 MB; `…-macos-arm64.dmg`, 151 MB, and `…-macos-x64.dmg`, 156 MB; `…-linux-x64.deb`, 126 MB, and `…-linux-x64.tar.gz`, 171 MB. Those of 0.1.0-alpha.4, in the same order: 142, 158, 165, 134 and 182 million bytes. Not on this computer, which has no Inno Setup. On Ubuntu the tarball is unpacked and not started, because Ubuntu keeps an unpacked app from building its sandbox; the folder it holds is started there by the check of the release build |
+| The release itself | PASS | **0.1.0-alpha.4** from the release commit `fd2c524` (ADR-043), 2026-11-22, in run 45077644773: every check passed, and the installers made and tried in that run were published as a pre-release, tagged `v0.1.0-alpha.4` at that commit, with five installers and `SHA256SUMS.txt`. **0.1.0-alpha.3** from the release commit `3eddd4a` (ADR-043), 2026-11-22, published as a pre-release with its installers and checksums. **0.1.0-alpha.2** from the release commit `622b396` (ADR-043), 2026-11-22: its notes job found the version in `package.json` and the changelog and not yet released; every check passed; the installers made and tried in that run were published as a pre-release, tagged `v0.1.0-alpha.2` at that commit by GitHub, with five installers and `SHA256SUMS.txt`. Before it, 0.1.0-alpha.1 by `release.yml` on the tag `v0.1.0-alpha.1` (`c320bd7`), 2026-11-21: the tag is the version and the changelog has it; the four builds made again from the tag, each installer installed, started and removed where it was built and on a machine that did not build it; published as a pre-release with five installers and `SHA256SUMS.txt`, whose sums are the ones GitHub computed for the files. Nobody has installed one by hand yet |
 | Code signing | NOT RUN | Not done, by the owner's decision (ADR-034). Windows and macOS say so to whoever opens a build |
 | macOS / Linux | PASS (machines); NOT RUN (a person) | Linux: every journey passes on GitHub's Ubuntu machine, and the `.deb` installs and starts on Ubuntu as it ships. macOS: built, signed ad hoc, installed from its disk image and started, on Apple's and on Intel's processors; no journey runs there. Nobody has looked at Adle on either. The window's own title bar (ADR-030) has been seen on Windows 11 only |
 | Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. 2026-11-22: the whole way through the owner's chapter seven times (three at "high", three at "medium" with a lesson begun at its first part, one at "none"), and two more lessons at "none", by hand, 31 requests in all; before that, three times, ten requests (see "A whole way through the owner's chapter"). AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: lessons, curricula and answers were written through Adle's own services on 2026-11-20; tried again after the way an answer is read was changed (ADR-029): a key check in 26 seconds and an answer to a question in 88, two requests. See "The real providers" |
@@ -605,8 +611,8 @@ in its decision: PowerPoint, web pages, text in pictures (OCR) and search by mea
 (ADR-041: each needs a download or a migration of its own); a sample of a natural voice in
 Settings before it is used, and the voices tried by hand on Linux and a Mac (ADR-042).
 
-**Asked for by the owner on 2026-11-22, after watching real lessons: done, on `main`, not
-released yet.** A lesson is a slideshow (ADR-049): every part that teaches has a slide the
+**Asked for by the owner on 2026-11-22, after watching real lessons: done, and released
+in 0.1.0-alpha.4.** A lesson is a slideshow (ADR-049): every part that teaches has a slide the
 model scripts and Adle draws, a step at each phrase of the narration the script marked;
 lessons teach by intuition and example first; no picture is asked of a model as a program,
 and the model does not think first, so a lesson can be begun about twelve seconds after it
@@ -616,22 +622,21 @@ a board line is not repeated. Measured by hand through NVIDIA (see "The real pro
 
 What remains needs the owner. In the order it matters:
 
-0. **Watch a lesson made as a slideshow** (ADR-049), from `main` (`npm run dev`) or the next
-   release: say whether the pictures now carry the idea, whether each step comes at its
-   words, and which subjects still come out as words on a stage.
-1. **Try 0.1.0-alpha.3**, installed from its release
-   (`github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.3`): a lesson begun at its first
-   part (ADR-048), figures drawn by Adle (ADR-045), a PDF's whole syllabus (ADR-046),
-   lessons mended rather than written twice (ADR-047), American English (ADR-044). Make a
-   course from your chapter and start its first lesson: through NVIDIA it can usually be
-   begun within one to three minutes, however long the model thinks.
+0. **Watch a lesson made as a slideshow** (ADR-049), installed from 0.1.0-alpha.4
+   (`github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.4`): say whether the pictures now
+   carry the idea, whether each step comes at its words, and which subjects still come out
+   as words on a stage. Make a course from your chapter and start its first lesson: through
+   NVIDIA it can be begun about twelve seconds after you ask.
+1. **Try the rest of what 0.1.0-alpha.3 brought**, which 0.1.0-alpha.4 carries too: a
+   lesson begun at its first part (ADR-048), a PDF's whole syllabus (ADR-046), lessons
+   mended rather than written twice (ADR-047), American English (ADR-044).
 2. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
    They are in a transcript; treat them as used. The owner will, later (said 2026-11-21).
 3. **Sit a generated lesson from start to finish**, asking it a question on the way. Install
    Adle from the release (or `npm run dev`), type a key into Settings → AI provider, press
-   "Test key", leave the choice on Automatic. Through NVIDIA, expect two to four minutes
-   until the lesson can be started; the app offers a break and tells you when. Its figures
-   follow within seconds.
+   "Test key", leave the choice on Automatic. Through NVIDIA, expect about twelve seconds
+   until the lesson can be started and a minute or two until it is whole; its slides come
+   with its words.
 4. **AIHubMix** will be topped up by the owner (2026-11-22, they said). Until then Automatic
    finds out once that it refuses and uses NVIDIA.
 5. **Look at Adle on a Mac.** GitHub's machines build it, install it from the disk image and
