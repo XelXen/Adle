@@ -1,6 +1,6 @@
 {
   "name": "@adle/contracts",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "private": true,
   "description": "Shared JSON Schemas exported from the Python core, with generated TypeScript types and validators.",
   "license": "GPL-3.0-only",

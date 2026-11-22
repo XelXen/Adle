@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.3] - 2026-11-22
+
+The third alpha. A lesson can be started as soon as its first part is written, usually one
+to three minutes after you ask through NVIDIA, and the rest of it is written while you
+study. Most of its pictures are now drawn by Adle from what the lesson says, four to seven
+a lesson, there seconds after the words; and a course made from a PDF covers its whole
+syllabus, section by section.
+
 ### Added
 
 - **Start a lesson as soon as its first part is written.** The rest of it is written while
