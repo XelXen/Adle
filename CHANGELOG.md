@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.4] - 2026-11-22
+
+The fourth alpha. A lesson is now a slideshow: every part that teaches has a picture, and
+the picture changes at the words it belongs to as the lesson is read. It starts from
+something you can see, an example with small numbers or a real sentence, and brings in the
+formula after the picture it describes. A lesson can be started about twelve seconds after
+you ask through NVIDIA.
+
 ### Changed
 
 - **A lesson is a slideshow.** Every part that teaches now has a picture, and the picture
