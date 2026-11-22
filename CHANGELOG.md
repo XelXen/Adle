@@ -5,11 +5,36 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Many more pictures, there seconds after the words.** A lesson now has four to seven:
+  formulas worked step by step, graphs (with an area under a curve, named points, a point
+  running along the curve, or a slider you move), bars, number lines, steps in order,
+  layers of a network, tables filled in row by row, scatter plots with a fitted line,
+  vectors added tip to tail, and probability trees. The AI says which picture and what is
+  in it; Adle draws it, so a picture no longer costs a request of its own or minutes of
+  waiting, and no longer fails because a program was written wrong.
+
 ### Changed
 
+- **A PDF's whole syllabus is planned.** A course from a PDF follows its bookmarks, or its
+  numbered headings, section by section: a chapter of ten sections gives a plan of every
+  one of them, not of its first pages. A PDF with neither is planned from how each of its
+  pages begins, first to last.
+- **A lesson is rarely written twice.** Mathematics the AI wrote as notation in what is
+  read aloud is now said in words, the way a teacher reads it ("e to the minus lambda x"),
+  and a practice question that is not whole is left out, instead of the whole lesson being
+  written again.
+- **A natural voice begins as soon as a lesson's words are written**, not when it is
+  opened, so its lines are usually recorded by the time you start.
 - **Adle's words are in American English**: "Practice" in Up next and on a concept,
   "Step-by-step math", "Read the license", "Canceled", and the sample course's lessons.
   Lessons the AI writes are asked for in American spelling too.
+
+### Fixed
+
+- Formulas on a lesson's board that the AI wrote with every backslash doubled showed
+  broken; they are shown as meant.
 
 ## [0.1.0-alpha.2] - 2026-11-21
 

@@ -1037,6 +1037,18 @@ a release is a commit (ADR-043). Evidence: the gate in `PROJECT_STATE.md`; for t
 particular `test_narration.py`, `test_voice_install.py`, `VoiceChoices.test.tsx`,
 `recorded.test.ts`, `e2e/voice`, and the real setups by hand recorded in ADR-042.
 
+On 2026-11-22, at the owner's word ("why does ai fail on a lot of animations... why does it
+only draw like 1 or two... it doesnt cover the full syllabus... optimize the workflow"),
+measured on the owner's own chapter with the real provider: **most pictures are figures**,
+a kind and its data from the lesson, drawn by Adle from tested templates with no request of
+their own, four to seven in a lesson (ADR-045); **a PDF's whole syllabus** from its outline
+or numbered headings (ADR-046); and **a lesson's answer mended rather than asked for
+again** where the core can, with a natural voice that begins on a lesson as soon as its
+words are stored (ADR-047). Evidence: `test_figures.py`, `test_lesson_figures.py`,
+`test_speech.py`, `test_pdf_headings.py`, every figure run in the player in both themes
+(`e2e/scene-player`), a lesson with figures end to end (`e2e/generation`), and the real
+runs recorded in `PERFORMANCE.md`.
+
 ### Deviations from this plan (each has an ADR)
 
 - **Narration can be a natural voice that runs on the learner's computer** (ADR-042),
@@ -1044,6 +1056,12 @@ particular `test_narration.py`, `test_voice_install.py`, `VoiceChoices.test.tsx`
   remain the first choice and what reads anything not yet recorded.
 - **One branch, and a release is a commit** (ADR-043), where ADR-034 had `dev`, `main`
   and a tag.
+- **Most pictures are not written by a model** (ADR-045). Section 9 has every scene written
+  by the model as one file; a figure is data the model gives and a scene the core writes
+  from a template. A model still writes a scene for what no figure can show.
+- **The core mends what it can in a model's lesson** (ADR-047): notation in narration is
+  said in words, and a practice question that is not whole is left out, where section 9
+  would refuse the draft and ask again.
 
 - **Installers are made with each system's own tool** (Inno Setup, hdiutil, dpkg-deb), not
   with a packaging framework, and nothing is signed: the owner's decision (ADR-034). Section

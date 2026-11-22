@@ -3,7 +3,7 @@
 The single place to find out where Adle stands and what to do next. Update it at the end of every
 work session (see `AGENTS.md` → "Keeping the next agent oriented").
 
-- **Last updated:** 2026-11-21
+- **Last updated:** 2026-11-22
 - **Branch:** `main`, the only one (ADR-043, since 2026-11-21; `dev` was folded into it).
   On GitHub: `github.com/XelXen/Adle`, public, since 2026-11-21
 - **Last commit:** see `git log -1`
@@ -30,8 +30,15 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   release made by a commit (ADR-043). **0.1.0-alpha.2 carries all of it**: published from
   the release commit `622b396` on 2026-11-22,
   `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.2`. Since then, at the owner's word,
-  what a learner reads is in American English (ADR-044), for the next release. What is
-  left to them is under "Next actions"
+  what a learner reads is in American English (ADR-044); and, asked why pictures fail and
+  are so few, why a PDF's syllabus is not covered, and for every slowdown to go: **most
+  pictures are figures** that Adle draws from the lesson's data, four to seven a lesson
+  with no request of their own (ADR-045); **a PDF's whole syllabus** from its outline or
+  numbered headings (ADR-046); and **a lesson's answer mended rather than asked for
+  again**, with a natural voice that begins as soon as the words are stored (ADR-047).
+  Each was measured on the owner's own chapter with the real provider ("The real
+  providers" below). All of it is for the next release. What is left to them is under
+  "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -216,9 +223,9 @@ on Linux (GitHub's machines build it, install it and start it there; nobody has 
 
 ## Test results
 
-Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. The whole end-to-end suite on
-the tree that became the natural voice's commits (`f3a75e6`), on 2026-11-21, and the fast
-gates on every commit after it, the last on the tree of ADR-044. The release folder was not
+Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. Every gate, the whole
+end-to-end suite included, on the tree of the figures' commits (ADR-045 to ADR-047), on
+2026-11-22 (`node scripts/check.mjs --e2e`); before that the whole suite on `f3a75e6`. The release folder was not
 built again on this computer, because the owner had Adle open from it; the build for tests
 was, and passed its start-up check. What GitHub's machines ran is in the rows that name
 them.
@@ -234,9 +241,9 @@ them.
 | TypeScript (`tsc`, 6 projects) | PASS | |
 | Vitest | PASS | 728 tests, 41 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 106 source files |
-| pytest | PASS | 1356 tests |
-| Playwright + Electron (E2E) | PASS | 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
+| mypy (strict) | PASS | 109 source files |
+| pytest | PASS | 1502 tests |
+| Playwright + Electron (E2E) | PASS | 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
@@ -248,7 +255,7 @@ them.
 | The release itself | PASS | **0.1.0-alpha.2** from the release commit `622b396` (ADR-043), 2026-11-22: its notes job found the version in `package.json` and the changelog and not yet released; every check passed; the installers made and tried in that run were published as a pre-release, tagged `v0.1.0-alpha.2` at that commit by GitHub, with five installers and `SHA256SUMS.txt`. Before it, 0.1.0-alpha.1 by `release.yml` on the tag `v0.1.0-alpha.1` (`c320bd7`), 2026-11-21: the tag is the version and the changelog has it; the four builds made again from the tag, each installer installed, started and removed where it was built and on a machine that did not build it; published as a pre-release with five installers and `SHA256SUMS.txt`, whose sums are the ones GitHub computed for the files. Nobody has installed one by hand yet |
 | Code signing | NOT RUN | Not done, by the owner's decision (ADR-034). Windows and macOS say so to whoever opens a build |
 | macOS / Linux | PASS (machines); NOT RUN (a person) | Linux: every journey passes on GitHub's Ubuntu machine, and the `.deb` installs and starts on Ubuntu as it ships. macOS: built, signed ad hoc, installed from its disk image and started, on Apple's and on Intel's processors; no journey runs there. Nobody has looked at Adle on either. The window's own title bar (ADR-030) has been seen on Windows 11 only |
-| Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: lessons, curricula and answers were written through Adle's own services on 2026-11-20; tried again after the way an answer is read was changed (ADR-029): a key check in 26 seconds and an answer to a question in 88, two requests. See "The real providers" |
+| Real AI providers | AIHubMix: BLOCKED. NVIDIA NIM: tried by hand, works | No test may call a real provider. 2026-11-22: the whole way through the owner's chapter, three times, ten requests (see "A whole way through the owner's chapter"). AIHubMix: a relay error for one key; the other account must be topped up. NVIDIA: lessons, curricula and answers were written through Adle's own services on 2026-11-20; tried again after the way an answer is read was changed (ADR-029): a key check in 26 seconds and an answer to a question in 88, two requests. See "The real providers" |
 | A lesson a real model wrote, in the app | PASS | By a script, 2026-11-21, twice: a lesson written by Kimi K3.1 Pro, opened from its profile with no key, gone through in both themes from its first part to "Lesson complete", no error in the console. The second was written with the lesson opening when its text was ready (usable after 298 s, its one picture after 541 s); its interactive picture ran, and its formula is whole since ADR-032. Not a person |
 
 ## Launch reliability (ADR-008)
@@ -533,6 +540,21 @@ Keys are read from files and never printed. Every prompt and answer is saved und
 data it leaves can be opened in the app (`ADLE_USER_DATA_DIR=<out>/profile`). No test runs
 this, and it spends real allowance.
 
+The step `document:<file>` goes the whole way through a document and times each step:
+import, a course plan, a lesson on its first concept (until it can be started, and with
+every picture), and a question in that lesson.
+
+### A whole way through the owner's chapter (2026-11-22)
+
+Three runs of `document:testchap.pdf` through NVIDIA, each request at its measured model:
+import 1 s; a course plan 18 to 52 s, every section in it; a lesson's words 116 to 232 s
+for one request (the model's thinking varies); a question 10 to 16 s. Ten requests and
+about 109,000 tokens in all, as Adle counted them. Each run found something that cost a
+lesson a second request or its pictures, and each is now mended (ADR-045 to ADR-047): all
+five answers the runs gave are usable lessons as they came, with twenty-seven figures of
+twenty-seven. The table is in `PERFORMANCE.md`. What the model wrote is kept outside the
+repository, as the owner's chapter is.
+
 ## Next actions
 
 **Asked for by the owner on 2026-11-21, after looking at 0.1.0-alpha.1: done, and released
@@ -552,14 +574,15 @@ What remains needs the owner. In the order it matters:
 0. **Try 0.1.0-alpha.2**, installed from its release, and a natural voice in it:
    Settings → Learning → Voice, "Set up" on the one marked best for this computer. Say when
    the next version should be published (a commit `release: <version>`, `CONTRIBUTING.md` →
-   Releasing): it would carry American English (ADR-044).
+   Releasing): it would carry American English (ADR-044), figures (ADR-045), a PDF's whole
+   syllabus (ADR-046) and lessons mended rather than written twice (ADR-047).
 1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
    They are in a transcript; treat them as used. The owner will, later (said 2026-11-21).
 2. **Sit a generated lesson from start to finish**, asking it a question on the way. Install
    Adle from the release (or `npm run dev`), type a key into Settings → AI provider, press
-   "Test key", leave the choice on Automatic. Through NVIDIA, expect about five minutes until
-   the lesson can be started; the app offers a break and tells you when. Its pictures follow
-   and appear in it as they are drawn.
+   "Test key", leave the choice on Automatic. Through NVIDIA, expect two to four minutes
+   until the lesson can be started; the app offers a break and tells you when. Its figures
+   follow within seconds.
 3. **AIHubMix** will be topped up by the owner (2026-11-22, they said). Until then Automatic
    finds out once that it refuses and uses NVIDIA.
 4. **Look at Adle on a Mac.** GitHub's machines build it, install it from the disk image and
@@ -569,8 +592,9 @@ What remains needs the owner. In the order it matters:
    GitHub), which `SECURITY.md` points people to. Only the owner can.
 6. Decide whether GLM 5.3 Flash should stay NVIDIA's third model while it does not answer.
 7. Still not built from the plan's section 12.1: **writing a lesson part by part.** Its text
-   is one request and arrives whole, about five minutes through NVIDIA (ADR-012, ADR-031).
-   That would need the draft format and the request budget to change together.
+   is one request and arrives whole, two to four minutes through NVIDIA (measured
+   2026-11-22), the largest wait left in the workflow. A lesson that could be started at its
+   first part would need the draft format and the request budget to change together.
 8. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
    single course; a screen-reader pass by a person.
 9. From the review of 2026-11-20, left by decision (ADR-029, "Not done, and why"): a release

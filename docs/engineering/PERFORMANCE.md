@@ -123,6 +123,31 @@ through", "writing"), and it can be stopped. Finding out that a model is not the
 quarter of a second; finding out that it is silent takes three minutes, once, after which
 that model is left alone for ten.
 
+### A whole way through a chapter of notes (2026-11-22)
+
+The owner's own chapter of lecture notes (a PDF of 26 pages, ten sections), imported, a
+course planned from it, a lesson written on its first concept, and a question asked in
+that lesson, each step timed, through NVIDIA with each request at the model measured best
+for it (`scripts/dev/real_provider_check.py document:<file>`, by hand):
+
+| Step | Run 1 | Run 2 | Run 3 |
+|---|---|---|---|
+| Import (read, cut into sections, indexed) | 1 s | 1 s | 1 s |
+| A course plan | 32 s, 9 concepts, every section | 18 s, 8 concepts, every section but the summary of formulas | 52 s, the same 8 |
+| A lesson, until it can be started | none: refused twice, 56 s + 149 s | 259 s: refused once (116 s), then 143 s | 232 s, its first answer |
+| Its pictures, after that | | 5 figures, none lost, no wait | 5 figures, then left out for want of a description |
+| A question in the lesson | | 10 s | 16 s |
+
+Each run found something the core now mends (ADR-047): run 1's refusals were notation in
+the narration, then a practice question without its explanation; run 2's was three
+checkpoints without a title; run 3 was usable at once, but its figures had no descriptions
+and its board's formulas were written with every backslash twice. With what was changed,
+every one of those answers is a usable lesson as it came, with all its figures (twenty-seven
+of twenty-seven, on all five answers), after one request: about two to four minutes
+of the model's time, which varies with how long it thinks. Before figures (ADR-045) a picture
+was a request of its own, two to two and a half minutes each, one or two to a lesson; a
+figure is drawn in milliseconds and tried in the player in a second or two.
+
 ## A natural voice (2026-11-21)
 
 On the development machine (an RTX 4080 Laptop GPU with 12 GB, Windows 11), with the voices

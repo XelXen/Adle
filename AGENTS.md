@@ -54,6 +54,7 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Two fake providers in a run | `ADLE_PROVIDER_ENDPOINTS='{"aihubmix":"http://127.0.0.1:9000/v1","nvidia":"http://127.0.0.1:9100/v1"}'` (see `e2e/providers.spec.ts`) |
 | Regenerate scene name allowlist | `npm run wanim-names` (after a Wanim upgrade) |
 | Repackage the scene guide for prompts | `npm run scene-guide` (after editing the scene skill or its examples) |
+| Rewrite the figure examples the player runs | `npm run figures` (after changing `generation/figures.py`; a unit test says when) |
 | Re-render the app icons | `npm run icons` (after the mark changes; `npm run icons:verify` compares it with the artwork) |
 | Rebuild document fixtures | see `fixtures/sample-documents/README.md` |
 | Add a sample lesson | files in `services/core/adle_core/sample_course/`, then `core:test` and `e2e -- lesson.spec.ts` |
@@ -109,7 +110,8 @@ is built from it, and an alpha or a stable version is published from a release c
 - A notification of the operating system is asked for by its kind and nothing else
   (`window.adle.app.notify`). Its words are fixed in the main process (ADR-026): never add
   an argument that carries text.
-- Scene code is untrusted. It runs only in the player frame, passes `scene_policy`, and talks
+- Scene code is untrusted, a figure's too (written by the core, from a model's data). It
+  runs only in the player frame, passes `scene_policy`, and talks
   only through `@adle/event-protocol`. Do not add message types casually; never pass callbacks,
   URLs, or paths through it. A picture is tried in a frame nobody sees before it joins a
   lesson, when the app is there to try it (ADR-038).
@@ -175,9 +177,13 @@ account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day 
 - One request in flight at each provider, at most 4/minute there. When trying a real provider
   by hand, budget 80 requests and 800k tokens per day; the app itself stops at 90 and 900k
   for AIHubMix (ADR-012).
-- One scene = one request = one complete file. No repair loops; at most one deliberate retry,
+- A figure is no request at all: the lesson gives its kind and data, and Adle writes the
+  scene from a template (ADR-045). A scene a model writes is one request = one complete
+  file. No repair loops; at most one deliberate retry,
   told what was wrong: the rules' findings, or, when the file failed as it was tried in the
-  player, the error and the file (ADR-038).
+  player, the error and the file (ADR-038). What the core can mend in a lesson's answer it
+  mends instead of asking again: notation in narration is said in words, a broken practice
+  question is left out, a figure that cannot be drawn is told in words (ADR-047).
   A question asked during a lesson is one request, two at most; a check of a key is one.
   Asking a provider's next model because the one before is away is not a retry of the answer,
   and is bounded by the number of models.

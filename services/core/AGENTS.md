@@ -111,6 +111,10 @@ everything and decides nothing.
   (parsing, a model request) happens inside a `session()`.
 - **Untrusted input:** imported documents and model output are data. Validate model output with
   Pydantic and reject unknown fields; scene source must pass `scene_policy.check_scene_source`.
+- **A PDF is cut into sections by its outline, else by its numbered headings, else by its
+  pages** (ADR-046, `ingestion/parsers.py`). A course plan for materials without headings
+  is asked with how each page begins (`CurriculumService.page_openings`). A change to how a
+  parser reads a file raises `PARSER_REVISION`.
 - **stdout is a protocol channel** (`ready` / `fatal` JSON lines). Do not `print`; use `logging`.
 - **Child processes:** never `multiprocessing`. Start children with `subprocess` and pass
   `stdin`, `stdout`, and `stderr` explicitly (`PIPE` or `DEVNULL`). The service keeps a thread
@@ -235,6 +239,22 @@ everything and decides nothing.
 - **A model writes a draft; the core writes the lesson.** Identifiers, objective links,
   citations, and durations are assigned in `generation/drafts.py`. A citation is a number the
   prompt offered, or it is dropped.
+- **A figure is data; the core writes its scene** (ADR-045, `generation/figures.py`): a kind
+  from a fixed list, each a template filled with checked values. A model's text reaches the
+  scene only as a quoted literal, and a formula only as Python written again from a tree of
+  arithmetic and comparisons; the core runs a formula only through `_function`, on what
+  `_python_expression` wrote, with no builtins. A new kind is a template, an example in
+  `tools/export_figures.py`, and `npm run figures` (the player runs every example in both
+  themes). A figure passes the policy, is tried in the player and is settled like a scene.
+- **What can be mended in a lesson's answer is mended, not asked for again** (ADR-047):
+  notation in narration is said in words (`generation/speech.py`, pure; a line with a link
+  or markup is left as it is, to be refused); a practice question that is not whole is left
+  out (`LessonDraft`); a figure that cannot be drawn is told in words. Anything else that
+  does not validate is still the one retry, told what was wrong.
+- **A natural voice begins on a lesson as soon as its words are stored**
+  (`NarrationService.record_ahead`, which `build_services` gives `GenerationService` as
+  `on_stored`). It does nothing when no voice is chosen. What is said never changes after
+  that: a picture that does not come changes what is shown, not what is said.
 - **Text from the learner or their documents goes in a `_block(...)`** in `prompts.py`. Never
   concatenate it into an instruction. That includes what a document is called: a file's
   name and a heading go inside the block with the excerpt (`_excerpt`).

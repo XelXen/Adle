@@ -137,6 +137,17 @@ bridge response, and from every file in the profile, including the core log afte
 Scenes are the highest-risk content: executable code that a model wrote after reading course
 material. The full reasoning is in `docs/decisions/ADR-004-scene-isolation.md`.
 
+**Most pictures are written by the core, not a model** (ADR-045). A figure is data in the
+lesson: a kind from a fixed list and its values, checked field by field. The core fills a
+template with them, in `generation/figures.py`. The model's text reaches the scene file only
+as a quoted string literal (`repr`), TeX is refused if it uses a command that can reach
+outside a formula (`\href`, `\url`, `\cssId`, `\def`, `\require` and the like), and a
+formula is parsed into a tree that may hold only numbers, `x`, the slider's name, two
+constants, arithmetic, comparisons and sin, cos, tan, exp, log, sqrt and abs, and is written out again
+from that tree: nothing the model typed is pasted in as code. Before it is drawn the formula
+is evaluated in the core, on that rewritten expression only, with no builtins. The file that
+results is then treated exactly as a scene a model wrote: every layer below applies to it.
+
 **Layers, outermost first**
 
 1. **Static policy** (`services/core/adle_core/generation/scene_policy.py`). Before a scene is
