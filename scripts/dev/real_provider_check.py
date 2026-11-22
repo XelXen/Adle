@@ -16,6 +16,8 @@ Steps, in the order given (default: check ask curriculum lesson):
     ask                   a question about the first part of a sample lesson
     curriculum            a list of concepts for a small course
     lesson[:<concept>]    a lesson, with its pictures, for a concept of the sample course
+    document:<file>       a whole way through a document, each step timed: import, a plan
+                          for a course, a lesson on its first concept, a question
 
 A key is read from a file, held in memory, and never printed or written anywhere. Every
 prompt and every answer is saved under ``--out`` (which is refused if it is inside the
@@ -149,6 +151,88 @@ def sample_lesson(services: Services) -> tuple[str, str, str]:
     return course.id, lesson.id, first.id
 
 
+def workflow(services: Services, document: Path, out: Path) -> None:
+    """A learner's whole way through a document, each step timed: importing it, a plan for
+    a course from it, a lesson on its first concept, and a question asked in that lesson."""
+    say("DOCUMENT", document.name)
+    timings: dict[str, float] = {}
+    course = services.courses.create(title=document.stem, origin="materials")
+
+    started = time.monotonic()
+    snapshot = wait(services, services.sources.start_import(course.id, [document]).id)
+    timings["import"] = round(time.monotonic() - started, 1)
+    headings = services.curriculum.outline_candidates(course.id)
+    say(f"  {len(headings)} headings:", "; ".join(item.title for item in headings))
+
+    started = time.monotonic()
+    snapshot = wait(services, services.generation.propose_curriculum(course.id).id)
+    timings["course plan"] = round(time.monotonic() - started, 1)
+    if snapshot.status != "succeeded":
+        say("  no plan:", snapshot.error_code)
+        return
+    (out / "document-plan.json").write_text(
+        json.dumps(snapshot.result, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    concepts = snapshot.result["concepts"]
+    for index, concept in enumerate(concepts, start=1):
+        say(f"  {index}. {concept['title']}  (from headings {concept.get('section_ids')})")
+    covered = {section for concept in concepts for section in concept.get("section_ids") or []}
+    missed = [item.title for item in headings if item.section_id not in covered]
+    say(f"  headings no concept comes from: {missed or 'none'}")
+    services.generation.accept_proposal(snapshot.id, list(range(len(concepts))))
+
+    first = services.curriculum.get(course.id).concepts[0]
+    started = time.monotonic()
+    job = services.generation.generate_lesson(first.id)
+    usable_at: float | None = None
+    while True:
+        current = services.jobs.get(job.id)
+        if (
+            usable_at is None
+            and isinstance(current.result, dict)
+            and current.result.get("lesson_id")
+        ):
+            usable_at = round(time.monotonic() - started, 1)
+        if current.finished:
+            break
+        time.sleep(0.5)
+    timings["lesson: words, until it can be started"] = usable_at or -1
+    timings["lesson: with every picture"] = round(time.monotonic() - started, 1)
+    if current.status != "succeeded":
+        say("  no lesson:", current.error_code, current.error_message)
+        return
+    loaded = services.lessons.get(current.result["lesson_id"])
+    (out / "document-lesson.json").write_text(
+        loaded.lesson.model_dump_json(indent=2), encoding="utf-8"
+    )
+    for scene in loaded.scenes:
+        (out / f"document-scene-{scene.id}.py").write_text(scene.source, encoding="utf-8")
+    pictured = [segment for segment in loaded.lesson.segments if getattr(segment, "scene", None)]
+    say(
+        f"  lesson “{loaded.lesson.title}”: {len(loaded.lesson.segments)} parts, "
+        f"{len(pictured)} with a picture: {[scene.scene_class for scene in loaded.scenes]}"
+    )
+    say("  notes:", json.dumps(current.result.get("notes")))
+
+    segment = next(item for item in loaded.lesson.segments if item.type != "checkpoint")
+    started = time.monotonic()
+    asked = wait(
+        services,
+        services.generation.ask(loaded.lesson.lesson_id, segment.id, QUESTION_ON_DOCUMENT).id,
+    )
+    timings["a question during the lesson"] = round(time.monotonic() - started, 1)
+    if asked.status == "succeeded":
+        for paragraph in services.asks.get(asked.result["ask_id"]).paragraphs:
+            say("   ", paragraph[:200])
+    say("  TIMINGS")
+    for name, seconds in timings.items():
+        say(f"    {name}: {seconds} s")
+    (out / "document-timings.json").write_text(json.dumps(timings, indent=2), encoding="utf-8")
+
+
+QUESTION_ON_DOCUMENT = "Why is the probability of any single value zero, if the value can happen?"
+
+
 def main() -> int:
     args = arguments()
     out: Path = args.out.resolve()
@@ -268,6 +352,8 @@ def main() -> int:
                     )
                     say("  written by:", json.dumps(snapshot.result.get("written_by")))
                     say("  notes:", json.dumps(snapshot.result.get("notes")))
+            elif step.startswith("document:"):
+                workflow(services, Path(step.partition(":")[2]), out)
             else:
                 say("Unknown step:", step)
                 return 2

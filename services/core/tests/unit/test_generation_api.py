@@ -432,6 +432,36 @@ def test_an_unusable_first_draft_is_rewritten_once_with_the_reasons(
     assert lesson_count(services) == 1
 
 
+def test_a_draft_the_core_can_mend_is_kept_at_once(
+    keyed: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    """Each cost a real lesson its first answer (2026-11-22): twelve lines of narration with
+    TeX in them; a practice question without its explanation; three checkpoints without a
+    title. None is a reason to write the lesson again: notation is said in words, practice
+    is extra, and a checkpoint is named by what it is."""
+    course = topic_course(keyed)
+    concept = add_concept(keyed, course["id"])
+    draft = copy.deepcopy(LESSON)
+    draft["segments"][0]["beats"][0]["say"] = r"So F_X(x) = P(X \le x), always."
+    question = next(copy.deepcopy(s["question"]) for s in draft["segments"] if s.get("question"))
+    whole, without = copy.deepcopy(question), copy.deepcopy(question)
+    without.pop("explanation")
+    draft["practice"] = [whole, without]
+    checkpoint = next(index for index, s in enumerate(draft["segments"]) if s.get("question"))
+    draft["segments"][checkpoint].pop("title")
+    provider.queue(draft)
+
+    job = finished(services, keyed.post(f"/v1/concepts/{concept}/lessons"))
+
+    assert job["status"] == "succeeded", job
+    assert provider.kinds().count("lesson") == 1
+    lesson = services.lessons.get_lesson(job["result"]["lesson_id"])
+    said = lesson.segments[0].narration[0].text  # type: ignore[union-attr]
+    assert said == "So F sub X of x equals P of (X is less than or equal to x), always."
+    assert len(lesson.practice) == 1
+    assert lesson.segments[checkpoint].title == "Checkpoint 1"
+
+
 def test_two_unusable_drafts_end_the_job_with_nothing_saved(
     keyed: TestClient, services: Services, provider: FakeProvider
 ) -> None:

@@ -65,6 +65,50 @@ async function close({ adle, provider }: Session): Promise<void> {
   await provider.close();
 }
 
+/** The canned lesson, with figures in place of its scenes and on two more of its parts. */
+function lessonWithFigures(): string {
+  const lesson = JSON.parse(cannedAnswer('lesson')) as {
+    segments: Record<string, unknown>[];
+  };
+  const figures: Record<number, Record<string, unknown>> = {
+    0: {
+      kind: 'equation',
+      steps: ['z = w_1 x_1 + w_2 x_2 + b', 'z = (0.5)(2) + (-1)(1) + 0.5', 'z = 0.5'],
+      description: 'The weighted sum written out, then with numbers, then worked out.',
+    },
+    1: {
+      kind: 'graph',
+      x: [-2, 2],
+      curves: [{ f: '0.5x + 0.5', label: 'z = 0.5x + 0.5' }],
+      points: [{ x: 1, label: 'x = 1' }],
+      description: 'A line rises as the input grows; at an input of 1 it reaches 1.',
+    },
+    3: {
+      kind: 'graph',
+      x: [-2, 2],
+      curves: [{ f: 'w x + 0.5', label: 'z' }],
+      slider: { name: 'w', label: 'w', min: -2, max: 2, value: 0.5 },
+      description: 'Moving the weight tilts the line: a larger weight makes it steeper.',
+    },
+    4: {
+      kind: 'table',
+      header: ['input', 'weight', 'product'],
+      rows: [
+        ['2', '0.5', '1'],
+        ['1', '-1', '-1'],
+      ],
+      highlight: [1, 2],
+      description: 'Each input times its weight: 2 times 0.5 is 1, and 1 times minus 1 is minus 1.',
+    },
+  };
+  for (const [index, figure] of Object.entries(figures)) {
+    const segment = lesson.segments[Number(index)]!;
+    delete segment.scene;
+    segment.figure = figure;
+  }
+  return JSON.stringify(lesson);
+}
+
 async function addConcept(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: 'Add a concept' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add a concept' });
@@ -325,6 +369,48 @@ test.describe('generation with the AI provider', () => {
     await expect(first).toBeVisible();
     await expect(first.getByText('Loading animation…')).toBeHidden({ timeout: 30_000 });
     await expect(first.getByText('Couldn’t show the animation')).toHaveCount(0);
+    await close(session);
+  });
+
+  test('a lesson’s figures are drawn by Adle with no request of their own, tried, and shown', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await open(profileDir);
+    const { page, provider } = session;
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    const limits = detail(page, 'Limits');
+    const lessons = limits.getByRole('list', { name: 'Lessons for this concept' });
+
+    provider.queue(lessonWithFigures());
+    await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(limits.getByRole('progressbar')).toHaveCount(0, { timeout: 60_000 });
+    // One request, for the lesson's words: its four pictures were drawn here (ADR-045).
+    expect(provider.requests.map((request) => request.kind)).toEqual(['lesson']);
+    await expect(page.getByRole('status').filter({ hasText: 'About its pictures' })).toHaveCount(0);
+
+    // ---- In the lesson, each part shows its figure, and none falls back to words ----
+    await lessons.getByRole('button', { name: /^Start lesson/ }).click();
+    await expect(page.getByText('Part 1 of 8')).toBeVisible();
+    for (const title of ['Why inputs are weighted', 'The weighted sum']) {
+      const figure = page.getByRole('figure', { name: title });
+      await expect(figure).toBeVisible();
+      await expect(figure.getByText('Loading animation…')).toBeHidden({ timeout: 30_000 });
+      await expect(figure.getByText('Couldn’t show the animation')).toHaveCount(0);
+      await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    }
+    // A checkpoint comes between them and the interaction.
+    await page.getByRole('radio', { name: 'The first input' }).check();
+    await page.getByRole('button', { name: 'Check answer' }).click();
+    await expect(page.getByText('Correct', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    // The interaction's figure has a slider, mirrored as a control of the page's own.
+    await expect(page.getByText('Part 4 of 8')).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'w' })).toBeVisible({ timeout: 30_000 });
     await close(session);
   });
 

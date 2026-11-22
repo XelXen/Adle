@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from adle_core.application.narration import NarrationService
+from adle_core.application.narration import KIND_NARRATION, NarrationService
 from adle_core.application.services import Services
 from adle_core.voice.catalog import ALIGNER, DEFAULT_DESIGN, TIERS, Tier
 from adle_core.voice.catalog import tier as find_tier
@@ -239,6 +239,33 @@ def test_each_line_of_a_lesson_is_recorded_once_with_where_its_words_are(
     # Asked again, nothing is recorded twice.
     again = record(client, voiced, lesson["id"])
     assert again.result["recorded"] == 0
+
+
+def recorded_lines(client: TestClient, lesson_id: str, expected: int) -> list[str]:
+    """The lines recorded for a lesson, once there are as many as expected (or a minute)."""
+    for _ in range(600):
+        narration = client.get(f"/v1/lessons/{lesson_id}/narration").json()
+        if len(narration["lines"]) >= expected and narration["recording"] is None:
+            break
+        threading.Event().wait(0.1)
+    return [line["text"] for line in narration["lines"]]
+
+
+def test_a_lesson_is_recorded_as_soon_as_it_is_stored_when_a_voice_reads_the_lessons(
+    client: TestClient, voiced: Services
+) -> None:
+    client.put("/v1/voice", json={"tier": "kokoro"})
+    lesson = a_lesson(client)
+    voiced.narration.record_ahead(lesson["id"])
+    # Recorded without the lesson being opened: its clips are there when it is.
+    assert recorded_lines(client, lesson["id"], len(lines_of(lesson))) == lines_of(lesson)
+
+
+def test_without_a_voice_nothing_is_recorded_ahead(client: TestClient, services: Services) -> None:
+    lesson = a_lesson(client)
+    services.narration.record_ahead(lesson["id"])
+    assert services.jobs.find_active(KIND_NARRATION, lesson["id"]) is None
+    assert client.get(f"/v1/lessons/{lesson['id']}/narration").json()["lines"] == []
 
 
 def test_a_line_is_recorded_again_in_another_voice_and_never_played_in_the_old_one(

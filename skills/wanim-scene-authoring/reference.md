@@ -156,6 +156,7 @@ Rules that come with the interactive API (documented upstream):
 | `set_fill(opacity=...)`, `set_fill(color=..., opacity=...)`, `set_color(color=...)` (no argument in first place) | "ManimColor only accepts int, str, ... not Object". The names are taken for the colour. The static policy rejects these forms. | `runtime` |
 | `set_fill(colour, opacity=...)` (the opacity by name) | No error. The shape is left with no fill. Use `set_fill(colour, 0.3)`, or `set_fill(None, 0.3)` to keep the colour. The static policy rejects the named form. | none |
 | `Circumscribe(..., color=...)` | "shape should be either Rectangle or Circle." The name is taken for the shape and the scene stops. Without a colour it runs, drawn in a yellow outside the palette. The static policy rejects both (`e2e/fixtures/scenes/circumscribe.py`). | `runtime` |
+| `Indicate(..., color=...)` | "non-finite point/vector value (NaN/Infinity)." The scene stops. Without a colour it runs. The static policy rejects the colour (`e2e/fixtures/scenes/indicate_colour.py`). **Observed** 2026-11-22, in a figure. | `runtime` |
 | `Dot(point, color=...)` (position as an argument) | No error. The dot is drawn white: invisible on the light stage. Use `Dot(color=..., radius=...).move_to(point)`. The static policy rejects the first form. **Observed** in the sample scenes' screenshots. | none |
 
 Scenes and mobjects are JavaScript `Proxy` objects that throw an `AttributeError` for unknown

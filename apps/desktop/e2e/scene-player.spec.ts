@@ -431,6 +431,7 @@ test.describe('scene player frame', () => {
     ['runtime_error.py', 'runtime', /.+/],
     // Refused by the static rules for this reason: given a colour, it stops the scene.
     ['circumscribe.py', 'runtime', /shape should be either Rectangle or Circle/],
+    ['indicate_colour.py', 'runtime', /non-finite point/],
   ] as const) {
     test(`a broken scene (${file}) fails safely with a ${stage} error`, async ({ adle }) => {
       const player = await mountRawPlayer(adle.page, `e2e${stage}${file.length}`);
@@ -510,6 +511,14 @@ const sceneSets = [
   // What a learner actually sees in the sample course. A lesson's animation is paced to
   // its narration, so these run longer than the examples.
   { name: 'sample course scenes', directory: sampleScenesDir, prefix: 'sc', atLeast: 11 },
+  // A lesson's figures, as the core writes them from a model's data (ADR-045): one of every
+  // kind, written by `npm run figures`.
+  {
+    name: 'figures',
+    directory: path.join(desktopDir, 'e2e', 'fixtures', 'figures'),
+    prefix: 'fg',
+    atLeast: 15,
+  },
 ] as const;
 
 for (const set of sceneSets) {

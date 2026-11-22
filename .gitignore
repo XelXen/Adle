@@ -52,3 +52,7 @@ desktop.ini
 .vscode/*
 !.vscode/extensions.json
 *.log
+
+# The owner's own documents, used by tests where they are and never committed
+# (tests/unit/test_pdf_headings.py).
+/testchap.pdf

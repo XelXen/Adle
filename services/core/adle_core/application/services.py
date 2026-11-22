@@ -164,7 +164,15 @@ def build_services(
         provider_clients=provider_clients,
         gateway=gateway,
         generation=GenerationService(
-            database, jobs, gateway, curriculum, lessons, learner, retriever, asks
+            database,
+            jobs,
+            gateway,
+            curriculum,
+            lessons,
+            learner,
+            retriever,
+            asks,
+            on_stored=narration.record_ahead,
         ),
         narration=narration,
     )

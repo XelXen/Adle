@@ -26,7 +26,7 @@ from adle_core.ingestion.types import (
 #: Bumped whenever extraction output changes, so cached extractions can be invalidated.
 #: Bumped when what a parser makes of the same file changes. "2": Word documents keep
 #: their equations, the descriptions of their pictures, and their tables as tables (ADR-041).
-PARSER_REVISION = "2"
+PARSER_REVISION = "3"
 
 LINE_BREAK = chr(10)
 #: Unicode replacement character: what a decoder emits for bytes it cannot read.
@@ -202,6 +202,14 @@ def _garbled_ratio(text: str) -> float:
     return bad / len(text)
 
 
+#: A line of a table of contents: its title, dot leaders, and a page number.
+_LEADERS = re.compile(r"(?:\.\s?){4,}")
+#: A numbered heading: "5.2 The Cumulative Distribution Function", "3 Results".
+_NUMBERED_HEADING = re.compile(
+    r"^(?P<number>\d{1,2}(?:\.\d{1,2}){0,2})\.?\s+(?P<title>[A-Z][^\n]{1,79})$"
+)
+
+
 def reflow_wrapped_lines(text: str) -> str:
     """Undo the hard line wrapping of a PDF page.
 
@@ -209,6 +217,8 @@ def reflow_wrapped_lines(text: str) -> str:
     right margin. A line that runs close to the full width was wrapped, and is
     joined to the next one; a short line (a heading, a list item, the end of a
     paragraph) keeps its break. Hyphenated words are left exactly as printed.
+    A line of a table of contents is as wide as a wrapped one and is not one, and
+    a numbered heading starts a line of its own.
     """
     lines = text.splitlines()
     widest = max((len(line) for line in lines), default=0)
@@ -218,16 +228,171 @@ def reflow_wrapped_lines(text: str) -> str:
     reflowed: list[str] = []
     previous = ""
     for line in lines:
-        wrapped = len(previous) >= threshold
+        wrapped = len(previous) >= threshold and not _LEADERS.search(previous)
         # A full-looking line that ends a sentence, followed by a capital, is more
         # likely the end of a paragraph than a wrap; keeping the break loses nothing.
         ends_sentence = previous.endswith((".", "!", "?", ":")) and line[:1].isupper()
-        if reflowed and line and wrapped and not ends_sentence:
+        heading = _is_numbered_heading(line)
+        if reflowed and line and wrapped and not ends_sentence and not heading:
             reflowed[-1] = f"{reflowed[-1]} {line}"
         else:
             reflowed.append(line)
         previous = line
     return LINE_BREAK.join(reflowed)
+
+
+def _is_numbered_heading(line: str) -> bool:
+    found = _NUMBERED_HEADING.match(line.strip())
+    if found is None or _LEADERS.search(line):
+        return False
+    title = found.group("title")
+    # A title, not a sentence or a line of a calculation: mostly letters, no final stop.
+    letters = sum(char.isalpha() for char in title)
+    return not title.rstrip().endswith(".") and letters >= 0.6 * len(title.replace(" ", ""))
+
+
+def _normalised(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+def _heading_offset(page_text: str, title: str) -> int | None:
+    """Where a heading's own line is on its page: its number (if any) and its title alone
+    on a line. A line of the table of contents names the title too, with dot leaders after
+    it, and is passed over."""
+    wanted = _normalised(title)
+    offset = 0
+    for line in page_text.splitlines(keepends=True):
+        bare = _normalised(line)
+        if bare and not _LEADERS.search(line):
+            numbered = _NUMBERED_HEADING.match(line.strip())
+            rest = _normalised(numbered.group("title")) if numbered else bare
+            if rest == wanted or bare == wanted:
+                return offset
+        offset += len(line)
+    return None
+
+
+#: One heading of a paged document: its page (1-based), its depth, its title.
+_PageHeading = tuple[int, int, str]
+
+
+def _outline_headings(reader: Any) -> list[_PageHeading]:
+    """The document's own outline (its bookmarks), as the program that made it wrote it."""
+    found: list[_PageHeading] = []
+
+    def walk(items: Any, level: int) -> None:
+        for item in items:
+            if isinstance(item, list):
+                walk(item, level + 1)
+                continue
+            try:
+                page = reader.get_destination_page_number(item)
+            except Exception:  # noqa: S112 - a broken bookmark is not a broken document
+                continue
+            title = clean_text(str(getattr(item, "title", "") or "")).replace("\n", " ")
+            if page is not None and page >= 0 and title:
+                found.append((page + 1, min(level, 6), title[:_MAX_TITLE]))
+
+    try:
+        walk(reader.outline, 1)
+    except Exception:  # an outline that cannot be read is no outline
+        return []
+    return found if len(found) >= 2 else []
+
+
+def _numbered_headings(pages: list[tuple[int, str, float]]) -> list[_PageHeading]:
+    """Without an outline: the lines numbered as headings are ("5.2 The Cumulative ..."),
+    if there are at least three and they come in order."""
+    found: list[tuple[tuple[int, ...], _PageHeading]] = []
+    for number, text, _ in pages:
+        for line in text.splitlines():
+            if not _is_numbered_heading(line):
+                continue
+            matched = _NUMBERED_HEADING.match(line.strip())
+            assert matched is not None
+            key = tuple(int(part) for part in matched.group("number").split("."))
+            if found and key <= found[-1][0]:
+                continue
+            found.append((key, (number, len(key), matched.group("title").strip())))
+    return [heading for _, heading in found] if len(found) >= 3 else []
+
+
+def _sections_by_heading(
+    pages: list[tuple[int, str, float]], headings: list[_PageHeading]
+) -> list[ExtractedSection]:
+    """The pages cut where each heading begins. A heading that runs over several pages
+    gives a section for each of them, so that a passage still says which page it is on."""
+    texts = {number: (text, confidence) for number, text, confidence in pages}
+    numbers = sorted(texts)
+    placed: list[tuple[int, int, int, str]] = []
+    for page, level, title in headings:
+        # A bookmark to a page without text points at the next page that has some.
+        landing = next((number for number in numbers if number >= page), None)
+        if landing is None:
+            continue
+        offset = _heading_offset(texts[landing][0], title) if landing == page else 0
+        placed.append((landing, offset or 0, level, title))
+    if not placed:
+        return []
+    placed.sort(key=lambda heading: (heading[0], heading[1]))
+
+    sections: list[ExtractedSection] = []
+    first_page, first_offset = placed[0][0], placed[0][1]
+    for number in numbers:
+        text, confidence = texts[number]
+        before = (
+            text if number < first_page else text[:first_offset] if number == first_page else ""
+        )
+        if before.strip():
+            sections.append(
+                ExtractedSection(
+                    kind=SectionKind.PAGE,
+                    text=before.strip(),
+                    page_number=number,
+                    confidence=confidence,
+                )
+            )
+    path = _HeadingPath()
+    for index, (page, offset, level, title) in enumerate(placed):
+        path.enter(level, title)
+        if index + 1 < len(placed):
+            end_page, end_offset = placed[index + 1][0], placed[index + 1][1]
+        else:
+            end_page, end_offset = numbers[-1], len(texts[numbers[-1]][0])
+        pieces = 0
+        for number in numbers:
+            if number < page or number > end_page:
+                continue
+            text, confidence = texts[number]
+            start = offset if number == page else 0
+            stop = end_offset if number == end_page else len(text)
+            piece = text[start:stop].strip()
+            if not piece:
+                continue
+            pieces += 1
+            sections.append(
+                ExtractedSection(
+                    kind=SectionKind.HEADING,
+                    text=piece,
+                    title=path.title,
+                    level=level,
+                    page_number=number,
+                    confidence=confidence,
+                )
+            )
+        if pieces == 0:
+            # The heading, then the next one straight away: it is still a heading.
+            sections.append(
+                ExtractedSection(
+                    kind=SectionKind.HEADING,
+                    text=title,
+                    title=path.title,
+                    level=level,
+                    page_number=page,
+                    confidence=texts[page][1],
+                )
+            )
+    return sections
 
 
 def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
@@ -259,7 +424,7 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
             "Split it into parts and import them separately.",
         )
 
-    sections: list[ExtractedSection] = []
+    pages: list[tuple[int, str, float]] = []
     empty_pages: list[int] = []
     garbled_pages: list[int] = []
     unreadable_pages: list[int] = []
@@ -276,22 +441,27 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
         garbled = _garbled_ratio(text)
         if garbled > 0.05:
             garbled_pages.append(number)
-        sections.append(
-            ExtractedSection(
-                kind=SectionKind.PAGE,
-                text=text,
-                page_number=number,
-                confidence=max(0.2, 1.0 - 4 * garbled),
-            )
-        )
+        pages.append((number, text, max(0.2, 1.0 - 4 * garbled)))
 
-    if not sections:
+    if not pages:
         raise IngestionError(
             "scanned_document",
             "This PDF has no selectable text: it is probably a scan. Adle does not run text "
             "recognition (OCR) and never uploads files to do so. Convert it with an OCR tool "
             "first, or import the text in another format.",
         )
+
+    # Cut where the document's headings begin, so that what it covers can be read off
+    # them: its own outline first, else the lines numbered as headings, else the pages.
+    headings = _outline_headings(reader) or _numbered_headings(pages)
+    sections = _sections_by_heading(pages, headings) if headings else []
+    if not sections:
+        sections = [
+            ExtractedSection(
+                kind=SectionKind.PAGE, text=text, page_number=number, confidence=confidence
+            )
+            for number, text, confidence in pages
+        ]
 
     warnings: list[str] = []
     if empty_pages:

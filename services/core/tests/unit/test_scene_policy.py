@@ -121,6 +121,7 @@ def test_allowed_standard_library_imports() -> None:
         ("fill_without_colour.py", "unreliable_call"),
         # And this one stops whatever it is given.
         ("circumscribe.py", "unreliable_call"),
+        ("indicate_colour.py", "unreliable_call"),
     ],
 )
 def test_broken_and_hostile_fixtures_are_rejected(fixture: str, expected: str) -> None:

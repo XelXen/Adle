@@ -43,6 +43,7 @@
     "wanim-names": "node scripts/export-wanim-names.mjs",
     "wanim-names:check": "node scripts/export-wanim-names.mjs --check",
     "scene-guide": "node scripts/sync-scene-guide.mjs",
+    "figures": "uv run --directory services/core python -m adle_core.tools.export_figures ../../apps/desktop/e2e/fixtures/figures",
     "scene-guide:check": "node scripts/sync-scene-guide.mjs --check",
     "licenses": "node scripts/licenses.mjs",
     "licenses:check": "node scripts/licenses.mjs --check",

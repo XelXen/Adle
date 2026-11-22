@@ -30,7 +30,7 @@ import logging
 import re
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -70,6 +70,7 @@ from adle_core.errors import AdleError, ConflictError, NotFoundError, Validation
 from adle_core.generation import prompts
 from adle_core.generation.drafts import (
     DraftError,
+    FigureScene,
     LessonContext,
     ObjectiveRef,
     PassageRef,
@@ -383,6 +384,7 @@ class GenerationService:
         retriever: Retriever,
         asks: AskService,
         trials: SceneTrials | None = None,
+        on_stored: Callable[[str], None] | None = None,
     ) -> None:
         self._database = database
         self._jobs = jobs
@@ -393,6 +395,9 @@ class GenerationService:
         self._retriever = retriever
         self._asks = asks
         self._trials = trials if trials is not None else SceneTrials()
+        #: Told the id of each lesson as soon as its words are stored: the natural voice
+        #: begins on them then (``NarrationService.record_ahead``).
+        self._on_stored = on_stored
         #: Looking for work that is under way and starting it are one step. Without this,
         #: two requests arriving together both find nothing and both begin: the same
         #: lesson written twice, or a provider chosen under a job that has just started.
@@ -620,6 +625,13 @@ class GenerationService:
         candidates = self._curriculum.outline_candidates(course_id)[: prompts.MAX_HEADINGS]
         headings = [f"{candidate.title} (in {candidate.source_name})" for candidate in candidates]
         section_ids = [candidate.section_id for candidate in candidates]
+        pages: list[str] = []
+        if not candidates:
+            # Materials without headings are still the whole of what the course covers:
+            # their pages, from first to last, and not only what matches its title.
+            openings = self._curriculum.page_openings(course_id, prompts.MAX_HEADINGS)
+            pages = [f"{opening.label}: {opening.opening}" for opening in openings]
+            section_ids = [opening.section_id for opening in openings]
         query = " ".join([title, topic, description])
         excerpts = [
             prompts.Passage(
@@ -646,6 +658,7 @@ class GenerationService:
                 goal=goal,
                 existing_titles=existing,
                 headings=headings,
+                pages=pages,
                 passages=excerpts,
                 problems=problems,
             )
@@ -859,6 +872,7 @@ class GenerationService:
 
         lesson: dict[str, Any] | None = None
         briefs: list[SceneBrief] = []
+        figures: list[FigureScene] = []
         problems: list[str] = []
         #: The answers that end up in the lesson: its text, then each picture kept.
         answers: list[ChatResult] = []
@@ -892,7 +906,9 @@ class GenerationService:
             except ValidationError as error:
                 problems = _problem_list(error)
             else:
-                lesson, briefs = compiled.lesson, compiled.scenes
+                lesson, briefs, figures = compiled.lesson, compiled.scenes, compiled.figures
+                if compiled.figures_dropped:
+                    logger.info("generation.figures_dropped count=%s", compiled.figures_dropped)
                 answers.append(result)
                 break
             logger.info("generation.lesson_unusable attempt=%s", attempt)
@@ -904,12 +920,13 @@ class GenerationService:
         # From here on there is a lesson. It is stored now, with its pictures marked as
         # still to come, so that the learner can begin while they are drawn (ADR-031).
         context.check_cancelled()
-        waiting = [brief.scene_id for brief in briefs]
+        waiting = [figure.scene_id for figure in figures] + [brief.scene_id for brief in briefs]
         bundle = parse_bundle({"lesson": lesson, "scenes": [], "pending_scene_ids": waiting})
         stored = self._lessons.store(
             bundle, origin="generated", written_by=self._written_by(answers)
         )
         total = 1 + len(briefs)
+        planned_pictures = len(figures) + len(briefs)
         made = 0
         notes: list[str] = []
 
@@ -919,18 +936,47 @@ class GenerationService:
                 "kind": KIND_LESSON,
                 "lesson_id": stored.id,
                 "title": stored.title,
-                "pictures_planned": len(briefs),
+                "pictures_planned": planned_pictures,
                 "pictures_made": made,
                 "pictures_pending": left,
                 "notes": [*notes, *([written_by["note"]] if written_by["note"] else [])],
                 "written_by": written_by,
             }
 
-        context.publish(so_far(len(briefs)))
+        context.publish(so_far(planned_pictures))
+        if self._on_stored is not None:
+            self._on_stored(stored.id)
         try:
+            # The figures first: drawn already, each is tried in the player and taken into
+            # the lesson in a second or two (ADR-045). All are offered for their trials at
+            # once, so that the app runs them one after another, in order, without waiting
+            # to be asked for each.
+            offered = [self._offer_figure(figure) for figure in figures]
+            try:
+                for number, figure in enumerate(figures, start=1):
+                    context.check_cancelled()
+                    context.report(
+                        0,
+                        total,
+                        f"Drawing picture {number} of {planned_pictures}",
+                        {"stage": "drawing"},
+                    )
+                    if self._settle_figure(stored.id, figure, offered[number - 1], context):
+                        made += 1
+                    else:
+                        notes.append(
+                            f"The picture for “{figure.title}” couldn’t be shown, so that part "
+                            "is explained in words."
+                        )
+                    context.publish(so_far(planned_pictures - number))
+            finally:
+                # A trial nobody waits for any more is not run.
+                for _, trial_id in offered:
+                    if trial_id is not None:
+                        self._trials.withdraw(trial_id)
             for number, brief in enumerate(briefs, start=1):
                 context.check_cancelled()
-                label = f"Drawing picture {number} of {len(briefs)}"
+                label = f"Drawing picture {len(figures) + number} of {planned_pictures}"
                 context.report(number, total, label, {"stage": "drawing"})
                 try:
                     artifact, answer = self._write_scene(brief, context, number, total, label)
@@ -1060,6 +1106,65 @@ class GenerationService:
                 continue
             return artifact, result
         return fallback
+
+    def _offer_figure(self, figure: FigureScene) -> tuple[SceneArtifact | None, str | None]:
+        """A figure as a scene the gate takes, and its trial in the app's player if the app
+        is there to run one: (None, None) for a figure the gate refuses."""
+        try:
+            artifact = inspect_scene(figure.scene_id, figure.title, figure.source)
+        except (SceneRejectedError, ValidationError) as error:
+            logger.info(
+                "generation.figure_unattached kind=%s error=%s", figure.kind, type(error).__name__
+            )
+            return None, None
+        if not self._trials.present():
+            return artifact, None
+        trial_id = self._trials.offer(
+            scene_class=artifact.scene_class,
+            source=artifact.source,
+            interactive=artifact.interactive,
+            controls=tuple(artifact.controls),
+        )
+        return artifact, trial_id
+
+    def _settle_figure(
+        self,
+        lesson_id: str,
+        figure: FigureScene,
+        offered: tuple[SceneArtifact | None, str | None],
+        context: JobContext,
+    ) -> bool:
+        """Take a figure into the stored lesson once it has run in the player, or say its
+        part in words. Whether it was taken."""
+        artifact, trial_id = offered
+        if artifact is not None:
+            verdict = (
+                "untried"
+                if trial_id is None
+                else self._trials.wait(trial_id, cancelled=lambda: context.cancelled)
+            )
+            context.check_cancelled()
+            if isinstance(verdict, TrialFailure):
+                # Only its kind and the stage: what a scene says is not logged (ADR-029).
+                logger.info(
+                    "generation.figure_failed_trial kind=%s stage=%s", figure.kind, verdict.stage
+                )
+            else:
+                try:
+                    self._lessons.settle_scene(
+                        lesson_id,
+                        figure.scene_id,
+                        {"purpose": artifact.purpose, "source": artifact.source},
+                    )
+                    return True
+                except (SceneRejectedError, LessonInvalidError, ValidationError) as error:
+                    logger.info(
+                        "generation.figure_unattached kind=%s error=%s",
+                        figure.kind,
+                        type(error).__name__,
+                    )
+        self._lessons.settle_scene(lesson_id, figure.scene_id, None)
+        return False
 
     def _try_in_player(self, artifact: SceneArtifact, context: JobContext) -> TrialFailure | None:
         """Run a picture in the app's player before it is kept, if the app is there to.

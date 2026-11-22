@@ -6,6 +6,7 @@ and answers them as told. No request in this file leaves the process.
 
 from __future__ import annotations
 
+import copy
 import threading
 from typing import Any
 
@@ -137,6 +138,8 @@ class App:
 
     def __init__(self, services: Services, verdicts: list[TrialFailure | None]) -> None:
         self.tried: list[Any] = []
+        #: How many pictures were waiting each time there were any.
+        self.looks: list[int] = []
         self._trials = services.generation.trials
         self._verdicts = verdicts
         self._stop = threading.Event()
@@ -153,7 +156,10 @@ class App:
 
     def _run(self) -> None:
         while not self._stop.is_set():
-            for trial in self._trials.waiting():
+            waiting = self._trials.waiting()
+            if waiting:
+                self.looks.append(len(waiting))
+            for trial in waiting:
                 self.tried.append(trial)
                 verdict = self._verdicts.pop(0) if self._verdicts else None
                 self._trials.report(trial.id, verdict)
@@ -237,3 +243,43 @@ def test_without_the_app_to_try_them_pictures_are_kept_untried(
     # Nobody asked for trials, so nobody was waited for.
     assert provider.kinds() == ["lesson", "scene", "scene"]
     assert job.result["pictures_made"] == 2
+
+
+def test_a_lessons_figures_are_offered_for_their_trials_all_at_once(
+    client: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    """The app runs them one after another in one look, instead of each figure waiting for
+    the app's next look, a second later (ADR-045)."""
+    lesson = copy.deepcopy(LESSON)
+    figures = {
+        0: {
+            "kind": "equation",
+            "steps": ["z = w x + b", r"z = 2 \cdot 3 + 1", "z = 7"],
+            "description": "The weighted sum is filled in and worked out to seven.",
+        },
+        1: {
+            "kind": "bars",
+            "labels": ["input 1", "input 2"],
+            "values": [1, 3],
+            "description": "Two bars: the second input counts three times as much.",
+        },
+        4: {
+            "kind": "number_line",
+            "from": 0,
+            "to": 10,
+            "marks": [{"at": 7, "label": "z"}],
+            "description": "A number line from zero to ten with the sum marked at seven.",
+        },
+    }
+    for index, figure in figures.items():
+        lesson["segments"][index].pop("scene", None)
+        lesson["segments"][index]["figure"] = figure
+    provider.queue(lesson)
+    broken = TrialFailure("runtime", "non-finite point/vector value")
+    with App(services, [None, None, broken]) as app:
+        job = write_a_lesson(client, services)
+    # All three were waiting at the first look; the last one failed and is said in words.
+    assert app.looks[0] == 3
+    assert job.result["pictures_made"] >= 2
+    assert any("couldn’t be shown" in note for note in job.result["notes"])
+    assert services.generation.trials.waiting() == []

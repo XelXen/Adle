@@ -41,6 +41,7 @@ from adle_core.infrastructure.orm import (
     LearnerConceptState,
     LearningObjective,
     Source,
+    SourceChunk,
     SourceSection,
 )
 from adle_core.ingestion.types import heading_leaf
@@ -145,6 +146,21 @@ class OutlineCandidateRecord:
     title: str
     source_id: str
     source_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class PageOpening:
+    """Where one page of materials without headings begins, for a course plan to read."""
+
+    section_id: str
+    #: "page 3 of notes.pdf", or the document's name.
+    label: str
+    #: Its opening words.
+    opening: str
+
+
+#: How much of a page a course plan is shown, in characters.
+PAGE_OPENING_CHARACTERS = 220
 
 
 NOT_ASSESSED = KnowledgeRecord(
@@ -712,6 +728,42 @@ class CurriculumService:
             )
             for section, source_name in rows
         ]
+
+    def page_openings(self, course_id: str, limit: int) -> list[PageOpening]:
+        """For materials without headings: the opening words of their pages, chosen evenly
+        from the first page to the last, so that a course plan sees all of what they cover."""
+        with self._database.read() as session:
+            get_course_or_404(session, course_id)
+            rows = [
+                (section_id, page_number, source_name)
+                for section_id, page_number, source_name in session.execute(
+                    select(SourceSection.id, SourceSection.page_number, Source.display_name)
+                    .join(Source, Source.id == SourceSection.source_id)
+                    .where(Source.course_id == course_id, SourceSection.char_count > 0)
+                    .order_by(Source.created_at, Source.id, SourceSection.ordinal)
+                )
+            ]
+            if not rows or limit <= 0:
+                return []
+            step = max(1, -(-len(rows) // limit))
+            chosen = rows[::step][:limit]
+            firsts: dict[str, str] = {}
+            for section_id, text in session.execute(
+                select(SourceChunk.section_id, SourceChunk.text)
+                .where(SourceChunk.section_id.in_([row[0] for row in chosen]))
+                .order_by(SourceChunk.section_id, SourceChunk.ordinal)
+            ):
+                firsts.setdefault(section_id, text)
+        openings: list[PageOpening] = []
+        for section_id, page_number, source_name in chosen:
+            text = " ".join(firsts.get(section_id, "").split())
+            if not text:
+                continue
+            if len(text) > PAGE_OPENING_CHARACTERS:
+                text = text[:PAGE_OPENING_CHARACTERS].rsplit(" ", 1)[0] + " …"
+            where = f"page {page_number} of " if page_number else ""
+            openings.append(PageOpening(section_id, f"{where}{source_name}", text))
+        return openings
 
     def outline_candidates(self, course_id: str) -> list[OutlineCandidateRecord]:
         """Concepts the headings of the course's materials suggest. Nothing is created."""

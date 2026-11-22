@@ -109,6 +109,11 @@ class SceneTrials:
             )
         return trial_id
 
+    def withdraw(self, trial_id: str) -> None:
+        """No longer wanted: the job that offered it has ended. Nothing if it is gone."""
+        with self._lock:
+            self._trials.pop(trial_id, None)
+
     def report(self, trial_id: str, failure: TrialFailure | None) -> bool:
         """The app's answer. False when nobody is waiting for it (any more)."""
         with self._lock:

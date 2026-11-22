@@ -160,12 +160,13 @@ enthusiasm for how things fit together." The voice only: not the lesson, and no 
 
 Every segment has "type" and "title". The types, and what else each needs:
 
-- "explanation": "beats". Use it to motivate and to explain.
-- "visualization": "beats" and "scene". A picture that moves while you talk.
-- "interaction": "prompt" (what to try and what to look for), "beats", and "scene".
-  A picture the learner changes with a slider or a switch.
+- "explanation": "beats", and a "figure" when there is something to see. Use it to
+  motivate and to explain.
+- "visualization": "beats" and a "figure". A picture that moves while you talk.
+- "interaction": "prompt" (what to try and what to look for), "beats", and a "figure" with a
+  "slider": a picture the learner changes.
 - "worked_example": "problem" (may contain $math$) and "beats"; each beat says one step and
-  its "show" writes that step.
+  its "show" writes that step. A "figure" when one helps.
 - "checkpoint": "question". No beats.
 - "reflection": "prompt" and one or two "beats". Something to think about; not scored.
 - "summary": "beats"; each "show" is one key point. Always the last segment.
@@ -177,7 +178,40 @@ A beat is {{"say": "...", "show": "..."}}:
 - "show" is optional: one short line that appears on the board when the beat starts.
   It may contain $math$. A segment has 2 to 5 beats.
 
-A scene is {{"brief": "...", "description": "..."}}:
+A figure is a picture Adle draws from your data, a step for each beat: {{"kind": ...,
+the fields of its kind, "description": the same thing in two to four sentences for someone
+who cannot see it (may contain $math$)}}. TeX below means TeX without dollar signs. Kinds:
+- "equation": "steps", 2 to 6 TeX formulas, each rewritten into the next.
+- "graph": "x": [from, to]; "curves", 1 to 3 of {{"f": a formula in x, "label": TeX,
+  optional "from" and "to"}}. A formula uses numbers, x, + - * / ^, brackets, pi, e, and
+  sin cos tan exp log sqrt abs: "exp(-x^2/2)/sqrt(2pi)"; a comparison is 1 where it holds
+  and 0 where not, for a curve in pieces: "(x >= 0) * exp(-x)". Optional: "y": [from, to],
+  "x_label" and "y_label" (TeX), "shade": {{"from", "to", "label"}} (the area under the
+  first curve; "curve": 2 for another), "points": [{{"x", "label"}}], "trace": true (a point
+  runs along the first curve), "slider": {{"name": "a", "label": TeX, "min", "max",
+  "value"}} (the formulas may use that name, and the shade's "from" or "to" may be it, to
+  follow it; the learner moves it).
+- "bars": "labels" (2 to 8) and "values"; optional "then" (values to change to), "highlight"
+  (a bar's number), "y_label".
+- "number_line": "from", "to"; optional "marks": [{{"at", "label"}}], "interval": {{"from",
+  "to", "label"}}, "move": {{"from", "to"}}.
+- "flow": "steps", 2 to 6 phrases of at most 28 characters; optional "loop": true.
+- "layers": "layers", 2 to 5 of {{"label", "nodes": 1 to 6}}; optional "path": a node's number
+  in each layer.
+- "table": "header" and "rows", at most 4 columns and 6 rows; a cell is words, $TeX$, or
+  both, at most 60 characters; optional "highlight": row numbers.
+- "scatter": "points": [[x, y], ...] (3 to 40); optional "line": {{"slope", "intercept",
+  "label"}}, "residuals": true, "x_label", "y_label".
+- "vectors": "vectors", 1 to 3 of {{"x", "y", "label"}}; optional "sum": true.
+- "tree": "nodes", 2 to 15 of {{"label", "parent": the number of an earlier node, "edge":
+  TeX on its branch}}; the first is the root.
+Give every explanation, visualization and worked example a figure when there is something
+to see: four to seven figures in a lesson. Choose the kind that shows the idea happening,
+and fill it with the lesson's own numbers and labels.
+
+Only for an interaction that no kind of figure can show, give the segment a "scene" in
+place of a figure, at most {MAX_SCENES_PER_LESSON} in the lesson. A scene is
+{{"brief": "...", "description": "..."}}:
 - "brief" tells an animator exactly what to draw: the objects, their labels, and step by
   step, in the order of the beats, what appears, what changes into what, and what is pointed
   at; for an interaction which controls exist (at most two: sliders with a range, or on/off
@@ -185,7 +219,6 @@ A scene is {{"brief": "...", "description": "..."}}:
   of shapes, each quantity in one color wherever it appears.
 - "description" says the same thing for someone who cannot see the picture. It may contain
   $math$. Two to four sentences.
-Use at most {MAX_SCENES_PER_LESSON} scenes in the lesson, and at least one.
 
 A question has "form", "stem" (may contain $math$), "explanation" (why the right answer is
 right; may contain $math$), "hint" (a nudge that does not give the answer), "objective" (the
@@ -443,8 +476,10 @@ def curriculum_request(
     headings: Sequence[str],
     passages: Sequence[Passage],
     problems: Sequence[str] = (),
+    pages: Sequence[str] = (),
 ) -> ChatRequest:
-    """The request for a proposed list of concepts for a course."""
+    """The request for a proposed list of concepts for a course. ``pages`` stand in for the
+    headings of materials that have none: how each page begins, from first to last."""
     system = (
         "You design the curriculum of a short course for Adle, an app that teaches one concept "
         "at a time to one learner. You are an expert teacher of the subject. You decide which "
@@ -473,6 +508,17 @@ def curriculum_request(
             'cover, in the learner\'s terms. In "sources", give the numbers of the headings a '
             "concept comes from; use no number that is not listed here.\n"
             + _block("headings", listed)
+        )
+    elif pages:
+        listed = "\n".join(
+            f"[{number}] {_clip(page, 300)}"
+            for number, page in enumerate(pages[:MAX_HEADINGS], start=1)
+        )
+        parts.append(
+            "The learner's own materials have no headings. This is how each of their pages "
+            "begins, from the first to the last: the course should cover what they cover, in "
+            'the learner\'s terms. In "sources", give the numbers of the pages a concept comes '
+            "from; use no number that is not listed here.\n" + _block("pages", listed)
         )
     else:
         parts.append('The learner has not imported materials. Leave every "sources" list empty.')

@@ -20,6 +20,7 @@ guide says about Wanim is true. **They are test fixtures, not examples to copy.*
 | `fill_by_name.py` | The same with `set_fill(colour, opacity=0.9)`: it runs, and the shape has no fill |
 | `fill_without_colour.py` | `set_fill(opacity=0.9)`: the scene stops with an error. A lesson a real model wrote lost its interactive picture this way (2026-11-21) |
 | `circumscribe.py` | `Circumscribe(..., color=...)`: the name is taken for its shape and the scene stops with "shape should be either Rectangle or Circle". Found while writing the style example (2026-11-21); the static policy refuses it |
+| `indicate_colour.py` | `Indicate(..., color=...)`: the scene stops with "non-finite point/vector value". Found in a figure (2026-11-22); the static policy refuses it |
 | `small_minus_signs.py` | Two columns of small minus signs, each exactly on a row of pixels of the 1280-wide drawing. Shown at the size of a lesson's picture on a display with one pixel to the point, some are lost if the scene is drawn 1280 wide and none if it is drawn 854 wide: why the player asks for a drawing to suit its frame (2026-11-21) |
 
 Known-good scenes live in `skills/wanim-scene-authoring/examples/`.

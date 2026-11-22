@@ -9,7 +9,7 @@ from pathlib import Path
 from lxml import etree
 
 from adle_core.ingestion.extract import extract_in_process
-from adle_core.ingestion.parsers import omml_text
+from adle_core.ingestion.parsers import PARSER_REVISION, omml_text
 
 M = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 #: The smallest picture there is: one pixel.
@@ -88,4 +88,4 @@ def test_a_word_document_keeps_its_equations_pictures_and_tables(tmp_path: Path)
         "| Weight | How much an input counts |\n"
         "| Both \\| together decide the output | |"
     ) in section.text
-    assert document.parser_version.endswith("+2")
+    assert document.parser_version.endswith(f"+{PARSER_REVISION}")

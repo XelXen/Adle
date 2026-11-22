@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Chapter 3: Rates of Change</title>
+    <style>
+      body {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 12pt;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 20pt;
+      }
+      h2 {
+        font-size: 15pt;
+        margin-top: 1.4em;
+      }
+      .contents p {
+        margin: 0.2em 0;
+      }
+      .page {
+        break-after: page;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="page">
+      <h1>Chapter 3: Rates of Change</h1>
+      <p>Notes written for Adle's tests. They are copied from no course.</p>
+      <div class="contents">
+        <p><strong>Contents</strong></p>
+        <p>3.1 Overview . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1</p>
+        <p>3.2 Average Rate of Change . . . . . . . . . . . . . . . . . . . . . . . . . 2</p>
+        <p>3.3 The Derivative as a Limit . . . . . . . . . . . . . . . . . . . . . . . 2</p>
+        <p>3.4 Rules for Derivatives . . . . . . . . . . . . . . . . . . . . . . . . . . 3</p>
+        <p>3.5 Summary . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4</p>
+      </div>
+      <h2>3.1 Overview</h2>
+      <p>
+        A rate of change says how fast one quantity changes when another one does. A car's speed is
+        the rate at which its position changes with time, and the slope of a hill is the rate at
+        which its height changes with distance. This chapter starts from the average rate over an
+        interval and makes the interval shrink until what is left is the rate at a single point.
+      </p>
+    </section>
+    <section class="page">
+      <h2>3.2 Average Rate of Change</h2>
+      <p>
+        Over an interval from a to b, the average rate of change of a function f is the change in
+        its value divided by the change in its input: the difference f(b) minus f(a), divided by b
+        minus a. On a graph it is the slope of the straight line through the two points, which is
+        called a secant line.
+      </p>
+      <p>
+        A train that covers 120 kilometres in two hours has an average speed of 60 kilometres an
+        hour, even if it stopped at a station on the way. The average hides what happened in
+        between, and that is what the next idea recovers.
+      </p>
+      <h2>3.3 The Derivative as a Limit</h2>
+      <p>
+        Let the interval shrink. Keep a fixed and move b towards it: the secant line turns, and the
+        slopes it takes settle on one number. That number is the derivative of f at a, the rate of
+        change at the single point a, and the line it is the slope of is the tangent line.
+      </p>
+    </section>
+    <section class="page">
+      <p>
+        When the slopes do not settle, for instance at a sharp corner of the graph, the function has
+        no derivative there. A function with a derivative at every point of an interval is called
+        differentiable on it.
+      </p>
+      <h2>3.4 Rules for Derivatives</h2>
+      <p>
+        Working out a limit every time would be slow, so a few rules do the work. The derivative of
+        a constant is zero. The derivative of x raised to a power n is n times x raised to the power
+        n minus one. The derivative of a sum is the sum of the derivatives, and a constant factor
+        can be taken outside.
+      </p>
+      <p>
+        With these three rules the derivative of any polynomial can be written down at once, one
+        term at a time.
+      </p>
+    </section>
+    <section>
+      <h2>3.5 Summary</h2>
+      <p>
+        The average rate of change over an interval is the slope of a secant line. The derivative at
+        a point is the limit of those slopes as the interval shrinks to nothing, the slope of the
+        tangent line, and a handful of rules gives the derivative of a polynomial without a limit.
+      </p>
+    </section>
+  </body>
+</html>

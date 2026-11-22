@@ -8,6 +8,8 @@ copied from a real course. Safe to commit and to redistribute with the project.
 | `neural-networks-syllabus.md` | A well-formed syllabus with nested headings. Also the source text of the bundled sample course. |
 | `study-notes.txt` | Plain UTF-8 text. |
 | `lecture-notes.pdf` | A three-page PDF with a real text layer, printed by Chromium. |
+| `chapter-with-outline.pdf` | A four-page chapter with a contents list, numbered sections (one beginning mid-page) and an outline (bookmarks), printed by Chromium: read by its headings. |
+| `chapter-numbered.pdf` | The same chapter printed without an outline: read by its numbered headings. |
 | `course-outline.docx` | A Word document with heading styles and a table. |
 | `legacy-encoding.txt` | Latin-1 bytes: import succeeds with a warning. |
 | `partly-scanned.pdf` | Pages 1 and 3 have text, page 2 is blank: import succeeds with a warning. |
@@ -24,6 +26,11 @@ The Markdown and text files are edited by hand. The rest are built:
 
 ```bash
 npx electron scripts/fixtures/print-pdf.cjs scripts/fixtures/lecture-notes.html fixtures/sample-documents/lecture-notes.pdf
+```
+
+```bash
+npx electron scripts/fixtures/print-pdf.cjs scripts/fixtures/chapter-notes.html fixtures/sample-documents/chapter-with-outline.pdf --outline
+npx electron scripts/fixtures/print-pdf.cjs scripts/fixtures/chapter-notes.html fixtures/sample-documents/chapter-numbered.pdf
 ```
 
 ```bash

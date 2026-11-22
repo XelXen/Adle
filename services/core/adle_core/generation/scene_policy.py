@@ -345,6 +345,21 @@ class _Checker:
                 node,
             )
             return
+        if (
+            isinstance(function, ast.Name)
+            and function.id == "Indicate"
+            and any(key.arg in ("color", "colour") for key in node.keywords)
+        ):
+            # Observed in the pinned runtime, 2026-11-22: given a colour, Indicate makes a
+            # point that is not a number, and the scene stops ("non-finite point/vector
+            # value"). Without one it runs.
+            self.fail(
+                "unreliable_call",
+                "Indicate stops the scene in this runtime when it is given a color. Call "
+                "Indicate(...) without one, or draw a SurroundingRectangle with Create.",
+                node,
+            )
+            return
         if isinstance(function, ast.Name) and function.id == "Dot":
             positioned = bool(node.args) or any(key.arg == "point" for key in node.keywords)
             if positioned:

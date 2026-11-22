@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 from adle_core.api.app import create_app
 from adle_core.api.auth import LaunchToken
+from adle_core.application.generation import GenerationService
 from adle_core.application.services import Services, build_services
 from adle_core.config import Settings
 from adle_core.generation.quota import QuotaLimits
@@ -143,6 +144,34 @@ def test_a_lesson_can_be_taken_as_soon_as_its_text_is_written(
     assert [scene["id"] for scene in loaded["scenes"]] == ["scn_1", "scn_2"]
     # The learner's place was not moved by the pictures arriving.
     assert loaded["progress"]["position"] == 3
+
+
+def test_the_voice_is_told_of_a_lesson_as_soon_as_its_words_are_stored(
+    keyed: TestClient, services: Services
+) -> None:
+    told: list[tuple[str, list[str]]] = []
+
+    def stored(lesson_id: str) -> None:
+        told.append((lesson_id, list(services.lessons.get(lesson_id).pending_scene_ids)))
+
+    generation = GenerationService(
+        services.database,
+        services.jobs,
+        services.gateway,
+        services.curriculum,
+        services.lessons,
+        services.learner,
+        services.retriever,
+        services.asks,
+        on_stored=stored,
+    )
+    _, concept = a_concept(keyed)
+    job = services.jobs.wait(generation.generate_lesson(concept).id, timeout=60)
+    assert job.status == "succeeded", job.error_message
+    # Told once, while its pictures were still to come: a natural voice begins on the
+    # words then (ADR-042), and does not wait for the pictures.
+    assert [lesson_id for lesson_id, _ in told] == [job.result["lesson_id"]]
+    assert told[0][1]
 
 
 def test_each_picture_is_added_when_it_is_drawn(

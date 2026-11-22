@@ -260,6 +260,17 @@ class NarrationService:
                     lines.append(beat.text)
         return lines
 
+    def record_ahead(self, lesson_id: str) -> None:
+        """Record a lesson as soon as its words are stored, when a natural voice reads the
+        lessons: the clips are made while the learner is elsewhere, and not while the
+        lesson plays in the computer's voice waiting for them. A picture that arrives later
+        changes nothing that is said. With no voice chosen, nothing is done."""
+        try:
+            if self.status().enabled:
+                self.start(lesson_id)
+        except (VoiceUnavailableError, NotFoundError, ConflictError, OSError) as error:
+            logger.info("narration.not_recorded_ahead kind=%s", type(error).__name__)
+
     def start(self, lesson_id: str) -> JobSnapshot:
         """Record what a lesson says, in the background. Work already under way is returned."""
         self._voice(lesson_id)

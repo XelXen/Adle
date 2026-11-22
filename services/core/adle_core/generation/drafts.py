@@ -24,8 +24,17 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+)
 
+from adle_core.generation.figures import FigureError, beat_seconds, compile_figure, undoubled
+from adle_core.generation.speech import spoken
 from adle_core.lessons.ir import (
     MAX_BEATS,
     MAX_PRACTICE_ITEMS,
@@ -35,11 +44,16 @@ from adle_core.lessons.ir import (
     STRATEGIES,
     AssessmentItem,
     Display,
+    LongDisplay,
     VoiceDescription,
 )
 
 #: A lesson asks for at most this many scenes: each one is a separate model request.
 MAX_SCENES_PER_LESSON = 2
+#: And has at most this many figures, which the core draws (ADR-045).
+MAX_FIGURES_PER_LESSON = 8
+#: The parts a figure may stand in.
+_FIGURE_PARTS = ("explanation", "visualization", "interaction", "worked_example")
 MAX_PROPOSED_CONCEPTS = 16
 MAX_PROPOSED_OBJECTIVES = 4
 READING_WORDS_PER_MINUTE = 150
@@ -233,7 +247,7 @@ def tidy(text: str) -> str:
     """Normalise the formatting habits of a model without changing what is said."""
     # Marks that change the direction text is drawn in, or hide in it. A model has no
     # reason to write one, and they can make a sentence read as something it is not.
-    text = _HIDDEN_MARKS.sub("", text)
+    text = undoubled(_HIDDEN_MARKS.sub("", text))
     if len(text) > MAX_TIDIED_CHARACTERS:
         return " ".join(text.split())
     text = _dollar_math(text)
@@ -303,11 +317,15 @@ class QuestionDraft(_Draft):
 
 class SegmentDraft(_Draft):
     type: str
-    title: str = Field(min_length=1)
+    #: Required, except where the core can name the part by what it is (``_UNTITLED``).
+    title: str = ""
     beats: list[BeatDraft] = Field(default_factory=list)
     prompt: str | None = None
     problem: str | None = None
     scene: SceneDraft | None = None
+    #: A figure: a kind of picture the core draws from this data (ADR-045). Read by the
+    #: figures module; a field it does not know is passed over there.
+    figure: dict[str, Any] | None = None
     question: QuestionDraft | None = None
 
 
@@ -321,6 +339,22 @@ class LessonDraft(_Draft):
     sources: list[int] = Field(default_factory=list)
     #: How the narrator sounds, in a sentence. A lesson without one is read in Adle's own.
     voice: str | None = None
+
+    @field_validator("practice", mode="before")
+    @classmethod
+    def _usable_practice(cls, value: Any) -> Any:
+        """A question kept for practice that is not whole is left out here, before it can
+        cost the lesson: practice is extra, and never a reason to write a lesson again."""
+        if not isinstance(value, list):
+            return []
+        kept = []
+        for item in value:
+            try:
+                QuestionDraft.model_validate(item)
+            except ValidationError:
+                continue
+            kept.append(item)
+        return kept
 
 
 @dataclass(frozen=True, slots=True)
@@ -366,10 +400,27 @@ class SceneBrief:
 
 
 @dataclass(frozen=True, slots=True)
+class FigureScene:
+    """One figure, drawn already: the scene file the core wrote for it."""
+
+    scene_id: str
+    segment_id: str
+    kind: str
+    title: str
+    description: str
+    source: str
+    interactive: bool
+
+
+@dataclass(frozen=True, slots=True)
 class CompiledLesson:
     #: The lesson in IR form, not yet validated.
     lesson: dict[str, Any]
     scenes: list[SceneBrief]
+    #: Drawn by the core (ADR-045): no request is needed for them.
+    figures: list[FigureScene] = field(default_factory=list)
+    #: How many figures the draft gave that could not be drawn as given.
+    figures_dropped: int = 0
 
 
 def _problems(error: ValidationError, prefix: str = "") -> list[str]:
@@ -394,7 +445,8 @@ _SECONDS_FOR = {"checkpoint": 45, "interaction": 60, "reflection": 25}
 def _narration(beats: list[BeatDraft]) -> list[dict[str, Any]]:
     narration = []
     for beat in beats[:MAX_BEATS]:
-        entry: dict[str, Any] = {"text": tidy(beat.say)}
+        # Narration is read aloud: notation in it is said in words (generation/speech.py).
+        entry: dict[str, Any] = {"text": spoken(tidy(beat.say))}
         shown = _text(beat.show)
         if shown:
             entry["show"] = shown
@@ -485,6 +537,10 @@ def _question(
     return item
 
 
+#: The title of a part a model left untitled, where what it is names it well enough.
+_UNTITLED = {"summary": "Summary", "reflection": "Think it over"}
+
+
 def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson:
     """Turn a draft into an (unvalidated) lesson in IR form, plus the scenes still to be written.
 
@@ -494,6 +550,8 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
     problems: list[str] = []
     segments: list[dict[str, Any]] = []
     scenes: list[SceneBrief] = []
+    figures: list[FigureScene] = []
+    dropped = 0
     questions = 0
 
     for index, segment in enumerate(draft.segments[:MAX_SEGMENTS]):
@@ -501,10 +559,20 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
         kind = segment.type.strip().lower().replace("-", "_").replace(" ", "_")
         segment_id = f"seg_{index + 1}"
         narration = _narration(segment.beats)
+        title = tidy(segment.title)
+        if not title:
+            # A part left without a title is named by what it is where that says enough
+            # (a real model left all three of its checkpoints so, 2026-11-22): not a reason
+            # to write the lesson again. Any other part needs its own.
+            title = (
+                f"Checkpoint {questions + 1}" if kind == "checkpoint" else _UNTITLED.get(kind, "")
+            )
+            if not title:
+                problems.append(f"{where}.title: Field required")
         entry: dict[str, Any] = {
             "id": segment_id,
             "type": kind,
-            "title": tidy(segment.title),
+            "title": title,
             "narration": narration,
         }
 
@@ -527,11 +595,43 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
             problems.append(f'{where}: "{_named(segment.type)}" is not a kind of segment Adle has')
             continue
 
+        drawn = None
+        if (
+            segment.figure is not None
+            and kind in _FIGURE_PARTS
+            and len(figures) < MAX_FIGURES_PER_LESSON
+        ):
+            drawn = _figure(segment.figure, narration)
+            if drawn is None:
+                dropped += 1
+            elif kind == "interaction" and not drawn[0].interactive:
+                # Nothing to operate: what it shows is still worth watching.
+                entry.pop("prompt", None)
+                entry["type"] = kind = "visualization"
+        if drawn is not None:
+            compiled_figure, described = drawn
+            scene_id = f"scn_{len(scenes) + len(figures) + 1}"
+            entry["scene"] = {"scene_id": scene_id, "fallback_text": described}
+            figures.append(
+                FigureScene(
+                    scene_id=scene_id,
+                    segment_id=segment_id,
+                    kind=compiled_figure.kind,
+                    title=entry["title"],
+                    description=described,
+                    source=compiled_figure.source,
+                    interactive=compiled_figure.interactive,
+                )
+            )
+            entry["estimated_seconds"] = _seconds(entry["type"], entry["narration"])
+            segments.append(entry)
+            continue
+
         wants_scene = kind in ("visualization", "interaction") or (
             kind in ("explanation", "worked_example") and segment.scene is not None
         )
         if wants_scene and segment.scene is not None and len(scenes) < MAX_SCENES_PER_LESSON:
-            scene_id = f"scn_{len(scenes) + 1}"
+            scene_id = f"scn_{len(scenes) + len(figures) + 1}"
             description = tidy(segment.scene.description)
             entry["scene"] = {"scene_id": scene_id, "fallback_text": description}
             scenes.append(
@@ -604,7 +704,30 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
     voice = _voice_description(draft.voice)
     if voice is not None:
         lesson["voice"] = voice
-    return CompiledLesson(lesson=lesson, scenes=scenes)
+    return CompiledLesson(lesson=lesson, scenes=scenes, figures=figures, figures_dropped=dropped)
+
+
+_LONG_DISPLAY = TypeAdapter(LongDisplay)
+
+
+def _figure(raw: dict[str, Any], narration: list[dict[str, Any]]) -> Any:
+    """A part's figure, drawn, with its description in words (the model's, or Adle's from
+    the figure's data); None when it cannot be drawn as given. A figure is never a reason
+    to write the lesson again: its part is said in words instead."""
+    try:
+        drawn = compile_figure(raw, beat_seconds=beat_seconds([beat["text"] for beat in narration]))
+    except FigureError:
+        return None
+    try:
+        described = _LONG_DISPLAY.validate_python(tidy(str(raw.get("description") or "")))
+    except ValidationError:
+        # The model said nothing usable of it (nothing at all, or a link): Adle says what
+        # it shows, from its data, so that it is never a picture without words.
+        try:
+            described = _LONG_DISPLAY.validate_python(drawn.described)
+        except ValidationError:
+            return None
+    return drawn, described
 
 
 #: The longest description of a voice that is kept, as the lesson format allows.

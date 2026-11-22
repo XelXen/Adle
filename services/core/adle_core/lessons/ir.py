@@ -110,6 +110,15 @@ def _safe(text: str) -> str:
     return text
 
 
+def is_plain_text(text: str) -> bool:
+    """Whether text is free of links, markup, file paths and control characters."""
+    try:
+        _safe(text)
+    except ValueError:
+        return False
+    return True
+
+
 def _spoken(text: str) -> str:
     _safe(text)
     if "$" in text or "\\" in text:

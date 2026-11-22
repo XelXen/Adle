@@ -25,8 +25,10 @@ BRITISH = re.compile(
     r"visualis|optimis|initialis)\w*",
     re.IGNORECASE,
 )
-#: Names the API gives things: a job that was stopped, a step that is practice.
-IDENTIFIERS = {"cancelled", "practise"}
+#: Names the API gives things: a job that was stopped, a step that is practice. And a name
+#: a model may write in a scene ("colour=" for "color="), which the scene policy must know
+#: by that spelling to refuse it.
+IDENTIFIERS = {"cancelled", "practise", "colour"}
 #: Where the database's own names are written.
 SCHEMA = (Path("migrations"), Path("infrastructure", "orm.py"))
 

@@ -166,7 +166,7 @@ slide with things fading in. **Verified:** every tool named here runs in the pin
   `MathTex` with `formula[i].set_color(...)`. Words stay `ink` or `muted`.
 - **Point at what the narration names**: `Indicate(...)` on the part in the picture and the
   symbol in the formula together, or a `SurroundingRectangle(..., color=self.sun)` drawn with
-  `Create` and taken away with `FadeOut`. (`Circumscribe` given a colour stops the scene in this runtime; the static policy refuses it.)
+  `Create` and taken away with `FadeOut`. (`Circumscribe`, and `Indicate` given a colour, stop the scene in this runtime; the static policy refuses both.)
   `LaggedStart(...)` for things that arrive together; `GrowArrow`, `GrowFromCenter`, `Create`
   for lines and shapes, `Write` for formulas, `FadeIn(..., shift=...)` for labels.
 - **Keep the stage clear.** At most about seven things at once; `FadeOut` what the narration

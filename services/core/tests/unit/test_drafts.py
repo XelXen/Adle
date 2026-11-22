@@ -592,3 +592,21 @@ def test_what_a_draft_called_something_is_quoted_back_short_and_plain() -> None:
     with pytest.raises(DraftError) as raised:
         compile_lesson(parse_lesson_draft(draft), CONTEXT)
     assert any('"that" is not a kind of segment' in problem for problem in raised.value.problems)
+
+
+@pytest.mark.parametrize(
+    ("written", "meant"),
+    [
+        # A real model's board text (2026-11-22): every backslash written twice.
+        (r"$F_X(x) = P(X \\le x)$", r"$F_X(x) = P(X \le x)$"),
+        (
+            r"$F_X(x) = \\begin{cases} 0 & x<0 \\\\ x/10 & 0\\le x \\end{cases}$",
+            r"$F_X(x) = \begin{cases} 0 & x<0 \\ x/10 & 0\le x \end{cases}$",
+        ),
+        # Written once, as TeX is: left as it is, a row's end included.
+        (r"$\begin{cases} 0 & x<0 \\ 1 & x \ge 0 \end{cases}$", None),
+        (r"$\frac{1}{2}$ of it", None),
+    ],
+)
+def test_tex_escaped_twice_is_shown_as_it_was_meant(written: str, meant: str | None) -> None:
+    assert tidy(written) == (meant if meant is not None else written)
