@@ -5,6 +5,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] - 2026-11-21
+
+The second alpha. A lesson is now something to watch: its pictures on one wide, dark screen
+with the words along the foot of it, each picture drawn happening, in step with what is
+said, and tried before you see it. Lessons can be read aloud in a natural voice that runs on
+your own computer, from Kokoro on any recent processor to Qwen3-TTS on an NVIDIA graphics
+card, set up in Settings when you choose. Nothing you study is sent anywhere.
+
+Each kind of request now goes to the model measured to do it best: through NVIDIA, a
+question is answered in about ten seconds and a lesson is written in about two minutes.
+
 ### Added
 
 - **A natural voice, on your own computer.** Settings → Learning → Voice lists the voices
