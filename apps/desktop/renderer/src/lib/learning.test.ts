@@ -91,7 +91,7 @@ describe('stepAction', () => {
       label: 'Start review',
       route: { name: 'practice', courseId: COURSE, conceptId: 'con_00000000000000000001' },
     });
-    expect(stepAction(step('practise'), COURSE)).toMatchObject({ label: 'Practise' });
+    expect(stepAction(step('practise'), COURSE)).toMatchObject({ label: 'Practice' });
     expect(stepAction(step('check', { about: 'causal_confusion' }), COURSE)).toEqual({
       type: 'navigate',
       label: 'Answer a few questions',

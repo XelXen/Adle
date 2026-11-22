@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Adle's words are in American English**: "Practice" in Up next and on a concept,
+  "Step-by-step math", "Read the license", "Canceled", and the sample course's lessons.
+  Lessons the AI writes are asked for in American spelling too.
+
 ## [0.1.0-alpha.2] - 2026-11-21
 
 The second alpha. A lesson is now something to watch: its pictures on one wide, dark screen

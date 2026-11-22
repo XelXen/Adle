@@ -223,7 +223,7 @@ export function LearnPanel({ course }: { course: Course }) {
                 concept={concept}
                 dismissing={dismissing}
                 onDismiss={(hypothesis) => void dismiss(concept, hypothesis)}
-                onPractise={() =>
+                onPractice={() =>
                   navigate({ name: 'practice', courseId, conceptId: concept.concept_id })
                 }
               />
@@ -255,12 +255,12 @@ function ConceptRow({
   concept,
   dismissing,
   onDismiss,
-  onPractise,
+  onPractice,
 }: {
   concept: ConceptProgress;
   dismissing: string | null;
   onDismiss: (hypothesis: Hypothesis) => void;
-  onPractise: () => void;
+  onPractice: () => void;
 }) {
   const { knowledge } = concept;
   const review = reviewNote(concept);
@@ -269,7 +269,7 @@ function ConceptRow({
     concept.lessons_completed > 0 ||
     knowledge.answered > 0 ||
     knowledge.self_report === 'confident';
-  const practiceLabel = concept.review_due ? 'Start review' : 'Practise';
+  const practiceLabel = concept.review_due ? 'Start review' : 'Practice';
 
   return (
     <li className={styles.concept}>
@@ -327,7 +327,7 @@ function ConceptRow({
               variant={concept.review_due ? 'primary' : 'secondary'}
               icon={concept.review_due ? <CalendarClock /> : <PencilLine />}
               aria-label={`${practiceLabel}: ${concept.title}`}
-              onClick={onPractise}
+              onClick={onPractice}
             >
               {practiceLabel}
             </Button>

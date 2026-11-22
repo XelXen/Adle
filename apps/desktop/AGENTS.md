@@ -329,7 +329,8 @@ most, a file's name.
   will see the app wait: test that, or stay under it. `{ slowly: true, thinkMs, pieceMs }`
   answers like a model that thinks first and writes a title at a time.
 - A toast that reports a failure is an `alert`; one that reports a success is a `status`.
-- **Words** (ADR-028): short, plain, about the learner's task. "Couldn't save your goal",
+- **Words** (ADR-028, ADR-044): American English, short, plain, about the learner's task.
+  `renderer/src/wording.test.ts` fails on a British spelling in any string. "Couldn't save your goal",
   "Loading library…", "Cancel" and the action by its name. Typographic quotation marks and
   apostrophes. Nothing about the app's own workings unless the learner must act on it.
 - The rail says nothing about the app's own service while it runs. The page writes the state

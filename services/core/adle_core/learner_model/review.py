@@ -135,7 +135,7 @@ def schedule(
     elapsed = max(0.0, (now - last_practised).total_seconds() / 86_400)
     if elapsed < planned * parameters.min_elapsed_fraction:
         return ReviewDecision(
-            state, "Practised before the review was due. The schedule is unchanged."
+            state, "Practiced before the review was due. The schedule is unchanged."
         )
 
     assisted = hinted or unsure

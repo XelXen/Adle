@@ -156,7 +156,8 @@ is built from it, and an alpha or a stable version is published from a release c
   gets the answer to a question the lesson is asking.
 - Every animation has a text equivalent; every scene control has a keyboard-operable mirror.
 - No placeholder buttons, fake data paths, or "coming soon" in anything marked done.
-- Words are short, plain, and about the learner's task (ADR-028), and few (ADR-036): a
+- Words are in American English (ADR-044), short, plain, and about the learner's task
+  (ADR-028), and few (ADR-036): a
   sentence stays where the learner has to act on it or decide by it. Nothing about the
   app's own workings; what a request sends is one press away, not beside every button.
 - A lesson is watched (ADR-035): its pictures on one dark screen in either theme, the

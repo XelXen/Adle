@@ -128,7 +128,7 @@
         "title": "A loss of zero?",
         "estimated_seconds": 45,
         "question": {
-          "id": "q_cancelling",
+          "id": "q_canceling",
           "form": "multiple_choice",
           "concept_id": "@concept:loss",
           "objective_id": "@objective:loss.meaning",
@@ -139,7 +139,7 @@
           "options": [
             {
               "id": "a",
-              "text": "The positive and negative errors cancelled, hiding that both predictions were off",
+              "text": "The positive and negative errors canceled, hiding that both predictions were off",
               "feedback": "Yes. That is exactly why each error is squared before averaging."
             },
             {
@@ -215,8 +215,8 @@
             "show": "Mean squared error: square the errors, then average."
           },
           {
-            "text": "Squaring stops errors from cancelling and makes large mistakes count for more.",
-            "show": "No cancelling; large errors count for more."
+            "text": "Squaring stops errors from canceling and makes large mistakes count for more.",
+            "show": "No canceling; large errors count for more."
           },
           {
             "text": "Next: how to change the weights so that the loss goes down."
@@ -254,7 +254,7 @@
         "concept_id": "@concept:loss",
         "objective_id": "@objective:loss.compute",
         "stem": "Every target is $0$. The four predictions are $1$, $-1$, $2$ and $-2$. What is the mean squared error?",
-        "explanation": "The squared errors are $1$, $1$, $4$ and $4$, which add up to $10$. Dividing by four gives $2.5$. Averaged without squaring, the errors would have cancelled to $0$.",
+        "explanation": "The squared errors are $1$, $1$, $4$ and $4$, which add up to $10$. Dividing by four gives $2.5$. Averaged without squaring, the errors would have canceled to $0$.",
         "difficulty": 2,
         "hint": "Square each error, add the four squares, and divide by four.",
         "is_transfer": true,

@@ -124,7 +124,7 @@
             {
               "id": "a",
               "text": "Both give $0$, or very close to it",
-              "feedback": "Yes. Sigmoid flattens out towards $0$, and ReLU is exactly $0$ for every negative input."
+              "feedback": "Yes. Sigmoid flattens out toward $0$, and ReLU is exactly $0$ for every negative input."
             },
             {
               "id": "b",

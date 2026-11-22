@@ -320,7 +320,8 @@ A lesson, and a round of questions, are one thing to attend to: the rail is left
 
 ### Writing
 
-The rule is ADR-028: short, plain, and about the learner's task.
+The rule is ADR-028: short, plain, and about the learner's task. In American English
+(ADR-044): practice, math, color, gray, license, canceled.
 
 - One sentence where one will do, the point first, in ordinary speech with contractions:
   "Couldn't save your goal", "Key saved", "Loading library…".

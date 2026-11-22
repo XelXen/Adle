@@ -32,7 +32,7 @@ test.describe('learning preferences', () => {
     await expect(page.getByRole('switch', { name: 'Narration' })).not.toBeChecked();
 
     await page
-      .getByLabel('What are you working towards?')
+      .getByLabel('What are you working toward?')
       .fill('Understand backpropagation well enough to implement it.');
     await page.getByRole('button', { name: 'Save goal' }).click();
     await expect(page.getByText('Goal saved')).toBeVisible();
@@ -48,7 +48,7 @@ test.describe('learning preferences', () => {
     await expect(second.page.getByRole('radio', { name: 'Detailed' })).toBeChecked();
     await expect(second.page.getByRole('switch', { name: 'Narration' })).not.toBeChecked();
     await expect(second.page.getByRole('switch', { name: 'Captions' })).toBeChecked();
-    await expect(second.page.getByLabel('What are you working towards?')).toHaveValue(
+    await expect(second.page.getByLabel('What are you working toward?')).toHaveValue(
       'Understand backpropagation well enough to implement it.',
     );
     await second.close();

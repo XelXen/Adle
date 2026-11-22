@@ -69,7 +69,7 @@ describe('the sizes of a download', () => {
 
   it('say where a setup downloads from, and that nothing of the learner’s goes', () => {
     expect(downloadNote(aTier('kokoro'))).toBe(
-      'Downloads about 0.6 GB from Hugging Face, the Python Package Index, PyTorch and GitHub: ' +
+      'Downloads about 0.6 GB from Hugging Face, the Python Package Index, PyTorch, and GitHub: ' +
         'the voice, and the programs it runs with. Nothing of yours is sent. Once it is set up ' +
         'it works without a connection.',
     );

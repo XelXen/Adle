@@ -59,7 +59,7 @@
         ],
         "scene": {
           "scene_id": "scn_descent",
-          "fallback_text": "A U-shaped curve shows the loss $L = (w - 2)^2$ against the weight $w$, with its lowest point at $w = 2$. A dot starts high on the left at $w = -1$ and moves down the curve in a series of steps towards the bottom. The steps get shorter as the curve flattens: the dot goes to about $0.2$, then $0.9$, then $1.4$, then $1.6$, closing in on $2$."
+          "fallback_text": "A U-shaped curve shows the loss $L = (w - 2)^2$ against the weight $w$, with its lowest point at $w = 2$. A dot starts high on the left at $w = -1$ and moves down the curve in a series of steps toward the bottom. The steps get shorter as the curve flattens: the dot goes to about $0.2$, then $0.9$, then $1.4$, then $1.6$, closing in on $2$."
         }
       },
       {
@@ -80,7 +80,7 @@
             "show": "$0.25 \\times (-6) = -1.5$"
           },
           {
-            "text": "Subtract that step from the weight. Minus one, minus minus one and a half, is one half. The weight has moved towards two, and the loss has dropped from nine to two and a quarter.",
+            "text": "Subtract that step from the weight. Minus one, minus minus one and a half, is one half. The weight has moved toward two, and the loss has dropped from nine to two and a quarter.",
             "show": "$w = -1 - (-1.5) = 0.5$"
           }
         ],
@@ -97,7 +97,7 @@
           "concept_id": "@concept:gradient_descent",
           "objective_id": "@objective:gradient_descent.step",
           "stem": "With the same loss, $\\dfrac{dL}{dw} = 2(w - 2)$, the weight is now $w = 4$ and the learning rate is $0.25$. What is the weight after one update?",
-          "explanation": "The derivative is $2 \\times (4 - 2) = 4$. The step is $0.25 \\times 4 = 1$. Subtracting it gives $w = 4 - 1 = 3$: the weight moves left, towards $2$.",
+          "explanation": "The derivative is $2 \\times (4 - 2) = 4$. The step is $0.25 \\times 4 = 1$. Subtracting it gives $w = 4 - 1 = 3$: the weight moves left, toward $2$.",
           "difficulty": 2,
           "hint": "Work out the derivative at $w = 4$, multiply it by the learning rate, and subtract the result from $w$.",
           "expected": 3,
@@ -111,7 +111,7 @@
         "estimated_seconds": 67,
         "narration": [
           {
-            "text": "The learning rate decides how big each step is. Try it. The grey dot is where we start, and the coloured dot shows where one step lands."
+            "text": "The learning rate decides how big each step is. Try it. The gray dot is where we start, and the colored dot shows where one step lands."
           },
           {
             "text": "A tiny rate barely moves. A rate that is too large jumps right over the bottom, and can land higher up the other side than where it started."
@@ -241,7 +241,7 @@
         "form": "true_false",
         "concept_id": "@concept:gradient_descent",
         "objective_id": "@objective:gradient_descent.rate",
-        "stem": "True or false: with a very small learning rate, gradient descent still moves towards a lower loss, only slowly.",
+        "stem": "True or false: with a very small learning rate, gradient descent still moves toward a lower loss, only slowly.",
         "explanation": "A small rate means short steps, still in the downhill direction. Training takes longer, but it does not go the wrong way.",
         "difficulty": 1,
         "hint": "Does the learning rate change the direction of a step, or its length?",

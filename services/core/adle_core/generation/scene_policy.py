@@ -182,7 +182,7 @@ def content_hash(source: str) -> str:
 #: each. Seen in Wanim 0.1.3 on 2026-11-21 (`e2e/scene-player.spec.ts` reads the pixels).
 IN_ORDER_ONLY = {
     "set_fill": (
-        "mobject.set_fill(self.blue, 0.3), or mobject.set_fill(None, 0.3) to keep the colour it has"
+        "mobject.set_fill(self.blue, 0.3), or mobject.set_fill(None, 0.3) to keep the color it has"
     ),
     "set_color": "mobject.set_color(self.blue)",
 }
@@ -339,7 +339,7 @@ class _Checker:
             # Circle"); without one it runs, in a yellow that is not in the palette.
             self.fail(
                 "unreliable_call",
-                "Circumscribe stops the scene in this runtime when it is given a colour, and "
+                "Circumscribe stops the scene in this runtime when it is given a color, and "
                 "without one draws outside the palette. Point with Indicate(...), or draw a "
                 "SurroundingRectangle with Create and take it away with FadeOut.",
                 node,

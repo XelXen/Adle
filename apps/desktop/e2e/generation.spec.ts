@@ -528,7 +528,7 @@ test.describe('generation with the AI provider', () => {
       'You stopped the pictures, so 2 parts are explained in words.',
     );
     await expect(limits.getByRole('progressbar')).toHaveCount(0);
-    await expect(limits.getByText('Cancelled')).toHaveCount(0);
+    await expect(limits.getByText('Canceled')).toHaveCount(0);
     await expect(lessons.getByRole('listitem')).toHaveCount(1);
     await expect(lessons).not.toContainText('Pictures on their way');
     await expect(now).toHaveCount(0);
@@ -566,7 +566,7 @@ test.describe('generation with the AI provider', () => {
     await expect(lessons).not.toContainText('Pictures on their way');
     // Nothing is left under way, nothing is called cancelled, and another can be asked for.
     await expect(limits.getByRole('progressbar')).toHaveCount(0);
-    await expect(limits.getByText('Cancelled')).toHaveCount(0);
+    await expect(limits.getByText('Canceled')).toHaveCount(0);
     await expect(now).toHaveCount(0, { timeout: 15_000 });
     await expect(
       limits.getByRole('button', { name: 'Create another lesson with AI' }),
@@ -687,13 +687,13 @@ test.describe('generation with the AI provider', () => {
 
     // ---- Cancelling while it waits sends nothing and leaves nothing behind ----
     await limits.getByRole('button', { name: 'Cancel' }).click();
-    await expect(limits.getByText('Cancelled')).toBeVisible({ timeout: 30_000 });
+    await expect(limits.getByText('Canceled')).toBeVisible({ timeout: 30_000 });
     await expect(limits).toContainText('Nothing was added.');
     await expect(
       limits.getByRole('list', { name: 'Lessons for this concept' }).getByRole('listitem'),
     ).toHaveCount(1);
     await limits.getByRole('button', { name: 'Dismiss' }).click();
-    await expect(limits.getByText('Cancelled')).toHaveCount(0);
+    await expect(limits.getByText('Canceled')).toHaveCount(0);
     expect(provider.requests).toHaveLength(4);
 
     expect(session.adle.problems).toEqual([]);

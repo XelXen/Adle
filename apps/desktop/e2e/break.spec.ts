@@ -191,7 +191,7 @@ test.describe('waiting for something to be written', () => {
 
     // ---- The lesson that was being written can still be stopped ----
     await detail(page).getByRole('button', { name: 'Cancel' }).click();
-    await expect(detail(page).getByText('Cancelled')).toBeVisible({ timeout: 30_000 });
+    await expect(detail(page).getByText('Canceled')).toBeVisible({ timeout: 30_000 });
     await expect(now(page)).toHaveCount(0);
 
     expect(adle.problems).toEqual([]);

@@ -40,7 +40,7 @@
             "show": "Some inputs matter more than others."
           },
           {
-            "text": "An artificial neuron makes the same kind of judgement with numbers. It gives each input a weight, and the weight says how much that input counts.",
+            "text": "An artificial neuron makes the same kind of judgment with numbers. It gives each input a weight, and the weight says how much that input counts.",
             "show": "A weight says how much an input counts."
           }
         ]
@@ -83,7 +83,7 @@
         ],
         "scene": {
           "scene_id": "scn_neuron_weight",
-          "fallback_text": "A bar shows the output $z = w x + b$ with the input fixed at $x = 1$. A slider sets the weight $w$ between $-2$ and $2$: the bar grows as the weight grows, and drops below the baseline and changes colour when the weight is negative. A switch adds a bias of $0.5$, which raises the bar by the same amount for every weight."
+          "fallback_text": "A bar shows the output $z = w x + b$ with the input fixed at $x = 1$. A slider sets the weight $w$ between $-2$ and $2$: the bar grows as the weight grows, and drops below the baseline and changes color when the weight is negative. A switch adds a bias of $0.5$, which raises the bar by the same amount for every weight."
         }
       },
       {

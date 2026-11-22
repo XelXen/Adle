@@ -60,7 +60,7 @@
         ],
         "scene": {
           "scene_id": "scn_forward_pass",
-          "fallback_text": "A diagram of a network. On the left, two input circles labelled $x_1 = 1$ and $x_2 = 2$. In the middle, two hidden neurons, each joined by a line to both inputs. On the right, one output neuron joined to both hidden neurons. The values appear from left to right: the hidden neurons show $h_1 = 3$ and $h_2 = 0$, and then the output shows $y = 5$."
+          "fallback_text": "A diagram of a network. On the left, two input circles labeled $x_1 = 1$ and $x_2 = 2$. In the middle, two hidden neurons, each joined by a line to both inputs. On the right, one output neuron joined to both hidden neurons. The values appear from left to right: the hidden neurons show $h_1 = 3$ and $h_2 = 0$, and then the output shows $y = 5$."
         }
       },
       {
@@ -307,7 +307,7 @@
         "rubric": [
           {
             "id": "order",
-            "text": "It computes the network's output one layer at a time, from the inputs towards the output"
+            "text": "It computes the network's output one layer at a time, from the inputs toward the output"
           },
           {
             "id": "reuse",

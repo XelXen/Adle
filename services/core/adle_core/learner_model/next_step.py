@@ -203,7 +203,7 @@ def _revisit(concept: ConceptStatus, weak: Sequence[ConceptStatus], why: str) ->
         if needed.fresh_questions > 0:
             return Step(
                 kind=StepKind.PRACTISE,
-                title=f"Practise “{needed.title}”",
+                title=f"Practice “{needed.title}”",
                 reason=f"{why} “{concept.title}” builds on “{needed.title}”, which isn’t solid "
                 "yet. A few questions on it come first.",
                 concept_id=needed.id,
@@ -361,7 +361,7 @@ def _practise(concept: ConceptStatus) -> Step | None:
     needed = "; ".join(within_reach)
     return Step(
         kind=StepKind.PRACTISE,
-        title=f"Practise “{concept.title}”",
+        title=f"Practice “{concept.title}”",
         reason=f"“{concept.title}” is at “{STATE_LABELS[concept.state]}”."
         + (f" Still needed: {needed}." if needed else ""),
         concept_id=concept.id,

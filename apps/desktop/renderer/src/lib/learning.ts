@@ -57,7 +57,7 @@ export function stepAction(step: NextStep, courseId: string): StepAction {
     case 'review':
       return practice('Start review');
     case 'practise':
-      return practice('Practise');
+      return practice('Practice');
     case 'check':
       return practice('Answer a few questions');
     case 'create_lesson':

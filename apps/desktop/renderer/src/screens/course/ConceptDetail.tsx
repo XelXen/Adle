@@ -93,7 +93,7 @@ export const STRATEGY_CHOICES: readonly { value: TeachingStrategy | ''; label: s
   { value: 'visual', label: 'Visual first' },
   { value: 'worked_example', label: 'Worked example' },
   { value: 'analogy', label: 'Everyday analogy' },
-  { value: 'mathematical', label: 'Step-by-step maths' },
+  { value: 'mathematical', label: 'Step-by-step math' },
   { value: 'computational', label: 'Calculation by hand' },
   { value: 'socratic', label: 'Guided questions' },
 ];

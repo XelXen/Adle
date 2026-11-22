@@ -163,15 +163,15 @@ export function AboutSettings() {
             </div>
           </dl>
         </Card>
-        {/* What the licence asks an app to say: whose it is, that it comes with no warranty,
-            that it may be shared, and where the licence and the source are. */}
+        {/* What the license asks an app to say: whose it is, that it comes with no warranty,
+            that it may be shared, and where the license and the source are. */}
         <Card>
           <div className={styles.statusRow}>
             <div className={styles.statusText}>
               <p>Adle is free software under the GNU General Public License, version 3.</p>
               <p className={styles.muted}>
                 © 2026 XelXen. It comes with no warranty. You may share it and change it under that
-                licence.
+                license.
               </p>
             </div>
             <Stack direction="row" gap={2} wrap>
@@ -187,7 +187,7 @@ export function AboutSettings() {
                 icon={<ExternalLink />}
                 onClick={() => void getBridge().app.openExternal('licence')}
               >
-                Read the licence
+                Read the license
               </Button>
             </Stack>
           </div>

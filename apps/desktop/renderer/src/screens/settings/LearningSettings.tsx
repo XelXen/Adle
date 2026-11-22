@@ -176,7 +176,7 @@ export function LearningSettings() {
         <Card>
           <Stack gap={3}>
             <TextArea
-              label="What are you working towards?"
+              label="What are you working toward?"
               value={goal}
               rows={3}
               maxLength={MAX_GOAL_LENGTH}

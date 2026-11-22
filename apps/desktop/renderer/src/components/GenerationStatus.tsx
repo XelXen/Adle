@@ -118,7 +118,7 @@ export function GenerationStatus({
   if (job?.status === 'cancelled') {
     return (
       <Callout
-        title="Cancelled"
+        title="Canceled"
         actions={
           <Button size="small" variant="tertiary" onClick={onDismiss}>
             Dismiss

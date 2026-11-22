@@ -47,6 +47,7 @@ _WRITING_RULES = """\
 Writing rules:
 - Be correct. Leave out anything you are not sure of. Do not invent sources, people, or data.
 - Plain, direct sentences for one learner ("you"). No praise, no filler, no exclamation marks.
+- American spelling: color, gray, practice, labeled, math.
 - No Markdown, no HTML, no links, no file names, no emoji.
 - Mathematics may appear only where a field says so, written between dollar signs in TeX,
   for example $z = w_1 x_1 + b$. Never use \\( \\) or \\[ \\].
@@ -181,7 +182,7 @@ A scene is {{"brief": "...", "description": "..."}}:
   step, in the order of the beats, what appears, what changes into what, and what is pointed
   at; for an interaction which controls exist (at most two: sliders with a range, or on/off
   switches) and what each one changes. Under 150 words. One idea, shown happening: a handful
-  of shapes, each quantity in one colour wherever it appears.
+  of shapes, each quantity in one color wherever it appears.
 - "description" says the same thing for someone who cannot see the picture. It may contain
   $math$. Two to four sentences.
 Use at most {MAX_SCENES_PER_LESSON} scenes in the lesson, and at least one.
@@ -221,7 +222,7 @@ STRATEGY_BRIEFS: dict[str, str] = {
     "analogy": "lead with a comparison from everyday life, then say exactly where the "
     "comparison stops working",
     "mathematical": "lead with the definition and derive the result one justified step at a time",
-    "socratic": "lead with questions the learner can answer, each a small step towards the idea",
+    "socratic": "lead with questions the learner can answer, each a small step toward the idea",
     "computational": "lead with a tiny procedure carried out by hand, value by value, the "
     "way a program would run it",
 }
@@ -343,7 +344,7 @@ def scene_request(
     system = (
         "You write one complete Wanim scene file in Python for Adle. Wanim runs manim-style "
         "scenes in a browser. Follow the guide below exactly: it lists what exists, the layout "
-        "and colour conventions, and what is forbidden. A file that breaks a rule is thrown "
+        "and color conventions, and what is forbidden. A file that breaks a rule is thrown "
         "away, so prefer the simple constructions the examples use over anything clever.\n\n"
         "Answer with the Python file only: no explanation before or after it.\n\n" + scene_guide()
     )
@@ -372,10 +373,10 @@ def scene_request(
         + _block("description", _clip(brief.description, 1400)),
         "The narration that plays alongside (for context; do not put these sentences on "
         "screen):\n" + _block("narration", _clip(narration, 2500)),
-        "Reminders: colours only from self.theme in setup(); never set a background; keep "
+        "Reminders: colors only from self.theme in setup(); never set a background; keep "
         "everything inside the safe area; use MathTex for anything mathematical and Text for "
-        "plain words; define every name you use; import only from manim (and numpy or math "
-        "if needed); one scene class in the file.",
+        "plain words, spelled the American way; define every name you use; import only from "
+        "manim (and numpy or math if needed); one scene class in the file.",
     ]
     if problems and previous is not None:
         listed = "\n".join(f"- {problem}" for problem in problems[:MAX_PROBLEMS_IN_RETRY])

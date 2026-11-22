@@ -70,7 +70,7 @@ export function setupProgress(job: Job): {
 
 /** Where a setup downloads from, said once, in a list a person would write. */
 export function downloadNote(tier: VoiceTier): string {
-  const places = new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(tier.sources);
+  const places = new Intl.ListFormat('en-US', { type: 'conjunction' }).format(tier.sources);
   return (
     `Downloads ${aboutSize(setupBytes(tier))} from ${places}: the voice, and the programs it ` +
     'runs with. Nothing of yours is sent. Once it is set up it works without a connection.'
