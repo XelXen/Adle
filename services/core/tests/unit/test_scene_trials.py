@@ -108,6 +108,7 @@ def test_the_app_asks_for_trials_and_says_how_they_went(
             "source": INTERACTIVE_SCENE,
             "interactive": True,
             "controls": ["weight"],
+            "steps": 0,
         }
     ]
     report = {"passed": False, "stage": "controls", "message": "TypeError: bad value"}

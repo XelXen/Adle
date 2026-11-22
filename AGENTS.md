@@ -55,6 +55,7 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Regenerate scene name allowlist | `npm run wanim-names` (after a Wanim upgrade) |
 | Repackage the scene guide for prompts | `npm run scene-guide` (after editing the scene skill or its examples) |
 | Rewrite the figure examples the player runs | `npm run figures` (after changing `generation/figures.py`; a unit test says when) |
+| Rewrite the slide examples the player steps through | `npm run slides` (after changing `generation/slides.py` or the prompt's example; a unit test says when) |
 | Re-render the app icons | `npm run icons` (after the mark changes; `npm run icons:verify` compares it with the artwork) |
 | Rebuild document fixtures | see `fixtures/sample-documents/README.md` |
 | Add a sample lesson | files in `services/core/adle_core/sample_course/`, then `core:test` and `e2e -- lesson.spec.ts` |
@@ -165,6 +166,10 @@ is built from it, and an alpha or a stable version is published from a release c
   (ADR-028), and few (ADR-036): a
   sentence stays where the learner has to act on it or decide by it. Nothing about the
   app's own workings; what a request sends is one press away, not beside every button.
+- A lesson is a slideshow (ADR-049): every part that teaches has a slide, and the slide
+  takes a step when the narration reaches the words its script marked. Teach by intuition
+  and example first: the picture before the symbol, each symbol in the color of what it
+  stands for.
 - A lesson is watched (ADR-035): its pictures on one dark screen in either theme, the
   words being said along its foot with the spoken word marked, the whole screen if wanted.
 
@@ -180,6 +185,8 @@ account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day 
 - One request in flight at each provider, at most 4/minute there. When trying a real provider
   by hand, budget 80 requests and 800k tokens per day; the app itself stops at 90 and 900k
   for AIHubMix (ADR-012).
+- A slide is no request at all: the lesson's answer scripts it as data, and Adle lays it
+  out and writes its scene (ADR-049).
 - A figure is no request at all: the lesson gives its kind and data, and Adle writes the
   scene from a template (ADR-045). A scene a model writes is one request = one complete
   file. No repair loops; at most one deliberate retry,

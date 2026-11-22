@@ -253,14 +253,15 @@ MESSAGES = [
     [
         (
             0,
-            # A lesson is asked for with the reasoning its reference lists as "medium":
-            # measured to write as well in a third to a half of the time (ADR-048).
+            # A lesson is asked for with the reasoning its reference lists as "none": a
+            # lesson as a slideshow can be begun in seconds rather than minutes, and what
+            # thinking caught is caught in drafts (ADR-049; ADR-048 had "medium").
             {
                 "model": "nvidia/nemotron-3-ultra-550b-a55b",
                 "messages": MESSAGES,
                 "max_tokens": 500,
                 "stream": True,
-                "reasoning_effort": "medium",
+                "reasoning_effort": "none",
             },
         ),
         (

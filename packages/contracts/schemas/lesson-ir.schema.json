@@ -5,6 +5,12 @@
       "description": "One breath of narration, and what appears on screen as it starts.",
       "properties": {
         "advance_scene": { "default": false, "title": "Advance Scene", "type": "boolean" },
+        "cues": {
+          "items": { "maximum": 700, "minimum": 0, "type": "integer" },
+          "maxItems": 12,
+          "title": "Cues",
+          "type": "array"
+        },
         "show": {
           "anyOf": [{ "maxLength": 600, "minLength": 1, "type": "string" }, { "type": "null" }],
           "default": null,
@@ -570,8 +576,8 @@
           "type": "array"
         },
         "events": {
-          "items": { "enum": ["passed", "explored", "progress"], "type": "string" },
-          "maxItems": 3,
+          "items": { "enum": ["passed", "explored", "progress", "step"], "type": "string" },
+          "maxItems": 4,
           "title": "Events",
           "type": "array"
         },
@@ -584,6 +590,7 @@
           "type": "string"
         },
         "source": { "maxLength": 40000, "minLength": 1, "title": "Source", "type": "string" },
+        "steps": { "default": 0, "maximum": 16, "minimum": 0, "title": "Steps", "type": "integer" },
         "wanim_version": {
           "maxLength": 20,
           "minLength": 1,
@@ -697,6 +704,7 @@
     },
     "SummarySegment": {
       "additionalProperties": false,
+      "description": "The key points, shown on the board or in a picture that brings them back (ADR-049).",
       "properties": {
         "estimated_seconds": {
           "maximum": 900,
@@ -712,6 +720,7 @@
           "title": "Narration",
           "type": "array"
         },
+        "scene": { "anyOf": [{ "$ref": "#/$defs/SceneRef" }, { "type": "null" }], "default": null },
         "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
         "type": { "const": "summary", "title": "Type", "type": "string" }
       },
@@ -791,7 +800,7 @@
     },
     "WorkedExampleSegment": {
       "additionalProperties": false,
-      "description": "A problem solved step by step: each beat says a step and shows it.",
+      "description": "A problem solved step by step: each beat says a step and shows it, on the board or\nin its picture (a slide that grows with the solution, ADR-049).",
       "properties": {
         "estimated_seconds": {
           "maximum": 900,

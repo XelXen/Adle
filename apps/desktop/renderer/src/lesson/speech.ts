@@ -7,12 +7,17 @@
  * content and nothing leaves the machine without the learner asking.
  *
  * The narrator reports where it is only when the engine says so (a word
- * boundary event). It never estimates.
+ * boundary event). It never estimates where it is. A picture's cues are not a
+ * claim to a place: a voice that says nothing of where it is has them at the
+ * time the line would reach them at its pace (ADR-049).
  */
 import {
+  CueClock,
+  CueKeeper,
   type NarrationHandlers,
   type Narrator,
   type Pace,
+  readingTimeMs,
   TimedNarrator,
   type Utterance,
 } from './narration';
@@ -51,6 +56,10 @@ export interface SpokenLine {
 
 /** How fast each pace speaks. 1 is the voice's own speed. */
 export const SPEAKING_RATE: Record<Pace, number> = { relaxed: 0.9, standard: 1, brisk: 1.15 };
+
+/** About how many words a minute a voice says at each pace, for a voice that does not
+ * say where it is. */
+const SPOKEN_WORDS_PER_MINUTE: Record<Pace, number> = { relaxed: 150, standard: 165, brisk: 190 };
 
 /** The language lessons are written in. Voices for it are preferred over the system default. */
 export const LESSON_LANGUAGE = 'en';
@@ -147,9 +156,20 @@ export class SpeechNarrator implements Narrator {
   speak(text: string, handlers: NarrationHandlers): Utterance {
     let over = false;
     let standIn: Utterance | null = null;
+    // A picture's cues (ADR-049): at the words, when the voice says where it is; at the
+    // time the line would reach them when it does not; and any left, as the line ends.
+    const cues = new CueKeeper(handlers.cues ?? [], handlers.onCue);
+    const clock = new CueClock(
+      cues,
+      handlers.cues ?? [],
+      text,
+      readingTimeMs(text, SPOKEN_WORDS_PER_MINUTE[this.options.pace]),
+    );
     const finish = (): void => {
       if (over) return;
       over = true;
+      clock.stop();
+      cues.flush();
       handlers.onEnd();
     };
 
@@ -162,24 +182,42 @@ export class SpeechNarrator implements Narrator {
       if (over || standIn || event.name !== 'word') return;
       const length = event.charLength && event.charLength > 0 ? event.charLength : 0;
       handlers.onWord?.(event.charIndex, length || wordLengthAt(text, event.charIndex));
+      clock.located(event.charIndex);
     };
     line.onend = finish;
     line.onerror = (event) => {
       // Being stopped on purpose is not a failure.
       if (over || standIn || event.error === 'canceled' || event.error === 'interrupted') return;
-      standIn = this.silent.speak(text, { onEnd: finish });
+      clock.stop();
+      standIn = this.silent.speak(text, {
+        onEnd: finish,
+        cues: cues.remaining(),
+        onCue: handlers.onCue,
+      });
     };
 
     // Nothing left over from an earlier line may talk over this one.
     if (this.engine.speaking || this.engine.pending) this.engine.cancel();
     this.engine.speak(line);
+    clock.start();
 
     return {
-      pause: () => (standIn ? standIn.pause() : this.engine.pause()),
-      resume: () => (standIn ? standIn.resume() : this.engine.resume()),
+      pause: () => {
+        clock.pause();
+        if (standIn) standIn.pause();
+        else this.engine.pause();
+      },
+      resume: () => {
+        if (standIn) standIn.resume();
+        else {
+          this.engine.resume();
+          clock.start();
+        }
+      },
       cancel: () => {
         if (over) return;
         over = true;
+        clock.stop();
         if (standIn) standIn.cancel();
         else this.engine.cancel();
       },

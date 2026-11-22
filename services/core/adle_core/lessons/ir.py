@@ -220,6 +220,17 @@ class Beat(_Strict):
     show: Display | None = None
     #: Move the scene on to its animation when this beat begins (see ``SceneRef``).
     advance_scene: bool = False
+    #: Where in ``text`` (the index of a character) the part's picture takes its next
+    #: step: as the narrator reaches each, the slide moves on by one (ADR-049).
+    cues: list[Annotated[int, Field(ge=0, le=700)]] = Field(default_factory=list, max_length=12)
+
+    @model_validator(mode="after")
+    def _cues_in_order(self) -> Beat:
+        if self.cues != sorted(set(self.cues)):
+            raise ValueError("cues must be given once each, in order")
+        if self.cues and self.cues[-1] >= len(self.text):
+            raise ValueError("a cue must be within the words it is a cue in")
+        return self
 
 
 class SceneRef(_Strict):
@@ -405,7 +416,8 @@ class CheckpointSegment(_Segment):
 
 
 class WorkedExampleSegment(_Segment):
-    """A problem solved step by step: each beat says a step and shows it."""
+    """A problem solved step by step: each beat says a step and shows it, on the board or
+    in its picture (a slide that grows with the solution, ADR-049)."""
 
     type: Literal["worked_example"]
     problem: Display
@@ -414,7 +426,7 @@ class WorkedExampleSegment(_Segment):
 
     @model_validator(mode="after")
     def _steps_are_shown(self) -> WorkedExampleSegment:
-        if not any(beat.show for beat in self.narration):
+        if self.scene is None and not any(beat.show for beat in self.narration):
             raise ValueError("a worked example must show at least one step")
         return self
 
@@ -427,12 +439,15 @@ class ReflectionSegment(_Segment):
 
 
 class SummarySegment(_Segment):
+    """The key points, shown on the board or in a picture that brings them back (ADR-049)."""
+
     type: Literal["summary"]
     narration: list[Beat] = Field(min_length=1, max_length=MAX_BEATS)
+    scene: SceneRef | None = None
 
     @model_validator(mode="after")
     def _points_are_shown(self) -> SummarySegment:
-        if not any(beat.show for beat in self.narration):
+        if self.scene is None and not any(beat.show for beat in self.narration):
             raise ValueError("a summary must show at least one key point")
         return self
 
@@ -539,9 +554,12 @@ class SceneArtifact(_Strict):
     controls: list[Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,31}$")]] = Field(
         default_factory=list, max_length=16
     )
-    events: list[Literal["passed", "explored", "progress"]] = Field(
-        default_factory=list, max_length=3
+    events: list[Literal["passed", "explored", "progress", "step"]] = Field(
+        default_factory=list, max_length=4
     )
+    #: How many steps it is paced in, as the narration reaches its cues (ADR-049); 0 for
+    #: a scene that plays through.
+    steps: int = Field(default=0, ge=0, le=16)
 
 
 class LessonBundle(_Strict):

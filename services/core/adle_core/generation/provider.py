@@ -123,9 +123,14 @@ NEMOTRON_ULTRA = ModelSpec(
     # "high" took 116 to 232 s, the model thinking 18,000 to 35,000 characters first; at
     # "medium" 53 to 74 s, thinking 1,500 to 3,300, and as correct: three lessons of three
     # usable at their first answer, every figure drawn (2026-11-22, ADR-048).
+    # Asked for a lesson as a slideshow (ADR-049), the model thought 19,000 to 59,000
+    # characters at "medium", and a lesson could be begun only after 118 to 313 s; at
+    # "none", after 13.5 s, whole at 63 s. What thinking had caught (a wrong option that is
+    # the right one written another way, a key its own working does not reach) is caught
+    # in drafts now, and the prompt asks for the working before the answer (ADR-049).
     # A course plan was no quicker at "medium" (62 s, against 18 to 52), so it is left at
     # the default.
-    reasoning_for=(("lesson", "medium"),),
+    reasoning_for=(("lesson", "none"),),
 )
 NEMOTRON_SUPER = ModelSpec(id="nvidia/nemotron-3.5-super-vl-120b-a12b", name="Nemotron 3.5 Super")
 NVIDIA_MODELS = (

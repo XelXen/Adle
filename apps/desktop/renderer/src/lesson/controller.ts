@@ -47,7 +47,9 @@ export interface PlaybackHost {
   saveProgress: (position: number, completed: boolean) => void;
 }
 
-function narrationOf(segment: LessonSegment): { text: string; advance_scene?: boolean }[] {
+function narrationOf(
+  segment: LessonSegment,
+): { text: string; advance_scene?: boolean; cues?: number[] }[] {
   return segment.narration ?? [];
 }
 
@@ -334,6 +336,11 @@ export class LessonController {
       },
       onWord: (start, length) => {
         if (generation === this.generation) this.update({ word: { start, length } });
+      },
+      // Each cue is a step of the part's slide (ADR-049).
+      cues: beat.cues ?? [],
+      onCue: () => {
+        if (generation === this.generation) this.host.advanceScene();
       },
     });
     // A narrator may finish before `speak` returns; then there is nothing to hold on to.

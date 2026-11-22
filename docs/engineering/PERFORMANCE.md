@@ -200,6 +200,38 @@ may have eight rows and an equation ten steps, and a board line left open is lef
 Across every answer the model wrote that day, fourteen, 74 figures of 75 are drawn; the
 one left is a flow of eight steps, which is told in words. Nine more requests.
 
+### A lesson as a slideshow, and a model that does not think first (2026-11-22)
+
+Asked for a lesson in which every part that teaches has a slide (ADR-049), through NVIDIA,
+by hand, one request a lesson to Nemotron 3 Ultra:
+
+| Lesson | Prompt, thinking | Thinking | Can be started | Every part written | Parts kept | Slides |
+|---|---|---|---|---|---|---|
+| Sample spaces and events | first, "medium" | 53,462 characters | 313 s | 352 s | 7 of 9 | 3 |
+| The derivative as a slope | first, "medium" | 58,960 | 297 s | 348 s | 7 of 9 | 4 |
+| Active and passive voice | first, "medium" | 36,691 | 263 s | 328 s | 6 of 8 | 3 |
+| Linked lists | first, "medium" | 19,036 | 118 s | 177 s | 8 of 9 | 5 |
+| Sample spaces and events | revised, "medium" | 35,989 | 214 s | 263 s | 9 of 9 | 6 |
+| Sample spaces and events | revised, "none" | none | **13.5 s** | 63 s | 10 of 10 | 6 |
+| The derivative as a slope | revised, "none" | none | **11.5 s** | 97 s | 8 of 8 | 5 |
+| Active and passive voice | revised, "none" | none | **12.0 s** | 66 s | 9 of 9 | 5 |
+
+The parts the first prompt lost were refused by the lesson's format, not by their slides:
+a summary or a worked example with no line on the board, which a slide now stands for, and
+a worked example with no problem, which is now an explanation. What those answers scripted
+is drawn as the model meant it since (part names copied from the prompt's examples, items
+written as parts, a cell counted from 0, a sentence left empty for a step to fill, set
+symbols in plain words): every slide of the eight answers draws with nothing left out but
+one label on a word a later step adds.
+
+Every question of the three answers written without thinking was checked by hand: all right
+but one practice question, which offered 12/52 and 3/13 as different answers with one marked
+right. That slip, and the one ADR-048 saw (a key its own explanation did not reach), are
+caught in drafts now; with them caught, a lesson is asked for without thinking (ADR-049), and
+can be begun about twelve seconds after it is asked for, every part of it written within
+about a minute and a half. Eight requests for these runs; with those earlier the same day,
+48 of the 80 a day allowed by hand.
+
 ## A natural voice (2026-11-21)
 
 On the development machine (an RTX 4080 Laptop GPU with 12 GB, Windows 11), with the voices

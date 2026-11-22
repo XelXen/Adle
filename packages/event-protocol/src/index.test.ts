@@ -25,6 +25,7 @@ const load = {
   quality: 'medium',
   autoplay: true,
   rehearsal: false,
+  pacing: 'normal',
 };
 
 describe('parseHostMessage', () => {
@@ -37,6 +38,8 @@ describe('parseHostMessage', () => {
     ['missing field', (({ autoplay: _autoplay, ...rest }) => rest)(load)],
     ['no word on whether it is a rehearsal', (({ rehearsal: _rehearsal, ...rest }) => rest)(load)],
     ['a rehearsal that is not yes or no', { ...load, rehearsal: 'fast' }],
+    ['no word on how it is paced', (({ pacing: _pacing, ...rest }) => rest)(load)],
+    ['a pacing there is not', { ...load, pacing: 'slides' }],
     ['wrong protocol version', { ...load, adle: 2 }],
     ['empty source', { ...load, source: '' }],
     ['oversized source', { ...load, source: 'x'.repeat(MAX_SCENE_SOURCE_CHARS + 1) }],

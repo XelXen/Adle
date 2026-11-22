@@ -94,6 +94,7 @@ def scene_trials(services: ServicesDep) -> schemas.SceneTrialList:
                 source=trial.source,
                 interactive=trial.interactive,
                 controls=list(trial.controls),
+                steps=trial.steps,
             )
             for trial in services.generation.trials.waiting()
         ]

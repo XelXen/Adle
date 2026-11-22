@@ -703,7 +703,18 @@ function LessonPlayer({
                 <Button
                   variant="primary"
                   icon={playing ? <Pause /> : <Play />}
-                  onClick={() => (playing ? controller.pause() : controller.play())}
+                  onClick={() => {
+                    if (playing) {
+                      controller.pause();
+                      return;
+                    }
+                    // A part looked at again has its slide drawn through to its end (ADR-049):
+                    // heard again, the slide starts over with the words.
+                    if (state.status === 'ready' && state.segmentIndex < state.furthest) {
+                      cues.restart();
+                    }
+                    controller.play();
+                  }}
                 >
                   {playing ? 'Pause' : state.status === 'paused' ? 'Resume' : 'Start'}
                 </Button>
@@ -908,6 +919,15 @@ function SegmentStage({
   const live = segment.type === 'interaction' && (picture?.interactive ?? true);
   const wantPlaying =
     live || (state.status === 'ready' ? !waitingToStart : state.status !== 'paused');
+
+  // A slide (ADR-049) takes a step at each cue of the narration. Looked at again without
+  // being heard, it is drawn through to its end: each of its steps, one after another.
+  const steps = picture?.steps ?? 0;
+  const lookedAt = steps > 1 && revisiting && state.status === 'ready';
+  useEffect(() => {
+    if (!lookedAt) return;
+    for (let step = 1; step < steps; step += 1) cues.advance(segment.id);
+  }, [lookedAt, steps, cues, segment.id]);
   useEffect(() => {
     if (sceneStatus === 'paused' && wantPlaying) player.current?.play();
     else if (!wantPlaying && (sceneStatus === 'playing' || sceneStatus === 'interactive')) {
@@ -977,6 +997,7 @@ function SegmentStage({
             sceneName={picture.scene_class}
             title={segment.title}
             autoplay={live}
+            steps={steps}
             onStage
             {...framed}
             fallback={
@@ -987,10 +1008,15 @@ function SegmentStage({
             onStart={waitingToStart ? () => controller.play() : undefined}
             onStatusChange={(status) => {
               setSceneStatus(status);
-              cues.setHolding(segment.id, status === 'interactive');
+              // A slide says when it holds, at the end of each step; any other scene holds
+              // on a live page.
+              if (steps === 0) cues.setHolding(segment.id, status === 'interactive');
             }}
             onSceneEvent={(event) => {
               if (event.name === 'explored' || event.name === 'passed') controller.markExplored();
+              if (event.name === 'step' && steps > 0 && typeof event.value === 'number') {
+                cues.setHolding(segment.id, true, event.value);
+              }
             }}
           />
           {/* The picture in words, for whoever asks. A scene that failed is already

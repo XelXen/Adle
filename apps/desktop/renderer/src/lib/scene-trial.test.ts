@@ -138,4 +138,38 @@ describe('runTrial', () => {
     player.emit('finished', undefined);
     await expect(verdict).resolves.toMatchObject({ passed: false, stage: 'unresponsive' });
   });
+
+  it('steps a slide on as each step ends, and passes it held at its last (ADR-049)', async () => {
+    const player = new FakePlayer();
+    const verdict = runTrial(player, { ...TRIAL, steps: 3 }, QUICK);
+    expect(player.loaded).toMatchObject({ pacing: 'cued', rehearsal: true });
+    player.emit('scene-event', { name: 'step', value: 0 });
+    player.emit('scene-event', { name: 'step', value: 1 });
+    expect(player.nexts).toBe(2);
+    player.emit('scene-event', { name: 'step', value: 2 });
+    await expect(verdict).resolves.toEqual({ passed: true });
+    expect(player.nexts).toBe(2);
+  });
+
+  it('operates the live page at the end of a slide and goes no further', async () => {
+    const player = new FakePlayer();
+    const verdict = runTrial(player, { ...TRIAL, steps: 2 }, QUICK);
+    player.emit('scene-event', { name: 'step', value: 0 });
+    player.emit('scene-event', { name: 'step', value: 1 });
+    player.emit('state', page(1, true));
+    player.emit('controls', [slider]);
+    await expect(verdict).resolves.toEqual({ passed: true });
+    expect(player.moved).toEqual([
+      ['weight', -2],
+      ['weight', 3],
+      ['weight', 1],
+    ]);
+    expect(player.nexts).toBe(1);
+  });
+
+  it('loads a picture that is not a slide to play through', () => {
+    const player = new FakePlayer();
+    void runTrial(player, TRIAL, QUICK);
+    expect(player.loaded).toMatchObject({ pacing: 'normal' });
+  });
 });

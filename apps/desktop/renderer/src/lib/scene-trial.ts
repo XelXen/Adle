@@ -11,6 +11,9 @@ import type { LoadSceneOptions, PlayerEvents } from '../../../player/host/WanimP
  * wrong is what the player reports when it goes wrong in front of a learner, said as it was
  * said, so that the model asked to write the file again can be told. A picture that is not
  * seen to fail passes: the player still falls back to words if it fails later.
+ *
+ * A slide (ADR-049) is paced by cues: it is loaded so, and told to go on as each of its
+ * steps ends, until its last; a live page at its end is operated like any other.
  */
 
 /** What a trial needs of the player: the adapter's own methods. */
@@ -55,10 +58,11 @@ const later = (ms: number): Promise<void> =>
 /** Run one trial to its verdict. The caller disposes of the player afterwards. */
 export function runTrial(
   player: TrialPlayer,
-  trial: Pick<SceneTrial, 'source' | 'scene_class'>,
+  trial: Pick<SceneTrial, 'source' | 'scene_class'> & Partial<Pick<SceneTrial, 'steps'>>,
   timing: TrialTiming = TRIAL_TIMING,
   wait: (ms: number) => Promise<void> = later,
 ): Promise<SceneTrialReport> {
+  const steps = trial.steps ?? 0;
   return new Promise((resolve) => {
     let settled = false;
     let controls: ControlDescriptor[] = [];
@@ -94,8 +98,8 @@ export function runTrial(
       if (settled) return;
       operating = null;
       // Another page follows: go on to it. On the last, the picture is the learner's to
-      // operate from here on, and nothing went wrong.
-      if (canNext) player.next();
+      // operate from here on, and nothing went wrong. A slide's live page is its last.
+      if (canNext && steps === 0) player.next();
       else finish({ passed: true });
     };
 
@@ -118,6 +122,17 @@ export function runTrial(
       player.on('finished', () => {
         if (operating === null) finish({ passed: true });
       }),
+      player.on('scene-event', (event) => {
+        if (steps === 0 || event.name !== 'step' || typeof event.value !== 'number') return;
+        // Each step ends held: go on to the next. A slide is held at its last step, and
+        // says nothing more; one with a live page there is operated when it comes.
+        if (event.value < steps - 1) player.next();
+        else if (operating === null && !operated.size) {
+          void wait(timing.settleMs).then(() => {
+            if (operating === null && operated.size === 0) finish({ passed: true });
+          });
+        }
+      }),
     );
 
     // Not seen to fail in all that time: it passes, and the player keeps its fallback.
@@ -130,6 +145,7 @@ export function runTrial(
       theme: 'dark',
       autoplay: true,
       rehearsal: true,
+      pacing: steps > 0 ? 'cued' : 'normal',
     });
   });
 }

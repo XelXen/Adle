@@ -229,7 +229,10 @@ on Linux (GitHub's machines build it, install it and start it there; nobody has 
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. Every gate, the whole
-end-to-end suite included, on `13e5f99` (ADR-048, a lesson begun at its first part, with
+end-to-end suite included, on the tree of ADR-049 (a lesson as a slideshow), 2026-11-22: 190
+journeys of 190 in 32.9 minutes, none retried, among them every slide example stepped
+through in both themes and a generated lesson whose slide steps on as its words are read.
+Before: on `13e5f99` (ADR-048, a lesson begun at its first part, with
 the review's fixes and the last mends), on 2026-11-22; the release commit `3eddd4a` only
 sets the version, and GitHub checked everything again for it. Before: the figures' commits
 (ADR-045 to ADR-047), and `f3a75e6`. The release folder was not
@@ -246,10 +249,10 @@ them.
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 739 tests, 42 files |
+| Vitest | PASS | 755 tests, 43 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 111 source files |
-| pytest | PASS | 1562 tests |
+| mypy (strict) | PASS | 113 source files |
+| pytest | PASS | 1616 tests. One, `test_only_the_newest_copies_of_replaced_data_are_kept`, failed in two whole runs by the gate script and passed in every run after (two whole runs, twelve of its own file): see Known gaps |
 | Playwright + Electron (E2E) | PASS | 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
@@ -578,6 +581,16 @@ had an answer key that contradicted its explanation. With the figure shapes take
 wrote that day. The tables are in `PERFORMANCE.md`. What the model wrote is kept outside
 the repository, as the owner's chapter is.
 
+### A lesson as a slideshow (2026-11-22)
+
+Eight lessons by hand through NVIDIA (`PERFORMANCE.md`): asked as a slideshow (ADR-049) the
+model thought 19,000 to 59,000 characters at "medium" and a lesson could be begun after 118
+to 313 s; without thinking, after 11.5 to 13.5 s, whole at 63 to 97 s, every part kept, five
+or six slides a lesson, every question right but one practice question with two equal
+options (now caught in drafts). What the answers scripted is drawn as the model meant it;
+their slides were stepped through in the player and looked at. What the model wrote is
+kept outside the repository.
+
 ## Next actions
 
 **Asked for by the owner on 2026-11-21, after looking at 0.1.0-alpha.1: done, and released
@@ -592,38 +605,50 @@ in its decision: PowerPoint, web pages, text in pictures (OCR) and search by mea
 (ADR-041: each needs a download or a migration of its own); a sample of a natural voice in
 Settings before it is used, and the voices tried by hand on Linux and a Mac (ADR-042).
 
+**Asked for by the owner on 2026-11-22, after watching real lessons: done, on `main`, not
+released yet.** A lesson is a slideshow (ADR-049): every part that teaches has a slide the
+model scripts and Adle draws, a step at each phrase of the narration the script marked;
+lessons teach by intuition and example first; no picture is asked of a model as a program,
+and the model does not think first, so a lesson can be begun about twelve seconds after it
+is asked for;
+the teaching style can be chosen for a first lesson; a table's bare TeX is set as a formula;
+a board line is not repeated. Measured by hand through NVIDIA (see "The real providers").
+
 What remains needs the owner. In the order it matters:
 
-0. **Try 0.1.0-alpha.3**, installed from its release
+0. **Watch a lesson made as a slideshow** (ADR-049), from `main` (`npm run dev`) or the next
+   release: say whether the pictures now carry the idea, whether each step comes at its
+   words, and which subjects still come out as words on a stage.
+1. **Try 0.1.0-alpha.3**, installed from its release
    (`github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.3`): a lesson begun at its first
    part (ADR-048), figures drawn by Adle (ADR-045), a PDF's whole syllabus (ADR-046),
    lessons mended rather than written twice (ADR-047), American English (ADR-044). Make a
    course from your chapter and start its first lesson: through NVIDIA it can usually be
    begun within one to three minutes, however long the model thinks.
-1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
+2. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
    They are in a transcript; treat them as used. The owner will, later (said 2026-11-21).
-2. **Sit a generated lesson from start to finish**, asking it a question on the way. Install
+3. **Sit a generated lesson from start to finish**, asking it a question on the way. Install
    Adle from the release (or `npm run dev`), type a key into Settings → AI provider, press
    "Test key", leave the choice on Automatic. Through NVIDIA, expect two to four minutes
    until the lesson can be started; the app offers a break and tells you when. Its figures
    follow within seconds.
-3. **AIHubMix** will be topped up by the owner (2026-11-22, they said). Until then Automatic
+4. **AIHubMix** will be topped up by the owner (2026-11-22, they said). Until then Automatic
    finds out once that it refuses and uses NVIDIA.
-4. **Look at Adle on a Mac.** GitHub's machines build it, install it from the disk image and
+5. **Look at Adle on a Mac.** GitHub's machines build it, install it from the disk image and
    start it, on Apple's and on Intel's processors; nobody has seen it there. See "On a Mac"
    below: it is written for whoever opens this repository on one.
-5. **Turn on private vulnerability reporting** for the repository (Settings → Security on
+6. **Turn on private vulnerability reporting** for the repository (Settings → Security on
    GitHub), which `SECURITY.md` points people to. Only the owner can.
-6. Decide whether GLM 5.3 Flash should stay NVIDIA's third model while it does not answer.
-7. **A lesson begun at its first part** (ADR-048) is built and measured; sit one through
+7. Decide whether GLM 5.3 Flash should stay NVIDIA's third model while it does not answer.
+8. **A lesson begun at its first part** (ADR-048) is built and measured; sit one through
    NVIDIA and say whether waiting at the end of what is written ever happens to you, and
    whether "Part 2 of 3 so far" reads well.
-8. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
+9. Smaller, by choice: exporting a
    single course; a screen-reader pass by a person; a flow figure of seven or eight steps
    (the one figure shape of 75 still told in words); a question during a lesson in less
    than 10 to 19 seconds (Nemotron 3.5 Super thinks 4,800 to 8,600 characters first: try
    whether its reference lists a lower setting, by hand, as ADR-048 did for lessons).
-9. From the review of 2026-11-20, left by decision (ADR-029, "Not done, and why"): a release
+10. From the review of 2026-11-20, left by decision (ADR-029, "Not done, and why"): a release
    build can still be started with Chromium's remote debugging switch; the page can ask for
    the data dialogs again and again; `provider.usage` is a route the interface does not
    call (five tests read it).
@@ -657,6 +682,13 @@ In this order:
    to the end-to-end job in `.github/workflows/ci.yml`.
 
 ## Known gaps (tracked, not forgotten)
+
+- **A core test that fails now and then:** `test_database.py::
+  test_only_the_newest_copies_of_replaced_data_are_kept` kept an older safety copy and not a
+  newer one in two whole runs of `npm run check` on 2026-11-22, and passed in every run after.
+  Which copies are kept is now chosen by the time in their names (it was the time a file
+  last changed, which can tie); the failure was seen once more after that, so the cause is
+  not that alone. Not reproduced on its own.
 
 | Gap | Planned |
 |---|---|

@@ -11,12 +11,14 @@ size of a request never depends on the size of a learner's library.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib import resources
+from typing import Any
 
-from adle_core.generation.drafts import MAX_PROPOSED_CONCEPTS, MAX_SCENES_PER_LESSON, SceneBrief
+from adle_core.generation.drafts import MAX_PROPOSED_CONCEPTS, SceneBrief
 from adle_core.generation.provider import ChatRequest
 from adle_core.lessons.ir import MISCONCEPTION_KINDS, STRATEGIES
 
@@ -141,6 +143,129 @@ def _passages(passages: Sequence[Passage]) -> str:
 
 # -- a lesson ---------------------------------------------------------------------
 
+#: How a part's picture is written: a slide Adle draws and paces by the narration (ADR-049).
+#: Not an f-string: its braces and backslashes are as the model is to write them.
+_VISUAL_FORMAT = r"""A "visual" is a slide: what is on the stage, and how it changes while you talk.
+Adle draws it. {"elements": [...], "steps": [[...], ...], "description": "..."}
+
+"description" says what the picture shows, in two to four sentences, for someone who
+cannot see it (may contain $math$).
+
+Each element has "id" (letters, digits and _), "kind", and as it needs:
+"place": "center", "left", "right", "top", "bottom", "top left", "top right", "bottom
+left", "bottom right", or beside another element: {"below": "id"}, {"above": "id"},
+{"left of": "id"}, {"right of": "id"}; "color": blue, green, yellow, orange, red, purple,
+teal or gray; "size": small, normal or large; "label": a short name shown with it (TeX for
+a symbol: "\\Omega"). An element refers only to elements before it. A part of an element
+is named by the element's id, a dot, and the part: in an element "coins", "coins.H". Kinds:
+- "text": "text", one short sentence (may contain $math$).
+- "math": "tex", TeX without dollar signs. Put {{ }} around the parts a step points at: in
+  an element "rule", "{{P(E)}} = {{\\frac{3}{8}}}" makes the parts "rule.1" and "rule.2".
+  Color a symbol as the thing it stands for: "\\frac{\\color{yellow}{3}}{\\color{blue}{8}}".
+- "box": "text": a rule or a definition in a rounded box.
+- "words": "text": a sentence whose words can be pointed at: in an element "sentence",
+  "sentence.fox", "sentence.quick brown", "sentence.3" (its third word), "sentence.2-4".
+- "set": "items", up to 16 short names (outcomes, members) in an oval, written as they are
+  ("H", not "coins.H"): "coins.H" or "coins.1" is one of them.
+- "grid": "rows", up to 8 by 8 short cells, and optional "row_labels", "col_labels": in an
+  element "board", "board.2.3" is a cell, "board.row 2" and "board.col 3" a row and a column.
+- "table": "header", "rows", up to 5 columns and 8 rows (a cell may contain $math$): in an
+  element "law", "law.2.1", "law.row 2", "law.col 2".
+- "nodes": "nodes" (up to 10 names), "edges" ([[from, to], ...], by name or number from 1),
+  "layout" ("row", "column", "circle" or "tree"), "directed" (true or false): in an element
+  "steps", "steps.A" is a node and "steps.A->B" an edge.
+- "bars": "labels" and "values" (up to 10): in an element "counts", "counts.3" or
+  "counts." and a label.
+- "number_line": "x": [from, to].
+- "axes": "x": [from, to], optional "y": [from, to], "x_label", "y_label".
+- "curve": "on" (an axes), "f": a formula in x with numbers, + - * / ^, brackets, pi, e,
+  sin cos tan exp log sqrt abs, and the param's id: "a*x^2", "exp(-x)"; optional "from",
+  "to".
+- "area": "under" (a curve), "from", "to" (numbers, or the param's id).
+- "point": "on" (a curve or a number_line), "x" (a number, or the param's id).
+- "tangent": "at" (a point on a curve): the line touching it there.
+- "vector": "on" (an axes), "to": [x, y], optional "from": [x, y].
+- "number": "value" (a number, or the param's id to show its value), "decimals" (0 to 3);
+  with a "label" it reads "label = value".
+- "coin": "face" ("H" or "T"). "die": "face" (1 to 6). "dot". "shape": "shape" (circle,
+  square, rectangle or triangle), its "label" written inside.
+- "arrow": "from", "to" (elements or parts), optional "curved": true. "line": "from",
+  "to", optional "dashed": true. Either may have a "label".
+- "brace": "over" (an element, a part, or a list of them), "side" (below, above, left or
+  right), "label". "outline": "around" (the same): a box around them, with a "label".
+- "label": "on" (an element or a part), "text", "side": words beside something.
+- "param": "value", "min", "max", optional "slider": true: a number a step can change with
+  "set", and every curve, point, area and number that uses its id follows it. With
+  "slider": true the learner moves it at the end of the part. One at most.
+
+"steps" is a list of steps, each a list of actions done one after another. The first step
+plays as the part begins. Each later step plays when the narration reaches the next words
+in [square brackets]: put brackets around the words at which each later step should
+happen, in order. Adle fits a count that is off. Actions:
+- {"show": "id"} or {"show": ["id", ...]}: draw it; a part shows just that part ("coins.H").
+- {"hide": "id"}.
+- {"highlight": "id"}: point at it (an element or a part), until the next step.
+- {"color": "id", "to": "yellow"}: color it for good, to tie a thing to its symbol.
+- {"move": "id", "to": a place, or an element to move onto}.
+- {"transform": "id", "into": "other id"}: one text, formula, sentence or shape becomes
+  another, the parts they share staying put.
+- {"set": "id", "to": ...}: the param's new value (all that uses it follows), a point's x,
+  a number, a coin's face, a die's face, the bars' new "values", a formula's new TeX (it is
+  rewritten, the parts it keeps staying put), a text's or a sentence's new words.
+
+An example, for a part on why the area of a rectangle is width times height:
+{"type": "explanation", "title": "Area counts squares",
+ "beats": [{"say": "Here is a rectangle made of small squares. [Count one row]: four squares."},
+  {"say": "There are [three rows] like it. So the area is [three times four], twelve squares."}],
+ "visual": {"elements": [
+   {"id": "g", "kind": "grid", "place": "left",
+    "rows": [["","","",""],["","","",""],["","","",""]]},
+   {"id": "w", "kind": "brace", "over": "g.row 1", "side": "above", "label": "4",
+    "color": "blue"},
+   {"id": "h", "kind": "brace", "over": "g.col 1", "side": "left", "label": "3",
+    "color": "green"},
+   {"id": "area", "kind": "math", "place": "right",
+    "tex": "{{\\color{green}{3}}} \\times {{\\color{blue}{4}}} = 12"}],
+  "steps": [[{"show": "g"}],
+   [{"color": "g.row 1", "to": "blue"}, {"show": "w"}],
+   [{"color": "g.col 1", "to": "green"}, {"show": "h"}],
+   [{"show": "area"}, {"highlight": ["area.1", "area.2"]}]],
+  "description": "Three rows of four squares, and beside them $3 \\times 4 = 12$."}}"""
+
+
+def visual_example() -> dict[str, Any]:
+    """The example part the format shows a model, as the model would write it."""
+    example: dict[str, Any] = json.loads(_VISUAL_FORMAT[_VISUAL_FORMAT.index('{"type"') :])
+    return example
+
+
+#: How to teach: what makes a lesson worth watching. Kept beside the format it fills.
+_TEACHING = """\
+How to teach this lesson (this is what makes it good):
+- Begin with something the learner can see or picture: a concrete case with small numbers,
+  an everyday situation, a real example sentence. Name the general idea only once it has
+  been seen, and then give it its symbol.
+- The picture carries the idea. Every part that teaches has a visual that changes as you
+  speak: show the thing happening, not only its formula. A formula comes after the picture
+  it describes, beside it, each symbol in the color of the thing it stands for, so the
+  learner sees what each symbol means. Then change the example and show what changes and
+  what stays the same.
+- Mathematics and science: show a quantity as a length, an area, a count, a slope or a
+  motion; let a "param" or a "set" show how changing one thing changes another; derive the
+  formula from the picture, one step at a time.
+- Language and writing: show real sentences ("words"), color and label the words that carry
+  the idea, turn one sentence into another to show a rule at work, and set a right use
+  beside a wrong one.
+- History, the life sciences, economics and the rest: a concrete case first (a person, a
+  place, a date, a number); then dates on a number_line, causes and effects or the stages
+  of a process as "nodes", comparisons as "bars" or a "table".
+- 3 to 6 steps in a visual, four to eight elements on the stage. Words on the stage are
+  short, labels rather than paragraphs: the narration says the rest.
+- Use the lesson's own numbers, names and examples in the visuals and in the questions.
+- Adle forgives a visual's small slips: what it cannot draw it leaves out, and it fits the
+  brackets to the steps. Spend your thought on the teaching, not on checking the scripts."""
+
+
 _LESSON_FORMAT = f"""\
 The JSON object, its keys in this order:
 
@@ -149,7 +274,7 @@ The JSON object, its keys in this order:
   "strategy": one of {", ".join(f'"{name}"' for name in STRATEGIES)},
   "sources": [numbers of the excerpts used, or empty],
   "voice": "one sentence: how the narrator of this lesson sounds",
-  "segments": [ 7 to 10 segments, in teaching order ],
+  "segments": [ 6 to 9 segments, in teaching order ],
   "practice": [ 3 more questions, in the same form as a checkpoint's "question" ]
 }}
 
@@ -160,76 +285,34 @@ enthusiasm for how things fit together." The voice only: not the lesson, and no 
 
 Every segment has "type" and "title". The types, and what else each needs:
 
-- "explanation": "beats", and a "figure" when there is something to see. Use it to
-  motivate and to explain.
-- "visualization": "beats" and a "figure". A picture that moves while you talk.
-- "interaction": "prompt" (what to try and what to look for), "beats", and a "figure" with a
-  "slider": a picture the learner changes.
-- "worked_example": "problem" (may contain $math$) and "beats"; each beat says one step and
-  its "show" writes that step. A "figure" when one helps.
-- "checkpoint": "question". No beats.
+- "explanation": "beats" and a "visual". To motivate and to explain.
+- "visualization": "beats" and a "visual" that changes the most: the idea happening.
+- "interaction": "prompt" (what to try and what to look for), "beats", and a "visual" with a
+  "param" that has "slider": true, which the learner moves at the end.
+- "worked_example": "problem" (may contain $math$), "beats", and a "visual" that shows the
+  solution growing on the stage, a step of the visual for each step of the solution.
+- "checkpoint": "question". No beats, no visual.
 - "reflection": "prompt" and one or two "beats". Something to think about; not scored.
-- "summary": "beats"; each "show" is one key point. Always the last segment.
+- "summary": "beats" and a "visual" that brings back the lesson's key picture and formula.
+  Always the last segment.
 
-A beat is {{"say": "...", "show": "..."}}:
-- "say" is narration, read aloud. Two or three sentences. Words only: no symbols, no
-  formulas, no dollar signs, no backslashes. Say mathematics the way a person would
-  ("w times x plus b", "the derivative of the loss").
-- "show" is optional: one short line that appears on the board when the beat starts.
-  It may contain $math$. A segment has 2 to 5 beats.
+A beat is {{"say": "..."}}: narration, read aloud, two or three sentences. Words only: no
+symbols, no formulas, no dollar signs, no backslashes. Say mathematics the way a person
+would ("w times x plus b", "the derivative of the loss"). Put square brackets around the
+words at which the picture should change (see "steps" below). A segment has 2 to 4 beats.
 
-A figure is a picture Adle draws from your data, a step for each beat: {{"kind": ...,
-the fields of its kind, "description": the same thing in two to four sentences for someone
-who cannot see it (may contain $math$)}}. TeX below means TeX without dollar signs. Kinds:
-- "equation": "steps", 2 to 8 TeX formulas, each rewritten into the next.
-- "graph": "x": [from, to]; "curves", 1 to 3 of {{"f": a formula in x, "label": TeX,
-  optional "from" and "to"}}. A formula uses numbers, x, + - * / ^, brackets, pi, e, and
-  sin cos tan exp log sqrt abs tanh erf: "exp(-x^2/2)/sqrt(2pi)"; a comparison is 1 where it holds
-  and 0 where not, for a curve in pieces: "(x >= 0) * exp(-x)". Optional: "y": [from, to],
-  "x_label" and "y_label" (TeX), "shade": {{"from", "to", "label"}} (the area under the
-  first curve; "curve": 2 for another), "rise": [{{"from", "to", "label"}}] (up to three: how
-  much the first curve rises between two values of x), "points": [{{"x", "label"}}],
-  "trace": true (a point runs along the first curve), "slider": {{"name": "a", "label":
-  TeX, "min", "max", "value"}} (the formulas may use that name, and the shade's "from" or
-  "to" may be it, to follow it; the learner moves it). A probability is the area under a
-  density, so shade only under a density; on a cumulative curve a probability is how much
-  it rises: "rise".
-- "bars": "labels" (2 to 8) and "values"; optional "then" (values to change to), "highlight"
-  (a bar's number), "y_label".
-- "number_line": "from", "to"; optional "marks": [{{"at", "label"}}], "interval": {{"from",
-  "to", "label"}}, "move": {{"from", "to"}}.
-- "flow": "steps", 2 to 6 phrases of at most 28 characters; optional "loop": true.
-- "layers": "layers", 2 to 5 of {{"label", "nodes": 1 to 6}}; optional "path": a node's number
-  in each layer.
-- "table": "header" and "rows", at most 4 columns and 6 rows; a cell is words, $TeX$, or
-  both, at most 60 characters; optional "highlight": row numbers.
-- "scatter": "points": [[x, y], ...] (3 to 40); optional "line": {{"slope", "intercept",
-  "label"}}, "residuals": true, "x_label", "y_label".
-- "vectors": "vectors", 1 to 3 of {{"x", "y", "label"}}; optional "sum": true.
-- "tree": "nodes", 2 to 15 of {{"label", "parent": the number of an earlier node, "edge":
-  TeX on its branch}}; the first is the root.
-Give every explanation, visualization and worked example a figure when there is something
-to see: four to seven figures in a lesson. Choose the kind that shows the idea happening,
-and fill it with the lesson's own numbers and labels.
-
-Only for an interaction that no kind of figure can show, give the segment a "scene" in
-place of a figure, at most {MAX_SCENES_PER_LESSON} in the lesson. A scene is
-{{"brief": "...", "description": "..."}}:
-- "brief" tells an animator exactly what to draw: the objects, their labels, and step by
-  step, in the order of the beats, what appears, what changes into what, and what is pointed
-  at; for an interaction which controls exist (at most two: sliders with a range, or on/off
-  switches) and what each one changes. Under 150 words. One idea, shown happening: a handful
-  of shapes, each quantity in one color wherever it appears.
-- "description" says the same thing for someone who cannot see the picture. It may contain
-  $math$. Two to four sentences.
+{_VISUAL_FORMAT}
 
 A question has "form", "stem" (may contain $math$), "explanation" (why the right answer is
-right; may contain $math$), "hint" (a nudge that does not give the answer), "objective" (the
-number of the learning objective it checks), "difficulty" (1 easy, 2 medium, 3 hard), and
-"transfer" (true if it applies the idea to a situation the lesson did not show). Forms:
+right, worked out in full; may contain $math$), "hint" (a nudge that does not give the
+answer), "objective" (the number of the learning objective it checks), "difficulty" (1 easy,
+2 medium, 3 hard), and "transfer" (true if it applies the idea to a situation the lesson did
+not show), and then its answer. Write the explanation before the answer, and give as the
+answer what the explanation works out. Forms:
 
 - "multiple_choice": "options", 3 or 4 of {{"text", "correct", "feedback", "misconception"}}.
-  Exactly one has "correct": true. "feedback" says what that choice gets right or wrong.
+  Exactly one has "correct": true, and no wrong option is the same value written another
+  way (not "12/52" beside "3/13"). "feedback" says what that choice gets right or wrong.
   For a wrong option, "misconception" may name the kind of mistake it suggests, one of
   {", ".join(f'"{name}"' for name in MISCONCEPTION_KINDS)}; omit it if none fits.
   Wrong options must be mistakes a learner would really make.
@@ -248,7 +331,8 @@ Requirements for the whole lesson:
   different situations from the checkpoints. At least one has "transfer": true and at
   least one is not multiple choice.
 - Every question can be answered from this lesson alone and has one defensible answer.
-- Numbers in worked examples and questions are small and come out exactly."""
+- Numbers in examples, visuals and questions are small and come out exactly."""
+
 
 #: What each way of teaching means, as an instruction to the writer.
 STRATEGY_BRIEFS: dict[str, str] = {
@@ -282,8 +366,9 @@ def lesson_request(
     """
     system = (
         "You write short lessons for Adle, an app that teaches one concept at a time to one "
-        "learner at a desk, with narration, a board, live pictures, and a few questions. "
-        "You are an expert teacher of the subject and a careful writer.\n\n"
+        "learner at a desk, as a slideshow: narration over pictures that change as it is "
+        "said, and a few questions. You are an expert teacher of the subject who explains by "
+        "intuition and example first, and a careful writer.\n\n"
         f"{_WRITING_RULES}\n\n{_QUOTED_MATERIAL_RULE}"
     )
     objectives = "\n".join(
@@ -330,6 +415,7 @@ def lesson_request(
                 "use different examples, different numbers, and a different way in."
             )
         parts.append(" ".join(how))
+    parts.append(_TEACHING)
     parts.append(_LESSON_FORMAT)
     if problems:
         listed = "\n".join(f"- {problem}" for problem in problems[:MAX_PROBLEMS_IN_RETRY])

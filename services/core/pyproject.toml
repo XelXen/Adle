@@ -67,6 +67,8 @@ ignore = [
 "adle_core/tools/**" = ["T20"]
 # The scenes it writes are in its strings, as they are written in a scene file.
 "adle_core/generation/figures.py" = ["E501"]
+"adle_core/generation/slides.py" = ["E501"]
+"adle_core/tools/export_slides.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

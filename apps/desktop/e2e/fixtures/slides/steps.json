@@ -1,0 +1,70 @@
+{
+  "area.py": {
+    "interactive": true,
+    "steps": 5
+  },
+  "dice_and_count.py": {
+    "interactive": false,
+    "steps": 3
+  },
+  "dice_grid.py": {
+    "interactive": false,
+    "steps": 4
+  },
+  "distance.py": {
+    "interactive": false,
+    "steps": 3
+  },
+  "linked_list.py": {
+    "interactive": false,
+    "steps": 4
+  },
+  "machine.py": {
+    "interactive": false,
+    "steps": 5
+  },
+  "number_line.py": {
+    "interactive": false,
+    "steps": 3
+  },
+  "parts_of_speech.py": {
+    "interactive": false,
+    "steps": 5
+  },
+  "passive_voice.py": {
+    "interactive": false,
+    "steps": 4
+  },
+  "prompt_example.py": {
+    "interactive": false,
+    "steps": 4
+  },
+  "rolls.py": {
+    "interactive": false,
+    "steps": 3
+  },
+  "sample_space.py": {
+    "interactive": false,
+    "steps": 5
+  },
+  "solve.py": {
+    "interactive": false,
+    "steps": 4
+  },
+  "table.py": {
+    "interactive": false,
+    "steps": 3
+  },
+  "tangent.py": {
+    "interactive": true,
+    "steps": 6
+  },
+  "tree.py": {
+    "interactive": false,
+    "steps": 2
+  },
+  "vectors.py": {
+    "interactive": false,
+    "steps": 3
+  }
+}

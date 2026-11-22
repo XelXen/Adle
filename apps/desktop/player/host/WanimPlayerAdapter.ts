@@ -24,6 +24,7 @@ import {
   type SceneEventName,
   type SceneEventValue,
   type ScenePlaybackState,
+  type ScenePacing,
   type SceneQuality,
   type SceneTheme,
 } from '@adle/event-protocol';
@@ -62,6 +63,8 @@ export interface LoadSceneOptions {
    * looking at.
    */
   rehearsal?: boolean;
+  /** `cued` for a slide of a lesson, held after each step until `next()` (ADR-049). */
+  pacing?: ScenePacing;
 }
 
 export interface SceneEvent {
@@ -296,6 +299,7 @@ export class WanimPlayerAdapter {
       quality: options.quality ?? (options.rehearsal ? 'low' : this.suitableQuality()),
       autoplay: options.autoplay ?? true,
       rehearsal: options.rehearsal === true,
+      pacing: options.pacing ?? 'normal',
     });
     this.loadTimer = window.setTimeout(() => {
       this.fail({ stage: 'timeout', message: 'The scene took too long to prepare.' });

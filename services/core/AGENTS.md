@@ -250,6 +250,20 @@ everything and decides nothing.
 - **A model writes a draft; the core writes the lesson.** Identifiers, objective links,
   citations, and durations are assigned in `generation/drafts.py`. A citation is a number the
   prompt offered, or it is dropped.
+- **A slide is data; the core lays it out and writes its scene** (ADR-049,
+  `generation/slides.py`): elements and steps checked one by one, what cannot be drawn left
+  out and said (by count in the log, never its words). A model's text reaches the scene only
+  as a quoted literal and a curve's formula only through `_python_expression`, as for a
+  figure. The narration's [brackets] become `Beat.cues` in `drafts` (`_marked`, `_cued`,
+  `_paced`); a scene's `steps` are counted by the policy, never read from input. A new kind
+  of element or verb is a template, an example in `tools/export_slides.py`, and
+  `npm run slides` (the player steps through every example in both themes). The prompt's
+  own example (`prompts.visual_example`) is one of them: change it and run `npm run slides`.
+- **A lesson's model does not think first** (ADR-049): what thinking used to catch is
+  caught in `drafts` instead, deterministically (`_distinct_options`: a wrong option equal
+  in value to the right one is left out; `_worked_to`: a numeric key its explanation
+  does not reach is not used). Do not turn thinking back on to fix a kind of slip: catch
+  the slip here, with a test from the answer that showed it.
 - **A figure is data; the core writes its scene** (ADR-045, `generation/figures.py`): a kind
   from a fixed list, each a template filled with checked values. A model's text reaches the
   scene only as a quoted literal, and a formula only as Python written again from a tree of

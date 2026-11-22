@@ -65,6 +65,8 @@ class OpenTrial:
     source: str
     interactive: bool
     controls: tuple[str, ...]
+    #: A slide's steps (ADR-049): the trial goes through each.
+    steps: int = 0
 
 
 Verdict = TrialFailure | Literal["passed", "untried"]
@@ -100,12 +102,18 @@ class SceneTrials:
             return [trial.open for trial in self._trials.values() if trial.verdict is None]
 
     def offer(
-        self, *, scene_class: str, source: str, interactive: bool, controls: tuple[str, ...]
+        self,
+        *,
+        scene_class: str,
+        source: str,
+        interactive: bool,
+        controls: tuple[str, ...],
+        steps: int = 0,
     ) -> str:
         trial_id = new_id("trial")
         with self._lock:
             self._trials[trial_id] = _Trial(
-                OpenTrial(trial_id, scene_class, source, interactive, controls)
+                OpenTrial(trial_id, scene_class, source, interactive, controls, steps)
             )
         return trial_id
 

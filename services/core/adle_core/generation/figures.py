@@ -117,10 +117,11 @@ def _symbols(text: str) -> str:
     )
 
 
-#: Where a formula already says how its letters are set, or names something: kept as it is.
+#: Where a formula already says how its letters are set, or names something (a color among
+#: them: ``\color{yellow}`` is not the word "yellow" in a formula): kept as it is.
 _SET = re.compile(
     r"\\(?:text|textbf|textit|mathrm|mathbf|mathit|mathsf|mathtt|mathcal|mathbb|operatorname"
-    r"|mbox|begin|end)\s*\{[^{}]*\}|\\[A-Za-z]+"
+    r"|mbox|begin|end|color|textcolor)\s*\{[^{}]*\}|\\[A-Za-z]+"
 )
 #: A word of a sentence among the letters of a formula, or a few in a row ("is
 #: right-continuous"): one of three letters or more, with any words beside it.
@@ -1939,10 +1940,20 @@ def _mixed(text: str) -> str:
     return _tex(" ".join(parts))
 
 
+#: TeX written without its dollar signs: a command (``\frac``, ``\{``, ``\emptyset``), or a
+#: letter with a subscript or a power (``E_1``, ``x^2``).
+_BARE_TEX = re.compile(r"\\[A-Za-z]{2,}|\\[{}]|(?<![A-Za-z])[A-Za-z][_^](?:\{|[A-Za-z0-9])")
+
+
 def _cell(text: str, *, heading: bool = False) -> list[Any]:
     """A cell as ``[is a formula, what is drawn]``: words, a formula (``$...$``), or words
     with formulas among them, set as one formula with the words as text (``_mixed``). A
-    heading of a single letter names a variable and is set as the formulas under it are."""
+    heading of a single letter names a variable and is set as the formulas under it are.
+
+    TeX written without dollar signs is set as a formula too, its words as text: a real
+    lesson's table showed ``\\{H, T\\}`` and ``\\emptyset`` as they were typed, backslashes
+    and all (2026-11-22). Backslashes written twice in a cell, where a line cannot break,
+    are read as one."""
     text = " ".join(text.split())
     if not text:
         return [False, " "]
@@ -1950,6 +1961,11 @@ def _cell(text: str, *, heading: bool = False) -> list[Any]:
         return [True, _mixed(text)]
     if heading and re.fullmatch(r"[A-Za-z]", text):
         return [True, text]
+    # So is mathematics written in its own symbols ("E ⊆ Ω"), which the text face lacks.
+    if _BARE_TEX.search(text) or any(char in UNICODE_TEX for char in text):
+        once = re.sub(r"\\{2,}", lambda run: "\\" * max(1, len(run.group(0)) // 2), text)
+        with contextlib.suppress(ValueError):
+            return [True, _tex(once)]
     return [False, _plain(text)]
 
 

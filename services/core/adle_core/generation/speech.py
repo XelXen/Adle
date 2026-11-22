@@ -44,6 +44,15 @@ UNICODE_TEX = {
     chr(0x2202): r" \partial ",
     chr(0x2207): r" \nabla ",
     chr(0x2212): "-",
+    # Sets: a real lesson's slide wrote "E ⊆ Ω" as words (2026-11-22, ADR-049).
+    chr(0x2286): r" \subseteq ",
+    chr(0x2282): r" \subset ",
+    chr(0x2283): r" \supset ",
+    chr(0x222A): r" \cup ",
+    chr(0x2229): r" \cap ",
+    chr(0x2205): r" \emptyset ",
+    chr(0x2209): r" \notin ",
+    chr(0x2216): r" \setminus ",
 }
 for _name, _point in (
     ("alpha", 0x3B1), ("beta", 0x3B2), ("gamma", 0x3B3), ("delta", 0x3B4),

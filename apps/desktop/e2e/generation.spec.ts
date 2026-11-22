@@ -109,6 +109,79 @@ function lessonWithFigures(): string {
   return JSON.stringify(lesson);
 }
 
+/**
+ * The canned lesson as a lesson is now written (ADR-049): its teaching parts with slides,
+ * paced by the words of their narration in brackets.
+ */
+function lessonWithSlides(): string {
+  const lesson = JSON.parse(cannedAnswer('lesson')) as {
+    segments: Record<string, unknown>[];
+  };
+  const parts: Record<number, Record<string, unknown>> = {
+    0: {
+      beats: [
+        { say: 'A neuron receives [two numbers] and has to turn them into one.' },
+        { say: 'It does not treat them equally: [each input is multiplied by a weight] first.' },
+      ],
+      visual: {
+        elements: [
+          {
+            id: 'net',
+            kind: 'nodes',
+            nodes: ['x_1', 'x_2', 'z'],
+            edges: [
+              [1, 3],
+              [2, 3],
+            ],
+            layout: 'tree',
+            place: 'left',
+          },
+          { id: 'rule', kind: 'math', tex: 'z = {{w_1}} x_1 + {{w_2}} x_2', place: 'right' },
+        ],
+        steps: [
+          [{ show: 'net.x_1' }],
+          [{ show: ['net.x_2', 'net.z'] }],
+          [{ show: ['net', 'rule'] }, { color: ['rule.1', 'rule.2'], to: 'yellow' }],
+        ],
+        description: 'Two inputs joined to one output, and the weighted sum that joins them.',
+      },
+    },
+    1: {
+      beats: [
+        { say: 'Write the sum with letters first, then [put in the numbers] from the picture.' },
+        { say: 'Work it out and [the sum is one half].' },
+      ],
+      visual: {
+        elements: [{ id: 'sum', kind: 'math', tex: 'z = w_1 x_1 + w_2 x_2 + b', size: 'large' }],
+        steps: [
+          [{ show: 'sum' }],
+          [{ set: 'sum', to: 'z = (0.5)(2) + (-1)(1) + 0.5' }],
+          [{ set: 'sum', to: 'z = 0.5' }, { highlight: 'sum' }],
+        ],
+        description: 'The weighted sum written out, then with numbers, then worked out.',
+      },
+    },
+    3: {
+      visual: {
+        elements: [
+          { id: 'w', kind: 'param', value: 0.5, min: -2, max: 2, slider: true, label: 'w' },
+          { id: 'plane', kind: 'axes', x: [-2, 2], y: [-4, 4], x_label: 'x' },
+          { id: 'line', kind: 'curve', on: 'plane', f: 'w*x + 0.5', color: 'blue' },
+          { id: 'P', kind: 'point', on: 'line', x: 1, label: 'z' },
+        ],
+        steps: [[{ show: ['plane', 'line'] }], [{ show: 'P' }, { set: 'w', to: 1.5 }]],
+        description: 'Moving the weight tilts the line: a larger weight makes it steeper.',
+      },
+    },
+  };
+  for (const [index, changes] of Object.entries(parts)) {
+    const segment = lesson.segments[Number(index)]!;
+    delete segment.scene;
+    Object.assign(segment, changes);
+  }
+  return JSON.stringify(lesson);
+}
+
 async function addConcept(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: 'Add a concept' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add a concept' });
@@ -490,6 +563,42 @@ test.describe('generation with the AI provider', () => {
     // The interaction's figure has a slider, mirrored as a control of the page's own.
     await expect(page.getByText('Part 4 of 8')).toBeVisible();
     await expect(page.getByRole('slider', { name: 'w' })).toBeVisible({ timeout: 30_000 });
+    await close(session);
+  });
+
+  test('a lesson’s slides are drawn by Adle, tried, and step on as the narration reaches each cue', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await open(profileDir);
+    const { page, provider } = session;
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    const limits = detail(page, 'Limits');
+    const lessons = limits.getByRole('list', { name: 'Lessons for this concept' });
+
+    provider.queue(lessonWithSlides());
+    await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(limits.getByRole('progressbar')).toHaveCount(0, { timeout: 60_000 });
+    // One request, for the lesson's words: its slides were drawn here (ADR-049).
+    expect(provider.requests.map((request) => request.kind)).toEqual(['lesson']);
+
+    await lessons.getByRole('button', { name: /^Start lesson/ }).click();
+    await expect(page.getByText('Part 1 of 8')).toBeVisible();
+    const slide = page.getByRole('figure', { name: 'Why inputs are weighted' });
+    await expect(slide.getByText('Loading animation…')).toBeHidden({ timeout: 30_000 });
+    // Before the lesson starts the slide waits; as the words are read, it takes each step.
+    await expect(slide).not.toHaveAttribute('data-step', /[12]/);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await expect(slide).toHaveAttribute('data-step', '0', { timeout: 30_000 });
+    await expect(slide).toHaveAttribute('data-step', '1', { timeout: 30_000 });
+    await expect(slide).toHaveAttribute('data-step', '2', { timeout: 30_000 });
+    await expect(slide.getByText('Couldn’t show the animation')).toHaveCount(0);
+    // What was said has no brackets in it: they only mark where the picture changes.
+    await expect(page.getByText('[two numbers]')).toHaveCount(0);
     await close(session);
   });
 

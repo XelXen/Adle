@@ -226,6 +226,13 @@ most, a file's name.
   still on its way. A failure is said where the learner is: in the dialog if it is open, as
   a toast if not. Show the learner's own words as plain text and the answer with `MathText`.
 - A narrator calls `onWord` only if it really knows the position. Never fake word highlighting.
+- **A slide is paced by its cues** (ADR-049). Every narrator delivers a line's `cues` through
+  `onCue`, once each, in order, all before `onEnd` (`CueKeeper`); one that does not know
+  where it is delivers them at the time the line would reach them (`CueClock`), which is
+  not a claim to a word. The controller passes each to `advanceScene`; `SceneCues` counts
+  them and gives the slide one each time it says it holds after a step (`setHolding` with
+  the step's number). A slide is loaded with `steps` (`pacing: 'cued'`); never send it
+  `next` before its step event, which would cut the step short.
 - The renderer has no answer keys. Anything that needs one (what was right, why) comes back from
   `lessons.answer`. Do not add a field to the player view to "save a round trip".
 - Lesson text is shown with `MathText`, never `dangerouslySetInnerHTML`.

@@ -706,6 +706,9 @@ class SceneTrial(_Output):
     interactive: bool
     #: The names of the controls an interactive picture has.
     controls: list[str]
+    #: A slide's steps (ADR-049): the trial goes through each. 0 for a picture that plays
+    #: through.
+    steps: int = 0
 
 
 class SceneTrialList(_Output):

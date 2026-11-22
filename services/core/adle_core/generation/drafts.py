@@ -18,6 +18,7 @@ like any other lesson.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import re
 from collections.abc import Mapping, Sequence
@@ -34,6 +35,7 @@ from pydantic import (
 )
 
 from adle_core.generation.figures import FigureError, beat_seconds, compile_figure, undoubled
+from adle_core.generation.slides import SlideError, compile_slide
 from adle_core.generation.speech import spoken
 from adle_core.lessons.ir import (
     MAX_BEATS,
@@ -48,12 +50,18 @@ from adle_core.lessons.ir import (
     VoiceDescription,
 )
 
+logger = logging.getLogger(__name__)
+
 #: A lesson asks for at most this many scenes: each one is a separate model request.
 MAX_SCENES_PER_LESSON = 2
 #: And has at most this many figures, which the core draws (ADR-045).
 MAX_FIGURES_PER_LESSON = 8
+#: And this many slides: a picture for every part that teaches (ADR-049), drawn by the core.
+MAX_SLIDES_PER_LESSON = 12
 #: The parts a figure may stand in.
 _FIGURE_PARTS = ("explanation", "visualization", "interaction", "worked_example")
+#: And a slide: every part that teaches, a summary among them.
+_SLIDE_PARTS = (*_FIGURE_PARTS, "summary")
 MAX_PROPOSED_CONCEPTS = 16
 MAX_PROPOSED_OBJECTIVES = 4
 READING_WORDS_PER_MINUTE = 150
@@ -326,6 +334,9 @@ class SegmentDraft(_Draft):
     #: A figure: a kind of picture the core draws from this data (ADR-045). Read by the
     #: figures module; a field it does not know is passed over there.
     figure: dict[str, Any] | None = None
+    #: A slide: what is on the stage and how it changes as the narration reaches the words
+    #: in [brackets] (ADR-049). Read by the slides module.
+    visual: dict[str, Any] | None = None
     question: QuestionDraft | None = None
 
 
@@ -451,20 +462,158 @@ _SECONDS_FOR = {"checkpoint": 45, "interaction": 60, "reflection": 25}
 #: The most a line on the board may hold (``Display`` in the Lesson IR).
 MAX_BOARD_CHARACTERS = 600
 
+#: Words of the narration a model marked in [brackets], while they are said in words:
+#: characters nothing else writes, taken out again once the line is said (ADR-049).
+_CUE_OPEN, _CUE_CLOSE = "\u27e6", "\u27e7"
+#: Brackets that hold a number or an interval ("[0, 1]") are mathematics, not a cue.
+_INTERVAL = re.compile(
+    r"\s*[-+]?(?:\d+(?:\.\d+)?|\.\d+|infinity)\s*(?:,\s*[-+]?(?:\d+(?:\.\d+)?|\.\d+|infinity)\s*)?",
+    re.IGNORECASE,
+)
+
+
+def _cue_end(text: str, start: int) -> int | None:
+    """Where the bracket opened at ``start`` closes, outside any $...$ in it: None when it
+    does not close within a phrase, or another opens first."""
+    in_math = False
+    for index in range(start + 1, min(len(text), start + 160)):
+        char = text[index]
+        if char == "$":
+            in_math = not in_math
+        elif not in_math and char == "[":
+            return None
+        elif not in_math and char == "]":
+            return index
+    return None
+
+
+def _marked(text: str) -> str:
+    """The words a model put in [brackets] to cue the next step of a part's picture,
+    marked with characters nothing else writes. Brackets inside $...$, and brackets that
+    hold a number or an interval, are left as they were written."""
+    out: list[str] = []
+    in_math = False
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == "$":
+            in_math = not in_math
+        elif char == "[" and not in_math:
+            end = _cue_end(text, index)
+            inner = text[index + 1 : end] if end is not None else ""
+            if end is not None and inner.strip() and not _INTERVAL.fullmatch(inner):
+                out.append(_CUE_OPEN + inner + _CUE_CLOSE)
+                index = end + 1
+                continue
+        out.append(char)
+        index += 1
+    return "".join(out)
+
+
+def _cued(text: str) -> tuple[str, list[int]]:
+    """A line as it is said, without its marks, and where each marked phrase begins."""
+    clean: list[str] = []
+    cues: list[int] = []
+    for char in text:
+        if char == _CUE_OPEN:
+            cues.append(len(clean))
+        elif char == _CUE_CLOSE or (char.isspace() and (not clean or clean[-1] == " ")):
+            continue
+        else:
+            clean.append(" " if char.isspace() else char)
+    said = "".join(clean).rstrip()
+    found = sorted({cue for cue in cues if cue < len(said)})
+    return said, found
+
 
 def _narration(beats: list[BeatDraft]) -> list[dict[str, Any]]:
+    """What is said, line by line, with where each cue stands in it (``cues``) and the
+    line put on the board as it begins (``show``)."""
     narration = []
+    previous: str | None = None
     for beat in beats[:MAX_BEATS]:
         # Narration is read aloud: notation in it is said in words (generation/speech.py).
-        entry: dict[str, Any] = {"text": spoken(tidy(beat.say))}
+        said, cues = _cued(spoken(_marked(tidy(beat.say))))
+        entry: dict[str, Any] = {"text": said}
+        if cues:
+            entry["cues"] = cues
         shown = _text(beat.show)
         # A line on the board whose mathematics is not closed, or that is too long to show,
         # is left off: the words said over it stay, and a lesson is not written again for
         # one line of its board (ADR-047). Anything else wrong with it is still refused.
-        if shown and shown.count("$") % 2 == 0 and len(shown) <= MAX_BOARD_CHARACTERS:
+        # The same line twice in a row is shown once (a real lesson's board repeated its
+        # line three times, 2026-11-22).
+        if (
+            shown
+            and shown.count("$") % 2 == 0
+            and len(shown) <= MAX_BOARD_CHARACTERS
+            and shown != previous
+        ):
             entry["show"] = shown
+        previous = shown or previous
         narration.append(entry)
     return narration
+
+
+def _sentence_starts(
+    narration: list[dict[str, Any]], after: tuple[int, int]
+) -> list[tuple[int, int]]:
+    """Where each sentence of the narration begins, after a place in it."""
+    starts: list[tuple[int, int]] = []
+    for line, beat in enumerate(narration):
+        said = beat["text"]
+        heads = [0] + [match.end() for match in re.finditer(r"[.?!;:]\s+(?=\S)", said)]
+        starts += [
+            (line, head)
+            for head in heads
+            if (line, head) > after and (line, head) != (0, 0) and head < len(said)
+        ]
+    return starts
+
+
+def _paced(narration: list[dict[str, Any]], steps: int) -> list[dict[str, Any]]:
+    """The narration's cues fitted to a slide of ``steps`` steps: one cue for each step
+    after the first, which plays as the part begins. A model that marked the first step
+    too has that mark dropped, and marks past the last step are dropped. Steps that have
+    no mark are cued where a sentence begins, spread over what is said after the last
+    mark, or, short of sentences, at words of the last line."""
+    wanted = max(0, steps - 1)
+    places = [(line, cue) for line, beat in enumerate(narration) for cue in beat.get("cues", [])]
+    if len(places) > wanted and places and places[0] == (0, 0):
+        places = places[1:]
+    if len(places) > wanted and len(places) == steps:
+        places = places[1:]
+    places = places[:wanted]
+    missing = wanted - len(places)
+    if missing > 0:
+        starts = _sentence_starts(narration, places[-1] if places else (0, 0))
+        if len(starts) >= missing:
+            if missing == 1:
+                places.append(starts[len(starts) // 2])
+            else:
+                places += [
+                    starts[round(index * (len(starts) - 1) / (missing - 1))]
+                    for index in range(missing)
+                ]
+        else:
+            places += starts
+            last = len(narration) - 1
+            words = [match.start() for match in re.finditer(r"\S+", narration[last]["text"])]
+            still = wanted - len(places)
+            for number in range(1, still + 1):
+                if words:
+                    places.append(
+                        (last, words[min(len(words) - 1, number * len(words) // (still + 1))])
+                    )
+    paced = [{key: value for key, value in beat.items() if key != "cues"} for beat in narration]
+    for line, cue in sorted(set(places)):
+        paced[line].setdefault("cues", []).append(cue)
+    return paced
+
+
+def _uncued(narration: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The narration of a part with no slide: its cues have nothing to move."""
+    return [{key: value for key, value in beat.items() if key != "cues"} for beat in narration]
 
 
 def minutes_for(segments: Sequence[Mapping[str, Any]]) -> int:
@@ -503,7 +652,7 @@ def _question(
         item["objective_id"] = context.objectives[draft.objective - 1].id
 
     if form in ("multiple_choice", "prediction"):
-        options = draft.options[:5]
+        options = _distinct_options(draft.options[:5])
         correct = [index for index, option in enumerate(options) if option.correct]
         if len(correct) != 1:
             problems.append(f'{where}: exactly one option must have "correct": true')
@@ -528,6 +677,11 @@ def _question(
     elif form == "numeric":
         if draft.answer is None:
             problems.append(f'{where}: a numeric question needs a number in "answer"')
+            return None
+        if not _worked_to(draft.explanation, draft.answer, draft.tolerance):
+            # The key is not what its own working finds (ADR-049): a learner who works it
+            # out right would be told they are wrong. Not a key Adle can trust, or mend.
+            problems.append(f"{where}: the answer is not what its explanation works out")
             return None
         item["expected"] = draft.answer
         item["tolerance"] = abs(draft.tolerance) if draft.tolerance is not None else 0.0
@@ -575,6 +729,8 @@ class LessonCompiler:
     figures: list[FigureScene] = field(default_factory=list)
     #: Figures given that could not be drawn as given: their parts are said in words.
     dropped: int = 0
+    #: Of the figures, how many are slides (ADR-049).
+    slides: int = 0
     questions: int = 0
     #: How many parts have been read, kept or not: a part's place in what was written.
     read: int = 0
@@ -640,10 +796,43 @@ class LessonCompiler:
         brief: SceneBrief | None = None
         lost = 0
         drawn = None
+        scene_id = f"scn_{len(self.scenes) + len(self.figures) + 1}"
+        slide = None
         if (
-            segment.figure is not None
+            segment.visual is not None
+            and kind in _SLIDE_PARTS
+            and self.slides < MAX_SLIDES_PER_LESSON
+        ):
+            slide = _slide(segment.visual)
+            lost = 1 if slide is None else 0
+        if slide is not None:
+            # The part's picture is a slide, paced by the words it marked (ADR-049).
+            compiled_slide, described = slide
+            if kind == "interaction" and not compiled_slide.interactive:
+                entry.pop("prompt", None)
+                entry["type"] = kind = "visualization"
+            # The slide is what this part shows: a board under it would say it twice.
+            entry["narration"] = [
+                {key: value for key, value in beat.items() if key != "show"}
+                for beat in _paced(narration, compiled_slide.steps)
+            ]
+            entry["scene"] = {"scene_id": scene_id, "fallback_text": described}
+            figure = FigureScene(
+                scene_id=scene_id,
+                segment_id=segment_id,
+                kind="slide",
+                title=entry["title"],
+                description=described,
+                source=compiled_slide.source,
+                interactive=compiled_slide.interactive,
+            )
+        else:
+            entry["narration"] = narration = _uncued(narration)
+        if (
+            slide is None
+            and segment.figure is not None
             and kind in _FIGURE_PARTS
-            and len(self.figures) < MAX_FIGURES_PER_LESSON
+            and len(self.figures) - self.slides < MAX_FIGURES_PER_LESSON
         ):
             drawn = _figure(segment.figure, narration)
             if drawn is None:
@@ -652,8 +841,9 @@ class LessonCompiler:
                 # Nothing to operate: what it shows is still worth watching.
                 entry.pop("prompt", None)
                 entry["type"] = kind = "visualization"
-        scene_id = f"scn_{len(self.scenes) + len(self.figures) + 1}"
-        if drawn is not None:
+        if slide is not None:
+            pass
+        elif drawn is not None:
             compiled_figure, described = drawn
             entry["scene"] = {"scene_id": scene_id, "fallback_text": described}
             figure = FigureScene(
@@ -691,12 +881,14 @@ class LessonCompiler:
                 described = tidy(segment.scene.description) if segment.scene else None
                 entry = _as_explanation(entry, described)
 
+        entry = _shown_somewhere(entry, segment)
         entry["estimated_seconds"] = _seconds(entry["type"], entry["narration"])
         self.segments.append(entry)
         self.questions += asks
         self.dropped += lost
         if figure is not None:
             self.figures.append(figure)
+            self.slides += 1 if slide is not None else 0
         if brief is not None:
             self.scenes.append(brief)
         return []
@@ -749,6 +941,83 @@ class LessonCompiler:
         return lesson
 
 
+#: A number as a question's working writes it: 0.25, 3/13, $\frac{3}{13}$, 25%, 1,200.
+_FRACTION = re.compile(
+    r"\\[dt]?frac\{\s*(-?[\d.,]+)\s*\}\{\s*(-?[\d.,]+)\s*\}|(-?[\d.,]*\d)\s*/\s*(-?[\d.,]*\d)"
+)
+_DECIMAL = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?%?|(?<![\w.])-?\.\d+%?")
+
+
+def _figure_of(text: str) -> float | None:
+    """The one value a short text says, when it says one (an option such as "12/52",
+    "$\\frac{3}{13}$", "0.25" or "25%"); None for anything else."""
+    plain = " ".join(text.replace("$", " ").split())
+    whole = _FRACTION.fullmatch(plain)
+    if whole:
+        top, bottom = (
+            (whole.group(1), whole.group(2)) if whole.group(1) else (whole.group(3), whole.group(4))
+        )
+        try:
+            denominator = float(bottom.replace(",", ""))
+            return float(top.replace(",", "")) / denominator if denominator else None
+        except ValueError:
+            return None
+    single = _DECIMAL.fullmatch(plain)
+    if single:
+        figure = single.group(0)
+        try:
+            value = float(figure.rstrip("%").replace(",", ""))
+        except ValueError:
+            return None
+        return value / 100 if figure.endswith("%") else value
+    return None
+
+
+def _distinct_options(options: Sequence[OptionDraft]) -> list[OptionDraft]:
+    """The options without a wrong one that is the right one written another way ("12/52"
+    beside "3/13", as a real lesson asked without thinking, 2026-11-22): a learner who
+    chose it would be told they were wrong (ADR-049)."""
+    right = [_figure_of(option.text) for option in options if option.correct]
+    if len(right) != 1 or right[0] is None:
+        return list(options)
+    value = right[0]
+    kept = [
+        option
+        for option in options
+        if option.correct
+        or (figure := _figure_of(option.text)) is None
+        or abs(figure - value) > 1e-9 * max(1.0, abs(value))
+    ]
+    return kept if len(kept) >= 2 else list(options)
+
+
+def _figures_in(text: str) -> list[float]:
+    """Every value a question's working writes: its numbers, and its fractions worked out."""
+    plain = text.replace("$", " ")
+    found: list[float] = []
+    for match in _FRACTION.finditer(plain):
+        figure = _figure_of(match.group(0))
+        if figure is not None:
+            found.append(figure)
+    for match in _DECIMAL.finditer(plain):
+        figure = _figure_of(match.group(0))
+        if figure is not None:
+            found.append(figure)
+    return found
+
+
+def _worked_to(explanation: str, answer: float, tolerance: float | None) -> bool:
+    """Whether a numeric question's explanation arrives at its key: some value it writes is
+    the key, to within the tolerance, or to the places the key is given to. An explanation
+    that writes no number at all says nothing either way, and is let be."""
+    figures = _figures_in(explanation)
+    if not figures:
+        return True
+    places = len(f"{answer:.10g}".partition(".")[2])
+    allowed = max(abs(tolerance or 0.0), 0.5 * 10.0 ** (-places), 1e-9 * max(1.0, abs(answer)))
+    return any(abs(figure - answer) <= allowed + 1e-12 for figure in figures)
+
+
 def compile_practice(
     drafts: Sequence[QuestionDraft], context: LessonContext
 ) -> list[dict[str, Any]]:
@@ -784,6 +1053,27 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
 
 
 _LONG_DISPLAY = TypeAdapter(LongDisplay)
+
+
+def _slide(raw: dict[str, Any]) -> Any:
+    """A part's slide, drawn, with its description in words (the model's, or Adle's from
+    the script); None when nothing of it can be drawn. A slide is never a reason to write
+    the lesson again: its part is said in words instead."""
+    try:
+        drawn = compile_slide(raw)
+    except SlideError:
+        return None
+    if drawn.left_out:
+        # What was left out is not logged in words: a script's text is the model's.
+        logger.info("generation.slide_parts_left_out count=%s", len(drawn.left_out))
+    for candidate in (raw.get("description"), drawn.described, "A picture of this part."):
+        try:
+            described = _LONG_DISPLAY.validate_python(tidy(str(candidate or "")))
+        except ValidationError:
+            continue
+        if described:
+            return drawn, described
+    return None
 
 
 def _figure(raw: dict[str, Any], narration: list[dict[str, Any]]) -> Any:
@@ -842,6 +1132,28 @@ def _is_usable(item: dict[str, Any]) -> bool:
     except ValidationError:
         return False
     return True
+
+
+def _shown_somewhere(entry: dict[str, Any], segment: SegmentDraft) -> dict[str, Any]:
+    """A worked example or a summary shows what it says: on the board, or in its picture.
+    Written without either (its slide could not be drawn, and the board is no longer asked
+    for, ADR-049), its first line puts the picture's description, or its title, on the
+    board. A worked example without a problem to solve is an explanation (ADR-047)."""
+    if entry["type"] == "worked_example" and not entry.get("problem"):
+        entry = {key: value for key, value in entry.items() if key != "problem"}
+        entry["type"] = "explanation"
+    if entry["type"] not in ("worked_example", "summary") or "scene" in entry:
+        return entry
+    narration = [dict(beat) for beat in entry["narration"]]
+    if not narration or any(beat.get("show") for beat in narration):
+        return entry
+    raw = segment.visual.get("description") if isinstance(segment.visual, dict) else None
+    for candidate in (raw, entry["title"]):
+        shown = _text(str(candidate)) if candidate else None
+        if shown and shown.count("$") % 2 == 0 and len(shown) <= MAX_BOARD_CHARACTERS:
+            narration[0]["show"] = shown
+            return {**entry, "narration": narration}
+    return entry
 
 
 def _as_explanation(segment: dict[str, Any], described: str | None) -> dict[str, Any]:

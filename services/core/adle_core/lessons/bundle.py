@@ -101,6 +101,7 @@ def inspect_scene(scene_id: str, purpose: str, source: str) -> SceneArtifact:
         interactive=report.interactive,
         controls=list(report.controls),
         events=list(report.events),
+        steps=report.steps,
     )
 
 

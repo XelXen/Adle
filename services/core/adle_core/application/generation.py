@@ -1599,6 +1599,7 @@ class GenerationService:
             source=artifact.source,
             interactive=artifact.interactive,
             controls=tuple(artifact.controls),
+            steps=artifact.steps,
         )
         return artifact, trial_id
 
@@ -1660,6 +1661,7 @@ class GenerationService:
             source=artifact.source,
             interactive=artifact.interactive,
             controls=tuple(artifact.controls),
+            steps=artifact.steps,
         )
         verdict = self._trials.wait(trial_id, cancelled=lambda: context.cancelled)
         context.check_cancelled()

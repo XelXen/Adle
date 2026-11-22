@@ -27,8 +27,9 @@ BRITISH = re.compile(
 )
 #: Names the API gives things: a job that was stopped, a step that is practice. And a name
 #: a model may write in a scene ("colour=" for "color="), which the scene policy must know
-#: by that spelling to refuse it.
-IDENTIFIERS = {"cancelled", "practise", "colour"}
+#: by that spelling to refuse it, or in a slide's script ("grey", "centre"), which the
+#: slides module must know by that spelling to understand it (ADR-049).
+IDENTIFIERS = {"cancelled", "practise", "colour", "grey", "centre"}
 #: Where the database's own names are written.
 SCHEMA = (Path("migrations"), Path("infrastructure", "orm.py"))
 

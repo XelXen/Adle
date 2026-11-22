@@ -26,13 +26,20 @@ const MAX_CONTROLS = 16;
 
 export type SceneTheme = 'light' | 'dark';
 export type SceneQuality = 'low' | 'medium' | 'high';
+/**
+ * How a scene is paced. `normal`: it plays through, holding only on a live page.
+ * `cued`: a slide of a lesson (ADR-049), which holds after each of its steps until the
+ * host says `next`, when the narration reaches the words the next step belongs to.
+ */
+export type ScenePacing = 'normal' | 'cued';
+export const SCENE_PACINGS: readonly ScenePacing[] = ['normal', 'cued'];
 
 /**
  * Events a scene may report with `self.post_message(name, value)`.
  * This vocabulary is closed: anything else is dropped by the player and,
  * independently, by the host.
  */
-export const SCENE_EVENT_NAMES = ['passed', 'explored', 'progress'] as const;
+export const SCENE_EVENT_NAMES = ['passed', 'explored', 'progress', 'step'] as const;
 export type SceneEventName = (typeof SCENE_EVENT_NAMES)[number];
 export type SceneEventValue = boolean | number | string | null;
 
@@ -84,6 +91,7 @@ export type HostMessage =
        * the time it takes is not a learner's.
        */
       rehearsal: boolean;
+      pacing: ScenePacing;
     }
   | { adle: typeof PROTOCOL_VERSION; type: 'play'; runId: string }
   | { adle: typeof PROTOCOL_VERSION; type: 'pause'; runId: string }
@@ -280,6 +288,7 @@ export function parseHostMessage(data: unknown): HostMessage | null {
         'quality',
         'autoplay',
         'rehearsal',
+        'pacing',
       ];
       if (!hasExactKeys(data, keys)) return null;
       if (
@@ -291,7 +300,8 @@ export function parseHostMessage(data: unknown): HostMessage | null {
         !isOneOf(data.theme, THEMES) ||
         !isOneOf(data.quality, QUALITIES) ||
         typeof data.autoplay !== 'boolean' ||
-        typeof data.rehearsal !== 'boolean'
+        typeof data.rehearsal !== 'boolean' ||
+        !isOneOf(data.pacing, SCENE_PACINGS)
       ) {
         return null;
       }
@@ -305,6 +315,7 @@ export function parseHostMessage(data: unknown): HostMessage | null {
         quality: data.quality,
         autoplay: data.autoplay,
         rehearsal: data.rehearsal,
+        pacing: data.pacing,
       };
     }
     case 'play':

@@ -129,7 +129,9 @@ export class SceneRun {
     this.bridge
       .runPythonOnCanvas(this.request.source, this.canvas, {
         quality: QUALITY_FLAGS[this.request.quality],
-        mode: 'normal',
+        // A slide of a lesson holds after each step until the host says `next`
+        // (ADR-049): Wanim's slides mode, which parks after every phase.
+        mode: this.request.pacing === 'cued' ? 'slides' : 'normal',
         theme: this.request.theme,
         background: STAGE_BACKGROUND[this.request.theme],
         instanceId: this.runId,

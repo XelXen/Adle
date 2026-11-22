@@ -1,4 +1,4 @@
-import type { NarrationHandlers, Narrator, Utterance } from './narration';
+import { CueKeeper, type NarrationHandlers, type Narrator, type Utterance } from './narration';
 
 /**
  * Narration in a natural voice, recorded on this computer (ADR-042).
@@ -83,6 +83,8 @@ export class RecordedNarrator implements Narrator {
 
     const words = [...line.words].sort((a, b) => a.start - b.start);
     const clip = this.makeClip();
+    // A picture's cues (ADR-049) are reached with the words the core measured.
+    const cues = new CueKeeper(handlers.cues ?? [], handlers.onCue);
     let next = 0;
     let handle: number | null = null;
     let over = false;
@@ -95,6 +97,7 @@ export class RecordedNarrator implements Narrator {
       while (next < words.length && words[next]!.start <= now) {
         const word = words[next]!;
         handlers.onWord?.(word.index, word.length);
+        cues.reached(word.index);
         next += 1;
       }
       if (!clip.paused) handle = this.frame(watch);
@@ -116,6 +119,7 @@ export class RecordedNarrator implements Narrator {
       over = true;
       stopWatching();
       detach();
+      cues.flush();
       handlers.onEnd();
     }
     const onError = (): void => {
@@ -123,7 +127,7 @@ export class RecordedNarrator implements Narrator {
       if (over || standIn) return;
       stopWatching();
       detach();
-      standIn = this.fallback.speak(text, handlers);
+      standIn = this.fallback.speak(text, { ...handlers, cues: cues.remaining() });
     };
 
     clip.addEventListener('playing', onPlaying);

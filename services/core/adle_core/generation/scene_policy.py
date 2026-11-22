@@ -73,7 +73,7 @@ UNSUPPORTED_SCENE_BASES: Final = frozenset(
 
 #: The closed event vocabulary. Must match `SCENE_EVENT_NAMES` in
 #: packages/event-protocol (checked by tests/unit/test_scene_policy.py).
-EVENT_NAMES: Final = ("passed", "explored", "progress")
+EVENT_NAMES: Final = ("passed", "explored", "progress", "step")
 
 #: Attribute (and constant subscript) names that lead out of the Python-like
 #: world into JavaScript objects, the DOM, or the renderer's canvas.
@@ -134,6 +134,9 @@ class SceneReport:
     controls: tuple[str, ...] = ()
     #: Event names the scene may report.
     events: tuple[str, ...] = ()
+    #: How many steps it is paced in (ADR-049): the steps it reports as each ends,
+    #: ``post_message("step", n)`` for each n from 0. None that are numbered so: 0.
+    steps: int = 0
     #: SHA-256 of the normalised source; the identity of the stored artifact.
     content_hash: str = ""
     wanim_version: str = ""
@@ -188,6 +191,19 @@ IN_ORDER_ONLY = {
 }
 
 
+#: Calls that stop a scene in the pinned runtime however they are given, and what to use.
+_BROKEN_CALLS = {
+    "Ellipse": (
+        "Ellipse stops the scene in this runtime. Draw a circle and stretch it: "
+        "Circle(radius=1).stretch_to_fit_width(w).stretch_to_fit_height(h)."
+    ),
+    "Flash": (
+        "Flash stops the scene in this runtime. Point with Indicate(...), or draw a "
+        "SurroundingRectangle with Create."
+    ),
+}
+
+
 class _Checker:
     def __init__(self, source: str) -> None:
         self.source = source
@@ -196,6 +212,7 @@ class _Checker:
         self.scene_classes: list[ast.ClassDef] = []
         self.controls: list[str] = []
         self.events: list[str] = []
+        self.steps: set[int] = set()
         self._first_use: dict[str, int] = {}
 
     def fail(self, code: str, message: str, node: ast.AST | None = None) -> None:
@@ -360,6 +377,11 @@ class _Checker:
                 node,
             )
             return
+        if isinstance(function, ast.Name) and function.id in _BROKEN_CALLS:
+            # Observed in the pinned runtime, 2026-11-22 (ADR-049): each stops the scene
+            # with "non-finite point/vector value" as soon as it is drawn.
+            self.fail("unreliable_call", _BROKEN_CALLS[function.id], node)
+            return
         if isinstance(function, ast.Name) and function.id == "Dot":
             positioned = bool(node.args) or any(key.arg == "point" for key in node.keywords)
             if positioned:
@@ -391,8 +413,17 @@ class _Checker:
                 f"Unknown event '{name.value}'. Allowed events: {', '.join(EVENT_NAMES)}.",
                 node,
             )
-        elif name.value not in self.events:
-            self.events.append(name.value)
+        else:
+            if name.value not in self.events:
+                self.events.append(name.value)
+            if name.value == "step" and len(node.args) > 1:
+                number = node.args[1]
+                if (
+                    isinstance(number, ast.Constant)
+                    and type(number.value) is int
+                    and 0 <= number.value < 64
+                ):
+                    self.steps.add(number.value)
 
     def _collect_controls(self, node: ast.Assign) -> None:
         for target in node.targets:
@@ -569,6 +600,7 @@ def check_scene_source(source: object) -> SceneReport:
         interactive=interactive,
         controls=tuple(checker.controls),
         events=tuple(checker.events),
+        steps=len(checker.steps) if checker.steps == set(range(len(checker.steps))) else 0,
         content_hash=content_hash(source),
         wanim_version=version,
     )

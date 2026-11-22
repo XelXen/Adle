@@ -55,6 +55,11 @@ export interface ScenePlayerProps {
   caption?: ReactNode;
   /** With `onStage`: the line along the top of the screen. */
   header?: ReactNode;
+  /**
+   * A slide's steps (ADR-049): it is held after each until `next()`, as the narration
+   * reaches its cues. 0 for a scene that plays through.
+   */
+  steps?: number;
   ref?: Ref<ScenePlayerHandle>;
 }
 
@@ -87,12 +92,15 @@ export function ScenePlayer({
   onStage = false,
   caption,
   header,
+  steps = 0,
   ref,
 }: ScenePlayerProps) {
   const host = useRef<HTMLDivElement>(null);
   const adapter = useRef<WanimPlayerAdapter | null>(null);
   const [status, setStatus] = useState<PlayerStatus>('loading');
   const [controls, setControls] = useState<ControlDescriptor[]>([]);
+  /** The last step a slide has drawn (ADR-049). */
+  const [step, setStep] = useState<number | null>(null);
   const appTheme = useResolvedTheme();
   const theme = onStage ? 'dark' : appTheme;
 
@@ -113,14 +121,24 @@ export function ScenePlayer({
       callbacks.current.onStatusChange?.(next);
     });
     player.on('controls', setControls);
-    player.on('scene-event', (event) => callbacks.current.onSceneEvent?.(event));
+    player.on('scene-event', (event) => {
+      if (event.name === 'step' && typeof event.value === 'number') setStep(event.value);
+      callbacks.current.onSceneEvent?.(event);
+    });
     player.on('failure', (failure) => callbacks.current.onFailure?.(failure));
-    player.load({ source, sceneName, theme: themeAtMount.current, autoplay });
+    setStep(null);
+    player.load({
+      source,
+      sceneName,
+      theme: themeAtMount.current,
+      autoplay,
+      pacing: steps > 0 ? 'cued' : 'normal',
+    });
     return () => {
       player.dispose();
       adapter.current = null;
     };
-  }, [source, sceneName, autoplay, title]);
+  }, [source, sceneName, autoplay, title, steps]);
 
   useEffect(() => {
     themeAtMount.current = theme;
@@ -185,7 +203,11 @@ export function ScenePlayer({
   );
 
   return (
-    <figure className={styles.player} aria-label={title}>
+    <figure
+      className={styles.player}
+      aria-label={title}
+      data-step={steps > 0 && step !== null ? step : undefined}
+    >
       {onStage ? (
         <StageFrame header={header} caption={caption}>
           {picture}

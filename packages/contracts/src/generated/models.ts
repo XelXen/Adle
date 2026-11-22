@@ -88,6 +88,10 @@ export interface AskRequest {
  */
 export interface Beat {
   advance_scene?: boolean;
+  /**
+   * @maxItems 12
+   */
+  cues?: number[];
   show?: string | null;
   text: string;
 }
@@ -543,7 +547,8 @@ export interface PlayerRubricPoint {
   text: string;
 }
 /**
- * A problem solved step by step: each beat says a step and shows it.
+ * A problem solved step by step: each beat says a step and shows it, on the board or
+ * in its picture (a slide that grows with the solution, ADR-049).
  *
  */
 export interface WorkedExampleSegment {
@@ -574,6 +579,10 @@ export interface ReflectionSegment {
   title: string;
   type: 'reflection';
 }
+/**
+ * The key points, shown on the board or in a picture that brings them back (ADR-049).
+ *
+ */
 export interface SummarySegment {
   estimated_seconds: number;
   id: string;
@@ -582,6 +591,7 @@ export interface SummarySegment {
    * @maxItems 12
    */
   narration: Beat[];
+  scene?: SceneRef | null;
   title: string;
   type: 'summary';
 }
@@ -611,14 +621,15 @@ export interface SceneArtifact {
    */
   controls?: string[];
   /**
-   * @maxItems 3
+   * @maxItems 4
    */
-  events?: ('passed' | 'explored' | 'progress')[];
+  events?: ('passed' | 'explored' | 'progress' | 'step')[];
   id: string;
   interactive: boolean;
   purpose: string;
   scene_class: string;
   source: string;
+  steps?: number;
   wanim_version: string;
 }
 export interface LessonList {
@@ -855,6 +866,7 @@ export interface SceneTrial {
   interactive: boolean;
   scene_class: string;
   source: string;
+  steps?: number;
 }
 export interface SceneTrialList {
   trials: SceneTrial[];

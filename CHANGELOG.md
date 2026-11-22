@@ -5,6 +5,34 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **A lesson is a slideshow.** Every part that teaches now has a picture, and the picture
+  changes as the narrator speaks: a step at the very words it belongs to, whether the
+  lesson is read aloud, by a natural voice, or as text. Lessons start from something you
+  can see, an example with small numbers or a real sentence, and bring in the formula only
+  after the picture it describes, each symbol in the color of the thing it stands for.
+  For language, the words that carry an idea are colored and labeled in real sentences,
+  and one sentence turns into another to show a rule at work.
+- **A lesson can be started about twelve seconds after you ask** through NVIDIA, and is
+  written whole within a minute or two, where it took two to five minutes before it could
+  be started. Its questions are checked for two slips that were found in lessons written
+  this fast: an answer offered twice in different forms, and a number the question's own
+  working does not reach.
+- **Pictures cost nothing and are there at once.** Adle draws each slide from what the
+  lesson says: sets of outcomes, grids, tables, curves with a point and its tangent, an area
+  that follows a slider, number lines, bars, steps and trees of boxes, coins and dice,
+  sentences, and formulas that rewrite themselves step by step. No picture is asked of
+  the AI as a program any more, so a lesson no longer waits minutes for one.
+- **You can choose how a first lesson teaches** (visual first, worked example, everyday
+  analogy and the rest), not only a second one.
+
+### Fixed
+
+- A table in a picture showed formulas written without dollar signs as their raw text
+  (`\{H, T\}`, `\emptyset`); they are set as formulas.
+- The same line shown on the board twice in a row is shown once.
+
 ## [0.1.0-alpha.3] - 2026-11-22
 
 The third alpha. A lesson can be started as soon as its first part is written, usually one

@@ -1058,6 +1058,16 @@ Nemotron 3 Ultra thinks at "medium" for a lesson, measured as quick and as corre
 and begun while it is written; one begun at its first part that waits for its second), and
 the real runs in `PERFORMANCE.md`.
 
+Then, at the owner's word ("the lesson should be one slideshow that ai controls... 3b1b level
+of visual teaching with intuition examples and animations"): **a lesson is a slideshow**,
+every part that teaches with a slide the model scripts as data and the core lays out and
+draws, a step at each phrase of the narration the script marked in brackets, whichever
+narrator reads it; the prompt teaches by intuition and example first, each symbol in the
+color of what it stands for; no scene asked of a model in the ordinary case (ADR-049).
+Evidence: `test_slides.py`, `cues.test.ts`, `scene-trial.test.ts`, every slide stepped
+through in the player in both themes (`e2e/slide-player`), a lesson's slides stepping on
+as its words are read (`e2e/generation`), and the real runs in `PERFORMANCE.md`.
+
 ### Deviations from this plan (each has an ADR)
 
 - **Narration can be a natural voice that runs on the learner's computer** (ADR-042),
@@ -1071,6 +1081,9 @@ the real runs in `PERFORMANCE.md`.
 - **The core mends what it can in a model's lesson** (ADR-047): notation in narration is
   said in words, and a practice question that is not whole is left out, where section 9
   would refuse the draft and ask again.
+- **A lesson's pictures are slides, scripted as data** (ADR-049): section 9 has a picture as
+  a scene file a model writes; a slide is elements and steps the model gives and a scene
+  the core writes, paced by cues in the narration rather than by the scene's own clock.
 - **A lesson is begun at its first part** (ADR-048), the way section 12.1 hoped for,
   without changing the draft format or the budget of requests: the one answer is read as
   it arrives. Once begun, a part that cannot be used is left out rather than the lesson

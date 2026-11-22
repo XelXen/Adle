@@ -34,6 +34,8 @@ export interface RawPlayer {
       quality?: 'low' | 'medium' | 'high';
       /** Run it through as fast as it can be drawn (ADR-038). */
       rehearsal?: boolean;
+      /** `cued`: held after each step until `next` (ADR-049). */
+      pacing?: 'normal' | 'cued';
     },
   ) => Promise<void>;
   remove: () => Promise<void>;
@@ -139,6 +141,7 @@ export async function mountRawPlayer(
         quality: options.quality ?? 'medium',
         autoplay: options.autoplay ?? true,
         rehearsal: options.rehearsal ?? false,
+        pacing: options.pacing ?? 'normal',
       }),
     remove: () =>
       page.evaluate((instance) => {

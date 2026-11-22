@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -122,10 +123,24 @@ def backup_database(source: Path, destination: Path) -> None:
 def _prune_backups(
     directory: Path, pattern: str = "adle-before-*.db", keep: int = MAX_AUTOMATIC_BACKUPS
 ) -> None:
-    """Keep the newest ``keep`` safety copies of one kind. Files named otherwise are not ours."""
-    backups = sorted(directory.glob(pattern), key=lambda path: path.stat().st_mtime)
+    """Keep the newest ``keep`` safety copies of one kind. Files named otherwise are not ours.
+
+    The newest by the time in its name, which is when the copy was made: the time a file was
+    last changed is not that (a copy can keep the time of what it copied), and copies made
+    within moments of each other were seen to be kept out of order by it."""
+    backups = sorted(directory.glob(pattern), key=_made_at)
     for stale in backups[:-keep]:
         stale.unlink(missing_ok=True)
+
+
+#: The time in a safety copy's name: 20261122T182931Z, or with microseconds before the Z.
+_STAMP = re.compile(r"(\d{8}T\d{6})(\d{0,6})Z")
+
+
+def _made_at(path: Path) -> tuple[str, str, float]:
+    found = _STAMP.search(path.name)
+    stamp = (found.group(1), found.group(2).ljust(6, "0")) if found else ("", "")
+    return (*stamp, path.stat().st_mtime)
 
 
 #: Tables created by the first revision and present in every one since.

@@ -352,9 +352,9 @@ export function ConceptDetail({
         generation.job?.status === 'failed' ||
         generation.job?.status === 'cancelled' ? null : (
           <div className={styles.generation}>
-            {/* A first lesson is left to the writer. For another one, the learner can say
-                what kind of explanation they want this time. */}
-            {lessons.status === 'ready' && lessons.lessons.length > 0 ? (
+            {/* The learner can say what kind of explanation they want, for a first lesson
+                as for another; left on Automatic, the writer chooses. */}
+            {lessons.status === 'ready' ? (
               <div className={styles.strategy}>
                 <Select
                   label="Teaching style"

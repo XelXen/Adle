@@ -127,12 +127,38 @@ Write ordinary manim Community v0.21 Python. Only the Wanim-specific parts are l
   the scene (`e2e/fixtures/scenes/fill_in_order.py`, `fill_by_name.py` and
   `fill_without_colour.py`, read back pixel by pixel in `e2e/scene-player.spec.ts`). Found
   by sitting a lesson a real model wrote, 2026-11-21: its interactive picture never ran.
+- **Slides (ADR-049)**, every example in `e2e/fixtures/slides/` stepped through in both themes
+  by `e2e/slide-player.spec.ts`, 2026-11-22:
+  - `self.set_storyboard([[None, self.step_0], [None, self.step_1], ..., [self.blueprint,
+    None]])`, called in `setup()`, plays the phases in order, and what a phase drew stays for
+    the next. A scene that never defines `blueprint` has no page prepended for it.
+  - Loaded with `pacing: 'cued'` (Wanim's `slides` mode) the scene holds after every phase,
+    the last too, and says nothing more there (no `finished`). `next` plays the next phase.
+    `next` while a phase is still playing cuts that phase short: a host says `next` only
+    after the phase's own `post_message("step", n)`.
+  - A blueprint page that comes after construct phases is live: its controls work, and
+    `mobject.update(0)` runs an `always_redraw` mobject's updater there (updaters do not run
+    by themselves on a live page; reactions do).
+  - `MathTex` takes `\color{#E9BE5A}{...}` and `\color{yellow}` inside a formula; parts given
+    as separate strings (or cut at `{{ }}`) can each be colored or pointed at (`formula[i]`).
+    `MathTex(*words, arg_separator="\\ ")` of `\text{...}` parts sets a sentence on one
+    baseline with each word a part.
+  - TeX is drawn about two thirds the size of text at one font size: a formula, a
+    `DecimalNumber` or words set in TeX beside `Text` need about 1.45 times the size.
+  - `Circle(radius=1).stretch_to_fit_width(w).stretch_to_fit_height(h)` draws an oval;
+    `RoundedRectangle`, `SurroundingRectangle(..., corner_radius=...)`, `Brace` (and
+    `next_to` a label beside it), `CurvedArrow`, `DashedLine`, `Polygon`, `Square`,
+    `NumberLine(...).n2p`, `arrange_in_grid(rows=..., cols=...)`, `Rotate(m, angle=...)`,
+    `mobject.become(other)`, `ChangeDecimalToValue`, `FadeTransform`, `ReplacementTransform`,
+    `Transform` and `copy()` all run.
+  - **`Ellipse(width=..., height=...)` and `Flash(...)` stop the scene** ("non-finite point
+    or vector value"). The scene policy refuses both.
 
 ### Documented upstream, not yet exercised here
 
 `PathSlider`, `DraggablePoint`, `Chip`, `InputDecimalNumber`, `InputInteger`,
 `InputDecimalMatrix`, `InputDecimalTable`; `self.add_reaction` (scene-level); `SEPARATE = True`;
-`self.clear_stage()`; `set_storyboard` / `set_script`; `self.next_slide()` (slides mode only);
+`self.clear_stage()`; `set_script` (the same as `set_storyboard`); `self.next_slide()` (not in the pinned version);
 `InteractiveThreeDScene`; `InteractiveLinearTransformationScene`.
 
 Rules that come with the interactive API (documented upstream):
