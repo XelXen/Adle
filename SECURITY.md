@@ -312,10 +312,35 @@ computer** (`localService`). A voice that would send text to a service is never 
 (`lesson/speech.ts`, `speech.test.ts`). The session's network filter would refuse such a
 request in any case. See ADR-013.
 
+### A natural voice (ADR-042)
+
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| Nothing is downloaded but at the learner's word, and what and where from is said first | Settings says each voice's size beside "Set up", and where it downloads from one press away; the core starts a setup only when asked (`voice.install`) | `VoiceChoices.test.tsx`; `test_narration.py` |
+| Only the files pinned are kept | Each model file is checked against its size and hash in `voice/catalog.py` (SHA-256, or Git's hash for a small file) after it arrives and before it is used; a file that differs is deleted. A redirect is followed and what arrives is checked, not where it came from | `test_voice_install.py` (a changed, a longer and a shorter file are each refused; a stopped download leaves nothing) |
+| The programs are exactly the ones locked | pip installs the lock for this system with `--require-hashes --no-deps --only-binary=:all:`, from the Python Package Index and PyTorch's index only, with this computer's settings for pip and Python left out (`quiet_environment`) | `test_voice_install.py`; the CI audit of the locks |
+| The programs never touch the core's | They go into an environment of their own, made with `python -m venv` from the core's Python; only that folder is ever removed | `test_voice_install.py` (removal keeps what another voice needs) |
+| The engine reads only what was checked, and says nothing of what it speaks | `voice/engine.py` runs as its own process with `-I`, told it is offline before its libraries load, with models only from the voice's folder; its standard error is thrown away | `test_narration.py` with a stand-in engine; the real voices tried by hand (ADR-042) |
+| A recording is reached by a name the core made, never by a path | A clip is named by a hash of the voice and the words, and asked for by that name (24 hexadecimal digits) under a lesson that exists | `test_narration.py` |
+
+**Residual risks, accepted**
+
+- **The engine is not shut off from the network by the system.** Its libraries are told
+  they are offline and everything it loads is here and checked; a library that ignored that
+  could reach the network from the engine's process.
+- **The voice's programs carry advisories that were read and set aside** (ADR-042 lists
+  them): each needs a model file Adle did not pin, or a part of a library the voice never
+  runs. CI fails on any other.
+- **The voice's programs are large and trusted as their publishers built them**: torch,
+  transformers, Kokoro and Qwen3-TTS, from the Python Package Index and PyTorch's index,
+  each by its hash.
+
 ## Privacy
 
 - No telemetry, analytics, or crash upload. No external service other than the AI providers
-  the learner gave a key to, and only when the learner asks for something they write.
+  the learner gave a key to, and only when the learner asks for something they write; and,
+  when the learner sets a natural voice up, its downloads from Hugging Face, the Python
+  Package Index, PyTorch and GitHub, which carry nothing of theirs (ADR-042).
 - A notification of the operating system carries fixed words chosen in the main process by
   its kind (`electron/main/notices.ts`, ADR-026). The page cannot supply text for one, so no
   course title, lesson, or model output reaches the notification centre. None is shown while
@@ -349,6 +374,9 @@ request in any case. See ADR-013.
   MIT, ISC, BSD-3-Clause, Apache-2.0, MPL-2.0, OFL-1.1, PSF-2.0, all of which can be
   combined with it. Nothing under a copyleft or source-available licence is built from,
   shipped or not, until someone decides about it.
+- The programs a natural voice is set up with are not shipped: they are downloaded at the
+  learner's word, from locks with every hash (`adle_core/voice/data/`). CI audits those
+  locks too, setting aside only the advisories ADR-042 lists.
 - FastAPI depends on the interface package of a telemetry library. Without that library's
   other half it records and sends nothing; the package build fails if the other half is ever
   present (`scripts/package.mjs`).
@@ -368,14 +396,15 @@ Reasoning: `docs/decisions/ADR-019-packaging.md`.
 
 ## Releases
 
-Details and reasoning: `docs/decisions/ADR-034-installers-and-releases.md`.
+Details and reasoning: `docs/decisions/ADR-034-installers-and-releases.md` and
+`ADR-043-one-branch-and-a-release-commit.md`.
 
 | Guarantee | Implementation | Verified by |
 |---|---|---|
-| What is published is what the repository builds, from a commit anyone can read | A release is made by a workflow, from a tag; nobody uploads a file. The tag must be the version in `package.json` | `release.yml`; `scripts/release-notes.mjs --tag` |
+| What is published is what the repository builds, from a commit anyone can read | A release is made by CI from a commit `release: <version>` on `main`, once every check has passed for it, with the installers that were tried for that commit; nobody uploads a file or makes a tag. The version must be the one in `package.json` and the changelog, and not released from another commit | `ci.yml` (`release` and `publish`); `scripts/release-notes.mjs --tag` |
 | The workflows can change nothing they do not need to | Every job has read access only, except the one that makes the release; no job is given a secret; a checkout leaves no credential behind | `permissions` and `persist-credentials: false` in `.github/workflows/` |
 | An action cannot be swapped under a workflow | Each is named by the commit it was reviewed at, with its version beside it | `.github/workflows/` |
-| A download can be checked | Every release lists a SHA-256 for each file | `SHA256SUMS.txt`, written by `release.yml` |
+| A download can be checked | Every release lists a SHA-256 for each file | `SHA256SUMS.txt`, written by `ci.yml` |
 | An installer never weakens the app it installs | No launcher passes `--no-sandbox`. On Linux the package installs Chromium's sandbox helper so that the sandbox can be built; where it cannot be, the app does not start | `scripts/installer.mjs --check` on every push: the installed app is started on a system as Ubuntu ships it |
 | Installing or removing Adle does not touch a learner's data | The installers write only the program's own folder, a menu entry, and what the system needs to remove them again | The Windows try-out installs, starts and uninstalls with a profile of its own |
 | Nothing looks for updates | No updater is installed and the app makes no request about versions | ADR-019; `e2e/security.spec.ts` (the session refuses everything) |

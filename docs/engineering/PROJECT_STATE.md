@@ -4,8 +4,8 @@ The single place to find out where Adle stands and what to do next. Update it at
 work session (see `AGENTS.md` → "Keeping the next agent oriented").
 
 - **Last updated:** 2026-11-21
-- **Branch:** `dev` (all work). `main` is what was last released and only ever moves forward
-  to a commit of `dev`. Both are on GitHub: `github.com/XelXen/Adle`, public, since 2026-11-21
+- **Branch:** `main`, the only one (ADR-043, since 2026-11-21; `dev` was folded into it).
+  On GitHub: `github.com/XelXen/Adle`, public, since 2026-11-21
 - **Last commit:** see `git log -1`
 - **Active milestone:** M8 — release hardening, done as far as this machine can take it:
   failure handling (ADR-018), packaging (ADR-019), the licence inventory, the audits, the
@@ -24,14 +24,17 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   the GNU GPL, version 3 (ADR-033); it has installers for Windows, macOS and Linux, built,
   tried out and published by GitHub (ADR-034); and its first version, 0.1.0-alpha.1, was
   published from the tag `v0.1.0-alpha.1` the same evening:
-  `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.1`. What the owner asked for after
-  looking at it, and what is left to them, is under "Next actions"
+  `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.1`. After looking at it the owner
+  asked for eight things, and each was built that day (ADR-035 to ADR-042), the last of
+  them a natural voice on the learner's own computer (ADR-042); and for one branch, with a
+  release made by a commit (ADR-043). What is left to them is under "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
-- **Pushing and releasing:** push `dev` when a commit is ready; GitHub then runs everything
-  on its own machines (`TESTING.md`, section 5). A version is published by pushing a tag,
-  never by hand: `CONTRIBUTING.md` → Releasing.
+- **Pushing and releasing:** push `main` when a commit is ready; GitHub then runs everything
+  on its own machines (`TESTING.md`, section 5) and publishes nothing. A version is published
+  by a commit `release: <version>`, once every check has passed for it: an alpha as a
+  pre-release, a stable version as the latest (`CONTRIBUTING.md` → Releasing, ADR-043).
 
 ## Milestone status
 
@@ -529,29 +532,24 @@ this, and it spends real allowance.
 
 ## Next actions
 
-**Asked for by the owner on 2026-11-21, after looking at this version, and not in it.** Work
-on these began the same day; look at `git log` and at the decisions after ADR-034 for how
-far each has come before starting one again.
-
-- A list of choices that follows the theme (the system's own list showed light words on a
-  light ground in the dark theme), and the same distance between a page's sections
-  everywhere (Materials had none).
-- Far fewer sentences on screen: what a request sends and where it goes said once, where a
-  key is given, and kept one press away, instead of beside every button.
-- Something to watch while a lesson is written, that shows it taking shape.
-- Pictures as the larger part of a lesson: a wide, dark screen, the words being said as
-  captions with the spoken word marked, and a way to fill the whole screen.
-- A picture tried out before a learner sees it, and sent back once with the error it gave
-  if it does not run.
-- Each kind of request sent to the model that is best at it, by measurement (Kimi for
-  pictures only), instead of one order of models for everything.
-- More taken from documents (tables, pictures, more kinds of file), and search by meaning.
-- A natural voice that still runs on this computer (Qwen3-TTS, a smaller and a larger
-  model), with the voice described by the lesson itself where the computer can run the
-  larger one.
+**Asked for by the owner on 2026-11-21, after looking at 0.1.0-alpha.1: done, not yet
+released.** Each is on `main` with its decision: the theme's lists and the sections' spacing,
+and far fewer sentences (ADR-036); a lesson watched on one screen (ADR-035); a lesson seen
+taking shape (ADR-037); pictures tried before they are shown (ADR-038); each request to the
+model measured best for it (ADR-039); pictures drawn happening (ADR-040); more of a Word
+document read, and search by any form of a word (ADR-041); a natural voice on this computer,
+from Kokoro to Qwen3-TTS 1.7B with a voice designed for each lesson (ADR-042); and one
+branch, with a release made by a commit (ADR-043). Left of what was asked, with the reason
+in its decision: PowerPoint, web pages, text in pictures (OCR) and search by meaning
+(ADR-041: each needs a download or a migration of its own); a sample of a natural voice in
+Settings before it is used, and the voices tried by hand on Linux and a Mac (ADR-042).
 
 What remains needs the owner. In the order it matters:
 
+0. **Say when to publish 0.1.0-alpha.2**: a commit `release: 0.1.0-alpha.2` with the
+   version set and its changelog section (`CONTRIBUTING.md` → Releasing) publishes it once
+   every check has passed. And try a natural voice: Settings → Learning → Voice, "Set up"
+   on the one marked best for this computer.
 1. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
    They are in a transcript; treat them as used. The owner will, later (said 2026-11-21).
 2. **Sit a generated lesson from start to finish**, asking it a question on the way. Install

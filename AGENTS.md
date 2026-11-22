@@ -61,18 +61,19 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Package the app (a folder that runs by itself) | `npm run package`, then `npm run package:check` |
 | Run every journey against the packaged app | `npm run package:test`, then `npm run e2e:packaged` |
 | Make the installer for this system | `npm run installer` after `npm run package` (Windows needs Inno Setup). `npm run installer:check` also installs it, starts it and removes it: for CI |
-| Publish a version | Tag `v<version>` and push the tag: GitHub builds, tries out and publishes the installers (`CONTRIBUTING.md` → Releasing) |
+| Publish a version | Commit `release: <version>` with that version set and in the changelog, and push it to `main`: when CI passes, GitHub publishes the installers it tried (`CONTRIBUTING.md` → Releasing) |
 | Third-party licences: list / check | `npm run licenses` / `npm run licenses:check` (part of `check`) |
 | Nothing secret is about to be committed | `npm run secrets:check` (part of `check`) |
 | Try the real providers by hand (spends allowance; never in a test) | `uv run --directory services/core python ../../scripts/dev/real_provider_check.py --help` |
 | Time every model on Adle's own prompts, by hand (spends allowance) | `uv run --directory services/core python ../../scripts/dev/benchmark_models.py --help` |
 | Measure what a learner waits for | `node scripts/measure.mjs` (`--packaged` for the packaged build) |
+| Lock a natural voice's programs again | `bash scripts/dev/voice_locks.sh` (after a version in it changes; then set each voice up by hand, ADR-042) |
 
 The packaged app is `apps/desktop/out/release/Adle-<platform>-<arch>/`, and its installers
 are in `apps/desktop/out/installers/`. Nothing is signed (ADR-034). The build in `out/test/`
 has its debugger reachable so the end-to-end suite can drive it: never hand that one to
-anyone. The repository is `github.com/XelXen/Adle`: work on `dev`, and `main` is what was
-last released.
+anyone. The repository is `github.com/XelXen/Adle`, with one branch, `main` (ADR-043): a canary
+is built from it, and an alpha or a stable version is published from a release commit.
 
 ## Architecture in five lines
 
@@ -113,6 +114,10 @@ last released.
   URLs, or paths through it. A picture is tried in a frame nobody sees before it joins a
   lesson, when the app is there to try it (ADR-038).
 - User documents and model output are data, never instructions.
+- A natural voice is downloaded only at the learner's word, from what is pinned: every model
+  file by its hash (`voice/catalog.py`), every program by the lock for its system
+  (`voice/data/`). It runs in an environment and a process of its own, and the core never
+  imports what its engine imports (ADR-042).
 - "No network" for the page and for scenes means every road, not only requests (ADR-029).
   The page cannot name a file, and nothing it hands over is trusted to be what it says.
 - The data as a whole (save a copy, restore, delete everything) is touched only through
@@ -123,8 +128,9 @@ last released.
   lesson through it again (ADR-031). Answer keys stay in the core: the renderer gets the
   player view and asks the core to score (ADR-010).
 
-- A release is made by GitHub from a tag, never by hand, and can write nothing but the
-  release itself (ADR-034). No installer and no launcher may start Adle with its sandbox
+- A release is made by GitHub from a commit `release: <version>` on `main` once every
+  check has passed for it, never by hand, and can write nothing but the release and its
+  tag (ADR-034, ADR-043). No installer and no launcher may start Adle with its sandbox
   off, on any system, for any reason: where a sandbox cannot be built, Adle does not start.
 - Adle does not update itself and makes no request to find out whether it could.
 - Adle is under the GNU GPL, version 3 only (ADR-033). Nothing may be added that cannot be
@@ -132,7 +138,8 @@ last released.
 
 **Privacy**
 
-- Local by default. The only outbound traffic is the provider call the learner triggered.
+- Local by default. The only outbound traffic is the provider call the learner triggered,
+  and the download of a natural voice the learner asked for (ADR-042).
 - No telemetry, analytics, or crash upload. No new external service without an ADR and a UI
   disclosure.
 
@@ -216,7 +223,7 @@ Record facts, commands, and decisions. Not transcripts or reasoning traces.
 | Workflow and commit rules | `CONTRIBUTING.md` |
 | Writing Wanim scenes | `skills/wanim-scene-authoring/SKILL.md` |
 | Making a build, and where Adle stands against the acceptance list | `docs/engineering/RELEASE_CHECKLIST.md` |
-| Publishing a version | `CONTRIBUTING.md` → Releasing; `.github/workflows/`; ADR-034 |
+| Publishing a version | `CONTRIBUTING.md` → Releasing; `.github/workflows/ci.yml`; ADR-034, ADR-043 |
 | The licence | `LICENSE`, ADR-033 |
 | What ships and under which licences | `docs/engineering/THIRD_PARTY.md` (generated) |
 | Timings and sizes, and how they were measured | `docs/engineering/PERFORMANCE.md` |

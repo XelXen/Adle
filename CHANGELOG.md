@@ -5,6 +5,19 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **A natural voice, on your own computer.** Settings → Learning → Voice lists the voices
+  from the lightest to the richest: the computer's own; Natural (Kokoro, on the processor,
+  about 0.6 GB); Rich (Qwen3-TTS 0.6B, on an NVIDIA graphics card with 4 GB, about 5.8 GB);
+  and Expressive (Qwen3-TTS 1.7B, with 8 GB, about 12 GB), whose voice is designed for each
+  lesson from a sentence written with it. Each says whether this computer can run it, and
+  why not; the best it can run is marked. Nothing is downloaded until you press "Set up",
+  which says how much it downloads and from where. It downloads in the background, can be
+  stopped, and goes on where it stopped; every file is checked before it is kept. A lesson
+  is then recorded in that voice while you watch, each word marked as it is said; a line not
+  recorded yet is read by the computer's voice. Nothing you study is sent anywhere.
+
 ### Changed
 
 - **A lesson is something to watch.** Its pictures are on a wide, dark screen in either
@@ -38,6 +51,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
   way if you import them again.
 - **A lesson finds your notes by any form of a word**: a lesson about weighted sums finds
   notes that speak of weights.
+- **One branch, and a release is a commit.** Everything is on `main`. The newest Adle is
+  built from the source; an alpha or a stable version is published on the releases page by
+  a commit that says so, once every check has passed for it.
 - **Far fewer sentences.** What a request to an AI provider sends, and where it goes, is one
   press away from the button that sends it (the small "i" beside it) instead of written out
   beside every button; it is still said in full in Settings. What a lesson is made from and

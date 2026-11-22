@@ -1021,7 +1021,29 @@ not build it; and where a tag publishes a version (ADR-034). **Version 0.1.0-alp
 first.** Evidence: the runs of `.github/workflows/` on `github.com/XelXen/Adle`, and the
 release itself.
 
+After looking at 0.1.0-alpha.1 the owner asked for eight things, and all of them were built
+the same day. A lesson is watched: its pictures on one dark screen with the words along its
+foot and the spoken word marked, and the whole screen if wanted (ADR-035); far fewer
+sentences, what a request sends one press away (ADR-036); a lesson seen taking shape while
+it is written, by its parts' titles and never its words (ADR-037); every picture tried
+before it is shown, and one that breaks written again, told why (ADR-038); each kind of
+request sent to the model measured to do it best (ADR-039); pictures drawn happening, paced
+to the words said over them (ADR-040); more of a Word document read, and passages found by
+any form of a word (ADR-041); and **a natural voice on the learner's own computer**, from the
+lightest to the richest it can run: Kokoro, Qwen3-TTS 0.6B, and 1.7B with a voice designed
+for each lesson, each set up at the learner's word from pinned, checked files, recorded in
+the background with every word's time (ADR-042). The repository has one branch, `main`, and
+a release is a commit (ADR-043). Evidence: the gate in `PROJECT_STATE.md`; for the voice in
+particular `test_narration.py`, `test_voice_install.py`, `VoiceChoices.test.tsx`,
+`recorded.test.ts`, `e2e/voice`, and the real setups by hand recorded in ADR-042.
+
 ### Deviations from this plan (each has an ADR)
+
+- **Narration can be a natural voice that runs on the learner's computer** (ADR-042),
+  downloaded at their word. Section 12 had the computer's own voices only (ADR-013); those
+  remain the first choice and what reads anything not yet recorded.
+- **One branch, and a release is a commit** (ADR-043), where ADR-034 had `dev`, `main`
+  and a tag.
 
 - **Installers are made with each system's own tool** (Inno Setup, hdiutil, dpkg-deb), not
   with a packaging framework, and nothing is signed: the owner's decision (ADR-034). Section

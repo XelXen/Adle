@@ -123,6 +123,22 @@ through", "writing"), and it can be stopped. Finding out that a model is not the
 quarter of a second; finding out that it is silent takes three minutes, once, after which
 that model is left alone for ten.
 
+## A natural voice (2026-11-21)
+
+On the development machine (an RTX 4080 Laptop GPU with 12 GB, Windows 11), with the voices
+set up by Adle's own installer into a folder of their own (ADR-042):
+
+| | Natural (Kokoro) | Rich (Qwen3-TTS 0.6B) | Expressive (Qwen3-TTS 1.7B) |
+|---|---|---|---|
+| Downloaded to set it up | 0.33 GB of models, 0.23 GB of programs | 2.88 GB of models (the aligner included), 2.91 GB of programs | 8.76 GB of models, 2.91 GB of programs |
+| Set up | 378 s: programs about 4 minutes, models about 2 | Programs: 4 minutes to download, 4 to install (its models were here) | Not timed through the installer |
+| On the disk, set up | 1.4 GB | about 8 GB with its programs | — |
+| Speaking | 4.6 times faster than it is said, on the processor; ready 2.3 s after it starts | 11.2 s of speech in 8.0 s on the card | A voice designed and two lines said in 36 s, loading included |
+| Finding each word | its own durations | 0.18 to 0.39 s a line (wav2vec 2.0) | the same |
+
+A lesson is recorded line by line in the background and never waited for: a line not
+recorded yet is read by the computer's voice.
+
 ## What was not measured
 
 - **Generating with AIHubMix's model.** That provider has not answered a request yet (see
@@ -135,6 +151,9 @@ that model is left alone for ten.
   (`ingestion/types.py`) and runs outside the service, so it cannot hold the interface up;
   how long a 300-page PDF takes was not timed.
 - **Memory.** Not profiled. Each scene runs in its own process, which ends with the frame.
+- **A natural voice anywhere else.** Linux and macOS set a voice up only on GitHub's
+  machines' terms (the environment is made there by every package check; nothing is
+  downloaded). A card with less memory, or a slower connection, was not tried.
 - **Other machines and other operating systems.** One laptop, one system, for every timing
   in this document except the first starts on GitHub's machines above.
 
