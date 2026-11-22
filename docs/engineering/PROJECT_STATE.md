@@ -36,8 +36,11 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   with no request of their own (ADR-045); **a PDF's whole syllabus** from its outline or
   numbered headings (ADR-046); and **a lesson's answer mended rather than asked for
   again**, with a natural voice that begins as soon as the words are stored (ADR-047).
+  Then, at the owner's word to do it all and to make sensible choices: **a lesson begins
+  at its first part** while the rest is written, and its model thinks at "medium"
+  (ADR-048), and the figures take six more shapes a model writes (ADR-045's addendum).
   Each was measured on the owner's own chapter with the real provider ("The real
-  providers" below). All of it is for the next release. What is left to them is under
+  providers" below). All of it is in 0.1.0-alpha.3. What is left to them is under
   "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
@@ -552,8 +555,11 @@ for one request (the model's thinking varies); a question 10 to 16 s. Ten reques
 about 109,000 tokens in all, as Adle counted them. Each run found something that cost a
 lesson a second request or its pictures, and each is now mended (ADR-045 to ADR-047): all
 five answers the runs gave are usable lessons as they came, with twenty-seven figures of
-twenty-seven. The table is in `PERFORMANCE.md`. What the model wrote is kept outside the
-repository, as the owner's chapter is.
+twenty-seven. Then at "medium", and with the lesson begun at its first part (ADR-048, run
+7): a plan 37 s, the lesson begun at 77 s and whole at 122 s, a question 19 s; with the
+figure shapes taken since (counted with `scripts/dev/figure_census.py`), fifty figures of
+fifty in every lesson the model wrote that day. The tables are in `PERFORMANCE.md`. What
+the model wrote is kept outside the repository, as the owner's chapter is.
 
 ## Next actions
 
@@ -591,10 +597,9 @@ What remains needs the owner. In the order it matters:
 5. **Turn on private vulnerability reporting** for the repository (Settings → Security on
    GitHub), which `SECURITY.md` points people to. Only the owner can.
 6. Decide whether GLM 5.3 Flash should stay NVIDIA's third model while it does not answer.
-7. Still not built from the plan's section 12.1: **writing a lesson part by part.** Its text
-   is one request and arrives whole, two to four minutes through NVIDIA (measured
-   2026-11-22), the largest wait left in the workflow. A lesson that could be started at its
-   first part would need the draft format and the request budget to change together.
+7. **A lesson begun at its first part** (ADR-048) is built and measured; sit one through
+   NVIDIA and say whether waiting at the end of what is written ever happens to you, and
+   whether "Part 2 of 3 so far" reads well.
 8. Smaller, by choice: Wanim's slides mode for narration in step with animation; exporting a
    single course; a screen-reader pass by a person.
 9. From the review of 2026-11-20, left by decision (ADR-029, "Not done, and why"): a release

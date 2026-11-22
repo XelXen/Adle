@@ -181,16 +181,19 @@ A beat is {{"say": "...", "show": "..."}}:
 A figure is a picture Adle draws from your data, a step for each beat: {{"kind": ...,
 the fields of its kind, "description": the same thing in two to four sentences for someone
 who cannot see it (may contain $math$)}}. TeX below means TeX without dollar signs. Kinds:
-- "equation": "steps", 2 to 6 TeX formulas, each rewritten into the next.
+- "equation": "steps", 2 to 8 TeX formulas, each rewritten into the next.
 - "graph": "x": [from, to]; "curves", 1 to 3 of {{"f": a formula in x, "label": TeX,
   optional "from" and "to"}}. A formula uses numbers, x, + - * / ^, brackets, pi, e, and
   sin cos tan exp log sqrt abs: "exp(-x^2/2)/sqrt(2pi)"; a comparison is 1 where it holds
   and 0 where not, for a curve in pieces: "(x >= 0) * exp(-x)". Optional: "y": [from, to],
   "x_label" and "y_label" (TeX), "shade": {{"from", "to", "label"}} (the area under the
-  first curve; "curve": 2 for another), "points": [{{"x", "label"}}], "trace": true (a point
-  runs along the first curve), "slider": {{"name": "a", "label": TeX, "min", "max",
-  "value"}} (the formulas may use that name, and the shade's "from" or "to" may be it, to
-  follow it; the learner moves it).
+  first curve; "curve": 2 for another), "rise": [{{"from", "to", "label"}}] (up to three: how
+  much the first curve rises between two values of x), "points": [{{"x", "label"}}],
+  "trace": true (a point runs along the first curve), "slider": {{"name": "a", "label":
+  TeX, "min", "max", "value"}} (the formulas may use that name, and the shade's "from" or
+  "to" may be it, to follow it; the learner moves it). A probability is the area under a
+  density, so shade only under a density; on a cumulative curve a probability is how much
+  it rises: "rise".
 - "bars": "labels" (2 to 8) and "values"; optional "then" (values to change to), "highlight"
   (a bar's number), "y_label".
 - "number_line": "from", "to"; optional "marks": [{{"at", "label"}}], "interval": {{"from",

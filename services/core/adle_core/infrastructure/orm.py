@@ -415,6 +415,11 @@ class StoredLesson(Base):
     pending_scenes: Mapped[list[str]] = mapped_column(
         JSON, nullable=False, default=list, server_default="[]"
     )
+    #: The rest of it is still being written: it was stored at its first part, and each
+    #: part after it is added as it is written (ADR-048). False once the writing has ended.
+    writing: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     #: Who wrote it, where a model did: the provider, the models, and a sentence if one
     #: stood in for another. Names only.
     written_by: Mapped[dict[str, Any] | None] = mapped_column(JSON)

@@ -455,6 +455,7 @@ export interface LessonForPlayer {
   pending_scene_ids?: string[];
   progress: LessonProgress;
   scenes: SceneArtifact[];
+  writing?: boolean;
   written_by?: LessonAuthor | null;
 }
 export interface PlayerLesson {
@@ -633,6 +634,7 @@ export interface LessonSummary {
   progress: LessonProgress;
   segment_count: number;
   title: string;
+  writing?: boolean;
 }
 export interface LessonProgressUpdate {
   completed?: boolean;

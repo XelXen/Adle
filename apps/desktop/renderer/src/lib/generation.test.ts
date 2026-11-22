@@ -4,7 +4,9 @@ import type { Job } from '@adle/contracts';
 
 import {
   authorName,
+  hasLessonToStart,
   isDrawingPictures,
+  isWritingTheRest,
   jobFailure,
   jobProgress,
   keptNeeds,
@@ -217,6 +219,32 @@ describe('readLessonOutcome', () => {
     expect(isDrawingPictures(null)).toBe(false);
   });
 
+  it('tells a lesson whose later parts are still written from one that has its pictures drawn', () => {
+    const result = { lesson_id: 'les_1', title: 'Weights', pictures_pending: 1, notes: [] };
+    // Begun at its first part, while the model writes the rest (ADR-048).
+    const begun = job({
+      kind: KIND_LESSON,
+      status: 'running',
+      result,
+      progress_detail: { stage: 'writing', title: 'Weights', outline: ['Why weights'] },
+    });
+    expect(hasLessonToStart(begun)).toBe(true);
+    expect(isWritingTheRest(begun)).toBe(true);
+    expect(isDrawingPictures(begun)).toBe(false);
+    // All of it written: what is left is its pictures.
+    const drawing = { ...begun, progress_detail: { stage: 'drawing' as const } };
+    expect(hasLessonToStart(drawing)).toBe(true);
+    expect(isWritingTheRest(drawing)).toBe(false);
+    expect(isDrawingPictures(drawing)).toBe(true);
+    // Without a lesson there is nothing to start, however far the writing has come.
+    const before = { ...begun, result: null };
+    expect(hasLessonToStart(before)).toBe(false);
+    expect(isWritingTheRest(before)).toBe(false);
+    // Nor once the work has ended.
+    expect(isWritingTheRest({ ...begun, status: 'succeeded' })).toBe(false);
+    expect(hasLessonToStart(null)).toBe(false);
+  });
+
   it('is null unless a lesson job has a lesson', () => {
     expect(readLessonOutcome(job({ result: { lesson_id: 'les_1' } }))).toBeNull();
     expect(readLessonOutcome(job({ kind: KIND_LESSON, status: 'cancelled' }))).toBeNull();
@@ -249,6 +277,19 @@ describe('lessonNotice', () => {
     });
   });
 
+  it('says the rest of it is being written when it can be started at its first part', () => {
+    const begun = {
+      ...drawing,
+      progress_detail: { stage: 'writing' as const, title: 'Weights', outline: ['Why weights'] },
+    };
+    expect(lessonNotice(begun, false)).toEqual({
+      tone: 'success',
+      title: 'Lesson ready',
+      description: 'Weights. The rest of it is being written.',
+    });
+    expect(lessonNotice(begun, true)).toBeNull();
+  });
+
   it('does not say it a second time when the pictures are done', () => {
     expect(lessonNotice(drawing, true)).toBeNull();
     expect(lessonNotice(done([]), true)).toBeNull();
@@ -258,7 +299,7 @@ describe('lessonNotice', () => {
     const note = 'The picture for “The weighted sum” couldn’t be made.';
     expect(lessonNotice(done([note]), true)).toEqual({
       tone: 'info',
-      title: 'About its pictures',
+      title: 'About the lesson',
       description: note,
     });
   });

@@ -10,7 +10,7 @@ scenes are put through the static policy again before they are handed out.
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session, selectinload
 from adle_core.application.courses import get_course_or_404
 from adle_core.application.evidence import EVENT_LESSON_COMPLETED
 from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
-from adle_core.generation.drafts import as_visualization, without_scene
+from adle_core.generation.drafts import as_visualization, minutes_for, without_scene
 from adle_core.infrastructure.database import Database, utc_now
 from adle_core.infrastructure.orm import (
     Concept,
@@ -69,6 +69,8 @@ class LessonSummary:
     progress: ProgressRecord
     #: Pictures the lesson is still waiting for. It can be taken meanwhile (ADR-031).
     pictures_pending: int = 0
+    #: Its later parts are still being written. It can be taken meanwhile (ADR-048).
+    writing: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +83,8 @@ class LessonForPlayer:
     pending_scene_ids: list[str]
     #: Who wrote it, where a model did: provider, models, and a note. ``None`` otherwise.
     written_by: dict[str, Any] | None
+    #: The rest of it is still being written; its parts come after these (ADR-048).
+    writing: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +139,7 @@ def _summary(row: StoredLesson) -> LessonSummary:
         segment_count=row.segment_count,
         progress=_progress(row.progress),
         pictures_pending=len(row.pending_scenes or []),
+        writing=row.writing,
     )
 
 
@@ -180,11 +185,14 @@ class LessonService:
         *,
         origin: str,
         written_by: Mapping[str, Any] | None = None,
+        writing: bool = False,
     ) -> LessonSummary:
         """Store a validated bundle. Every id it refers to must exist in its course.
 
         A bundle may list scenes that are still to come (ADR-031): the lesson can be taken
-        at once, and each is settled later with ``settle_scene``.
+        at once, and each is settled later with ``settle_scene``. With ``writing`` it is the
+        beginning of a lesson still being written: its later parts are added with
+        ``extend`` (ADR-048).
         """
         lesson = bundle.lesson
         with self._database.session() as session:
@@ -204,6 +212,7 @@ class LessonService:
                 document=lesson.model_dump(mode="json"),
                 pending_scenes=list(bundle.pending_scene_ids),
                 written_by=_author(written_by),
+                writing=writing,
             )
             session.add(row)
             for position, scene in enumerate(bundle.scenes):
@@ -278,6 +287,50 @@ class LessonService:
         with self._database.session() as session:
             return self._settle(session, _get_or_404(session, lesson_id), scene_id, scene)
 
+    def extend(
+        self,
+        lesson_id: str,
+        segments: Sequence[Mapping[str, Any]],
+        pending: Sequence[str] = (),
+        *,
+        writing: bool,
+        practice: Sequence[Mapping[str, Any]] | None = None,
+        voice: str | None = None,
+    ) -> None:
+        """Add parts of a lesson that is still being written, after the parts it has
+        (ADR-048), with the pictures they are waiting for. A part already there never
+        changes: the learner may be in it. The whole lesson goes through the gate again,
+        as when a picture joins it. ``writing`` false ends its writing; the questions kept
+        for practice and the narrator's voice, which are written last, come with that.
+        """
+        with self._database.session() as session:
+            row = _get_or_404(session, lesson_id)
+            document: dict[str, Any] = dict(row.document)
+            document["segments"] = [*document["segments"], *segments]
+            document["estimated_minutes"] = minutes_for(document["segments"])
+            if practice is not None:
+                document["practice"] = list(practice)
+            if voice is not None:
+                document["voice"] = voice
+            scenes = [
+                {
+                    "id": stored.scene_id,
+                    "purpose": stored.document["purpose"],
+                    "source": stored.document["source"],
+                }
+                for stored in row.scenes
+            ]
+            coming = [*row.pending_scenes, *pending]
+            bundle = parse_bundle(
+                {"lesson": document, "scenes": scenes, "pending_scene_ids": coming}
+            )
+            row.document = bundle.lesson.model_dump(mode="json")
+            row.pending_scenes = coming
+            row.estimated_minutes = bundle.lesson.estimated_minutes
+            row.segment_count = len(bundle.lesson.segments)
+            row.writing = writing
+            session.flush()
+
     def settle_unfinished(self, lesson_id: str | None = None) -> int:
         """Say in words every picture that is not coming after all. Returns how many.
 
@@ -307,6 +360,13 @@ class LessonService:
                             item for item in row.pending_scenes if item != scene_id
                         ]
                     settled += 1
+            # Nor is anything being written: a lesson stored at its first part keeps the
+            # parts it has (ADR-048).
+            unended = select(StoredLesson).where(StoredLesson.writing.is_(True))
+            if lesson_id is not None:
+                unended = unended.where(StoredLesson.id == lesson_id)
+            for row in session.scalars(unended).all():
+                row.writing = False
         return settled
 
     def set_written_by(self, lesson_id: str, written_by: Mapping[str, Any] | None) -> None:
@@ -407,6 +467,7 @@ class LessonService:
                 progress=_progress(row.progress),
                 pending_scene_ids=list(row.pending_scenes or []),
                 written_by=row.written_by,
+                writing=row.writing,
             )
 
     # -- progress ----------------------------------------------------------

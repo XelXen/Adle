@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import copy
 import threading
+import time
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
+from adle_core.application import generation as generation_module
 from adle_core.application.scene_trials import (
     PRESENT_SECONDS,
     SceneTrials,
@@ -245,36 +247,67 @@ def test_without_the_app_to_try_them_pictures_are_kept_untried(
     assert job.result["pictures_made"] == 2
 
 
-def test_a_lessons_figures_are_offered_for_their_trials_all_at_once(
+FIGURES = {
+    0: {
+        "kind": "equation",
+        "steps": ["z = w x + b", r"z = 2 \cdot 3 + 1", "z = 7"],
+        "description": "The weighted sum is filled in and worked out to seven.",
+    },
+    1: {
+        "kind": "bars",
+        "labels": ["input 1", "input 2"],
+        "values": [1, 3],
+        "description": "Two bars: the second input counts three times as much.",
+    },
+    4: {
+        "kind": "number_line",
+        "from": 0,
+        "to": 10,
+        "marks": [{"at": 7, "label": "z"}],
+        "description": "A number line from zero to ten with the sum marked at seven.",
+    },
+}
+
+
+def with_figures(*, parts_first: bool = False) -> dict[str, Any]:
+    """The stand-in lesson with three figures; ``parts_first`` writes its parts before its
+    title, so that it cannot be begun before it is whole."""
+    lesson = copy.deepcopy(LESSON)
+    for index, figure in FIGURES.items():
+        lesson["segments"][index].pop("scene", None)
+        lesson["segments"][index]["figure"] = figure
+    if parts_first:
+        lesson = {"segments": lesson.pop("segments"), **lesson}
+    return lesson
+
+
+def test_each_figure_is_tried_as_soon_as_its_part_is_written(
+    client: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    """A lesson begun at its first part (ADR-048) has each figure tried as its part comes:
+    the learner may be about to begin that part."""
+    provider.queue(with_figures())
+    broken = TrialFailure("runtime", "non-finite point/vector value")
+    with App(services, [None, None, broken]) as app:
+        job = write_a_lesson(client, services)
+    # One at a time, each as its part came; then the scene a model wrote for the interaction.
+    assert app.looks == [1, 1, 1, 1]
+    assert [trial.scene_class for trial in app.tried[:3]] == [
+        "EquationFigure",
+        "BarsFigure",
+        "NumberLineFigure",
+    ]
+    assert job.result["pictures_made"] >= 2
+    assert any("couldn’t be shown" in note for note in job.result["notes"])
+    assert services.generation.trials.waiting() == []
+
+
+def test_the_figures_of_a_lesson_taken_whole_are_offered_for_their_trials_all_at_once(
     client: TestClient, services: Services, provider: FakeProvider
 ) -> None:
     """The app runs them one after another in one look, instead of each figure waiting for
     the app's next look, a second later (ADR-045)."""
-    lesson = copy.deepcopy(LESSON)
-    figures = {
-        0: {
-            "kind": "equation",
-            "steps": ["z = w x + b", r"z = 2 \cdot 3 + 1", "z = 7"],
-            "description": "The weighted sum is filled in and worked out to seven.",
-        },
-        1: {
-            "kind": "bars",
-            "labels": ["input 1", "input 2"],
-            "values": [1, 3],
-            "description": "Two bars: the second input counts three times as much.",
-        },
-        4: {
-            "kind": "number_line",
-            "from": 0,
-            "to": 10,
-            "marks": [{"at": 7, "label": "z"}],
-            "description": "A number line from zero to ten with the sum marked at seven.",
-        },
-    }
-    for index, figure in figures.items():
-        lesson["segments"][index].pop("scene", None)
-        lesson["segments"][index]["figure"] = figure
-    provider.queue(lesson)
+    provider.queue(with_figures(parts_first=True))
     broken = TrialFailure("runtime", "non-finite point/vector value")
     with App(services, [None, None, broken]) as app:
         job = write_a_lesson(client, services)
@@ -283,3 +316,40 @@ def test_a_lessons_figures_are_offered_for_their_trials_all_at_once(
     assert job.result["pictures_made"] >= 2
     assert any("couldn’t be shown" in note for note in job.result["notes"])
     assert services.generation.trials.waiting() == []
+
+
+def test_a_figure_whose_trial_does_not_come_does_not_hold_up_the_rest_of_the_answer(
+    client: TestClient,
+    services: Services,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """While the answer is still being read, a figure's trial is waited for briefly: the
+    parts after it are not read meanwhile (ADR-048). One that does not come keeps the figure
+    untried, as before trials."""
+    monkeypatch.setattr(generation_module, "FIGURE_WAIT_WHILE_WRITING", 0.3)
+    provider.queue(with_figures())
+    trials = services.generation.trials
+    stop = threading.Event()
+
+    def app() -> None:
+        # There and asking, and answering the model's scene, but never a figure.
+        while not stop.is_set():
+            for trial in trials.waiting():
+                if not trial.scene_class.endswith("Figure"):
+                    trials.report(trial.id, None)
+            stop.wait(0.02)
+
+    trials.waiting()
+    thread = threading.Thread(target=app, daemon=True)
+    thread.start()
+    started = time.monotonic()
+    try:
+        job = write_a_lesson(client, services)
+    finally:
+        stop.set()
+        thread.join(5)
+    # Three figures waited for a minute each would be three minutes.
+    assert time.monotonic() - started < 30
+    assert job.result["pictures_made"] >= 3
+    assert trials.waiting() == []

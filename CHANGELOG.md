@@ -7,6 +7,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Start a lesson as soon as its first part is written.** The rest of it is written while
+  you study: the lesson says "Part 1 of 2 so far", and if you reach the end of what is
+  written it waits there and goes on by itself when the next part comes. In the course the
+  lesson's parts still appear as they are written, and "Stop" keeps the lesson as far as
+  it has come.
 - **Many more pictures, there seconds after the words.** A lesson now has four to seven:
   formulas worked step by step, graphs (with an area under a curve, named points, a point
   running along the curve, or a slider you move), bars, number lines, steps in order,
@@ -21,6 +26,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
   numbered headings, section by section: a chapter of ten sections gives a plan of every
   one of them, not of its first pages. A PDF with neither is planned from how each of its
   pages begins, first to last.
+- **A lesson is written faster.** Through NVIDIA, the model now thinks less before it
+  writes a lesson: about a minute where it took two to four, with lessons as correct.
+- **A probability on a cumulative curve is shown as how much the curve rises**, not as an
+  area under it.
 - **A lesson is rarely written twice.** Mathematics the AI wrote as notation in what is
   read aloud is now said in words, the way a teacher reads it ("e to the minus lambda x"),
   and a practice question that is not whole is left out, instead of the whole lesson being
@@ -35,6 +44,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 - Formulas on a lesson's board that the AI wrote with every backslash doubled showed
   broken; they are shown as meant.
+- Mathematics written in its own symbols (σ, ≤, ∫) in what is read aloud is said in words.
+- Pictures the AI described in ways Adle didn't take are drawn: a formula with words beside
+  it, a function given in up to eight steps, two or three marks on one graph, a choice
+  written as in code (`x >= 0 ? 1 : 0`), and a curve that is flat over most of its range.
+  Words in a picture's labels are set as words, not as a row of italic letters.
+- The installer check on Linux could find the app's folder recreated by a process that
+  was still ending; it waits for them first.
 
 ## [0.1.0-alpha.2] - 2026-11-21
 

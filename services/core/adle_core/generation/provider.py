@@ -97,6 +97,13 @@ class ModelSpec:
     #: nothing and leaves the model at its provider's default. Try a value against the
     #: real endpoint before relying on it: see the notes on NVIDIA's models below.
     reasoning_effort: str | None = None
+    #: The same, for one kind of request only (``purpose``, value), where it was measured
+    #: to help that kind and not the others. Takes the place of ``reasoning_effort``.
+    reasoning_for: tuple[tuple[str, str], ...] = ()
+
+    def effort(self, purpose: str) -> str | None:
+        """What is sent as ``reasoning_effort`` for this kind of request, if anything."""
+        return dict(self.reasoning_for).get(purpose, self.reasoning_effort)
 
 
 AIHUBMIX_MODEL = ModelSpec(
@@ -107,8 +114,19 @@ AIHUBMIX_MODEL = ModelSpec(
 #: https://build.nvidia.com/, and then what the endpoint was seen to do, which is not
 #: always what the page says. Which of them is asked for what is ``NVIDIA_ORDERS``, from
 #: one run of each kind of request on 2026-11-21 (PERFORMANCE.md). The two Nemotron models
-#: are sent nothing but the fields every request has: that is how they were measured.
-NEMOTRON_ULTRA = ModelSpec(id="nvidia/nemotron-3-ultra-550b-a55b", name="Nemotron 3 Ultra")
+#: are sent nothing but the fields every request has, but for the one below that was
+#: measured against the endpoint: Nemotron 3 Ultra thinks less for a lesson (ADR-048).
+NEMOTRON_ULTRA = ModelSpec(
+    id="nvidia/nemotron-3-ultra-550b-a55b",
+    name="Nemotron 3 Ultra",
+    # The reference lists "none", "medium" and "high" (the default). A lesson's words at
+    # "high" took 116 to 232 s, the model thinking 18,000 to 35,000 characters first; at
+    # "medium" 53 to 74 s, thinking 1,500 to 3,300, and as correct: three lessons of three
+    # usable at their first answer, every figure drawn (2026-11-22, ADR-048).
+    # A course plan was no quicker at "medium" (62 s, against 18 to 52), so it is left at
+    # the default.
+    reasoning_for=(("lesson", "medium"),),
+)
 NEMOTRON_SUPER = ModelSpec(id="nvidia/nemotron-3.5-super-vl-120b-a12b", name="Nemotron 3.5 Super")
 NVIDIA_MODELS = (
     NEMOTRON_ULTRA,
@@ -737,8 +755,9 @@ class ChatClient:
         }
         if spec.usage_option:
             body["stream_options"] = {"include_usage": True}
-        if spec.reasoning_effort is not None:
-            body["reasoning_effort"] = spec.reasoning_effort
+        effort = spec.effort(request.purpose)
+        if effort is not None:
+            body["reasoning_effort"] = effort
         if request.json_output and spec.json_mode:
             body["response_format"] = {"type": "json_object"}
 

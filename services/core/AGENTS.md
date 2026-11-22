@@ -181,7 +181,17 @@ everything and decides nothing.
 - **A model request goes through `ModelGateway.complete`**, from inside a job. Nothing else
   may call `ChatClient`. Do not add sampling parameters, retries, or a second request "to fix
   it": the number of requests per job is fixed in `application/generation.py` (ADR-012).
-- **A lesson is stored as soon as its text is written** (ADR-031), with the pictures it is
+- **A lesson is stored as soon as its first part is written** (ADR-048): the answer is
+  read as it arrives (`generation/stream.py`), and `_GrowingLesson` stores the lesson at
+  its first whole part with `writing` set, then adds each later whole part after the last
+  with `LessonService.extend`, which puts the whole lesson through `parse_bundle` again.
+  A part already stored is never changed; a later part that cannot be used is left out
+  and said; once begun the lesson is never written again (no retry), and a stop or a
+  failing provider keeps what there is. Until the first part is whole the whole answer
+  decides, with its one retry, as it always did. Each figure is tried and settled as its
+  part is stored; the job reports the `drawing` stage once every word is written. Who
+  writes it is stored with its first part (`on_writer`).
+- **A lesson's pictures follow its words** (ADR-031), with the pictures it is
   waiting for in `pending_scenes`. A picture reaches a stored lesson only through
   `LessonService.settle_scene`, which puts the whole lesson through `parse_bundle` again:
   with the picture, or with that part turned into words. Nothing may be left waiting once

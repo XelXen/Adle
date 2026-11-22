@@ -517,7 +517,7 @@ const sceneSets = [
     name: 'figures',
     directory: path.join(desktopDir, 'e2e', 'fixtures', 'figures'),
     prefix: 'fg',
-    atLeast: 15,
+    atLeast: 16,
   },
 ] as const;
 
@@ -532,7 +532,9 @@ for (const set of sceneSets) {
     for (const file of examples) {
       for (const theme of ['light', 'dark'] as const) {
         test(`${file} runs to completion in the ${theme} theme`, async ({ adle }) => {
-          test.setTimeout(90_000);
+          // The longest scene plays for about thirty seconds. A computer busy with other
+          // checks has been seen to take four times as long as usual, so the wait is ample.
+          test.setTimeout(150_000);
           const player = await mountRawPlayer(
             adle.page,
             `${set.prefix}${theme}${file.replace(/[^a-z0-9]/g, '').slice(0, 12)}`,
@@ -542,7 +544,7 @@ for (const set of sceneSets) {
 
           const settled = await player.waitFor(
             `m.type === 'error' || m.type === 'finished' || (m.type === 'state' && m.state.interactive)`,
-            60_000,
+            120_000,
           );
           expect(settled?.type, JSON.stringify(settled)).not.toBe('error');
           expect(settled).not.toBeNull();

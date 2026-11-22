@@ -289,12 +289,18 @@ export function lessonAction(progress: LessonSummary['progress']): string {
 /** One line about a lesson: how long it takes and how far the learner has got. */
 export function describeLesson(lesson: LessonSummary): string {
   const { progress, segment_count: parts } = lesson;
+  // A lesson can be started while the rest of it is still being written (ADR-048): how
+  // long it is, and how many parts it has, are not known yet.
+  const writing = lesson.writing ?? false;
   const place = progress.completed
     ? 'Completed'
     : progress.started
-      ? `Part ${Math.min(progress.position + 1, parts)} of ${parts}`
+      ? `Part ${Math.min(progress.position + 1, parts)} of ${parts}${writing ? ' so far' : ''}`
       : 'Not started';
   // A lesson can be started while its pictures are still being drawn (ADR-031).
   const pictures = (lesson.pictures_pending ?? 0) > 0 ? ' · Pictures on their way' : '';
-  return `About ${pluralise(lesson.estimated_minutes, 'minute')} · ${place}${pictures}`;
+  const length = writing
+    ? 'Still being written'
+    : `About ${pluralise(lesson.estimated_minutes, 'minute')}`;
+  return `${length} · ${place}${pictures}`;
 }

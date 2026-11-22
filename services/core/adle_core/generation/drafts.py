@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -329,14 +329,20 @@ class SegmentDraft(_Draft):
     question: QuestionDraft | None = None
 
 
-class LessonDraft(_Draft):
+class LessonHeaderDraft(_Draft):
+    """What a lesson's answer says before its parts: enough to begin the lesson with its
+    first part while the rest is written (ADR-048)."""
+
     title: str = Field(min_length=1)
     strategy: str = "visual"
+    #: The numbers of the supplied passages the lesson draws on.
+    sources: list[int] = Field(default_factory=list)
+
+
+class LessonDraft(LessonHeaderDraft):
     segments: list[SegmentDraft] = Field(min_length=1)
     #: Questions that are not part of the lesson's flow, kept for practice and review.
     practice: list[QuestionDraft] = Field(default_factory=list)
-    #: The numbers of the supplied passages the lesson draws on.
-    sources: list[int] = Field(default_factory=list)
     #: How the narrator sounds, in a sentence. A lesson without one is read in Adle's own.
     voice: str | None = None
 
@@ -454,6 +460,12 @@ def _narration(beats: list[BeatDraft]) -> list[dict[str, Any]]:
     return narration
 
 
+def minutes_for(segments: Sequence[Mapping[str, Any]]) -> int:
+    """How long a lesson is said to take, from its parts: whole minutes, one to sixty."""
+    total = sum(int(segment.get("estimated_seconds", 0)) for segment in segments)
+    return max(1, min(60, math.ceil(total / 60)))
+
+
 def _seconds(kind: str, narration: list[dict[str, Any]]) -> int:
     spoken = sum(_words(beat["text"]) for beat in narration)
     reading = math.ceil(spoken / READING_WORDS_PER_MINUTE * 60)
@@ -541,20 +553,33 @@ def _question(
 _UNTITLED = {"summary": "Summary", "reflection": "Think it over"}
 
 
-def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson:
-    """Turn a draft into an (unvalidated) lesson in IR form, plus the scenes still to be written.
+@dataclass
+class LessonCompiler:
+    """A lesson's parts turned into the Lesson IR one at a time, as they are written
+    (ADR-048), or all at once (``compile_lesson``): a part gets the same ids either way.
 
-    Raises ``DraftError`` for problems only a rewrite can fix. Everything else is
-    left to ``parse_bundle``, which reports precisely.
+    A part is kept only whole. One with a problem is left out and its problems returned,
+    and nothing of it is counted: the ids of the parts after it follow from the parts kept.
     """
-    problems: list[str] = []
-    segments: list[dict[str, Any]] = []
-    scenes: list[SceneBrief] = []
-    figures: list[FigureScene] = []
-    dropped = 0
-    questions = 0
 
-    for index, segment in enumerate(draft.segments[:MAX_SEGMENTS]):
+    context: LessonContext
+    segments: list[dict[str, Any]] = field(default_factory=list)
+    scenes: list[SceneBrief] = field(default_factory=list)
+    figures: list[FigureScene] = field(default_factory=list)
+    #: Figures given that could not be drawn as given: their parts are said in words.
+    dropped: int = 0
+    questions: int = 0
+    #: How many parts have been read, kept or not: a part's place in what was written.
+    read: int = 0
+
+    def add(self, segment: SegmentDraft) -> list[str]:
+        """Compile the next part as it was written. Its problems, if it has any; then it is
+        not kept."""
+        index = self.read
+        self.read += 1
+        if index >= MAX_SEGMENTS:
+            return []
+        problems: list[str] = []
         where = f"segments.{index}"
         kind = segment.type.strip().lower().replace("-", "_").replace(" ", "_")
         segment_id = f"seg_{index + 1}"
@@ -565,7 +590,9 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
             # (a real model left all three of its checkpoints so, 2026-11-22): not a reason
             # to write the lesson again. Any other part needs its own.
             title = (
-                f"Checkpoint {questions + 1}" if kind == "checkpoint" else _UNTITLED.get(kind, "")
+                f"Checkpoint {self.questions + 1}"
+                if kind == "checkpoint"
+                else _UNTITLED.get(kind, "")
             )
             if not title:
                 problems.append(f"{where}.title: Field required")
@@ -575,67 +602,74 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
             "title": title,
             "narration": narration,
         }
-
+        asks = 0
         if kind == "checkpoint":
             if segment.question is None:
-                problems.append(f"{where}: a checkpoint needs a question")
-                continue
-            questions += 1
+                return [*problems, f"{where}: a checkpoint needs a question"]
             question = _question(
-                segment.question, f"q_{questions}", context, problems, f"{where}.question"
+                segment.question,
+                f"q_{self.questions + 1}",
+                self.context,
+                problems,
+                f"{where}.question",
             )
             if question is None:
-                continue
+                return problems
             entry["question"] = question
+            asks = 1
         elif kind in ("interaction", "reflection"):
             entry["prompt"] = tidy(segment.prompt or "")
         elif kind == "worked_example":
             entry["problem"] = tidy(segment.problem or "")
         elif kind not in ("explanation", "visualization", "summary"):
-            problems.append(f'{where}: "{_named(segment.type)}" is not a kind of segment Adle has')
-            continue
+            return [
+                *problems,
+                f'{where}: "{_named(segment.type)}" is not a kind of segment Adle has',
+            ]
+        if problems:
+            return problems
 
+        figure: FigureScene | None = None
+        brief: SceneBrief | None = None
+        lost = 0
         drawn = None
         if (
             segment.figure is not None
             and kind in _FIGURE_PARTS
-            and len(figures) < MAX_FIGURES_PER_LESSON
+            and len(self.figures) < MAX_FIGURES_PER_LESSON
         ):
             drawn = _figure(segment.figure, narration)
             if drawn is None:
-                dropped += 1
+                lost = 1
             elif kind == "interaction" and not drawn[0].interactive:
                 # Nothing to operate: what it shows is still worth watching.
                 entry.pop("prompt", None)
                 entry["type"] = kind = "visualization"
+        scene_id = f"scn_{len(self.scenes) + len(self.figures) + 1}"
         if drawn is not None:
             compiled_figure, described = drawn
-            scene_id = f"scn_{len(scenes) + len(figures) + 1}"
             entry["scene"] = {"scene_id": scene_id, "fallback_text": described}
-            figures.append(
-                FigureScene(
-                    scene_id=scene_id,
-                    segment_id=segment_id,
-                    kind=compiled_figure.kind,
-                    title=entry["title"],
-                    description=described,
-                    source=compiled_figure.source,
-                    interactive=compiled_figure.interactive,
-                )
+            figure = FigureScene(
+                scene_id=scene_id,
+                segment_id=segment_id,
+                kind=compiled_figure.kind,
+                title=entry["title"],
+                description=described,
+                source=compiled_figure.source,
+                interactive=compiled_figure.interactive,
             )
-            entry["estimated_seconds"] = _seconds(entry["type"], entry["narration"])
-            segments.append(entry)
-            continue
-
-        wants_scene = kind in ("visualization", "interaction") or (
-            kind in ("explanation", "worked_example") and segment.scene is not None
-        )
-        if wants_scene and segment.scene is not None and len(scenes) < MAX_SCENES_PER_LESSON:
-            scene_id = f"scn_{len(scenes) + len(figures) + 1}"
-            description = tidy(segment.scene.description)
-            entry["scene"] = {"scene_id": scene_id, "fallback_text": description}
-            scenes.append(
-                SceneBrief(
+        else:
+            wants_scene = kind in ("visualization", "interaction") or (
+                kind in ("explanation", "worked_example") and segment.scene is not None
+            )
+            if (
+                wants_scene
+                and segment.scene is not None
+                and len(self.scenes) < MAX_SCENES_PER_LESSON
+            ):
+                description = tidy(segment.scene.description)
+                entry["scene"] = {"scene_id": scene_id, "fallback_text": description}
+                brief = SceneBrief(
                     scene_id=scene_id,
                     segment_id=segment_id,
                     kind="interactive" if kind == "interaction" else "animation",
@@ -644,67 +678,102 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
                     description=description,
                     narration=[beat["text"] for beat in narration],
                 )
-            )
-        elif kind in ("visualization", "interaction"):
-            # No scene was described, or the lesson already has as many as it may ask for:
-            # the part is still worth having as words.
-            described = tidy(segment.scene.description) if segment.scene else None
-            entry = _as_explanation(entry, described)
+            elif kind in ("visualization", "interaction"):
+                # No scene was described, or the lesson already has as many as it may ask
+                # for: the part is still worth having as words.
+                described = tidy(segment.scene.description) if segment.scene else None
+                entry = _as_explanation(entry, described)
 
         entry["estimated_seconds"] = _seconds(entry["type"], entry["narration"])
-        segments.append(entry)
+        self.segments.append(entry)
+        self.questions += asks
+        self.dropped += lost
+        if figure is not None:
+            self.figures.append(figure)
+        if brief is not None:
+            self.scenes.append(brief)
+        return []
 
-    if problems:
-        raise DraftError(problems[:12])
+    def lesson(
+        self,
+        header: LessonHeaderDraft,
+        practice: Sequence[QuestionDraft] = (),
+        voice: str | None = None,
+    ) -> dict[str, Any]:
+        """The lesson in IR form, not yet validated, with the parts kept so far."""
+        context = self.context
+        strategy = header.strategy.strip().lower().replace("-", "_").replace(" ", "_")
+        if context.strategy in STRATEGIES:
+            strategy = context.strategy
+        cited: dict[str, PassageRef] = {}
+        for number in header.sources:
+            # Only passages that were actually supplied can be cited.
+            if 1 <= number <= len(context.passages):
+                passage = context.passages[number - 1]
+                cited.setdefault(passage.section_id, passage)
+        lesson: dict[str, Any] = {
+            "schema_version": SCHEMA_VERSION,
+            "lesson_id": context.lesson_id,
+            "course_id": context.course_id,
+            "title": tidy(header.title),
+            "concept_ids": [context.concept_id],
+            "objectives": [
+                {"objective_id": objective.id, "statement": objective.statement}
+                for objective in context.objectives[:6]
+            ],
+            "source_refs": [
+                {
+                    "source_id": passage.source_id,
+                    "section_id": passage.section_id,
+                    "source_name": passage.source_name,
+                    "locator": passage.locator,
+                }
+                for passage in list(cited.values())[:12]
+            ],
+            "grounding": "materials" if cited else "general_knowledge",
+            "strategy": strategy if strategy in STRATEGIES else "visual",
+            "estimated_minutes": minutes_for(self.segments),
+            "segments": list(self.segments),
+            "practice": compile_practice(practice, context),
+        }
+        spoken_as = voice_description(voice)
+        if spoken_as is not None:
+            lesson["voice"] = spoken_as
+        return lesson
 
+
+def compile_practice(
+    drafts: Sequence[QuestionDraft], context: LessonContext
+) -> list[dict[str, Any]]:
+    """The questions kept for practice. Extra questions are a bonus: one that cannot be used
+    is left out, and is never a reason to write the lesson again."""
     practice: list[dict[str, Any]] = []
-    for index, extra in enumerate(draft.practice[:MAX_PRACTICE_ITEMS], start=1):
-        # Extra questions are a bonus. One that cannot be used is left out; it is never a
-        # reason to write the lesson again.
+    for index, extra in enumerate(drafts[:MAX_PRACTICE_ITEMS], start=1):
         item = _question(extra, f"q_practice_{index}", context, [], f"practice.{index - 1}")
         if item is not None and _is_usable(item):
             practice.append(item)
+    return practice
 
-    strategy = draft.strategy.strip().lower().replace("-", "_").replace(" ", "_")
-    if context.strategy in STRATEGIES:
-        strategy = context.strategy
-    cited: dict[str, PassageRef] = {}
-    for number in draft.sources:
-        # Only passages that were actually supplied can be cited.
-        if 1 <= number <= len(context.passages):
-            passage = context.passages[number - 1]
-            cited.setdefault(passage.section_id, passage)
 
-    total_seconds = sum(segment["estimated_seconds"] for segment in segments)
-    lesson: dict[str, Any] = {
-        "schema_version": SCHEMA_VERSION,
-        "lesson_id": context.lesson_id,
-        "course_id": context.course_id,
-        "title": tidy(draft.title),
-        "concept_ids": [context.concept_id],
-        "objectives": [
-            {"objective_id": objective.id, "statement": objective.statement}
-            for objective in context.objectives[:6]
-        ],
-        "source_refs": [
-            {
-                "source_id": passage.source_id,
-                "section_id": passage.section_id,
-                "source_name": passage.source_name,
-                "locator": passage.locator,
-            }
-            for passage in list(cited.values())[:12]
-        ],
-        "grounding": "materials" if cited else "general_knowledge",
-        "strategy": strategy if strategy in STRATEGIES else "visual",
-        "estimated_minutes": max(1, min(60, math.ceil(total_seconds / 60))),
-        "segments": segments,
-        "practice": practice,
-    }
-    voice = _voice_description(draft.voice)
-    if voice is not None:
-        lesson["voice"] = voice
-    return CompiledLesson(lesson=lesson, scenes=scenes, figures=figures, figures_dropped=dropped)
+def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson:
+    """Turn a whole draft into an (unvalidated) lesson in IR form, plus the scenes still to
+    be written.
+
+    Raises ``DraftError`` for problems only a rewrite can fix. Everything else is
+    left to ``parse_bundle``, which reports precisely.
+    """
+    compiler = LessonCompiler(context)
+    problems: list[str] = []
+    for segment in draft.segments:
+        problems += compiler.add(segment)
+    if problems:
+        raise DraftError(problems[:12])
+    return CompiledLesson(
+        lesson=compiler.lesson(draft, draft.practice, draft.voice),
+        scenes=compiler.scenes,
+        figures=compiler.figures,
+        figures_dropped=compiler.dropped,
+    )
 
 
 _LONG_DISPLAY = TypeAdapter(LongDisplay)
@@ -734,7 +803,7 @@ def _figure(raw: dict[str, Any], narration: list[dict[str, Any]]) -> Any:
 _VOICE_CHARACTERS = 240
 
 
-def _voice_description(text: str | None) -> str | None:
+def voice_description(text: str | None) -> str | None:
     """What the model said of the narrator's voice, as one plain sentence, or nothing.
 
     It is only ever a description for a speech model to design a voice from. Anything a

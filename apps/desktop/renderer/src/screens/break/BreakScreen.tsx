@@ -17,6 +17,7 @@ import {
 } from '../../lib/breaks';
 import {
   isDrawingPictures,
+  isWritingTheRest,
   jobFailure,
   jobProgress,
   KIND_LESSON,
@@ -213,14 +214,16 @@ function Waiting({
   onOpen: (job: Job) => void;
 }) {
   if (writing.length === 0 && !finished) return null;
-  // A lesson that can be started while its pictures are drawn (ADR-031) is said once, as
-  // something that has arrived, and not a second time as something under way.
-  const drawing = finished !== null && writing.some((job) => job.id === finished.id);
+  // A lesson that can be started while the rest of it is written (ADR-048) or its pictures
+  // drawn (ADR-031) is said once, as something that has arrived, and not a second time as
+  // something under way.
+  const still = finished ? writing.find((job) => job.id === finished.id) : undefined;
+  const coming = still ? (isWritingTheRest(still) ? 'parts' : 'pictures') : null;
   const others = writing.filter((job) => job.id !== finished?.id);
   return (
     <section className={styles.waiting} aria-label="In progress">
       <h2 className="ad-eyebrow">Meanwhile</h2>
-      {finished ? <Arrived job={finished} drawing={drawing} onOpen={onOpen} /> : null}
+      {finished ? <Arrived job={finished} coming={coming} onOpen={onOpen} /> : null}
       {others.map((job) => {
         const progress = jobProgress(job, 'Queued');
         const drawing = isDrawingPictures(job);
@@ -252,12 +255,12 @@ function Waiting({
 /** Something that finished while the learner was resting: there when they look up. */
 function Arrived({
   job,
-  drawing,
+  coming,
   onOpen,
 }: {
   job: Job;
-  /** It is a lesson whose pictures are still being drawn. */
-  drawing: boolean;
+  /** It is a lesson, and the rest of its parts or its pictures are still to come. */
+  coming: 'parts' | 'pictures' | null;
   onOpen: (job: Job) => void;
 }) {
   const failure = jobFailure(job);
@@ -291,7 +294,11 @@ function Arrived({
     >
       {lesson?.title
         ? `“${lesson.title}” is ready${
-            drawing ? ', and its pictures are on their way' : ''
+            coming === 'parts'
+              ? ', and the rest of it is on its way'
+              : coming === 'pictures'
+                ? ', and its pictures are on their way'
+                : ''
           }. Finish your break first if you like.`
         : 'Finish your break first if you like.'}
     </Callout>

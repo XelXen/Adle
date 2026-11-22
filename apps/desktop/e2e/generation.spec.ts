@@ -316,6 +316,21 @@ test.describe('generation with the AI provider', () => {
     // Titles, and nothing of what the parts say.
     await expect(limits).not.toContainText('has to turn them into one');
     await expect(limits).not.toContainText('its own weight');
+
+    // ---- Its first part is whole: it can be begun while the rest is written (ADR-048) ----
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible();
+    await expect(
+      limits.getByRole('button', { name: 'Start lesson: How a neuron weighs its inputs' }),
+    ).toBeVisible();
+    await expect(limits).toContainText('Still being written');
+    await expect(limits).toContainText(
+      'You can start the lesson now. The rest of it is being written.',
+    );
+    // Stopping now ends the writing and keeps the lesson; there is nothing to wait for.
+    await expect(limits.getByRole('button', { name: 'Stop writing the lesson' })).toBeVisible();
+    await expect(limits.getByRole('button', { name: /break/i })).toHaveCount(0);
+    // Still seen taking shape, under the same name.
+    await expect(bar).toHaveAccessibleName('Writing “How a neuron weighs its inputs”');
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'writing-a-lesson-part-by-part');
     await expect(parts.getByRole('listitem')).toHaveCount(5, { timeout: 15_000 });
@@ -323,11 +338,75 @@ test.describe('generation with the AI provider', () => {
     expect(moved).toBeGreaterThan(30);
     expect(moved).toBeLessThan(100);
 
-    // ---- And then it is a lesson ----
-    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible({
-      timeout: 60_000,
+    // ---- And then all of it is written: what is left is its pictures ----
+    await expect(parts).toHaveCount(0, { timeout: 60_000 });
+    await expect(limits).not.toContainText('Still being written', { timeout: 60_000 });
+    await expect(limits).toContainText('Not started');
+    expect(session.adle.problems).toEqual([]);
+    await close(session);
+  });
+
+  test('a lesson begun at its first part waits at the end of what is written, and goes on by itself', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await open(profileDir);
+    const { page, provider } = session;
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    const limits = detail(page, 'Limits');
+
+    // The model writes the lesson's title, its first part and the title of its second,
+    // and then stops until the test lets it go on: a model in the middle of its answer.
+    provider.queue({ slowly: true, thinkMs: 300, pieceMs: 300, pauseAfter: 3 });
+    await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
+
+    // ---- Its first part is whole: it can be begun ----
+    const start = limits.getByRole('button', {
+      name: 'Start lesson: How a neuron weighs its inputs',
     });
-    await expect(parts).toHaveCount(0);
+    await expect(start).toBeVisible({ timeout: 30_000 });
+    await expect(limits).toContainText('Still being written');
+    await start.click();
+
+    // ---- In it: the parts so far, more to come, and no end yet ----
+    const position = page.getByRole('status').filter({ hasText: /^Part \d+ of \d+/ });
+    await expect(position).toHaveText('Part 1 of 1 so far');
+    const coming = page.getByRole('img', { name: 'More parts are being written' });
+    await expect(coming).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Why inputs are weighted' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Finish lesson' })).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'lesson-begun-while-written');
+
+    // ---- At the end of what is written, it waits for the next part ----
+    const next = page.getByRole('button', { name: 'Continue', exact: true });
+    await next.click();
+    const waiting = page.getByRole('status').filter({ hasText: 'The next part is being written' });
+    await expect(waiting).toBeVisible();
+    await expect(next).toBeDisabled();
+    await expect(position).toHaveText('Part 1 of 1 so far');
+    await expectNoAccessibilityViolations(page);
+
+    // ---- It comes, and the lesson goes on into it without being asked ----
+    provider.pass();
+    await expect(page.getByRole('heading', { name: 'The weighted sum' })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(position).toHaveText(/^Part 2 of \d+( so far)?$/);
+    await expect(waiting).toHaveCount(0);
+
+    // ---- Once all of it is written, it is whole, and it ends where its last part does ----
+    await expect(position).toHaveText('Part 2 of 8', { timeout: 60_000 });
+    await expect(coming).toHaveCount(0);
+    const questions = new Set([3, 6, 7]);
+    for (let part = 2; part <= 8; part += 1) {
+      await expect(position).toHaveText(`Part ${part} of 8`);
+      if (questions.has(part)) await page.getByRole('button', { name: 'Skip question' }).click();
+      if (part < 8) await next.click();
+    }
+    await page.getByRole('button', { name: 'Finish lesson' }).click();
+    await expect(page.getByRole('region', { name: 'Lesson complete' })).toBeVisible();
     expect(session.adle.problems).toEqual([]);
     await close(session);
   });
@@ -359,7 +438,7 @@ test.describe('generation with the AI provider', () => {
     expect(again).toContain('class Broken(Scene):');
     await expect(limits.getByRole('progressbar')).toHaveCount(0, { timeout: 60_000 });
     // Every picture was made in the end, so there is nothing to say about them.
-    await expect(page.getByRole('status').filter({ hasText: 'About its pictures' })).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: 'About the lesson' })).toHaveCount(0);
 
     // ---- In the lesson, the picture is the one that ran ----
     await lessons.getByRole('button', { name: /^Start lesson/ }).click();
@@ -391,7 +470,7 @@ test.describe('generation with the AI provider', () => {
     await expect(limits.getByRole('progressbar')).toHaveCount(0, { timeout: 60_000 });
     // One request, for the lesson's words: its four pictures were drawn here (ADR-045).
     expect(provider.requests.map((request) => request.kind)).toEqual(['lesson']);
-    await expect(page.getByRole('status').filter({ hasText: 'About its pictures' })).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: 'About the lesson' })).toHaveCount(0);
 
     // ---- In the lesson, each part shows its figure, and none falls back to words ----
     await lessons.getByRole('button', { name: /^Start lesson/ }).click();
@@ -429,7 +508,7 @@ test.describe('generation with the AI provider', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible({
       timeout: 60_000,
     });
-    const about = page.getByRole('status').filter({ hasText: 'About its pictures' });
+    const about = page.getByRole('status').filter({ hasText: 'About the lesson' });
     await expect(about).toBeVisible({ timeout: 60_000 });
     await expect(about).toContainText(
       'The picture for “The weighted sum” couldn’t be made, so that part is explained in words.',
@@ -467,11 +546,14 @@ test.describe('generation with the AI provider', () => {
     provider.hold('scene');
     await limits.getByRole('button', { name: 'Create a lesson with AI' }).click();
 
-    // ---- Said once, as soon as the lesson is written ----
+    // ---- Said once, as soon as the lesson can be started ----
     const ready = page.getByRole('status').filter({ hasText: 'Lesson ready' });
     await expect(ready).toBeVisible({ timeout: 60_000 });
+    // Begun at its first part (ADR-048), the lesson is told as soon as it is seen: this
+    // answer arrives all at once, and is seen either while its last parts are being taken
+    // in, for a moment, or once its pictures are what is left.
     await expect(ready).toContainText(
-      'How a neuron weighs its inputs. Its pictures are still being drawn.',
+      /How a neuron weighs its inputs\. (Its pictures are still being drawn|The rest of it is being written)\./,
     );
     await expect
       .poll(() => provider.requests.map((request) => request.kind))
@@ -608,7 +690,7 @@ test.describe('generation with the AI provider', () => {
     await expect.poll(kinds).toEqual(['lesson', 'scene']);
     await expectNoAccessibilityViolations(page);
     await limits.getByRole('button', { name: 'Stop drawing pictures' }).click();
-    const about = page.getByRole('status').filter({ hasText: 'About its pictures' });
+    const about = page.getByRole('status').filter({ hasText: 'About the lesson' });
     await expect(about).toBeVisible({ timeout: 30_000 });
     await expect(about).toContainText(
       'You stopped the pictures, so 2 parts are explained in words.',

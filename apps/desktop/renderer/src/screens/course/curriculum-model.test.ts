@@ -319,4 +319,18 @@ describe('lessons of a concept', () => {
       'About 8 minutes · Not started',
     );
   });
+
+  it('says so while the rest of a lesson is still being written, and not how long it is', () => {
+    expect(describeLesson({ ...lesson('a', 'weights'), writing: true })).toBe(
+      'Still being written · Not started',
+    );
+    expect(
+      describeLesson({
+        ...lesson('a', 'weights', { started: true, position: 1 }),
+        segment_count: 2,
+        writing: true,
+        pictures_pending: 1,
+      }),
+    ).toBe('Still being written · Part 2 of 2 so far · Pictures on their way');
+  });
 });

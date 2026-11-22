@@ -1,5 +1,7 @@
 import type { Job } from '@adle/contracts';
 
+import { readWritingProgress } from './writing-progress';
+
 /**
  * Reading what a generation job says. A job's `result` is free-form as far as
  * the contract goes, so it is checked here before anything is shown.
@@ -152,9 +154,28 @@ export function readLessonOutcome(job: Job | null): LessonOutcome | null {
   };
 }
 
-/** Whether a job has a lesson to start already and is still drawing its pictures. */
-export function isDrawingPictures(job: Job | null): boolean {
+/**
+ * Whether a job has a lesson to start already while it is still running: the lesson was
+ * begun at its first part and the rest of it is being written (ADR-048), or all of it is
+ * written and its pictures are being drawn (ADR-031).
+ */
+export function hasLessonToStart(job: Job | null): boolean {
   return job !== null && job.status === 'running' && readLessonOutcome(job) !== null;
+}
+
+/**
+ * Whether a job's lesson can be started while the rest of its parts are still being
+ * written (ADR-048). Once its words are all written, the core says it is drawing.
+ */
+export function isWritingTheRest(job: Job | null): boolean {
+  if (!hasLessonToStart(job)) return false;
+  const stage = readWritingProgress(job)?.stage ?? null;
+  return stage !== null && stage !== 'drawing';
+}
+
+/** Whether all of a job's lesson is written, and what is left is its pictures (ADR-031). */
+export function isDrawingPictures(job: Job | null): boolean {
+  return hasLessonToStart(job) && !isWritingTheRest(job);
 }
 
 export interface JobProgress {
@@ -241,16 +262,18 @@ export function titled(title: string, about: readonly string[]): string {
 /**
  * What to say when a lesson job has a lesson to start, and when it has ended.
  *
- * The lesson is announced once: when it can be started, which is before its pictures are
- * drawn (ADR-031). The end of the work is only worth a second word if something about the
- * pictures needs saying: one could not be made, or they were stopped.
+ * The lesson is announced once: when it can be started, which is at its first part, before
+ * the rest is written (ADR-048) and its pictures drawn (ADR-031). The end of the work is
+ * only worth a second word if something needs saying: a picture could not be made, a part
+ * was left out, or the work was stopped.
  */
 export function lessonNotice(job: Job, saidBefore: boolean): LessonNotice | null {
   const outcome = readLessonOutcome(job);
   if (!outcome) return null;
   if (!saidBefore) {
-    const about =
-      outcome.picturesPending > 0 ? ['Its pictures are still being drawn.'] : outcome.notes;
+    let about = outcome.notes;
+    if (isWritingTheRest(job)) about = ['The rest of it is being written.'];
+    else if (outcome.picturesPending > 0) about = ['Its pictures are still being drawn.'];
     return {
       tone: 'success',
       title: 'Lesson ready',
@@ -258,7 +281,7 @@ export function lessonNotice(job: Job, saidBefore: boolean): LessonNotice | null
     };
   }
   if (job.status === 'succeeded' && outcome.notes.length > 0) {
-    return { tone: 'info', title: 'About its pictures', description: outcome.notes.join(' ') };
+    return { tone: 'info', title: 'About the lesson', description: outcome.notes.join(' ') };
   }
   return null;
 }

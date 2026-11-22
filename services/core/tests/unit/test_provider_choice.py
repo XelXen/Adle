@@ -253,12 +253,14 @@ MESSAGES = [
     [
         (
             0,
-            # Measured with nothing but the fields every request has, and sent just those.
+            # A lesson is asked for with the reasoning its reference lists as "medium":
+            # measured to write as well in a third to a half of the time (ADR-048).
             {
                 "model": "nvidia/nemotron-3-ultra-550b-a55b",
                 "messages": MESSAGES,
                 "max_tokens": 500,
                 "stream": True,
+                "reasoning_effort": "medium",
             },
         ),
         (
@@ -307,6 +309,16 @@ def test_each_model_is_sent_exactly_the_fields_its_reference_lists(
     client_for(NVIDIA, endpoint).complete(REQUEST, model=NVIDIA.models[position])
     assert endpoint.bodies == [expected]
     assert endpoint.urls == [NVIDIA_URL]
+
+
+@pytest.mark.parametrize("purpose", ["ask", "curriculum", "check", "scene"])
+def test_only_a_lesson_is_asked_for_with_less_reasoning(purpose: str) -> None:
+    """Measured to help a lesson's words and not a course plan: every other kind of request
+    is sent nothing, and the model reasons as its provider set it to."""
+    endpoint = Endpoint()
+    request = ChatRequest(purpose=purpose, system="s", user="u", max_output_tokens=500)
+    client_for(NVIDIA, endpoint).complete(request, model=NVIDIA.models[0])
+    assert "reasoning_effort" not in endpoint.bodies[0]
 
 
 def test_a_request_that_asks_for_more_than_the_floor_keeps_what_it_asked_for() -> None:

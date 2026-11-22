@@ -185,6 +185,7 @@ def workflow(services: Services, document: Path, out: Path) -> None:
     started = time.monotonic()
     job = services.generation.generate_lesson(first.id)
     usable_at: float | None = None
+    written_at: float | None = None
     while True:
         current = services.jobs.get(job.id)
         if (
@@ -192,11 +193,16 @@ def workflow(services: Services, document: Path, out: Path) -> None:
             and isinstance(current.result, dict)
             and current.result.get("lesson_id")
         ):
+            # Begun at its first part (ADR-048).
             usable_at = round(time.monotonic() - started, 1)
+        if written_at is None and (current.progress_detail or {}).get("stage") == "drawing":
+            # Every part written: what is left is its pictures.
+            written_at = round(time.monotonic() - started, 1)
         if current.finished:
             break
         time.sleep(0.5)
-    timings["lesson: words, until it can be started"] = usable_at or -1
+    timings["lesson: its first part, when it can be started"] = usable_at or -1
+    timings["lesson: every part written"] = written_at or round(time.monotonic() - started, 1)
     timings["lesson: with every picture"] = round(time.monotonic() - started, 1)
     if current.status != "succeeded":
         say("  no lesson:", current.error_code, current.error_message)

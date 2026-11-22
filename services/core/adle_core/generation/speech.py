@@ -23,6 +23,38 @@ from adle_core.lessons.ir import is_plain_text
 #: Notation that a voice would read out character by character.
 _NOTATION = re.compile(r"[$\\_^{}]")
 
+#: Mathematics written with its own symbols (a model writes "∫" as often as "\int"), as the
+#: commands of TeX that say the same. Written by code point: several look like letters.
+#: Figures use it too, so that what they set is what the player's TeX is sure to know.
+UNICODE_TEX = {
+    chr(0x222B): r" \int ",
+    chr(0x2211): r" \sum ",
+    chr(0x220F): r" \prod ",
+    chr(0x221A): r" \sqrt ",
+    chr(0x221E): r" \infty ",
+    chr(0x2264): r" \le ",
+    chr(0x2265): r" \ge ",
+    chr(0x2260): r" \ne ",
+    chr(0x2248): r" \approx ",
+    chr(0x2192): r" \to ",
+    chr(0x2208): r" \in ",
+    chr(0x00B1): r" \pm ",
+    chr(0x00D7): r" \times ",
+    chr(0x00B7): r" \cdot ",
+    chr(0x2202): r" \partial ",
+    chr(0x2207): r" \nabla ",
+    chr(0x2212): "-",
+}
+for _name, _point in (
+    ("alpha", 0x3B1), ("beta", 0x3B2), ("gamma", 0x3B3), ("delta", 0x3B4),
+    ("epsilon", 0x3B5), ("theta", 0x3B8), ("lambda", 0x3BB), ("mu", 0x3BC),
+    ("pi", 0x3C0), ("rho", 0x3C1), ("sigma", 0x3C3), ("tau", 0x3C4), ("phi", 0x3C6),
+    ("chi", 0x3C7), ("psi", 0x3C8), ("omega", 0x3C9), ("Gamma", 0x393), ("Delta", 0x394),
+    ("Theta", 0x398), ("Lambda", 0x39B), ("Pi", 0x3A0), ("Sigma", 0x3A3), ("Phi", 0x3A6),
+    ("Psi", 0x3A8), ("Omega", 0x3A9),
+):  # fmt: skip
+    UNICODE_TEX[chr(_point)] = " \\" + _name + " "
+
 _PIECE = re.compile(r"\\[A-Za-z]+|\\[^A-Za-z]|[{}^_&\[\]()]|[A-Za-z]+|\d+(?:\.\d+)?|\s+|.", re.S)
 
 _GREEK = {
@@ -126,10 +158,12 @@ _SYMBOLS = {
 
 def spoken(text: str) -> str:
     """``text`` with any notation in it said in words; text without notation as it was."""
-    if not _NOTATION.search(text) or not is_plain_text(text):
+    has_symbols = any(char in UNICODE_TEX for char in text)
+    if not (_NOTATION.search(text) or has_symbols) or not is_plain_text(text):
         # A line with a link or markup in it is refused as it was written, never said.
         return text
-    reader = _Reader(_PIECE.findall(text.replace("$", " ")))
+    written = "".join(UNICODE_TEX.get(char, char) for char in text.replace("$", " "))
+    reader = _Reader(_PIECE.findall(written))
     said = _tidy("".join(reader.read()[0]))
     # "For x is less than 0" is said "for x less than 0", and "a is less than X is less
     # than b" with one "is".

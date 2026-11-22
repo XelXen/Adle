@@ -148,6 +148,31 @@ of the model's time, which varies with how long it thinks. Before figures (ADR-0
 was a request of its own, two to two and a half minutes each, one or two to a lesson; a
 figure is drawn in milliseconds and tried in the player in a second or two.
 
+### Thinking less, and a lesson begun at its first part (2026-11-22)
+
+Most of a lesson's wait was the model thinking before it wrote (18,000 to 35,000
+characters of it, at the default `reasoning_effort` of "high"). The same lesson asked at
+"medium" (ADR-048), and then the whole way again with the lesson begun at its first part:
+
+| Step | Run 4 (medium) | Two more lessons (medium) | Run 7 (medium, begun at its first part) |
+|---|---|---|---|
+| A course plan | 62 s (left at the default since) | | 37 s, 8 concepts, every section but the summary of formulas |
+| A lesson, until it can be started | 74 s, its first answer | 71 s and 53 s, each its first answer | **77 s, at its first part** |
+| Every part of it written | the same | the same | 122 s, 10 parts |
+| The model's thinking first | 1,500 to 3,300 characters | | 9,600 characters |
+| A question in the lesson | 20 s | | 19 s |
+
+At "medium" every lesson was usable at its first answer, so the lesson is no worse for the
+minutes saved. Run 7 thought three times longer than the others and could still be begun
+at 77 seconds; the rest of its parts were written while it would have been studied. Its
+figures showed what was still lost to the format: one of its five was drawn. The four
+others, and three in the two lessons before it, were shapes a model means that the format
+did not take: a step of an equation with words in it, seven steps where six were taken,
+two rises given as a list, a curve flat over most of its range taken for one that jumps, a
+choice written `a ? b : c`, and a label with words beside its formula. Each is now taken as
+the model meant it (ADR-045), and the figures of every lesson the model wrote that day are
+drawn: fifty of fifty, in nine answers. Eight requests for these runs.
+
 ## A natural voice (2026-11-21)
 
 On the development machine (an RTX 4080 Laptop GPU with 12 GB, Windows 11), with the voices

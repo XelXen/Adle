@@ -12,7 +12,12 @@ import { callCore, describeError } from '../../lib/core-client';
 import { pluralise } from '../../lib/format';
 import { WhatIsSent } from '../../components/WhatIsSent';
 import { destination, usualWait } from '../../lib/provider';
-import { isDrawingPictures, KIND_LESSON, lessonDisclosure } from '../../lib/generation';
+import {
+  hasLessonToStart,
+  isWritingTheRest,
+  KIND_LESSON,
+  lessonDisclosure,
+} from '../../lib/generation';
 import {
   formatWait,
   hypothesisLabel,
@@ -84,13 +89,14 @@ export function LearnPanel({ course }: { course: Course }) {
   /** The control that asks for a lesson, with what it sends; or where that work stands. */
   const lessonControl = (_step: NextStep, conceptId: string, primary: boolean): ReactNode => {
     const job = generation.jobs.find(KIND_LESSON, conceptId);
-    if (isDrawingPictures(job)) {
+    if (hasLessonToStart(job)) {
       // Said once, above. Another lesson on this concept can be asked for when this one
-      // has its pictures: one piece of long work at a time.
+      // is whole: one piece of long work at a time.
       return (
         <p className={styles.aiNote}>
-          A new lesson on this concept is getting its pictures. You can create another when they’re
-          done.
+          {isWritingTheRest(job)
+            ? 'A new lesson on this concept is still being written. You can create another when it’s done.'
+            : 'A new lesson on this concept is getting its pictures. You can create another when they’re done.'}
         </p>
       );
     }
@@ -169,8 +175,8 @@ export function LearnPanel({ course }: { course: Course }) {
 
   return (
     <div className={styles.panel}>
-      {/* A lesson that can be started while its pictures are still being drawn. */}
-      {generation.jobs.jobs.filter(isDrawingPictures).map((job) => (
+      {/* A lesson that can be started while the rest of it is written, or its pictures drawn. */}
+      {generation.jobs.jobs.filter(hasLessonToStart).map((job) => (
         <GenerationStatus
           key={job.id}
           job={job}

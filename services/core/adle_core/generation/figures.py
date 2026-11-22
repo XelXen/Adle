@@ -37,7 +37,10 @@ from pydantic import (
     StringConstraints,
     TypeAdapter,
     ValidationError,
+    field_validator,
 )
+
+from adle_core.generation.speech import UNICODE_TEX
 
 #: The kinds of figure there are, as the lesson format names them.
 FIGURE_KINDS = (
@@ -104,14 +107,79 @@ def _plain(text: str) -> str:
     return text
 
 
+def _symbols(text: str) -> str:
+    """Mathematics written in its own symbols ("≤", a Greek letter) as the commands of TeX
+    that say the same, outside any ``\\text{...}``: what the player's TeX is sure to set."""
+    pieces = re.split(r"(\\text\{[^{}]*\})", text)
+    return "".join(
+        piece if index % 2 else "".join(UNICODE_TEX.get(char, char) for char in piece)
+        for index, piece in enumerate(pieces)
+    )
+
+
+#: Where a formula already says how its letters are set, or names something: kept as it is.
+_SET = re.compile(
+    r"\\(?:text|textbf|textit|mathrm|mathbf|mathit|mathsf|mathtt|mathcal|mathbb|operatorname"
+    r"|mbox|begin|end)\s*\{[^{}]*\}|\\[A-Za-z]+"
+)
+#: A word of a sentence among the letters of a formula, or a few in a row ("is
+#: right-continuous"): one of three letters or more, with any words beside it.
+_WORD = r"[A-Za-z]+(?:-[A-Za-z]+)*"
+_WORDS = re.compile(
+    rf"(?<![A-Za-z])(?:[A-Za-z]{{2,}}(?:-[A-Za-z]+)*\s+)*[A-Za-z]{{3,}}(?:-[A-Za-z]+)*"
+    rf"(?:\s+{_WORD})*(?![A-Za-z])"
+)
+#: Functions TeX sets upright by a command of their own.
+_NAMED = {
+    "sin", "cos", "tan", "sec", "csc", "cot", "sinh", "cosh", "tanh", "arcsin", "arccos",
+    "arctan", "exp", "log", "lim", "max", "min", "det", "gcd", "arg", "sup", "inf",
+}  # fmt: skip
+
+
+def _words_in(piece: str) -> str:
+    def setting(match: re.Match[str]) -> str:
+        words = match.group(0)
+        if words in _NAMED:
+            return "\\" + words + " "
+        # A space beside the words stands between them and the formula: kept, as text.
+        lead = " " if match.start() > 0 and piece[match.start() - 1] == " " else ""
+        trail = " " if match.end() < len(piece) and piece[match.end()] == " " else ""
+        return "\\text{" + lead + words + trail + "}"
+
+    return _WORDS.sub(setting, piece)
+
+
+def _words_as_text(tex: str) -> str:
+    """Words in a formula set as words ("Uniform(0,10) CDF"), and the functions TeX names
+    by a command as that command ("exp(-x)"): in a formula a word is otherwise a row of
+    variables, in italics and without its spaces. A command, and what is already set as
+    text or named, is left as it is."""
+    out: list[str] = []
+    at = 0
+    for kept in _SET.finditer(tex):
+        out.append(_words_in(tex[at : kept.start()]))
+        out.append(kept.group(0))
+        at = kept.end()
+    out.append(_words_in(tex[at:]))
+    return "".join(out)
+
+
 def _tex(text: str) -> str:
-    text = undoubled(" ".join(_CONTROL.sub(" ", text).split()).strip())
-    if text.startswith("$") and text.endswith("$"):
-        text = text.strip("$").strip()
+    """A formula: TeX, with its dollar signs or without them, or words with formulas among
+    them ("$F_X$ is non-decreasing", "$f(x) = 1/2$ on [0, 2]"), set as one formula with the
+    words as text, as a cell of a table is (``_mixed``)."""
+    text = " ".join(_CONTROL.sub(" ", text).split())
+    for mark in ("$$", "$"):
+        if len(text) > 2 * len(mark) and text.startswith(mark) and text.endswith(mark):
+            inside = text[len(mark) : -len(mark)]
+            if "$" not in inside:
+                text = inside.strip()
+                break
+    if "$" in text:
+        return _mixed(text)
+    text = _words_as_text(" ".join(_symbols(undoubled(text)).split()))
     if not text:
         raise ValueError("must say something")
-    if "$" in text:
-        raise ValueError("is TeX without dollar signs")
     if _TEX_FORBIDDEN.search(text):
         raise ValueError("uses a TeX command a figure may not use")
     if re.search(r"(?<!\\)%", text):
@@ -143,7 +211,9 @@ class _Spec(BaseModel):
 
 class EquationFigure(_Spec):
     kind: Literal["equation"]
-    steps: list[Tex] = Field(min_length=2, max_length=6)
+    # One step on the stage at a time: eight is a long derivation, or a function given
+    # piece by piece, and still a step for each sentence said over it.
+    steps: list[Tex] = Field(min_length=2, max_length=8)
 
 
 class Curve(_Spec):
@@ -169,6 +239,15 @@ class Shade(_Spec):
 class GraphPoint(_Spec):
     x: Number
     curve: int = Field(default=1, ge=0, le=3)
+    label: ShortTex | None = None
+
+
+class Rise(_Spec):
+    """How much a curve rises between two values of x: on a cumulative curve, a probability."""
+
+    curve: int = Field(default=1, ge=0, le=3)
+    start: Number = Field(alias="from")
+    end: Number = Field(alias="to")
     label: ShortTex | None = None
 
 
@@ -202,9 +281,18 @@ class GraphFigure(_Spec):
     y_label: ShortTex | None = None
     curves: list[Curve] = Field(min_length=1, max_length=3)
     shade: Shade | None = None
+    rise: list[Rise] = Field(default_factory=list, max_length=3)
     points: list[GraphPoint] = Field(default_factory=list, max_length=3)
     trace: bool = False
     slider: GraphSlider | None = None
+
+    @field_validator("rise", mode="before")
+    @classmethod
+    def _one_or_more(cls, value: object) -> object:
+        # One rise, or a list of them: a model writes either.
+        if value is None:
+            return []
+        return [value] if isinstance(value, dict) else value
 
 
 class BarsFigure(_Spec):
@@ -253,7 +341,7 @@ class LayersFigure(_Spec):
     path: list[int] | None = None
 
 
-Cell = Annotated[str, StringConstraints(max_length=60)]
+Cell = Annotated[str, StringConstraints(max_length=90)]
 
 
 class TableFigure(_Spec):
@@ -432,6 +520,11 @@ def describe(figure: Any) -> str:
             extras.append(
                 f"the area under it from {ends[0]} to {ends[1]} shaded"
                 + (f" ({_math(figure.shade.label)})" if figure.shade.label else "")
+            )
+        for rise in figure.rise:
+            extras.append(
+                f"how much it rises from {_number(rise.start)} to {_number(rise.end)} marked"
+                + (f" ({_math(rise.label)})" if rise.label else "")
             )
         if figure.points:
             extras.append(
@@ -670,11 +763,56 @@ _FUNCTIONS = {
 _CONSTANTS = {"pi": "math.pi", "e": "math.e"}
 _TOKEN = re.compile(
     r"\s*(?:(?P<number>(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)|(?P<name>[A-Za-z][A-Za-z0-9]*)"
-    r"|(?P<op>\*\*|<=|>=|&&|\|\||[-+*/^(),<>]))"
+    r"|(?P<op>\*\*|<=|>=|&&|\|\||[-+*/^(),<>?:]))"
 )
 #: Words that join conditions, never values.
 _LOGIC = {"and": "and", "or": "or", "&&": "and", "||": "or"}
 _COMPARE: dict[type[ast.cmpop], str] = {ast.Lt: "<", ast.LtE: "<=", ast.Gt: ">", ast.GtE: ">="}
+
+
+def _conditional(tokens: list[str], text: str) -> list[str]:
+    """``a ? b : c``, as a model may write it from C or JavaScript, written as Python writes
+    it (``b if a else c``): within each bracket first, then at the top, from the right."""
+    unread = FigureError([f"the formula {text[:40]!r} could not be read"])
+    out: list[str] = []
+    index = 0
+    while index < len(tokens):
+        if tokens[index] != "(":
+            out.append(tokens[index])
+            index += 1
+            continue
+        depth = 0
+        for end in range(index, len(tokens)):
+            depth += {"(": 1, ")": -1}.get(tokens[end], 0)
+            if depth == 0:
+                break
+        if depth != 0:
+            raise unread
+        out += ["(", *_conditional(tokens[index + 1 : end], text), ")"]
+        index = end + 1
+    depth, asked, waiting = 0, None, 0
+    for position, piece in enumerate(out):
+        depth += {"(": 1, ")": -1}.get(piece, 0)
+        if depth or piece not in ("?", ":"):
+            continue
+        if piece == "?":
+            if asked is None:
+                asked = position
+            else:
+                waiting += 1
+        elif asked is None:
+            raise unread
+        elif waiting:
+            waiting -= 1
+        else:
+            test, then = out[:asked], _conditional(out[asked + 1 : position], text)
+            otherwise = _conditional(out[position + 1 :], text)
+            if not test or not then or not otherwise:
+                raise unread
+            return ["(", "(", *then, ")", "if", "(", *test, ")", "else", "(", *otherwise, ")", ")"]
+    if asked is not None:
+        raise unread
+    return out
 
 
 def _python_expression(text: str, parameter: str | None) -> str:
@@ -683,8 +821,9 @@ def _python_expression(text: str, parameter: str | None) -> str:
     Numbers, ``x``, the slider's name, pi and e, + - * / and powers (``^`` or ``**``),
     brackets, and sin, cos, tan, exp, log (or ln), sqrt and abs of one argument; and a
     comparison (< <= > >=, joined by and/&& or or/||), which is 1 where it holds and 0 where
-    it does not, so that a piece of a curve is written "(x >= 0) * exp(-x)". Nothing else:
-    no names, no attributes, no calls but those. "2x" is read as "2*x"."""
+    it does not, so that a piece of a curve is written "(x >= 0) * exp(-x)", or a choice
+    between two values by one ("x >= 0 ? exp(-x) : 0"). Nothing else: no names, no
+    attributes, no calls but those. "2x" is read as "2*x"."""
     tokens: list[tuple[str, str]] = []
     position = 0
     stripped = text.strip()
@@ -717,6 +856,7 @@ def _python_expression(text: str, parameter: str | None) -> str:
                 joined.append("*")
         joined.append("**" if value == "^" else _LOGIC.get(value, value))
         previous = (kind, value)
+    joined = _conditional(joined, text)
     try:
         tree = ast.parse(" ".join(joined), mode="eval")
     except SyntaxError as error:
@@ -745,6 +885,8 @@ def _python_expression(text: str, parameter: str | None) -> str:
             return emit(node.body)
         if isinstance(node, ast.Compare | ast.BoolOp):
             return f"(1.0 if {condition(node)} else 0.0)"
+        if isinstance(node, ast.IfExp):
+            return f"({emit(node.body)} if {condition(node.test)} else {emit(node.orelse)})"
         if (
             isinstance(node, ast.Constant)
             and isinstance(node.value, int | float)
@@ -796,9 +938,32 @@ def _samples(start: float, end: float, count: int = 161) -> list[float]:
     return [start + (end - start) * index / (count - 1) for index in range(count)]
 
 
+def _runs_off(
+    fn: Callable[[float, float], float],
+    p: float,
+    left: float,
+    right: float,
+    ends: tuple[float, float],
+) -> bool:
+    """Whether the curve runs off between two of its samples, as 1/x does across 0, rather
+    than stepping from one value to the other, as a comparison does, or climbing steeply."""
+    low, high = min(ends), max(ends)
+    margin = high - low
+    for step in range(1, 17):
+        x = left + (right - left) * step / 17
+        try:
+            y = fn(x, p)
+        except (ValueError, ZeroDivisionError, OverflowError):
+            return True
+        if not math.isfinite(y) or y < low - margin or y > high + margin:
+            return True
+    return False
+
+
 def _tried(fn: Callable[[float, float], float], xs: list[float], ps: list[float]) -> list[float]:
     """The curve's values where it is drawn, or FigureError where it has none: a formula
-    that cannot be worked out there, or one that jumps there, as 1/x does across 0."""
+    that cannot be worked out there, or one that runs off there, as 1/x does across 0. A
+    step, where a comparison changes, is drawn as one: a cumulative curve is made of them."""
     values: list[float] = []
     for p in ps:
         row: list[float] = []
@@ -813,9 +978,15 @@ def _tried(fn: Callable[[float, float], float], xs: list[float], ps: list[float]
         ordered = sorted(row)
         # How far the curve ranges, leaving out its most extreme tenth at each end.
         spread = ordered[len(ordered) * 9 // 10] - ordered[len(ordered) // 10]
-        jumps = max(abs(after - before) for before, after in itertools.pairwise(row))
-        if jumps > 10 * max(spread, 1e-9) and jumps > 1e-6:
-            raise FigureError(["a curve has no value somewhere it is drawn"])
+        # A change between neighbours far larger than the curve's own range is looked at
+        # closely: a pole is refused, a step or a steep climb is not. (A curve flat over
+        # most of where it is drawn has no range but its steps.)
+        limit = max(10 * max(spread, 1e-9), 1e-6)
+        for index, (before, after) in enumerate(itertools.pairwise(row)):
+            if abs(after - before) > limit and _runs_off(
+                fn, p, xs[index], xs[index + 1], (before, after)
+            ):
+                raise FigureError(["a curve has no value somewhere it is drawn"])
         values += row
     return values
 
@@ -981,10 +1152,14 @@ def _graph(figure: GraphFigure, beats: list[float]) -> tuple[str, bool]:
     # Curves are counted from 1; a model that counts from 0 numbers one of them 0. A curve
     # not named at all is the first.
     shade = figure.shade
-    named = [item for item in [shade, *figure.points] if item and "curve" in item.model_fields_set]
+    named = [
+        item
+        for item in [shade, *figure.rise, *figure.points]
+        if item and "curve" in item.model_fields_set
+    ]
     first = 0 if any(item.curve == 0 for item in named) else 1
 
-    def curve_of(item: Shade | GraphPoint) -> int:
+    def curve_of(item: Shade | Rise | GraphPoint) -> int:
         return item.curve - first if "curve" in item.model_fields_set else 0
 
     def bound(value: float | str) -> float | None:
@@ -1017,6 +1192,16 @@ def _graph(figure: GraphFigure, beats: list[float]) -> tuple[str, bool]:
         shade_spec: list[Any] | None = [index, ends[0], ends[1], shade.label or "", start, end]
     else:
         shade_spec = None
+    rise_specs: list[list[Any]] = []
+    for rise in figure.rise:
+        index = curve_of(rise)
+        if not 0 <= index < len(curves):
+            raise FigureError(["the rise names a curve there is not"])
+        _, start, end, _ = curves[index]
+        low, high = sorted((rise.start, rise.end))
+        if high - low < 1e-6 or low < start - 1e-9 or high > end + 1e-9:
+            raise FigureError(["the rise is not between two places on its curve"])
+        rise_specs.append([index, low, high, rise.label or ""])
     interactive = slider is not None
     x_label = figure.x_label or ""
     # The name of the x axis stands to the right of its end, clear of anything drawn on it.
@@ -1117,6 +1302,27 @@ def _graph(figure: GraphFigure, beats: list[float]) -> tuple[str, bool]:
             color=hues[index],
         )
 
+    def rise(self, axes, spec, p, number):
+        # How much the curve rises from one place to the other: a dashed run along, and
+        # an arrow up by the difference, named beside it. Each rise has a hue of its own.
+        hue = [self.coral, self.violet, self.green][number]
+        below = self.value(spec[0], spec[1], p)
+        above = self.value(spec[0], spec[2], p)
+        start = axes.c2p(spec[1], below)
+        corner = axes.c2p(spec[2], below)
+        end = axes.c2p(spec[2], above)
+        drawn = VGroup(
+            DashedLine(start, corner, color=self.muted),
+            Dot(color=hue, radius=0.08).move_to(start),
+            Dot(color=hue, radius=0.08).move_to(end),
+        )
+        if abs(end[1] - corner[1]) > 0.05:
+            arrow = DoubleArrow(corner, end, buff=0, color=hue, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=12)
+            drawn.add(arrow)
+            if spec[3]:
+                drawn.add(MathTex(spec[3], font_size=34, color=self.ink).next_to(arrow, RIGHT, buff=0.15))
+        return drawn
+
     def area(self, axes, index, p, low, high):
         points = [axes.c2p(low, 0)]
         for step in range(61):
@@ -1177,8 +1383,9 @@ def _graph(figure: GraphFigure, beats: list[float]) -> tuple[str, bool]:
         name.next_to(knob, LEFT, buff=0.4)
         reading = DecimalNumber({_py(slider.value)}, num_decimal_places=2, font_size=34, color=self.ink)
         reading.next_to(knob, RIGHT, buff=0.4)
-        held = {{"curves": [], "area": None}}
+        held = {{"curves": [], "area": None, "rises": []}}
         shade = {_py(shade_spec)}
+        rises = {_py(rise_specs)}
 
         def draw():
             p = knob.get_value()
@@ -1202,6 +1409,13 @@ def _graph(figure: GraphFigure, beats: list[float]) -> tuple[str, bool]:
                 curve = self.plot(axes, index, p, spans[index][0], spans[index][1])
                 held["curves"].append(curve)
                 self.add(curve)
+            for old in held["rises"]:
+                self.remove(old)
+            held["rises"] = []
+            for number in range(len(rises)):
+                drawn = self.rise(axes, rises[number], p, number)
+                held["rises"].append(drawn)
+                self.add(drawn)
             reading.set_value(p)
 
         def moved(control, previous, value):
@@ -1222,7 +1436,14 @@ def _graph(figure: GraphFigure, beats: list[float]) -> tuple[str, bool]:
             "GraphFigure", "A graph the learner changes with a slider.", body, interactive=True
         ), True
 
-    steps = 1 + len(curves) + (1 if shade_spec else 0) + (1 if points else 0) + (1 if trace else 0)
+    steps = (
+        1
+        + len(curves)
+        + (1 if shade_spec else 0)
+        + len(rise_specs)
+        + (1 if points else 0)
+        + (1 if trace else 0)
+    )
     holds = _paced(steps, beats, 1.2)
     body = (
         common
@@ -1252,6 +1473,11 @@ def _graph(figure: GraphFigure, beats: list[float]) -> tuple[str, bool]:
             if legend[len(spans)] is not None:
                 parts.append(FadeIn(legend[len(spans)]))
             self.play(*parts, run_time=1.2)
+            self.wait(holds[step])
+            step += 1
+        rises = {_py(rise_specs)}
+        for number in range(len(rises)):
+            self.play(FadeIn(self.rise(axes, rises[number], 0, number)), run_time=1.2)
             self.wait(holds[step])
             step += 1
         marks = {_py(points)}
@@ -1613,30 +1839,35 @@ _IN_TEXT = {"%": r"\%", "#": r"\#", "&": r"\&", "_": r"\_", "\\": "", "{": "", "
             "^": "", "~": ""}  # fmt: skip
 
 
+def _mixed(text: str) -> str:
+    """Words with formulas among them ("If $x_1 < x_2$ then $F(x_1) \\le F(x_2)$") as one
+    formula, the words set as text."""
+    pieces = text.split("$")
+    if len(pieces) % 2 == 0:
+        raise ValueError("has a $ without its pair")
+    parts = []
+    for index, piece in enumerate(pieces):
+        if index % 2:
+            parts.append(piece)
+        elif piece.strip():
+            words = "".join(_IN_TEXT.get(char, char) for char in _plain(piece))
+            # A space at either end of the words is kept: it stands between them and the
+            # formula beside them.
+            lead = " " if piece[:1] == " " else ""
+            trail = " " if piece[-1:] == " " else ""
+            parts.append(r"\text{" + lead + words + trail + "}")
+    return _tex(" ".join(parts))
+
+
 def _cell(text: str, *, heading: bool = False) -> list[Any]:
     """A cell as ``[is a formula, what is drawn]``: words, a formula (``$...$``), or words
-    with formulas among them ("If $x_1 < x_2$ then $F(x_1) \\le F(x_2)$"), set as one
-    formula with the words as text. A heading of a single letter names a variable and is
-    set as the formulas under it are."""
+    with formulas among them, set as one formula with the words as text (``_mixed``). A
+    heading of a single letter names a variable and is set as the formulas under it are."""
     text = " ".join(text.split())
     if not text:
         return [False, " "]
     if "$" in text:
-        pieces = text.split("$")
-        if len(pieces) % 2 == 0:
-            raise ValueError("has a $ without its pair")
-        parts = []
-        for index, piece in enumerate(pieces):
-            if index % 2:
-                parts.append(piece)
-            elif piece.strip():
-                words = "".join(_IN_TEXT.get(char, char) for char in _plain(piece))
-                # A space at either end of the words is kept: it stands between them and the
-                # formula beside them.
-                lead = " " if piece[:1] == " " else ""
-                trail = " " if piece[-1:] == " " else ""
-                parts.append(r"\text{" + lead + words + trail + "}")
-        return [True, _tex(" ".join(parts))]
+        return [True, _mixed(text)]
     if heading and re.fullmatch(r"[A-Za-z]", text):
         return [True, text]
     return [False, _plain(text)]

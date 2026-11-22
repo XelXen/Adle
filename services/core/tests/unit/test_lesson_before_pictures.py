@@ -149,10 +149,11 @@ def test_a_lesson_can_be_taken_as_soon_as_its_text_is_written(
 def test_the_voice_is_told_of_a_lesson_as_soon_as_its_words_are_stored(
     keyed: TestClient, services: Services
 ) -> None:
-    told: list[tuple[str, list[str]]] = []
+    told: list[tuple[str, int, bool]] = []
 
     def stored(lesson_id: str) -> None:
-        told.append((lesson_id, list(services.lessons.get(lesson_id).pending_scene_ids)))
+        loaded = services.lessons.get(lesson_id)
+        told.append((lesson_id, len(loaded.lesson.segments), loaded.writing))
 
     generation = GenerationService(
         services.database,
@@ -168,10 +169,13 @@ def test_the_voice_is_told_of_a_lesson_as_soon_as_its_words_are_stored(
     _, concept = a_concept(keyed)
     job = services.jobs.wait(generation.generate_lesson(concept).id, timeout=60)
     assert job.status == "succeeded", job.error_message
-    # Told once, while its pictures were still to come: a natural voice begins on the
-    # words then (ADR-042), and does not wait for the pictures.
-    assert [lesson_id for lesson_id, _ in told] == [job.result["lesson_id"]]
-    assert told[0][1]
+    # Told as soon as its first part was stored, while the rest was still being written,
+    # and again as each part came and when it ended: a natural voice begins on the words
+    # there are (ADR-042, ADR-048), and waits for neither the pictures nor the rest.
+    assert {lesson_id for lesson_id, _, _ in told} == {job.result["lesson_id"]}
+    assert told[0][1:] == (1, True)
+    assert told[-1][2] is False
+    assert [parts for _, parts, _ in told] == sorted(parts for _, parts, _ in told)
 
 
 def test_each_picture_is_added_when_it_is_drawn(

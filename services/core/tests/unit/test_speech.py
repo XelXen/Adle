@@ -124,3 +124,28 @@ def test_a_line_said_longer_than_a_caption_ends_at_a_sentence() -> None:
     said = spoken(written)
     assert len(said) <= 700
     assert said.endswith(".")
+
+
+@pytest.mark.parametrize(
+    ("written", "said"),
+    [
+        # As a real model wrote it in a summary (2026-11-22), with the symbols themselves.
+        (
+            "The expected value is E[X] = ∫ x f_X(x) dx over the support.",
+            "The expected value is E of X equals the integral of x f sub X of x dx over the "
+            "support.",
+        ),
+        (
+            "For nonnegative X, E[X] = ∫_0^∞ P(X > t) dt.",
+            "For nonnegative X, E of X equals the integral from 0 to infinity of P of (X is "
+            "greater than t) dt.",
+        ),
+        (
+            "If x ≤ 3 and " + chr(0x3C3) + " ≥ 0, then √2 ≈ 1.41.",
+            "If x is less than or equal to 3 and sigma is greater than or equal to 0, then the "
+            "square root of 2 is approximately 1.41.",
+        ),
+    ],
+)
+def test_mathematics_written_in_its_own_symbols_is_said_in_words(written: str, said: str) -> None:
+    assert spoken(written) == said

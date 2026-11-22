@@ -42,13 +42,15 @@ export interface RecordedRequest {
  *  - `HANG`: accept the request and say nothing until the test releases it or the app gives up;
  *  - `{ slowly }`: the ordinary answer, the way a model that thinks gives it: thinking for
  *    `thinkMs`, then the answer in pieces that each end just after a title, `pieceMs` apart.
+ *    With `pauseAfter`, it stops after that many pieces until the test calls `pass()` or
+ *    `release()`, or the app hangs up: a model that has written only some of a lesson.
  */
 export type Answer =
   | string
   | { status: number; retryAfter?: number }
   | { notice: string }
   | { hang: true }
-  | { slowly: true; thinkMs: number; pieceMs: number };
+  | { slowly: true; thinkMs: number; pieceMs: number; pauseAfter?: number };
 
 /** An answer that never comes by itself. */
 export const HANG: Answer = { hang: true };
@@ -157,7 +159,8 @@ export function piecesAtTitles(text: string): string[] {
 
 /**
  * Send `text` the way a model that thinks first sends it: its thinking, a pause, then the
- * answer piece by piece. Stops as soon as the app hangs up.
+ * answer piece by piece. Stops as soon as the app hangs up. Given `held`, it waits after
+ * that many pieces until `until` says to go on.
  */
 async function streamSlowly(
   request: IncomingMessage,
@@ -165,13 +168,15 @@ async function streamSlowly(
   text: string,
   thinkMs: number,
   pieceMs: number,
+  held?: { after: number; until: () => Promise<void> },
 ): Promise<void> {
   const gone = (): boolean => response.destroyed || request.socket.destroyed;
   response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
   const thinking = { choices: [{ delta: { content: null, reasoning_content: 'Planning.' } }] };
   response.write(`data: ${JSON.stringify(thinking)}\n\n`);
   await pause(thinkMs);
-  for (const piece of piecesAtTitles(text)) {
+  for (const [index, piece] of piecesAtTitles(text).entries()) {
+    if (held && index === held.after) await held.until();
     if (gone()) return;
     response.write(`data: ${JSON.stringify({ choices: [{ delta: { content: piece } }] })}\n\n`);
     await pause(pieceMs);
@@ -227,12 +232,14 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
       });
 
       const answer = held.has(kind) ? HANG : (queued.shift() ?? defaultAnswer(kind, user));
-      if (typeof answer === 'object' && 'hang' in answer) {
-        await new Promise<void>((resolve) => {
+      const released = (): Promise<void> =>
+        new Promise<void>((resolve) => {
           hanging.add(resolve);
           // The app closing the connection (a cancel) ends the wait too.
           request.socket.on('close', resolve);
         });
+      if (typeof answer === 'object' && 'hang' in answer) {
+        await released();
         if (response.destroyed || request.socket.destroyed) return;
         stream(response, defaultAnswer(kind, user));
         return;
@@ -254,6 +261,9 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
           defaultAnswer(kind, user),
           answer.thinkMs,
           answer.pieceMs,
+          answer.pauseAfter === undefined
+            ? undefined
+            : { after: answer.pauseAfter, until: released },
         );
         return;
       }

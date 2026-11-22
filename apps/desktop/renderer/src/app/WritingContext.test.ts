@@ -85,6 +85,18 @@ describe('arrivalNotice', () => {
     });
   });
 
+  it('says the rest of it is being written when it can be started at its first part', () => {
+    const begun: Job = {
+      ...drawing,
+      progress_detail: { stage: 'writing', title: 'Weights', outline: ['Why weights'] },
+    };
+    expect(newsOf(begun)).toBe('usable');
+    expect(arrivalNotice(begun)).toEqual({
+      title: 'Your lesson is ready',
+      description: 'Weights. The rest of it is being written.',
+    });
+  });
+
   it('says where suggested concepts are to be found', () => {
     expect(arrivalNotice(concepts)).toEqual({
       title: 'Suggested concepts are ready',

@@ -6,7 +6,7 @@ import { Button, Callout, Card, ProgressBar, cx } from '@adle/design-system';
 import { useBreak } from '../app/BreakContext';
 import { useRouter } from '../app/router';
 import { suggestedBreakMinutes } from '../lib/breaks';
-import { type JobFailure, jobFailure, jobProgress } from '../lib/generation';
+import { type JobFailure, isWritingTheRest, jobFailure, jobProgress } from '../lib/generation';
 import { aboutHowLong } from '../lib/provider';
 import { isJobActive } from '../lib/use-job';
 import { useNow } from '../lib/use-now';
@@ -38,8 +38,9 @@ export interface GenerationStatusProps {
    */
   usualSeconds?: number | null;
   /**
-   * The lesson this job is writing can be started already: what is still under way is its
-   * pictures (ADR-031). Stopping then stops the pictures and keeps the lesson.
+   * The lesson this job is writing can be started already: what is still under way is the
+   * rest of its parts (ADR-048) or its pictures (ADR-031). Stopping then keeps the lesson
+   * as it is.
    */
   lessonReady?: boolean;
   onCancel: () => void;
@@ -159,10 +160,13 @@ function UnderWay({
   const now = useNow();
 
   const counted = job ? jobProgress(job, waitingText) : { value: undefined, message: waitingText };
-  // Once the lesson can be started, what is left is its pictures, which count for themselves.
-  const writing = lessonReady ? null : readWritingProgress(job);
-  const headline = lessonReady ? counted.message : writingHeadline(writing, kind, counted.message);
-  const value = lessonReady ? counted.value : barValue(job, writing, counted.value);
+  // Once the lesson can be started, what is left is the rest of its parts, still seen
+  // taking shape (ADR-048), or its pictures, which count for themselves.
+  const restOfParts = lessonReady && isWritingTheRest(job);
+  const counting = lessonReady && !restOfParts;
+  const writing = counting ? null : readWritingProgress(job);
+  const headline = counting ? counted.message : writingHeadline(writing, kind, counted.message);
+  const value = counting ? counted.value : barValue(job, writing, counted.value);
   const outline = writing?.stage === 'writing' ? writing.outline : [];
   const elapsed = lessonReady ? null : elapsedSince(job?.created_at, now);
   const noun = kind === 'suggestions' ? ['concept', 'concepts'] : ['part', 'parts'];
@@ -213,13 +217,15 @@ function UnderWay({
         ) : null}
         <div className={styles.bottom}>
           <p className={styles.note}>
-            {lessonReady
-              ? 'You can start the lesson now. Its pictures appear in it as they’re drawn.'
-              : `${
-                  usualSeconds
-                    ? `Usually takes ${aboutHowLong(usualSeconds)}. `
-                    : 'This can take a few minutes. '
-                }You’ll be notified when it’s ready.`}
+            {restOfParts
+              ? 'You can start the lesson now. The rest of it is being written.'
+              : lessonReady
+                ? 'You can start the lesson now. Its pictures appear in it as they’re drawn.'
+                : `${
+                    usualSeconds
+                      ? `Usually takes ${aboutHowLong(usualSeconds)}. `
+                      : 'This can take a few minutes. '
+                  }You’ll be notified when it’s ready.`}
           </p>
           <div className={styles.actions}>
             {/* Minutes of waiting are better spent away from the screen. Once the lesson
@@ -243,7 +249,7 @@ function UnderWay({
                 size="small"
                 variant="tertiary"
                 disabled={!job}
-                aria-label="Stop drawing pictures"
+                aria-label={restOfParts ? 'Stop writing the lesson' : 'Stop drawing pictures'}
                 onClick={onCancel}
               >
                 Stop

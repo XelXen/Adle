@@ -372,6 +372,8 @@ class LessonSummary(_Output):
     progress: LessonProgress
     #: Pictures the lesson is still waiting for. It can be taken meanwhile (ADR-031).
     pictures_pending: int = 0
+    #: Its later parts are still being written. It can be taken meanwhile (ADR-048).
+    writing: bool = False
 
 
 class LessonList(_Output):
@@ -401,6 +403,9 @@ class LessonForPlayer(_Output):
     #: Who wrote it, where a model did. Absent for the sample course, and for lessons
     #: written before this was kept.
     written_by: LessonAuthor | None = None
+    #: The rest of the lesson is still being written. Its parts are added after these, and
+    #: none of these changes (ADR-048).
+    writing: bool = False
 
 
 class LessonProgressUpdate(_Input):

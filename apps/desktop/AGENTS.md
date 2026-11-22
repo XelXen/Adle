@@ -233,12 +233,17 @@ most, a file's name.
   fails in the player (`ScenePlayer` shows the fallback), the core withheld the scene
   (no artifact for the reference), the scene is still being drawn, and the scene arrived
   after the part had begun (ADR-031).
-- A lesson can be open before all its pictures are drawn. `useLessonPictures` finds out
-  when one has arrived; it is not a clock of the lesson and decides nothing about what is
-  said or when. The lesson's words stay as they were when it was opened. A picture takes
-  its place by itself only in a part that has not begun (`status === 'ready'`); otherwise
-  it is offered. Ask the picture, not the part, whether there is anything to operate
-  (`scene.interactive`): the two can disagree in a lesson opened early.
+- A lesson can be open before all its pictures are drawn (ADR-031), and before all its
+  parts are written (ADR-048). `useLessonUpdates` finds out when a picture or a part has
+  arrived; it is not a clock of the lesson and decides nothing about what is said or when.
+  The words of a part already there stay as they were when it was opened, and a new part
+  only ever comes after the last (`LessonController.extend`). A learner who reaches the
+  end of what is written waits there (`held`) and goes on into the next part when it
+  comes; the last part so far is not the last while `more` is true, so it never says
+  "Finish lesson". A picture takes its place by itself only in a part that has not begun
+  (`status === 'ready'`); otherwise it is offered. Ask the picture, not the part, whether
+  there is anything to operate (`scene.interactive`): the two can disagree in a lesson
+  opened early.
 - **A lesson is watched on a screen** (`StageFrame`, ADR-035): dark in either theme, with
   the words being said along its foot. Whatever a part shows goes on it (`ScenePlayer
   onStage`, or the board), except a question, which is a card of the page. On the screen
@@ -300,9 +305,12 @@ most, a file's name.
   `adle.setFocused(false)` first (one is only asked for while Adle is in the background).
 - Read a job's `result` only through `lib/generation.ts`. It is free-form in the contract and is
   checked there.
-- **A lesson job has a lesson before it has ended** (ADR-031): `readLessonOutcome` reads it
-  from a running job, `isDrawingPictures` says that only pictures are left, and
-  `useGeneration`'s third argument (`onUsable`) fires when that begins. Show such a job with
+- **A lesson job has a lesson before it has ended** (ADR-031, ADR-048): `readLessonOutcome`
+  reads it from a running job, as soon as its first part is written. `hasLessonToStart`
+  says there is one; `isWritingTheRest` that its later parts are still being written (it
+  is still seen taking shape, part by part), and `isDrawingPictures` that only pictures are
+  left (the core reports the `drawing` stage before that). `useGeneration`'s third argument
+  (`onUsable`) fires when there is one. Show such a job with
   `GenerationStatus lessonReady`. A tab of the course says "Lesson ready" with
   `useLessonNotices`; everywhere else `WritingProvider` does, and it keeps the one record
   of who was told (`wasTold`, `markTold`), so a lesson is announced once however the

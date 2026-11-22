@@ -15,7 +15,8 @@ import { useToast } from '@adle/design-system';
 import { getBridge } from '../lib/bridge';
 import { callCore } from '../lib/core-client';
 import {
-  isDrawingPictures,
+  hasLessonToStart,
+  isWritingTheRest,
   jobFailure,
   KIND_LESSON,
   KIND_PROPOSAL,
@@ -90,11 +91,12 @@ export function leavesTellingToScreen(here: Route, job: Pick<Job, 'kind' | 'cour
  * What there is to say about a piece of long work now: it has something to use, it could
  * not be finished, or nothing yet.
  *
- * A lesson has something to use as soon as its text is written, while its pictures are
- * still being drawn (ADR-031). That is when it is said, and it is said once.
+ * A lesson has something to use as soon as its first part is written, while the rest of
+ * it is written (ADR-048) and its pictures are drawn (ADR-031). That is when it is said,
+ * and it is said once.
  */
 export function newsOf(job: Job): 'usable' | 'failed' | null {
-  if (job.status === 'succeeded' || isDrawingPictures(job)) return 'usable';
+  if (job.status === 'succeeded' || hasLessonToStart(job)) return 'usable';
   return job.status === 'failed' ? 'failed' : null;
 }
 
@@ -107,9 +109,14 @@ export function arrivalNotice(job: Job): { title: string; description: string | 
     };
   }
   const outcome = readLessonOutcome(job);
-  const words = titled(outcome?.title ?? '', [
-    outcome && outcome.picturesPending > 0 ? 'Its pictures are still being drawn.' : '',
-  ]);
+  // Begun at its first part, the rest of it is still being written (ADR-048); or it is all
+  // written and its pictures are still being drawn (ADR-031).
+  const still = isWritingTheRest(job)
+    ? 'The rest of it is being written.'
+    : outcome && outcome.picturesPending > 0
+      ? 'Its pictures are still being drawn.'
+      : '';
+  const words = titled(outcome?.title ?? '', [still]);
   return { title: 'Your lesson is ready', description: words || undefined };
 }
 
@@ -208,7 +215,7 @@ export function WritingProvider({ children }: { children: ReactNode }) {
           known.current = now;
           setJobs(list.jobs);
           // Work that is still under way and already has something to start.
-          for (const job of list.jobs) if (isDrawingPictures(job)) announce(job);
+          for (const job of list.jobs) if (hasLessonToStart(job)) announce(job);
           for (const id of gone) {
             callCore('jobs.get', { path: { job_id: id } }).then(
               (job) => {

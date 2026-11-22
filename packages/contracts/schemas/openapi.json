@@ -832,6 +832,7 @@
             "title": "Scenes",
             "type": "array"
           },
+          "writing": { "default": false, "title": "Writing", "type": "boolean" },
           "written_by": {
             "anyOf": [{ "$ref": "#/components/schemas/LessonAuthor" }, { "type": "null" }]
           }
@@ -923,7 +924,8 @@
           "pictures_pending": { "default": 0, "title": "Pictures Pending", "type": "integer" },
           "progress": { "$ref": "#/components/schemas/LessonProgress" },
           "segment_count": { "title": "Segment Count", "type": "integer" },
-          "title": { "title": "Title", "type": "string" }
+          "title": { "title": "Title", "type": "string" },
+          "writing": { "default": false, "title": "Writing", "type": "boolean" }
         },
         "required": [
           "id",

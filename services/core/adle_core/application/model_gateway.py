@@ -29,6 +29,7 @@ import time
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Literal
 
 from sqlalchemy import select
@@ -330,6 +331,7 @@ class ModelGateway:
         on_busy: Callable[[str], None] | None = None,
         provider_id: str | None = None,
         on_piece: Callable[[str], None] | None = None,
+        on_writer: Callable[[ChatResult], None] | None = None,
     ) -> ChatResult:
         """Send one request, or raise an ``AdleError`` that says why it was not answered.
 
@@ -346,7 +348,8 @@ class ModelGateway:
 
         The answer says who wrote it (``provider_name``, ``model_name``) and, when that was
         not who was asked first, who it stood in for (``instead_of_provider``,
-        ``instead_of``).
+        ``instead_of``). ``on_writer`` is told the same, as an answer with no words yet,
+        when a model begins to write: for something kept before its answer has ended.
         """
         if provider_id is not None:
             if provider_id not in self._clients:
@@ -374,6 +377,8 @@ class ModelGateway:
                         on_fallback,
                         on_stage,
                         on_piece,
+                        on_writer,
+                        standing_in_for=clients[0].config.display_name if position else "",
                     )
                 finally:
                     self._in_flight[config.provider_id].release()
@@ -432,18 +437,42 @@ class ModelGateway:
         on_fallback: Callable[[str, str, PassedOver], None] | None,
         on_stage: Callable[[str, Stage], None] | None,
         on_piece: Callable[[str], None] | None = None,
+        on_writer: Callable[[ChatResult], None] | None = None,
+        *,
+        standing_in_for: str = "",
     ) -> ChatResult:
         """One provider: its first model for this kind of request, or the next when that one
-        is away (ADR-021, ADR-039)."""
+        is away (ADR-021, ADR-039). ``standing_in_for`` is the provider asked first, when
+        this one is asked in its place."""
         if not client.has_key:
             raise ProviderKeyMissingError
         config = client.config
         order = config.models_for(request.purpose)
         models = self._models_to_ask(config, order)
         for position, spec in enumerate(models):
+            # Who writes the answer, if this model does: what its answer will say.
+            writer = ChatResult(
+                text="",
+                prompt_tokens=0,
+                completion_tokens=0,
+                usage_reported=False,
+                finish_reason=None,
+                model_name=spec.name,
+                instead_of="" if spec == order[0] else order[0].name,
+                provider_name=config.display_name,
+                instead_of_provider=standing_in_for,
+            )
             try:
                 result = self._ask(
-                    client, spec, request, prompt_tokens, cancelled, on_wait, on_stage, on_piece
+                    client,
+                    spec,
+                    request,
+                    prompt_tokens,
+                    cancelled,
+                    on_wait,
+                    on_stage,
+                    on_piece,
+                    None if on_writer is None else partial(on_writer, writer),
                 )
             except (ProviderModelUnavailableError, ProviderRequestRefusedError) as error:
                 if len(order) == 1:
@@ -492,10 +521,14 @@ class ModelGateway:
         on_wait: Callable[[float], None] | None,
         on_stage: Callable[[str, Stage], None] | None = None,
         on_piece: Callable[[str], None] | None = None,
+        on_writing: Callable[[], None] | None = None,
     ) -> ChatResult:
-        """One model, asked once; twice only if the provider said to slow down."""
+        """One model, asked once; twice only if the provider said to slow down.
+        ``on_writing`` is told when it begins to write its answer."""
 
         def stage_of_this_model(stage: Stage) -> None:
+            if stage == "writing" and on_writing is not None:
+                on_writing()
             if on_stage is not None:
                 on_stage(spec.name, stage)
 

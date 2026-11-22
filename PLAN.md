@@ -1049,6 +1049,15 @@ words are stored (ADR-047). Evidence: `test_figures.py`, `test_lesson_figures.py
 (`e2e/scene-player`), a lesson with figures end to end (`e2e/generation`), and the real
 runs recorded in `PERFORMANCE.md`.
 
+Then, the largest wait left in the workflow: **a lesson begins at its first part** while the
+rest is written, read from the answer as it arrives, each part added after the last and
+never changed; the learner waits at the end of what is written and goes on by itself; and
+Nemotron 3 Ultra thinks at "medium" for a lesson, measured as quick and as correct
+(ADR-048). Evidence: `test_stream.py`, `test_lesson_part_by_part.py`, `controller.test.ts`,
+`use-lesson-updates.test.tsx`, two journeys in `e2e/generation` (a lesson seen taking shape
+and begun while it is written; one begun at its first part that waits for its second), and
+the real runs in `PERFORMANCE.md`.
+
 ### Deviations from this plan (each has an ADR)
 
 - **Narration can be a natural voice that runs on the learner's computer** (ADR-042),
@@ -1062,6 +1071,10 @@ runs recorded in `PERFORMANCE.md`.
 - **The core mends what it can in a model's lesson** (ADR-047): notation in narration is
   said in words, and a practice question that is not whole is left out, where section 9
   would refuse the draft and ask again.
+- **A lesson is begun at its first part** (ADR-048), the way section 12.1 hoped for,
+  without changing the draft format or the budget of requests: the one answer is read as
+  it arrives. Once begun, a part that cannot be used is left out rather than the lesson
+  being asked for again.
 
 - **Installers are made with each system's own tool** (Inno Setup, hdiutil, dpkg-deb), not
   with a packaging framework, and nothing is signed: the owner's decision (ADR-034). Section

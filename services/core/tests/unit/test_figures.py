@@ -131,7 +131,7 @@ def test_a_curve_without_a_value_where_it_is_drawn_is_refused() -> None:
         {"steps": [r"\def\x{1} \x", "y"]},
         {"steps": ["{x", "y"]},
         {"steps": ["x % comment", "y"]},
-        {"steps": ["a"] * 7},
+        {"steps": ["a"] * 9},
     ],
 )
 def test_an_equation_that_could_not_be_drawn_safely_is_refused(change: dict[str, Any]) -> None:
@@ -340,3 +340,122 @@ def test_a_formula_escaped_twice_is_drawn_as_it_was_meant() -> None:
     }
     interval = assigned(compile_figure(line, beat_seconds=BEATS).source, "interval")
     assert interval[2] == r"P(a < X \le b)"
+
+
+def test_a_cumulative_curve_shows_a_probability_as_how_much_it_rises() -> None:
+    """A real lesson shaded the area under a cumulative curve and called it a probability
+    (2026-11-22). The area under a density is one; on a cumulative curve it is a rise."""
+    figure = compile_figure(EXAMPLES["graph_rise"], beat_seconds=BEATS)
+    rises = assigned(figure.source, "rises")
+    assert [rise[:3] for rise in rises] == [[0, 0.0, 2.0], [0, 5.0, 8.0]]
+    assert "how much it rises from $5$ to $8$ marked" in figure.described
+    # One rise, as a model also writes it, is a list of one.
+    one = compile_figure(
+        {**EXAMPLES["graph_rise"], "rise": {"from": 2, "to": 5}}, beat_seconds=BEATS
+    )
+    assert [rise[:3] for rise in assigned(one.source, "rises")] == [[0, 2.0, 5.0]]
+    many = {**EXAMPLES["graph_rise"], "rise": [{"from": 0, "to": 1}] * 4}
+    with pytest.raises(FigureError, match="rise"):
+        compile_figure(many, beat_seconds=BEATS)
+    outside = {**EXAMPLES["graph_rise"], "rise": {"from": 2, "to": 15}}
+    with pytest.raises(FigureError, match="rise"):
+        compile_figure(outside, beat_seconds=BEATS)
+    flat = {**EXAMPLES["graph_rise"], "rise": {"from": 3, "to": 3}}
+    with pytest.raises(FigureError, match="rise"):
+        compile_figure(flat, beat_seconds=BEATS)
+
+
+# -- what a real model wrote, again (2026-11-22) -------------------------------------------------
+#
+# A lesson on a chapter about distributions, written by Nemotron 3 Ultra at "medium": five
+# figures written, one drawn. Each of these is the shape of one that was lost.
+
+
+def test_a_step_of_an_equation_may_say_something_in_words_beside_its_formula() -> None:
+    figure = {
+        "kind": "equation",
+        "steps": [r"$F(x) = P(X \le x)$", "$F$ is non-decreasing", "F is right-continuous"],
+    }
+    parts = assigned(compile_figure(figure, beat_seconds=BEATS).source, "parts")
+    assert parts[1] == [r"\displaystyle F \text{ is non-decreasing}"]
+    assert parts[2] == [r"\displaystyle F \text{ is right-continuous}"]
+
+
+def test_a_function_given_piece_by_piece_may_take_more_steps() -> None:
+    steps = [r"F(x) = 0 \quad (x < 1)"]
+    steps += [rf"F(x) = {k}/6 \quad ({k} \le x < {k + 1})" for k in range(1, 6)]
+    steps += [r"F(x) = 1 \quad (x \ge 6)"]
+    figure = {"kind": "equation", "steps": steps}
+    assert len(assigned(compile_figure(figure, beat_seconds=BEATS).source, "parts")) == 7
+
+
+def test_a_curve_flat_over_most_of_where_it_is_drawn_is_not_taken_for_a_pole() -> None:
+    """A uniform distribution's cumulative curve with its width on a slider: at its least
+    width the curve is flat almost everywhere, and its one climb looked like a jump."""
+    figure = {
+        "kind": "graph",
+        "x": [-1, 21],
+        "curves": [{"f": "(x<0)*0 + (x>=0)*(x<=b)*(x/b) + (x>b)*1", "label": "F(x)"}],
+        "slider": {"name": "b", "label": "b", "min": 1, "max": 20, "value": 10},
+    }
+    assert compile_figure(figure, beat_seconds=BEATS).interactive
+    # A step where a comparison changes, as a die's cumulative curve has six of.
+    die = " + ".join(f"(x >= {k}) / 6" for k in range(1, 7))
+    steps = {"kind": "graph", "x": [0, 7], "curves": [{"f": die}]}
+    assert compile_figure(steps, beat_seconds=BEATS).kind == "graph"
+    # A pole is still refused, wherever the samples fall.
+    for formula, span in (("1/(x - 0.3)", [-1, 2]), ("tan(x)", [0, 3]), ("1/x^2", [-1, 2])):
+        pole = {"kind": "graph", "x": span, "curves": [{"f": formula}]}
+        with pytest.raises(FigureError, match="no value"):
+            compile_figure(pole, beat_seconds=BEATS)
+
+
+def test_words_in_a_formula_are_set_as_words_and_symbols_as_tex() -> None:
+    figure = {
+        "kind": "graph",
+        "x": [-1, 11],
+        "curves": [{"f": "(x >= 0 && x <= 10) * x / 10 + (x > 10) * 1", "label": "Uniform CDF"}],
+        "rise": [{"from": 0, "to": 3, "label": "P(X" + chr(0x2264) + "3)=0.3"}],
+        "x_label": "x",
+        "y_label": chr(0x03C3) + "^2",
+    }
+    compiled = compile_figure(figure, beat_seconds=BEATS)
+    assert r"$\text{Uniform CDF}$" in compiled.described
+    assert assigned(compiled.source, "rises")[0][3] == r"P(X \le 3)=0.3"
+    assert r"\sigma ^2" in compiled.source
+    # A function TeX has a command for is set by it; a command is left as it is.
+    exponential = {"kind": "graph", "x": [0, 3], "curves": [{"f": "exp(-x)", "label": "exp(-x)"}]}
+    assert r"\exp (-x)" in compile_figure(exponential, beat_seconds=BEATS).source
+    named = {**exponential, "curves": [{"f": "exp(-x)", "label": r"\operatorname{Var}(X)"}]}
+    assert r"\operatorname{Var}(X)" in compile_figure(named, beat_seconds=BEATS).source
+
+
+@pytest.mark.parametrize(
+    ("formula", "values"),
+    [
+        ("(x >= 0 && x <= 1) ? 2*x : 0", [0.0, 1.0, 0.0]),
+        ("x < 0 ? 0 : x < 1 ? x : 1", [0.0, 0.5, 1.0]),
+        ("x > 0 ? (x < 1 ? x : 1) : 0", [0.0, 0.5, 1.0]),
+    ],
+)
+def test_a_choice_between_two_values_is_read_as_a_model_writes_it(
+    formula: str, values: list[float]
+) -> None:
+    fn = _function(_python_expression(formula, None))
+    assert [fn(x, 0) for x in (-0.5, 0.5, 1.5)] == values
+
+
+@pytest.mark.parametrize("formula", ["x ? 1", "? 1 : 0", "x : 1", "x ? : 1", "x ? 1 :"])
+def test_a_choice_that_is_not_whole_is_refused(formula: str) -> None:
+    with pytest.raises(FigureError, match="could not be read"):
+        _python_expression(formula, None)
+
+
+def test_a_label_may_say_something_in_words_beside_its_formula() -> None:
+    figure = {
+        "kind": "graph",
+        "x": [-1, 3],
+        "curves": [{"f": "(x>=0 && x<=2) * 0.5", "label": "$f(x) = 1/2$ on [0, 2]"}],
+    }
+    described = compile_figure(figure, beat_seconds=BEATS).described
+    assert r"$f(x) = 1/2 \text{ on [0, 2]}$" in described

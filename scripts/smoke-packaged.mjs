@@ -216,12 +216,18 @@ function resourcesOf(executable) {
     : path.join(path.dirname(executable), 'resources');
 }
 
-/** The processes running a program from inside a folder, as the system lists them. */
+/**
+ * The processes running a program from inside a folder, as the system lists them. Not this
+ * one, whose own arguments name the app it checks.
+ */
 function processesFrom(folder) {
   const listing = spawnSync('ps', ['-A', '-ww', '-o', 'pid=', '-o', 'args='], {
     encoding: 'utf8',
   });
-  return (listing.stdout ?? '').split('\n').filter((line) => line.includes(folder));
+  return (listing.stdout ?? '')
+    .split('\n')
+    .filter((line) => line.includes(folder))
+    .filter((line) => Number.parseInt(line.trim(), 10) !== process.pid);
 }
 
 /**
@@ -405,13 +411,17 @@ async function main() {
 
   // Closed abruptly, as when the computer shuts down: only the app itself is ended here.
   child.kill();
-  await sleep(500);
-  // The core holds its database open. If it stayed behind, the profile could not be removed.
-  rmSync(profile, { recursive: true, force: true, maxRetries: 60, retryDelay: 250 });
-  if (existsSync(profile)) throw new Error('The core stayed behind after the app was closed.');
-  // That is true on Windows only. Elsewhere a folder can be removed from under a process
-  // that has it open, so there the processes themselves are looked at.
-  if (!isWindows()) {
+  if (isWindows()) {
+    await sleep(500);
+  } else {
+    // Here a folder can be removed from under a process that has it open, and a process
+    // that is still ending can write into it again: the processes themselves are looked at
+    // first, the app's and then the core's, and only after that is the profile removed.
+    await until(
+      () => processesFrom(path.dirname(executable)).length === 0,
+      20_000,
+      "the app's own processes to end after it was closed",
+    );
     const core = path.join(resourcesOf(executable), 'core');
     await until(
       () => processesFrom(core).length === 0,
@@ -419,6 +429,10 @@ async function main() {
       'the core to stop after the app was closed (it stayed behind)',
     );
   }
+  // On Windows the core holds its database open: had it stayed behind, the profile could
+  // not be removed.
+  rmSync(profile, { recursive: true, force: true, maxRetries: 60, retryDelay: 250 });
+  if (existsSync(profile)) throw new Error('The core stayed behind after the app was closed.');
   console.log('  PASS  the core does not stay behind when the app is ended');
 }
 

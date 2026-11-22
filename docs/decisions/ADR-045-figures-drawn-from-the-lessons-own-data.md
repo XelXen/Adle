@@ -88,6 +88,24 @@ lines, reliably; writing the program that draws it is where the time and the fai
 - **The scene policy refuses `Indicate` given a color**: found in a figure, it makes a
   point that is not a number in the pinned runtime and the scene stops. Without a color it
   runs.
+- **Added the same day: a rise.** A graph may show how much its first curve rises between
+  two values of `x` (`rise`: `from`, `to`, a label), drawn as the two heights and the
+  distance between them. On a cumulative curve that is a probability, which the lessons on
+  the owner's chapter had shaded as an area under the curve: the prompt now says that a
+  probability is an area only under a density. An example of it runs in the player with
+  the others.
+- **Added the same day, from the lessons written at "medium" (ADR-048):** of five figures
+  one was drawn, and three more were lost in two other lessons, each to a shape the model
+  meant and the format did not take. So: any formula may have words beside it ("$F_X$ is
+  non-decreasing", "$f(x) = 1/2$ on [0, 2]"), set as one formula with the words as text;
+  words written inside a formula are set as words, and a function TeX has a command for
+  (`exp`, `max`) by that command; a symbol written for itself (≤, a Greek letter) is
+  written as its TeX command; an equation may take eight steps; a graph may show up to
+  three rises, given as one or as a list, each in a hue of its own; a choice between two
+  values may be written as C writes it (`x >= 0 ? exp(-x) : 0`); and a change between two
+  samples far larger than the curve's range is looked at closely, so that only a pole (1/x
+  across 0) is refused, never a step or a steep climb on a curve that is flat elsewhere.
+  Measured on every lesson the model wrote that day: fifty figures of fifty are drawn.
 
 ## Consequences
 

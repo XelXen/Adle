@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PlayerLesson } from '@adle/contracts';
 
-import { canContinue, LessonController, type PlaybackHost } from './controller';
+import { canContinue, LessonController, type LessonSegment, type PlaybackHost } from './controller';
 import {
   type NarrationHandlers,
   type Narrator,
@@ -517,5 +517,85 @@ describe('going straight to the next question', () => {
     expect(controller.nextQuestionIndex()).toBeNull();
     expect(controller.skipToNextQuestion()).toBe(false);
     expect(host.saved).toEqual([]);
+  });
+});
+
+describe('a lesson still being written (ADR-048)', () => {
+  function growing() {
+    const narrator = new FakeNarrator();
+    const host: PlaybackHost & { saved: [number, boolean][] } = {
+      narrator,
+      saved: [],
+      advanceScene: () => undefined,
+      saveProgress: (at, completed) => {
+        host.saved.push([at, completed]);
+      },
+    };
+    const first = { ...LESSON, segments: LESSON.segments.slice(0, 2) };
+    const controller = new LessonController(first, host, { position: 0 }, { more: true });
+    return { controller, narrator, host };
+  }
+
+  it('opens with the parts written so far and says more are coming', () => {
+    const { controller } = growing();
+    expect(controller.getState()).toMatchObject({ parts: 2, more: true, held: false });
+    expect(controller.segments.map((segment) => segment.id)).toEqual(
+      LESSON.segments.slice(0, 2).map((segment) => segment.id),
+    );
+  });
+
+  it('adds the parts written since, after the last, and changes none it has', () => {
+    const { controller } = growing();
+    const opened = controller.segments[0];
+    const changed = { ...LESSON.segments[0], title: 'Written over' } as LessonSegment;
+    controller.extend([changed, ...LESSON.segments.slice(1, 4)], true);
+    expect(controller.segments).toHaveLength(4);
+    expect(controller.segments[0]).toBe(opened);
+    expect(controller.getState()).toMatchObject({ parts: 4, more: true });
+  });
+
+  it('waits at the end of what is written, and goes on by itself when the next part comes', () => {
+    const { controller, narrator, host } = growing();
+    controller.play();
+    narrator.finish();
+    controller.next();
+    narrator.finish();
+    expect(controller.getState().segmentIndex).toBe(1);
+    // Past the last part written so far: held, not finished.
+    expect(controller.next()).toBe(true);
+    expect(controller.getState()).toMatchObject({ held: true, finished: false, segmentIndex: 1 });
+
+    controller.extend(LESSON.segments.slice(0, 3), true);
+    expect(controller.getState()).toMatchObject({ segmentIndex: 2, held: false, parts: 3 });
+    // The learner had pressed play: the new part goes on as the others did.
+    expect(host.saved.at(-1)).toEqual([2, false]);
+  });
+
+  it('finishes where it is when no more parts will come', () => {
+    const { controller, narrator, host } = growing();
+    controller.goTo(0);
+    controller.play();
+    narrator.finish();
+    controller.next();
+    narrator.finish();
+    controller.next();
+    expect(controller.getState().held).toBe(true);
+
+    controller.extend(LESSON.segments.slice(0, 2), false);
+    expect(controller.getState()).toMatchObject({ finished: true, held: false, more: false });
+    expect(host.saved.at(-1)).toEqual([1, true]);
+  });
+
+  it('is never finished while more parts are coming, and finished once they have all come', () => {
+    const { controller, narrator } = growing();
+    controller.extend(LESSON.segments, false);
+    controller.goTo(0);
+    for (const _ of LESSON.segments) {
+      controller.play();
+      narrator.finish();
+      controller.markAnswered();
+      controller.next();
+    }
+    expect(controller.getState().finished).toBe(true);
   });
 });

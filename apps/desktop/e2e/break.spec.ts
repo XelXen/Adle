@@ -111,7 +111,14 @@ test.describe('waiting for something to be written', () => {
     provider.pass();
     const told = page.getByRole('status').filter({ hasText: 'Your lesson is ready' });
     await expect(told).toBeVisible({ timeout: 60_000 });
-    await expect(told).toContainText(`${WRITTEN}. Its pictures are still being drawn.`);
+    // Begun at its first part (ADR-048), it is told as soon as it is seen: this answer
+    // arrives all at once, and is seen either while its last parts are being taken in, for
+    // a moment, or once its pictures are what is left.
+    await expect(told).toContainText(
+      new RegExp(
+        `${WRITTEN}\\. (Its pictures are still being drawn|The rest of it is being written)\\.`,
+      ),
+    );
     // The computer says so too. Its words are fixed: nothing of the lesson is in them.
     await expect
       .poll(() => adle.notices())

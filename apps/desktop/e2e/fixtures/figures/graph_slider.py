@@ -81,6 +81,27 @@ class GraphFigure(InteractiveScene):
             color=hues[index],
         )
 
+    def rise(self, axes, spec, p, number):
+        # How much the curve rises from one place to the other: a dashed run along, and
+        # an arrow up by the difference, named beside it. Each rise has a hue of its own.
+        hue = [self.coral, self.violet, self.green][number]
+        below = self.value(spec[0], spec[1], p)
+        above = self.value(spec[0], spec[2], p)
+        start = axes.c2p(spec[1], below)
+        corner = axes.c2p(spec[2], below)
+        end = axes.c2p(spec[2], above)
+        drawn = VGroup(
+            DashedLine(start, corner, color=self.muted),
+            Dot(color=hue, radius=0.08).move_to(start),
+            Dot(color=hue, radius=0.08).move_to(end),
+        )
+        if abs(end[1] - corner[1]) > 0.05:
+            arrow = DoubleArrow(corner, end, buff=0, color=hue, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=12)
+            drawn.add(arrow)
+            if spec[3]:
+                drawn.add(MathTex(spec[3], font_size=34, color=self.ink).next_to(arrow, RIGHT, buff=0.15))
+        return drawn
+
     def area(self, axes, index, p, low, high):
         points = [axes.c2p(low, 0)]
         for step in range(61):
@@ -134,8 +155,9 @@ class GraphFigure(InteractiveScene):
         name.next_to(knob, LEFT, buff=0.4)
         reading = DecimalNumber(0.0, num_decimal_places=2, font_size=34, color=self.ink)
         reading.next_to(knob, RIGHT, buff=0.4)
-        held = {"curves": [], "area": None}
+        held = {"curves": [], "area": None, "rises": []}
         shade = [0, -1.0, 1.0, '', -4.0, 4.0]
+        rises = []
 
         def draw():
             p = knob.get_value()
@@ -159,6 +181,13 @@ class GraphFigure(InteractiveScene):
                 curve = self.plot(axes, index, p, spans[index][0], spans[index][1])
                 held["curves"].append(curve)
                 self.add(curve)
+            for old in held["rises"]:
+                self.remove(old)
+            held["rises"] = []
+            for number in range(len(rises)):
+                drawn = self.rise(axes, rises[number], p, number)
+                held["rises"].append(drawn)
+                self.add(drawn)
             reading.set_value(p)
 
         def moved(control, previous, value):

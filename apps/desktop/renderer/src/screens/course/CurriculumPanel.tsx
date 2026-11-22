@@ -8,7 +8,7 @@ import {
   Plus,
   Sparkles,
 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import type { Concept, Course, Curriculum, Job, LessonSummary } from '@adle/contracts';
 import {
@@ -34,7 +34,8 @@ import { pluralise } from '../../lib/format';
 import { destination, usualWait } from '../../lib/provider';
 import {
   authorName,
-  isDrawingPictures,
+  hasLessonToStart,
+  isWritingTheRest,
   KIND_LESSON,
   KIND_PROPOSAL,
   readLessonOutcome,
@@ -127,6 +128,22 @@ export function CurriculumPanel({ course }: { course: Course }) {
 
   const { jobs, starting, refusals, begin, putAway } = generation;
   const cancelJob = generation.cancel;
+
+  // A lesson's row says when the rest of it is still being written (ADR-048). Once every
+  // part is, the row is read again, without waiting for the pictures that follow.
+  const { reload: reloadLessons } = lessons;
+  const stillWriting = jobs.jobs
+    .filter(isWritingTheRest)
+    .map((job) => job.id)
+    .sort()
+    .join(',');
+  const wasWriting = useRef(stillWriting);
+  useEffect(() => {
+    const now = new Set(stillWriting.split(',').filter(Boolean));
+    const ended = wasWriting.current.split(',').some((id) => id !== '' && !now.has(id));
+    wasWriting.current = stillWriting;
+    if (ended) reloadLessons();
+  }, [stillWriting, reloadLessons]);
 
   // Suggestions that arrived while this screen was closed are still waiting to be looked at.
   const { track } = jobs;
@@ -531,7 +548,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
                   lessons={lessonsFor(selected)}
                   generation={{
                     job: jobs.find(KIND_LESSON, selected.id),
-                    lessonReady: isDrawingPictures(jobs.find(KIND_LESSON, selected.id)),
+                    lessonReady: hasLessonToStart(jobs.find(KIND_LESSON, selected.id)),
                     starting: starting.has(selected.id),
                     refusal: refusals.get(selected.id) ?? null,
                     destination: destination(providerStatus, 'lesson'),

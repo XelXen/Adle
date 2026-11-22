@@ -67,6 +67,7 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Nothing secret is about to be committed | `npm run secrets:check` (part of `check`) |
 | Try the real providers by hand (spends allowance; never in a test) | `uv run --directory services/core python ../../scripts/dev/real_provider_check.py --help` |
 | Time every model on Adle's own prompts, by hand (spends allowance) | `uv run --directory services/core python ../../scripts/dev/benchmark_models.py --help` |
+| Which figures in kept answers Adle can draw, and why not (offline) | `uv run --directory services/core python ../../scripts/dev/figure_census.py <answer files>` |
 | Measure what a learner waits for | `node scripts/measure.mjs` (`--packaged` for the packaged build) |
 | Lock a natural voice's programs again | `bash scripts/dev/voice_locks.sh` (after a version in it changes; then set each voice up by hand, ADR-042) |
 
@@ -151,9 +152,11 @@ is built from it, and an alpha or a stable version is published from a release c
 - Never shame, never trap the learner in repetition, never show mastery as a precise percentage,
   never mark mastery from one answer. Always say why the next step was chosen.
 - A break is offered and never counted: no streak, total, or reminder (ADR-026).
-- A lesson is not kept back for its pictures (ADR-031): it can be started when its text is
-  written, the learner is told once, and a picture that arrives is never sprung on someone
-  in the middle of a part. Removing a lesson or a course stops the work for it.
+- A lesson is not kept back for its pictures (ADR-031), nor for its later parts
+  (ADR-048): it can be started when its first part is written, the learner is told once,
+  a part already there never changes, and a picture that arrives is never sprung on
+  someone in the middle of a part. Once begun, a lesson is never written again. Removing
+  a lesson or a course stops the work for it.
 - A question asked during a lesson is a note beside one part, not a chat (ADR-024). It never
   gets the answer to a question the lesson is asking.
 - Every animation has a text equivalent; every scene control has a keyboard-operable mirror.
@@ -184,6 +187,8 @@ account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day 
   player, the error and the file (ADR-038). What the core can mend in a lesson's answer it
   mends instead of asking again: notation in narration is said in words, a broken practice
   question is left out, a figure that cannot be drawn is told in words (ADR-047).
+  A lesson's words are one request, read part by part as they arrive; once a lesson has
+  begun it is never asked for again (ADR-048).
   A question asked during a lesson is one request, two at most; a check of a key is one.
   Asking a provider's next model because the one before is away is not a retry of the answer,
   and is bounded by the number of models.

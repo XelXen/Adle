@@ -31,6 +31,12 @@ export interface PlaybackState {
   furthest: number;
   /** The last segment has been completed. */
   finished: boolean;
+  /** How many parts the lesson has so far. */
+  parts: number;
+  /** More parts are being written, and will come after these (ADR-048). */
+  more: boolean;
+  /** The learner moved on past the last part written so far and is waiting for the next. */
+  held: boolean;
 }
 
 export interface PlaybackHost {
@@ -71,14 +77,21 @@ export class LessonController {
   private readonly listeners = new Set<() => void>();
   /** Who is reading. Starts as the host's narrator and can be changed while a lesson plays. */
   private narrator: Narrator;
+  /** The lesson's parts so far. A lesson still being written grows at its end (ADR-048). */
+  private parts: LessonSegment[];
+  /** More parts are coming after these. */
+  private more: boolean;
 
   constructor(
-    private readonly lesson: PlayerLesson,
+    lesson: PlayerLesson,
     private readonly host: PlaybackHost,
     start: { position: number; furthest?: number } = { position: 0 },
+    { more = false }: { more?: boolean } = {},
   ) {
     this.narrator = host.narrator;
-    const last = lesson.segments.length - 1;
+    this.parts = [...lesson.segments];
+    this.more = more;
+    const last = this.parts.length - 1;
     const clamp = (index: number): number => Math.min(Math.max(0, index), last);
     const position = clamp(start.position);
     // A lesson that was completed before is open from end to end.
@@ -93,8 +106,13 @@ export class LessonController {
     return () => this.listeners.delete(listener);
   };
 
+  /** The lesson's parts as they are now: those it opened with, and any written since. */
+  get segments(): readonly LessonSegment[] {
+    return this.parts;
+  }
+
   get segment(): LessonSegment {
-    const segment = this.lesson.segments[this.state.segmentIndex];
+    const segment = this.parts[this.state.segmentIndex];
     if (!segment) throw new Error('The lesson has no segment at this position.');
     return segment;
   }
@@ -125,11 +143,14 @@ export class LessonController {
   /** Move on. Returns false when the learner still has a question to answer or skip. */
   next(): boolean {
     if (!canContinue(this.state, this.segment)) return false;
-    const last = this.lesson.segments.length - 1;
+    const last = this.parts.length - 1;
     if (this.state.segmentIndex >= last) {
-      this.cancelNarration();
-      this.update({ status: 'done', finished: true, word: null });
-      this.host.saveProgress(last, true);
+      if (this.more) {
+        // The next part is still being written: it begins by itself as soon as it comes.
+        this.update({ held: true });
+        return true;
+      }
+      this.finish();
       return true;
     }
     const position = this.state.segmentIndex + 1;
@@ -156,7 +177,7 @@ export class LessonController {
   nextQuestionIndex(): number | null {
     if (!canContinue(this.state, this.segment)) return null;
     const from = this.state.segmentIndex + 1;
-    const index = this.lesson.segments.findIndex(
+    const index = this.parts.findIndex(
       (segment, position) => position >= from && segment.type === 'checkpoint',
     );
     return index === -1 ? null : index;
@@ -209,6 +230,31 @@ export class LessonController {
     if (status === 'paused') this.pause();
   }
 
+  /**
+   * Parts written since the lesson was opened (ADR-048), as the lesson has them now: those
+   * not here yet are added after the last, and a part already here is never changed, since
+   * the learner may be in it. `more` says whether still more are coming. A learner waiting
+   * at the end goes on into the next part when it comes, or finishes when none will.
+   */
+  extend(segments: readonly LessonSegment[], more: boolean): void {
+    const known = new Set(this.parts.map((segment) => segment.id));
+    const added = segments.filter((segment) => !known.has(segment.id));
+    if (added.length === 0 && more === this.more) return;
+    this.parts = [...this.parts, ...added];
+    this.more = more;
+    if (this.state.held && added.length > 0) {
+      const position = this.state.segmentIndex + 1;
+      this.enter(position, this.started);
+      this.host.saveProgress(position, false);
+      return;
+    }
+    if (this.state.held && !more) {
+      this.finish();
+      return;
+    }
+    this.update({ parts: this.parts.length, more });
+  }
+
   /** Stop everything. The controller must not be used afterwards. */
   dispose(): void {
     this.cancelNarration();
@@ -228,7 +274,24 @@ export class LessonController {
       explored: false,
       furthest: Math.max(furthest, index),
       finished: false,
+      parts: this.parts.length,
+      more: this.more,
+      held: false,
     };
+  }
+
+  private finish(): void {
+    const last = this.parts.length - 1;
+    this.cancelNarration();
+    this.update({
+      status: 'done',
+      finished: true,
+      word: null,
+      held: false,
+      parts: this.parts.length,
+      more: this.more,
+    });
+    this.host.saveProgress(last, true);
   }
 
   private enter(index: number, autoplay: boolean): void {

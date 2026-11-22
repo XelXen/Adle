@@ -81,6 +81,27 @@ class GraphFigure(Scene):
             color=hues[index],
         )
 
+    def rise(self, axes, spec, p, number):
+        # How much the curve rises from one place to the other: a dashed run along, and
+        # an arrow up by the difference, named beside it. Each rise has a hue of its own.
+        hue = [self.coral, self.violet, self.green][number]
+        below = self.value(spec[0], spec[1], p)
+        above = self.value(spec[0], spec[2], p)
+        start = axes.c2p(spec[1], below)
+        corner = axes.c2p(spec[2], below)
+        end = axes.c2p(spec[2], above)
+        drawn = VGroup(
+            DashedLine(start, corner, color=self.muted),
+            Dot(color=hue, radius=0.08).move_to(start),
+            Dot(color=hue, radius=0.08).move_to(end),
+        )
+        if abs(end[1] - corner[1]) > 0.05:
+            arrow = DoubleArrow(corner, end, buff=0, color=hue, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=12)
+            drawn.add(arrow)
+            if spec[3]:
+                drawn.add(MathTex(spec[3], font_size=34, color=self.ink).next_to(arrow, RIGHT, buff=0.15))
+        return drawn
+
     def area(self, axes, index, p, low, high):
         points = [axes.c2p(low, 0)]
         for step in range(61):
@@ -143,6 +164,11 @@ class GraphFigure(Scene):
             if legend[len(spans)] is not None:
                 parts.append(FadeIn(legend[len(spans)]))
             self.play(*parts, run_time=1.2)
+            self.wait(holds[step])
+            step += 1
+        rises = []
+        for number in range(len(rises)):
+            self.play(FadeIn(self.rise(axes, rises[number], 0, number)), run_time=1.2)
             self.wait(holds[step])
             step += 1
         marks = [[0, 1.0, 'x = 1', 1]]

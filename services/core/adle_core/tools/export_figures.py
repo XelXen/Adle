@@ -61,6 +61,17 @@ EXAMPLES: dict[str, dict[str, Any]] = {
         "shade": {"from": 0, "to": "a", "label": "F(a)"},
         "slider": {"name": "a", "label": "a", "min": 0, "max": 4, "value": 1},
     },
+    "graph_rise": {
+        "kind": "graph",
+        "x": [-1, 11],
+        "x_label": "x",
+        "y_label": "F(x)",
+        "curves": [{"f": "(x >= 0 && x <= 10) * x / 10 + (x > 10) * 1", "label": "F(x)"}],
+        "rise": [
+            {"from": 0, "to": 2, "label": r"P(X \le 2)"},
+            {"from": 5, "to": 8, "label": r"P(5 < X \le 8)"},
+        ],
+    },
     "bars": {
         "kind": "bars",
         "labels": ["0", "1", "2"],

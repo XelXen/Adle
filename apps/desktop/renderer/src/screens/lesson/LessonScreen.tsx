@@ -21,7 +21,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import type { Ask, Job, LearnerPreferences, LessonForPlayer, SceneArtifact } from '@adle/contracts';
 import {
@@ -70,7 +70,7 @@ import { callCore, CoreRequestError, describeError } from '../../lib/core-client
 import { authorName, type JobFailure, jobFailure, refusalOf } from '../../lib/generation';
 import { useFullscreen, useStillness } from '../../lib/use-fullscreen';
 import { isJobActive, useJob } from '../../lib/use-job';
-import { useLessonPictures } from '../../lib/use-lesson-pictures';
+import { useLessonUpdates } from '../../lib/use-lesson-updates';
 import { linesOf, useRecordedNarration } from '../../lib/use-recorded-narration';
 import { useResource } from '../../lib/use-resource';
 import { KNOWLEDGE_TONE } from '../course/ConceptDetail';
@@ -166,6 +166,8 @@ function openSession(
     progress.completed
       ? { position: 0, furthest: lesson.segments.length - 1 }
       : { position: progress.position },
+    // Opened at its first part while the rest is written (ADR-048): more parts are coming.
+    { more: data.writing ?? false },
   );
   return { controller, cues, save, saved, silent, spoken, recorded };
 }
@@ -263,9 +265,10 @@ function LessonPlayer({
 }) {
   const toast = useToast();
   const { lesson } = data;
-  // A lesson can be opened before all its pictures are drawn (ADR-031): they are looked
-  // for while any is still to come. The words stay as they were when it was opened.
-  const pictures = useLessonPictures(lesson.lesson_id, data);
+  // A lesson can be opened before all its pictures are drawn (ADR-031), and before all its
+  // parts are written (ADR-048): they are looked for while any is still to come. The words
+  // of a part already there stay as they were when it was opened.
+  const pictures = useLessonUpdates(lesson.lesson_id, data);
   const [{ controller, cues, save, saved, silent, spoken, recorded }] = useState(() =>
     openSession(data, preferences, voices, natural, (error) =>
       toast.show({
@@ -276,7 +279,12 @@ function LessonPlayer({
     ),
   );
   const state = useSyncExternalStore(controller.subscribe, controller.getState);
-  const [lineCount] = useState(() => linesOf(lesson).length);
+  useEffect(() => {
+    controller.extend(pictures.segments, pictures.writing);
+  }, [controller, pictures.segments, pictures.writing]);
+  // The parts as the lesson has them now: those it opened with, and any written since.
+  const parts = controller.segments;
+  const lineCount = useMemo(() => linesOf({ segments: parts }), [parts]).length;
   useRecordedNarration(lesson.lesson_id, recorded, lineCount);
   const [aloud, setAloud] = useState(preferences.narration && spoken !== null);
   const [wordsShown, setWordsShown] = useState(preferences.captions);
@@ -341,7 +349,7 @@ function LessonPlayer({
     // And by the computer itself if they have gone to another window meanwhile.
     void getBridge().app.notify('answer_ready');
     if (askingAbout === null) {
-      const index = lesson.segments.findIndex((item) => item.id === about);
+      const index = parts.findIndex((item) => item.id === about);
       toast.show({
         tone: 'success',
         title: 'Your answer is ready',
@@ -392,8 +400,9 @@ function LessonPlayer({
   }, [controller, save]);
 
   const segment = controller.segment;
-  const total = lesson.segments.length;
-  const last = state.segmentIndex === total - 1;
+  const total = state.parts;
+  // The last part so far is not the last while more are being written (ADR-048).
+  const last = !state.more && state.segmentIndex === total - 1;
   const beats = segment.narration ?? [];
   const settled = state.status === 'done' || state.status === 'waiting';
   const allowed = canContinue(state, segment);
@@ -436,7 +445,7 @@ function LessonPlayer({
     setAskingAbout(state.segmentIndex);
   };
   const ask = async (question: string): Promise<void> => {
-    const about = lesson.segments[askingAbout ?? state.segmentIndex];
+    const about = parts[askingAbout ?? state.segmentIndex];
     if (!about) return;
     setAskStarting(true);
     setAskRefusal(null);
@@ -478,7 +487,7 @@ function LessonPlayer({
   };
   const aboutThisPart = asksAbout(kept, segment.id);
   const notesShown = notesOpen.has(segment.id);
-  const askedPart = askingAbout === null ? null : (lesson.segments[askingAbout] ?? null);
+  const askedPart = askingAbout === null ? null : (parts[askingAbout] ?? null);
 
   // The line the foot of the screen shows: the one being said; the first before anything
   // has been, and the last once everything has, so that the band is never empty.
@@ -545,7 +554,9 @@ function LessonPlayer({
         // way of the lesson itself (ADR-036).
         <InfoPopover label="About this lesson" icon={<Info />} title="About this lesson">
           <p>
-            {GROUNDING_NOTE[lesson.grounding]}. About {lesson.estimated_minutes} minutes.
+            {GROUNDING_NOTE[lesson.grounding]}.
+            {/* How long it is was not known when it was opened while it was written (ADR-048). */}
+            {data.writing ? null : ` About ${lesson.estimated_minutes} minutes.`}
           </p>
           {/* Where in the learner's own materials the lesson draws from: named, never invented. */}
           {lesson.source_refs.length > 0 ? (
@@ -576,7 +587,7 @@ function LessonPlayer({
       ) : (
         <div ref={theatre} className={styles.player}>
           <ol className={styles.parts} aria-label="Parts of this lesson">
-            {lesson.segments.map((item, index) => {
+            {parts.map((item, index) => {
               const current = index === state.segmentIndex;
               const reached = index <= state.furthest;
               return (
@@ -598,6 +609,15 @@ function LessonPlayer({
                 </li>
               );
             })}
+            {state.more ? (
+              <li>
+                <span
+                  className={styles.partComing}
+                  role="img"
+                  aria-label="More parts are being written"
+                />
+              </li>
+            ) : null}
           </ol>
 
           <div className={styles.body}>
@@ -614,6 +634,7 @@ function LessonPlayer({
               position={
                 <span className={styles.position} role="status">
                   Part {state.segmentIndex + 1} of {total}
+                  {state.more ? ' so far' : ''}
                 </span>
               }
             />
@@ -713,6 +734,12 @@ function LessonPlayer({
             </div>
             <div className={styles.controlGroup}>
               {!allowed ? <span className={styles.note}>Answer or skip to continue.</span> : null}
+              {state.held ? (
+                <span className={styles.note} role="status">
+                  <Spinner size="small" /> The next part is being written. It starts when it’s
+                  ready.
+                </span>
+              ) : null}
               {/* Busy, and still a button: opening it again is the way to watch the answer
                   being written, or to stop it. */}
               <Button
@@ -729,9 +756,10 @@ function LessonPlayer({
                 </Button>
               ) : null}
               <Button
-                variant={settled && allowed ? 'primary' : 'secondary'}
+                variant={settled && allowed && !state.held ? 'primary' : 'secondary'}
                 icon={last ? <Check /> : <ArrowRight />}
-                disabled={!allowed}
+                // Waiting for the next part: it begins by itself when it comes.
+                disabled={!allowed || state.held}
                 onClick={() => controller.next()}
               >
                 {last ? 'Finish lesson' : 'Continue'}
