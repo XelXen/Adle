@@ -647,6 +647,30 @@ export interface LessonRequest {
     | ('visual' | 'worked_example' | 'analogy' | 'mathematical' | 'socratic' | 'computational')
     | null;
 }
+/**
+ * What of a lesson has been recorded in the voice chosen now, and the recording under way.
+ *
+ */
+export interface Narration {
+  lines: NarrationLine[];
+  recording: Job | null;
+}
+export interface NarrationLine {
+  clip: string;
+  seconds: number;
+  text: string;
+  words: NarrationWord[];
+}
+export interface NarrationWord {
+  end: number;
+  index: number;
+  length: number;
+  start: number;
+}
+export interface NarrationClip {
+  data: string;
+  mime: string;
+}
 export interface ObjectiveInput {
   id?: string | null;
   statement: string;
@@ -897,4 +921,46 @@ export interface SourceRefCreate {
  */
 export interface UnhelpfulReport {
   segment_id: string;
+}
+export interface VoiceChoice {
+  enabled?: boolean | null;
+  speaker?: string | null;
+  tier?: ('kokoro' | 'standard' | 'expressive') | null;
+}
+export interface VoiceSetup {
+  tier: 'kokoro' | 'standard' | 'expressive';
+}
+export interface VoiceSpeaker {
+  description: string;
+  id: string;
+  name: string;
+}
+export interface VoiceStatus {
+  borrowed: boolean;
+  enabled: boolean;
+  gpu: string | null;
+  recommended: ('kokoro' | 'standard' | 'expressive') | null;
+  setting_up: Job | null;
+  speakers: {
+    [k: string]: string | undefined;
+  };
+  tier: ('kokoro' | 'standard' | 'expressive') | null;
+  tiers: VoiceTier[];
+}
+/**
+ * One size of natural voice, from the lightest (Kokoro) to the richest (Qwen3-TTS 1.7B).
+ *
+ */
+export interface VoiceTier {
+  description: string;
+  fits: boolean;
+  id: 'kokoro' | 'standard' | 'expressive';
+  min_memory_gb: number | null;
+  model_bytes: number;
+  name: string;
+  program_bytes: number;
+  ready: boolean;
+  sources: string[];
+  speakers: VoiceSpeaker[];
+  why: string;
 }

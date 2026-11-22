@@ -18,6 +18,7 @@ from adle_core.api.routes import (
     lessons,
     provider,
     system,
+    voice,
 )
 from adle_core.application.services import Services
 
@@ -52,6 +53,16 @@ def create_app(services: Services) -> FastAPI:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_ALLOWED_HOSTS)
     install_error_handlers(app)
 
-    for module in (system, provider, courses, curriculum, lessons, generation, learning, data):
+    for module in (
+        system,
+        provider,
+        courses,
+        curriculum,
+        lessons,
+        generation,
+        learning,
+        data,
+        voice,
+    ):
         app.include_router(module.router, prefix=API_PREFIX)
     return app

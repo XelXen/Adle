@@ -35,6 +35,7 @@ from adle_core.lessons.ir import (
     STRATEGIES,
     AssessmentItem,
     Display,
+    VoiceDescription,
 )
 
 #: A lesson asks for at most this many scenes: each one is a separate model request.
@@ -318,6 +319,8 @@ class LessonDraft(_Draft):
     practice: list[QuestionDraft] = Field(default_factory=list)
     #: The numbers of the supplied passages the lesson draws on.
     sources: list[int] = Field(default_factory=list)
+    #: How the narrator sounds, in a sentence. A lesson without one is read in Adle's own.
+    voice: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -598,10 +601,36 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
         "segments": segments,
         "practice": practice,
     }
+    voice = _voice_description(draft.voice)
+    if voice is not None:
+        lesson["voice"] = voice
     return CompiledLesson(lesson=lesson, scenes=scenes)
 
 
+#: The longest description of a voice that is kept, as the lesson format allows.
+_VOICE_CHARACTERS = 240
+
+
+def _voice_description(text: str | None) -> str | None:
+    """What the model said of the narrator's voice, as one plain sentence, or nothing.
+
+    It is only ever a description for a speech model to design a voice from. Anything a
+    lesson could not hold (a symbol of mathematics, a link, markup) loses the voice, never
+    the lesson."""
+    if not text:
+        return None
+    plain = " ".join(tidy(text).replace("$", " ").replace("\\", " ").split())
+    if len(plain) > _VOICE_CHARACTERS:
+        plain = plain[: _VOICE_CHARACTERS - 1].rsplit(" ", 1)[0].rstrip(",;:") + "."
+    try:
+        _VOICE.validate_python(plain)
+    except ValidationError:
+        return None
+    return plain or None
+
+
 _QUESTION = TypeAdapter(AssessmentItem)
+_VOICE = TypeAdapter(VoiceDescription)
 
 
 def _is_usable(item: dict[str, Any]) -> bool:

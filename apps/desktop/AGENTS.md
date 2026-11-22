@@ -157,7 +157,9 @@ most, a file's name.
 ## The packaged app
 
 - `scripts/package.mjs` puts `package.json`, `dist/`, and the icons into `app.asar`, and a
-  private Python with the core into `resources/core` (ADR-019). Nothing else ships: if the app
+  private Python with the core into `resources/core` (ADR-019). The Python's `venv` and
+  `ensurepip` stay in it, and on Windows `python.exe` stays beside `adle-core.exe`: a
+  natural voice's environment is made from it (ADR-042), and `package:check` makes one. Nothing else ships: if the app
   comes to need a file at run time, it must be in `dist/` or added to the script, and the
   packaged end-to-end run is what tells you that you forgot.
 - Anything the main process needs from npm must be bundled by esbuild. There is no
@@ -312,6 +314,13 @@ most, a file's name.
   add a control that sends without the note. A journey reads it with `openWhatIsSent`.
 - Speech uses **local voices only** (`loadLocalVoices`). Do not list or use a voice whose
   `localService` is false.
+- **A natural voice is played from what the core recorded** (ADR-042): `RecordedNarrator`
+  plays a line's clip and marks each word at the time the core measured, and
+  `useRecordedNarration` hands it the clips as they are recorded. A line not recorded yet
+  is read by the computer's voice; nothing waits for a recording. Settings → Learning →
+  Voice (`VoiceChoices`) sets a voice up, follows the setup, and removes a voice, saying
+  first how much is downloaded and from where. A journey uses a stand-in engine
+  (`e2e/voice.spec.ts`), never a real download.
 - End-to-end journeys that are not about speech call `showNarrationAsText(page)` first.
 - No end-to-end test reaches a real provider: start `startFakeProvider()` and pass its
   address in `ADLE_PROVIDER_BASE_URL` (one endpoint in place of the choice), or start two and

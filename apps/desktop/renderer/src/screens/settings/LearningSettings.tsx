@@ -17,7 +17,8 @@ import {
 import { callCore, describeError } from '../../lib/core-client';
 import { useResource } from '../../lib/use-resource';
 import styles from './Settings.module.css';
-import { VoiceSettings } from './VoiceSettings';
+import { VoiceChoices } from './VoiceChoices';
+import { VolumeSetting } from './VoiceSettings';
 
 type Pace = LearnerPreferences['pace'];
 type Density = LearnerPreferences['explanation_density'];
@@ -148,7 +149,7 @@ export function LearningSettings() {
           <Stack gap={4}>
             <Switch
               label="Narration"
-              description="Read lessons aloud using a voice on this computer."
+              description="Read lessons aloud, in a voice on this computer."
               checked={current.narration}
               onCheckedChange={(narration) => void change({ narration })}
             />
@@ -159,11 +160,17 @@ export function LearningSettings() {
               onCheckedChange={(captions) => void change({ captions })}
             />
             {current.narration ? (
-              <VoiceSettings preferences={current} onChange={(patch) => void change(patch)} />
+              <VolumeSetting preferences={current} onChange={(patch) => void change(patch)} />
             ) : null}
           </Stack>
         </Card>
       </Section>
+
+      {current.narration ? (
+        <Section title="Voice" description="From the lightest to the richest.">
+          <VoiceChoices preferences={current} onChange={(patch) => void change(patch)} />
+        </Section>
+      ) : null}
 
       <Section title="Your goal" description="Optional. What do you want to be able to do?">
         <Card>

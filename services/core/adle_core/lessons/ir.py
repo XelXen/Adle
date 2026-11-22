@@ -145,6 +145,13 @@ LongDisplay = Annotated[
     AfterValidator(_display),
 ]
 
+#: How a lesson's narrator sounds, in a sentence: what a voice is designed from (ADR-042).
+VoiceDescription = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=240),
+    AfterValidator(_spoken),
+]
+
 Identifier = Annotated[str, StringConstraints(pattern=r"^[a-z]{2,5}_[0-9a-f]{20}$")]
 #: Ids that only need to be unique inside one lesson, chosen by whoever writes it.
 SegmentId = Annotated[str, StringConstraints(pattern=r"^seg_[a-z0-9_]{1,40}$")]
@@ -458,6 +465,9 @@ class Lesson(_Strict):
     #: Questions that are not part of the lesson's flow. They are asked when the learner
     #: practises or reviews, so that a review is more than the lesson's questions again.
     practice: list[AssessmentItem] = Field(default_factory=list, max_length=MAX_PRACTICE_ITEMS)
+    #: How the narrator sounds, written with the lesson, for the voice that is designed for
+    #: it when the Expressive voice reads it (ADR-042). The voice only: never what it says.
+    voice: VoiceDescription | None = None
 
     @model_validator(mode="after")
     def _is_coherent(self) -> Lesson:

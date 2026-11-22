@@ -348,7 +348,12 @@
           "title": "Strategy",
           "type": "string"
         },
-        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" }
+        "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+        "voice": {
+          "anyOf": [{ "maxLength": 240, "minLength": 1, "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Voice"
+        }
       },
       "required": [
         "schema_version",

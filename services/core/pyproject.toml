@@ -74,6 +74,11 @@ exclude = ["adle_core/sample_course/scenes/"]
 plugins = ["pydantic.mypy"]
 warn_unreachable = true
 
+# The voice engine runs in an environment of its own (ADR-042): these are there, not here.
+[[tool.mypy.overrides]]
+module = ["torch", "torchaudio", "faster_qwen3_tts", "kokoro", "soundfile", "numpy"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers --strict-config"

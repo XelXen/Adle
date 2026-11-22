@@ -63,6 +63,8 @@ def delete_course(course_id: str, services: ServicesDep) -> Response:
     # provider for a course the learner is removing.
     services.generation.stop_for_course(course_id)
     services.courses.delete(course_id)
+    # Its lessons' recorded narration goes with them (ADR-042).
+    services.narration.tidy()
     return Response(status_code=204)
 
 

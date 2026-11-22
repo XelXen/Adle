@@ -25,6 +25,7 @@ from adle_core.application.learner import LearnerService
 from adle_core.application.learning import LearningService
 from adle_core.application.lessons import LessonService
 from adle_core.application.model_gateway import ModelGateway
+from adle_core.application.narration import NarrationService
 from adle_core.application.retrieval import FtsRetriever, Retriever
 from adle_core.application.sample_course import SampleCourseService
 from adle_core.application.sources import SourceService
@@ -37,6 +38,7 @@ from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.migrate import MigrationOutcome, migrate
 from adle_core.ingestion.extract import Extractor, extract_isolated
 from adle_core.lessons.player import ItemMask
+from adle_core.voice.runtime import VoicePaths
 
 
 @dataclass(slots=True)
@@ -63,6 +65,8 @@ class Services:
     provider_clients: tuple[ChatClient, ...]
     gateway: ModelGateway
     generation: GenerationService
+    #: A lesson's narration in a natural voice, when one is set up (ADR-042).
+    narration: NarrationService
 
     def close(self) -> None:
         """Stop background work and release the database. Safe to call more than once."""
@@ -124,6 +128,9 @@ def build_services(
     lessons.settle_unfinished()
     asks = AskService(database)
     learner = LearnerService(database)
+    narration = NarrationService(lessons, jobs, VoicePaths.under(settings.data_dir))
+    # Clips of lessons removed while the core was not looking go now.
+    narration.tidy()
     item_mask = ItemMask(_installation_secret(settings.item_key_path))
     # One vault, and one client for each provider. A client asks the vault for its own
     # provider's key and for no other, and only ever talks to its own address. The
@@ -159,6 +166,7 @@ def build_services(
         generation=GenerationService(
             database, jobs, gateway, curriculum, lessons, learner, retriever, asks
         ),
+        narration=narration,
     )
 
 

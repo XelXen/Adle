@@ -52,12 +52,14 @@ import {
   type PlaybackState,
 } from '../../lesson/controller';
 import { type Narrator, TimedNarrator } from '../../lesson/narration';
+import { RecordedNarrator } from '../../lesson/recorded';
 import { SceneCues } from '../../lesson/scene-cues';
 import {
   browserLine,
   browserSpeech,
   loadLocalVoices,
   pickVoice,
+  SPEAKING_RATE,
   SpeechNarrator,
   type Voice,
 } from '../../lesson/speech';
@@ -69,6 +71,7 @@ import { authorName, type JobFailure, jobFailure, refusalOf } from '../../lib/ge
 import { useFullscreen, useStillness } from '../../lib/use-fullscreen';
 import { isJobActive, useJob } from '../../lib/use-job';
 import { useLessonPictures } from '../../lib/use-lesson-pictures';
+import { linesOf, useRecordedNarration } from '../../lib/use-recorded-narration';
 import { useResource } from '../../lib/use-resource';
 import { KNOWLEDGE_TONE } from '../course/ConceptDetail';
 import { AskDialog, AskNote } from './AskDialog';
@@ -104,12 +107,18 @@ interface Session {
   silent: Narrator;
   /** Reads the narration aloud. Absent when this computer has no voice to read with. */
   spoken: Narrator | null;
+  /**
+   * Plays the lesson's recorded narration in the natural voice, when one is chosen
+   * (ADR-042); a line not recorded yet is read as it would be without it.
+   */
+  recorded: RecordedNarrator | null;
 }
 
 function openSession(
   data: LessonForPlayer,
   preferences: LearnerPreferences,
   voices: readonly Voice[],
+  natural: boolean,
   onSaveFailed: (error: unknown) => void,
 ): Session {
   const { lesson, progress } = data;
@@ -117,7 +126,7 @@ function openSession(
   const silent = new TimedNarrator(preferences.pace);
   const engine = browserSpeech();
   const voice = pickVoice(voices, preferences.voice);
-  const spoken =
+  const system =
     engine && voice
       ? new SpeechNarrator(engine, browserLine, {
           voice,
@@ -125,6 +134,13 @@ function openSession(
           volume: preferences.volume / 100,
         })
       : null;
+  const recorded = natural
+    ? new RecordedNarrator(system ?? silent, {
+        rate: SPEAKING_RATE[preferences.pace],
+        volume: preferences.volume / 100,
+      })
+    : null;
+  const spoken = recorded ?? system;
   let warned = false;
   let latest: Promise<unknown> = Promise.resolve();
   const save = (position: number, completed: boolean): void => {
@@ -151,7 +167,7 @@ function openSession(
       ? { position: 0, furthest: lesson.segments.length - 1 }
       : { position: progress.position },
   );
-  return { controller, cues, save, saved, silent, spoken };
+  return { controller, cues, save, saved, silent, spoken, recorded };
 }
 
 /** One lesson, played from start to finish with the learner in control of the pace. */
@@ -163,6 +179,8 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
   const preferences = useResource('learner-preferences', () => callCore('learner.get_preferences'));
   // Asked once per lesson: the list of voices is short and does not change while one plays.
   const voices = useResource('speech-voices', () => loadLocalVoices(browserSpeech()));
+  // Whether lessons are read in a natural voice recorded on this computer (ADR-042).
+  const natural = useResource('voice-status', () => callCore('voice.status'));
   const leave = (): void => navigate({ name: 'course', courseId, tab: 'learn' });
   const back = (
     <Button variant="tertiary" size="small" icon={<ArrowLeft />} onClick={leave}>
@@ -173,7 +191,8 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
   if (
     lesson.resource.status === 'loading' ||
     preferences.resource.status === 'loading' ||
-    voices.resource.status === 'loading'
+    voices.resource.status === 'loading' ||
+    natural.resource.status === 'loading'
   ) {
     return (
       <Page title="Lesson" eyebrow={back}>
@@ -219,6 +238,7 @@ export function LessonScreen({ courseId, lessonId }: { courseId: string; lessonI
         preferences.resource.status === 'ready' ? preferences.resource.data : DEFAULT_READING
       }
       voices={voices.resource.status === 'ready' ? voices.resource.data : []}
+      natural={natural.resource.status === 'ready' && natural.resource.data.enabled}
       eyebrow={back}
       onLeave={leave}
     />
@@ -229,12 +249,15 @@ function LessonPlayer({
   data,
   preferences,
   voices,
+  natural,
   eyebrow,
   onLeave,
 }: {
   data: LessonForPlayer;
   preferences: LearnerPreferences;
   voices: readonly Voice[];
+  /** A natural voice is chosen: the lesson's narration is played as recorded in it. */
+  natural: boolean;
   eyebrow: ReactNode;
   onLeave: () => void;
 }) {
@@ -243,8 +266,8 @@ function LessonPlayer({
   // A lesson can be opened before all its pictures are drawn (ADR-031): they are looked
   // for while any is still to come. The words stay as they were when it was opened.
   const pictures = useLessonPictures(lesson.lesson_id, data);
-  const [{ controller, cues, save, saved, silent, spoken }] = useState(() =>
-    openSession(data, preferences, voices, (error) =>
+  const [{ controller, cues, save, saved, silent, spoken, recorded }] = useState(() =>
+    openSession(data, preferences, voices, natural, (error) =>
       toast.show({
         tone: 'danger',
         title: 'Couldn’t save your place',
@@ -253,6 +276,8 @@ function LessonPlayer({
     ),
   );
   const state = useSyncExternalStore(controller.subscribe, controller.getState);
+  const [lineCount] = useState(() => linesOf(lesson).length);
+  useRecordedNarration(lesson.lesson_id, recorded, lineCount);
   const [aloud, setAloud] = useState(preferences.narration && spoken !== null);
   const [wordsShown, setWordsShown] = useState(preferences.captions);
   // Listening, the words run along the foot of the screen one line at a time, as under

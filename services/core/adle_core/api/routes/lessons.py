@@ -143,4 +143,6 @@ def delete_lesson(lesson_id: str, services: ServicesDep) -> HttpResponse:
     services.lessons.delete(lesson_id)
     # Its pictures may still have been on their way (ADR-031): that work stops with it.
     services.generation.stop_for_lesson(lesson_id)
+    # And its recorded narration goes (ADR-042).
+    services.narration.forget(lesson_id)
     return HttpResponse(status_code=204)

@@ -24,9 +24,11 @@
  *   3. nothing is written to the log of failures;
  *   4. when the app is closed abruptly, the core does not stay behind.
  *
- * And one thing that starting it cannot show, on Windows: that no program in the package
- * asks for a part of the Visual C++ runtime which the package does not bring. A computer
- * that builds software has that runtime; a new one may not.
+ * And two things that starting it cannot show. On Windows, that no program in the package
+ * asks for a part of the Visual C++ runtime which the package does not bring: a computer
+ * that builds software has that runtime; a new one may not. And everywhere, that the core's
+ * Python can make an environment with pip in it, which is where a natural voice is set up
+ * (ADR-042).
  *
  * It prints how long the first start took. On a fresh build that includes the time the
  * operating system takes to look at files it has not seen before.
@@ -307,6 +309,41 @@ export function missingRuntime(appFolder) {
   return { programs: programs.length, missing };
 }
 
+/**
+ * The core's Python makes an environment of its own, with pip in it, as a natural voice is
+ * set up in (ADR-042). Nothing is downloaded: venv brings the pip it installs.
+ */
+function checkMakesEnvironment(executable) {
+  const core = path.join(resourcesOf(executable), 'core');
+  const python = isWindows() ? path.join(core, 'python.exe') : path.join(core, 'bin', 'python3.12');
+  const folder = mkdtempSync(path.join(os.tmpdir(), 'adle-voice-'));
+  try {
+    const made = spawnSync(python, ['-I', '-m', 'venv', path.join(folder, 'env')], {
+      encoding: 'utf8',
+      timeout: 300_000,
+    });
+    if (made.status !== 0) {
+      throw new Error(
+        `The core's Python could not make an environment: ${made.error?.message ?? (made.stderr || made.stdout)}`,
+      );
+    }
+    const inside = isWindows()
+      ? path.join(folder, 'env', 'Scripts', 'python.exe')
+      : path.join(folder, 'env', 'bin', 'python');
+    const pip = spawnSync(inside, ['-I', '-m', 'pip', '--version'], {
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    if (pip.status !== 0) {
+      throw new Error(
+        `An environment the core's Python made has no pip: ${pip.error?.message ?? (pip.stderr || pip.stdout)}`,
+      );
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+}
+
 /** Whose work the app is built from, and their licences, travel with it. */
 function checkNotices(executable) {
   const folder = path.join(resourcesOf(executable), 'licenses');
@@ -359,6 +396,8 @@ async function main() {
     checkWillNotRunAsNode(executable);
     console.log('  PASS  will not run as plain Node');
   }
+  checkMakesEnvironment(executable);
+  console.log("  PASS  the core's Python makes an environment with pip, for a natural voice");
 
   const { profile, child, seconds } = await startAndCheck(executable);
   console.log(`  PASS  starts with an empty profile; the core was up after ${seconds} s`);

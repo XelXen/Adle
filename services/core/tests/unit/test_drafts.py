@@ -319,6 +319,26 @@ def test_an_unknown_strategy_falls_back_rather_than_failing() -> None:
     assert compiled(strategy="Worked Example").lesson["strategy"] == "worked_example"
 
 
+def test_the_narrators_voice_is_kept_as_one_plain_sentence_or_not_at_all() -> None:
+    """What the model says of the narrator's voice is what the Expressive voice is designed
+    from (ADR-042). Anything a lesson could not hold costs the voice, never the lesson."""
+    said = "A warm,   unhurried voice,\nmid-pitched and clear."
+    lesson = Lesson.model_validate(compiled(voice=said).lesson)
+    assert lesson.voice == "A warm, unhurried voice, mid-pitched and clear."
+    assert "voice" not in compiled().lesson
+    # Mathematics has no sound of its own here; a link or markup is no voice at all.
+    assert compiled(voice="A voice like $x^2$.").lesson["voice"] == "A voice like x^2 ."
+    assert "voice" not in compiled(voice="Like the one at https://example.com/voice").lesson
+    assert "voice" not in compiled(voice="<script>Loud</script>").lesson
+    assert "voice" not in compiled(voice="   ").lesson
+    # A long one is cut at a word, and still ends a sentence.
+    long = compiled(voice="A calm voice " + "that is very patient " * 20).lesson["voice"]
+    assert len(long) <= 240
+    assert long.endswith(".")
+    assert not long.endswith(" .")
+    Lesson.model_validate(compiled(voice=long).lesson)
+
+
 @pytest.mark.parametrize(
     ("change", "expected"),
     [

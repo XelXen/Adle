@@ -31,7 +31,6 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
-  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -123,7 +122,11 @@ function stageApp() {
 
 // -- the core -----------------------------------------------------------------------------
 
-/** Parts of a Python installation the core never uses. Paths are relative, lower case. */
+/**
+ * Parts of a Python installation the core never uses. Paths are relative, lower case. The
+ * modules that make an environment (venv, and ensurepip with the pip it carries) stay: a
+ * natural voice is set up in an environment of its own, made from this Python (ADR-042).
+ */
 const UNUSED_ON_WINDOWS = [
   'include',
   'libs',
@@ -138,8 +141,6 @@ const UNUSED_ON_WINDOWS = [
   'lib/idlelib',
   'lib/tkinter',
   'lib/turtledemo',
-  'lib/ensurepip',
-  'lib/venv',
   'lib/lib2to3',
   'lib/pydoc_data',
 ];
@@ -157,8 +158,6 @@ const UNUSED_ELSEWHERE = [
   'lib/python3.12/idlelib',
   'lib/python3.12/tkinter',
   'lib/python3.12/turtledemo',
-  'lib/python3.12/ensurepip',
-  'lib/python3.12/venv',
   'lib/python3.12/lib2to3',
   'lib/python3.12/pydoc_data',
 ];
@@ -264,8 +263,10 @@ function stageCore() {
   run(python, ['-I', '-m', 'compileall', '-q', path.dirname(sitePackages)], { stdio: 'ignore' });
 
   // The process is Adle's core, and should be called that wherever processes are listed.
+  // python.exe stays beside it: a natural voice's environment is made from it (ADR-042), and
+  // venv names the Python it puts in an environment after the program it was run as.
   const executable = isWindows ? path.join(target, 'adle-core.exe') : python;
-  if (isWindows) renameSync(python, executable);
+  if (isWindows) copyFileSync(python, executable);
 
   // It must start, alone, with everything it imports, before it is shipped.
   run(

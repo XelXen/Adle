@@ -123,7 +123,11 @@ test.describe('narration aloud', () => {
 
     if (voices.length === 0) {
       // No voice here: said plainly, and lessons still work, as text.
-      await expect(page.getByText('No voice found')).toBeVisible();
+      await expect(
+        page.getByText(
+          'None is installed. Install one in your system settings and it will appear here.',
+        ),
+      ).toBeVisible();
       await openSampleLesson(page);
       await expect(
         page.getByText('No voice is installed, so narration is shown as text.'),

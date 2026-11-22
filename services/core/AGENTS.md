@@ -26,7 +26,7 @@ Add a dependency with `uv add <name>` (or `uv add --dev <name>`) inside `service
 adle_core/
   errors.py       AdleError and friends (no framework imports; usable everywhere)
   api/            FastAPI app factory, auth, error contract, schemas, routes (no domain logic)
-  application/    service container; courses, sources, jobs (two lanes), curriculum,
+  application/    service container; courses, sources, jobs (three lanes), curriculum,
                   learner, retrieval, lessons, asks (questions put to Adle during a lesson),
                   generation and the model gateway, saving and restoring a copy of the data
   curriculum/     PURE rules: concept graph (loops, order, layers), outline from headings
@@ -43,8 +43,13 @@ adle_core/
   generation/     provider credentials and client, quota rules (pure), routing (pure: which
                   provider a request goes to), scene policy, drafts (what a model writes ->
                   Lesson IR, or an answer), prompts, data/ (generated files)
-  orchestration/ audio/   empty: narration is spoken by the browser (ADR-013), and jobs are
-                  run by application/jobs.py
+  voice/          a natural voice (ADR-042): what is downloaded, pinned (catalog), what
+                  this computer can run (hardware), where it lives and the engine process
+                  (runtime), setting it up (install), the locks of its programs (data/),
+                  and engine.py, which runs in the voice's own environment and is never
+                  imported by the core
+  orchestration/ audio/   empty: the computer's voice is the browser's (ADR-013), and jobs
+                  are run by application/jobs.py
   tools/          developer entry points (contract export)
 tests/unit/        fast, isolated
 tests/integration/ real process, real database, fake provider
@@ -114,7 +119,8 @@ everything and decides nothing.
   `interpreter_flags()` (`ingestion/extract.py`), so that it is as isolated as its parent.
   What a child says about a file is shown to the learner only if its reason is one a parser
   has, as one plain line (`_refusal`): a new reason for refusing a file is a new entry in
-  `_REFUSALS`.
+  `_REFUSALS`. The voice's children (`venv`, pip, the engine) keep the same rules; they run
+  on another Python, with `-I`, and with none of this computer's settings for pip or Python.
 - **The service ships as a wheel inside a private Python** (ADR-019), started with `-I`.
   So: anything read at run time is package data inside `adle_core/` and is found with
   `importlib.resources`, never by a path relative to the repository; nothing may depend on
@@ -182,10 +188,18 @@ everything and decides nothing.
   by the routes that delete). Nothing more is asked of a provider for what the learner has
   thrown away. A test of this must not wait longer than a stand-in for a slow answer
   takes to let go by itself, or it passes without the stopping.
-- **Jobs run in two lanes** (`application/jobs.py`). Long work (an import, a lesson, a list
-  of concepts) runs one at a time in the main lane. What the learner waits for (an ask, a
-  check of a key) runs in the quick lane, so it never queues behind a lesson. One request
-  is in flight at each provider, whichever lane asks.
+- **Jobs run in three lanes** (`application/jobs.py`). Long work (an import, a lesson, a
+  list of concepts) runs one at a time in the main lane. What the learner waits for (an ask,
+  a check of a key) runs in the quick lane, so it never queues behind a lesson. A natural
+  voice's work (setting one up, recording a lesson) runs in the voice lane, one at a time,
+  so that a recording never runs while its programs are being replaced. One request is in
+  flight at each provider, whichever lane asks.
+- **A natural voice is set up only by `VoiceInstaller`, at the learner's word** (ADR-042).
+  A model file is kept only if its size and hash are the catalogue's; a program only from
+  the lock for this system, by its hash. A new file is a new pinned entry; a new version of
+  a program is `scripts/dev/voice_locks.sh`, then each voice set up by hand. Only the
+  voice's own folders are ever removed (`VoicePaths.environment`), never a Python a
+  developer pointed Adle at (`borrowed`).
 - **Looking for work that is under way and starting it are one step**
   (`GenerationService._starting`). Two requests arriving together must not both find
   nothing and both begin, and the provider must not be chosen under a job that has just

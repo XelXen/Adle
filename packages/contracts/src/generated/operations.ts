@@ -29,6 +29,8 @@ import type {
   LessonProgress,
   LessonProgressUpdate,
   LessonRequest,
+  Narration,
+  NarrationClip,
   ObjectivesUpdate,
   OutlineCandidates,
   OutlineSelection,
@@ -50,6 +52,9 @@ import type {
   SourceList,
   SourceRefCreate,
   UnhelpfulReport,
+  VoiceChoice,
+  VoiceSetup,
+  VoiceStatus,
 } from './models';
 
 /**
@@ -201,6 +206,17 @@ export const OPERATIONS = {
     path: '/v1/lessons/{lesson_id}/progress',
     internal: false,
   },
+  'narration.clip': {
+    method: 'GET',
+    path: '/v1/lessons/{lesson_id}/narration/{clip}',
+    internal: false,
+  },
+  'narration.get': { method: 'GET', path: '/v1/lessons/{lesson_id}/narration', internal: false },
+  'narration.record': {
+    method: 'POST',
+    path: '/v1/lessons/{lesson_id}/narration',
+    internal: false,
+  },
   'provider.check': { method: 'POST', path: '/v1/provider/check', internal: false },
   'provider.clear_credential': {
     method: 'DELETE',
@@ -223,6 +239,10 @@ export const OPERATIONS = {
   'sources.list': { method: 'GET', path: '/v1/courses/{course_id}/sources', internal: false },
   'sources.search': { method: 'GET', path: '/v1/courses/{course_id}/search', internal: false },
   'system.health': { method: 'GET', path: '/v1/health', internal: false },
+  'voice.choose': { method: 'PUT', path: '/v1/voice', internal: false },
+  'voice.install': { method: 'POST', path: '/v1/voice/setup', internal: false },
+  'voice.remove': { method: 'DELETE', path: '/v1/voice/{tier}', internal: false },
+  'voice.status': { method: 'GET', path: '/v1/voice', internal: false },
 } as const;
 
 export type OperationId = keyof typeof OPERATIONS;
@@ -504,6 +524,24 @@ export interface OperationTypes {
     body: LessonProgressUpdate;
     result: LessonProgress;
   };
+  'narration.clip': {
+    path: { lesson_id: string; clip: string };
+    query: undefined;
+    body: undefined;
+    result: NarrationClip;
+  };
+  'narration.get': {
+    path: { lesson_id: string };
+    query: undefined;
+    body: undefined;
+    result: Narration;
+  };
+  'narration.record': {
+    path: { lesson_id: string };
+    query: undefined;
+    body: undefined;
+    result: Job;
+  };
   'provider.check': {
     path: undefined;
     query: undefined;
@@ -587,5 +625,29 @@ export interface OperationTypes {
     query: undefined;
     body: undefined;
     result: Health;
+  };
+  'voice.choose': {
+    path: undefined;
+    query: undefined;
+    body: VoiceChoice;
+    result: VoiceStatus;
+  };
+  'voice.install': {
+    path: undefined;
+    query: undefined;
+    body: VoiceSetup;
+    result: Job;
+  };
+  'voice.remove': {
+    path: { tier: string };
+    query: undefined;
+    body: undefined;
+    result: VoiceStatus;
+  };
+  'voice.status': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: VoiceStatus;
   };
 }

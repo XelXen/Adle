@@ -938,6 +938,55 @@
         "title": "LessonSummary",
         "type": "object"
       },
+      "Narration": {
+        "description": "What of a lesson has been recorded in the voice chosen now, and the recording under way.",
+        "properties": {
+          "lines": {
+            "items": { "$ref": "#/components/schemas/NarrationLine" },
+            "title": "Lines",
+            "type": "array"
+          },
+          "recording": { "anyOf": [{ "$ref": "#/components/schemas/Job" }, { "type": "null" }] }
+        },
+        "required": ["lines", "recording"],
+        "title": "Narration",
+        "type": "object"
+      },
+      "NarrationClip": {
+        "properties": {
+          "data": { "title": "Data", "type": "string" },
+          "mime": { "title": "Mime", "type": "string" }
+        },
+        "required": ["mime", "data"],
+        "title": "NarrationClip",
+        "type": "object"
+      },
+      "NarrationLine": {
+        "properties": {
+          "clip": { "title": "Clip", "type": "string" },
+          "seconds": { "title": "Seconds", "type": "number" },
+          "text": { "title": "Text", "type": "string" },
+          "words": {
+            "items": { "$ref": "#/components/schemas/NarrationWord" },
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": ["text", "clip", "seconds", "words"],
+        "title": "NarrationLine",
+        "type": "object"
+      },
+      "NarrationWord": {
+        "properties": {
+          "end": { "title": "End", "type": "number" },
+          "index": { "title": "Index", "type": "integer" },
+          "length": { "title": "Length", "type": "integer" },
+          "start": { "title": "Start", "type": "number" }
+        },
+        "required": ["index", "length", "start", "end"],
+        "title": "NarrationWord",
+        "type": "object"
+      },
       "NextStep": {
         "description": "Something worth doing now, with the reason for it. Never an instruction.",
         "properties": {
@@ -2141,6 +2190,130 @@
         },
         "required": ["id", "title", "estimated_seconds", "narration", "type", "scene"],
         "title": "VisualizationSegment",
+        "type": "object"
+      },
+      "VoiceChoice": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "anyOf": [{ "type": "boolean" }, { "type": "null" }], "title": "Enabled" },
+          "speaker": {
+            "anyOf": [{ "maxLength": 40, "type": "string" }, { "type": "null" }],
+            "title": "Speaker"
+          },
+          "tier": {
+            "anyOf": [
+              { "enum": ["kokoro", "standard", "expressive"], "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Tier"
+          }
+        },
+        "title": "VoiceChoice",
+        "type": "object"
+      },
+      "VoiceSetup": {
+        "additionalProperties": false,
+        "properties": {
+          "tier": {
+            "enum": ["kokoro", "standard", "expressive"],
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": ["tier"],
+        "title": "VoiceSetup",
+        "type": "object"
+      },
+      "VoiceSpeaker": {
+        "properties": {
+          "description": { "title": "Description", "type": "string" },
+          "id": { "title": "Id", "type": "string" },
+          "name": { "title": "Name", "type": "string" }
+        },
+        "required": ["id", "name", "description"],
+        "title": "VoiceSpeaker",
+        "type": "object"
+      },
+      "VoiceStatus": {
+        "properties": {
+          "borrowed": { "title": "Borrowed", "type": "boolean" },
+          "enabled": { "title": "Enabled", "type": "boolean" },
+          "gpu": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Gpu" },
+          "recommended": {
+            "anyOf": [
+              { "enum": ["kokoro", "standard", "expressive"], "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Recommended"
+          },
+          "setting_up": { "anyOf": [{ "$ref": "#/components/schemas/Job" }, { "type": "null" }] },
+          "speakers": {
+            "additionalProperties": { "type": "string" },
+            "title": "Speakers",
+            "type": "object"
+          },
+          "tier": {
+            "anyOf": [
+              { "enum": ["kokoro", "standard", "expressive"], "type": "string" },
+              { "type": "null" }
+            ],
+            "title": "Tier"
+          },
+          "tiers": {
+            "items": { "$ref": "#/components/schemas/VoiceTier" },
+            "title": "Tiers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tiers",
+          "tier",
+          "enabled",
+          "speakers",
+          "recommended",
+          "gpu",
+          "borrowed",
+          "setting_up"
+        ],
+        "title": "VoiceStatus",
+        "type": "object"
+      },
+      "VoiceTier": {
+        "description": "One size of natural voice, from the lightest (Kokoro) to the richest (Qwen3-TTS 1.7B).",
+        "properties": {
+          "description": { "title": "Description", "type": "string" },
+          "fits": { "title": "Fits", "type": "boolean" },
+          "id": { "enum": ["kokoro", "standard", "expressive"], "title": "Id", "type": "string" },
+          "min_memory_gb": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Min Memory Gb"
+          },
+          "model_bytes": { "title": "Model Bytes", "type": "integer" },
+          "name": { "title": "Name", "type": "string" },
+          "program_bytes": { "title": "Program Bytes", "type": "integer" },
+          "ready": { "title": "Ready", "type": "boolean" },
+          "sources": { "items": { "type": "string" }, "title": "Sources", "type": "array" },
+          "speakers": {
+            "items": { "$ref": "#/components/schemas/VoiceSpeaker" },
+            "title": "Speakers",
+            "type": "array"
+          },
+          "why": { "title": "Why", "type": "string" }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "model_bytes",
+          "program_bytes",
+          "sources",
+          "min_memory_gb",
+          "speakers",
+          "ready",
+          "fits",
+          "why"
+        ],
+        "title": "VoiceTier",
         "type": "object"
       },
       "WorkedExampleSegment": {
@@ -3847,6 +4020,113 @@
         "tags": ["lessons"]
       }
     },
+    "/v1/lessons/{lesson_id}/narration": {
+      "get": {
+        "operationId": "narration.get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Narration" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Lesson Narration",
+        "tags": ["voice"]
+      },
+      "post": {
+        "operationId": "narration.record",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Record Narration",
+        "tags": ["voice"]
+      }
+    },
+    "/v1/lessons/{lesson_id}/narration/{clip}": {
+      "get": {
+        "operationId": "narration.clip",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "clip",
+            "required": true,
+            "schema": { "title": "Clip", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/NarrationClip" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Narration Clip",
+        "tags": ["voice"]
+      }
+    },
     "/v1/lessons/{lesson_id}/progress": {
       "put": {
         "operationId": "lessons.save_progress",
@@ -4296,6 +4576,131 @@
         },
         "summary": "Get Source",
         "tags": ["courses"]
+      }
+    },
+    "/v1/voice": {
+      "get": {
+        "operationId": "voice.status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VoiceStatus" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Voice Status",
+        "tags": ["voice"]
+      },
+      "put": {
+        "operationId": "voice.choose",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/VoiceChoice" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VoiceStatus" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Choose Voice",
+        "tags": ["voice"]
+      }
+    },
+    "/v1/voice/setup": {
+      "post": {
+        "description": "Set a size of voice up: it is downloaded, at the learner's word (ADR-042).",
+        "operationId": "voice.install",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/VoiceSetup" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Install Voice",
+        "tags": ["voice"]
+      }
+    },
+    "/v1/voice/{tier}": {
+      "delete": {
+        "operationId": "voice.remove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tier",
+            "required": true,
+            "schema": { "title": "Tier", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VoiceStatus" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Remove Voice",
+        "tags": ["voice"]
       }
     }
   }
