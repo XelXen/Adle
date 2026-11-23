@@ -18,7 +18,7 @@ import re
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib import resources
 from pathlib import Path
 from urllib.parse import quote
@@ -143,6 +143,19 @@ def _made_at(path: Path) -> tuple[str, str, float]:
     return (*stamp, path.stat().st_mtime)
 
 
+def _new_copy(directory: Path, prefix: str) -> Path:
+    """A path for a safety copy about to be made: named for now, and not taken.
+
+    The clock can read the same twice in a row (on Windows it moves in steps of about
+    15 ms), and a copy written under a name already taken would replace the copy before
+    it. The later one is named a microsecond later instead, so the names still sort in
+    the order the copies were made."""
+    made = datetime.now(UTC)
+    while (path := directory / f"{prefix}-{made:%Y%m%dT%H%M%S%fZ}.db").exists():
+        made += timedelta(microseconds=1)
+    return path
+
+
 #: Tables created by the first revision and present in every one since.
 _TABLES_OF_EVERY_REVISION = frozenset({"courses", "sources", "app_settings"})
 
@@ -253,8 +266,7 @@ def restore_database(
             # Whatever prepared it has closed it; make sure it stands alone before it moves.
             _fold_in_write_ahead_log(staged)
         if target.exists():
-            stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
-            replaced = backups_dir / f"adle-replaced-{stamp}.db"
+            replaced = _new_copy(backups_dir, "adle-replaced")
             backup_database(target, replaced)
             _fold_in_write_ahead_log(target)
         # The one step that changes the learner's data, and it is all or nothing.

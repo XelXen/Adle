@@ -278,7 +278,7 @@ them.
 | Vitest | PASS | 764 tests, 43 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 113 source files |
-| pytest | PASS | 1666 tests. One, `test_only_the_newest_copies_of_replaced_data_are_kept`, failed in two whole runs by the gate script and passed in every run after (three whole runs, twelve of its own file): see Known gaps |
+| pytest | PASS | 1667 tests. `test_only_the_newest_copies_of_replaced_data_are_kept` failed now and then (three whole runs) because two restores in one step of Windows' clock (about 15 ms) named their safety copies the same, and the second replaced the first: a copy is now named a microsecond later when its name is taken (`_new_copy`), tested with a clock that stands still |
 | Playwright + Electron (E2E) | PASS | 203 of 203 in 37.4 minutes on the tree of ADR-052 and ADR-053 (2026-11-23), none retried, among them a course made from its files, named by the AI and set up through to its first lesson. Before: 202 of 202 in 35.3 minutes on the tree of ADR-050 and ADR-051, none retried. Before: 190 of 190 in 32.7 minutes on the release commit `fd2c524`, and in 32.9 minutes on the tree of `449dcf3`, none retried; among them the seventeen slide examples stepped through cue by cue in both themes, and a generated lesson whose slide steps on as its words are read. Before: 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
@@ -754,12 +754,6 @@ In this order:
   start is tested against a stand-in made slow, and by the rule checked second by second,
   but every voice on the development machine is faster than speech (Natural on one thread
   of its processor, 0.68). A computer weak enough to need it has not been tried.
-- **A core test that fails now and then:** `test_database.py::
-  test_only_the_newest_copies_of_replaced_data_are_kept` kept an older safety copy and not a
-  newer one in two whole runs of `npm run check` on 2026-11-22, and passed in every run after.
-  Which copies are kept is now chosen by the time in their names (it was the time a file
-  last changed, which can tie); the failure was seen once more after that, so the cause is
-  not that alone. Not reproduced on its own.
 
 | Gap | Planned |
 |---|---|

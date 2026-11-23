@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
 from importlib import resources
 from pathlib import Path
 
@@ -550,6 +550,33 @@ def test_only_the_newest_copies_of_replaced_data_are_kept(
     assert kept == sorted(newest)
     assert (backups / "adle-before-0002-from-0001-20260101T000000Z.db").exists()
     assert (backups / "my-own-copy.db").exists()
+
+
+def test_copies_of_replaced_data_made_in_the_same_moment_are_all_kept(
+    database: Database, backups: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    migrate(database, backups)
+    add_course(database, "Restored twice at once")
+    saved = tmp_path / "saved.db"
+    backup_database(database.path, saved)
+    database.dispose()
+
+    class StoppedClock(datetime):
+        """Reads the same every time, as Windows' clock does for about 15 ms."""
+
+        @classmethod
+        def now(cls, tz: tzinfo | None = None) -> StoppedClock:
+            return cls(2026, 11, 23, 17, 44, 15, 744545, tzinfo=tz)
+
+    monkeypatch.setattr(migrate_module, "datetime", StoppedClock)
+    replaced = [restore_database(saved, database.path, backups) for _ in range(3)]
+
+    # None replaced the one before it, and their names keep the order they were made in.
+    names = [path.name for path in replaced if path]
+    assert len(set(names)) == 3
+    assert names == sorted(names)
+    assert sorted(path.name for path in backups.glob("adle-replaced-*.db")) == names
+    assert all(course_titles(path) == ["Restored twice at once"] for path in replaced if path)
 
 
 # -- model behaviour -------------------------------------------------------
