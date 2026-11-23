@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.5] - 2026-11-22
+
+The fifth alpha. Each part of a lesson now opens on an example you can see, works it out
+in the picture, and only then writes the formula, its numbers flying out of the picture.
+A lesson in a natural voice is made with its voice: it is ready once its first part can
+be heard, about 45 seconds after you ask with the Expressive voice through NVIDIA, and the
+voice no longer changes in the middle of it.
+
 ### Changed
 
 - **The example first, and the rule out of it.** Each part of a lesson now opens on a case
