@@ -172,6 +172,11 @@ everything and decides nothing.
   `LearningService`) takes `now`; routes do not pass it. Tests move the clock that way.
 - **`learner_events` is append-only** and holds only events something reads. Adding a kind means
   a migration (the kinds are a CHECK constraint) and a reader.
+- **"This did not help" can be taken back** (ADR-054): `lessons.withdraw_unhelpful` writes an
+  `explanation_unhelpful_withdrawn` row after the report, which withdraws every report about
+  that part of that lesson made before it. Read reports only through
+  `evidence.standing_reports`, never by their kind alone. A lesson says which of its parts
+  stand reported (`LessonForPlayer.unhelpful_parts`).
 - **A question's `reveals` is stored with each attempt** (`evaluation.scoring.reveals`), as it
   was when answered. A right answer counts against a hypothesis only if the question could have
   shown it.

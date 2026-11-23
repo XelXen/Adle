@@ -404,6 +404,63 @@ test.describe('learning', () => {
     expect(adle.problems).toEqual([]);
   });
 
+  test('saying an explanation did not help can be taken back', async ({ adle }) => {
+    test.setTimeout(120_000);
+    const { page } = adle;
+    await addSampleCourse(page);
+    await suggestion(page, `Start “${LESSON}”`)
+      .getByRole('button', { name: 'Start lesson' })
+      .click();
+    await expectPart(page, 1);
+    // A toggle known by its picture: its name is for hover and for assistive technology.
+    const didNotHelp = page.getByRole('button', { name: 'This didn’t help' });
+    await expect(didNotHelp).toHaveAttribute('aria-pressed', 'false');
+
+    // ---- Pressed by mistake: undone from the dialog it opens ----
+    await didNotHelp.click();
+    const dialog = page.getByRole('dialog', { name: 'Thanks for the feedback' });
+    await dialog.getByRole('button', { name: 'Undo' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole('status').filter({ hasText: 'Feedback removed' })).toBeVisible();
+    await expect(didNotHelp).toHaveAttribute('aria-pressed', 'false');
+
+    // ---- As if it had never been said: the lesson is still what to continue ----
+    await page.getByRole('button', { name: 'Back to course' }).click();
+    const resume = suggestion(page, `Continue “${LESSON}”`);
+    await expect(resume).toContainText('Why: You stopped partway through this lesson.');
+    await expect(page.getByText(`Try another explanation of “${CONCEPT}”`)).toHaveCount(0);
+
+    // ---- Said and left standing, it is still shown when the lesson is opened again ----
+    await resume.getByRole('button', { name: 'Continue lesson' }).click();
+    await expectPart(page, 1);
+    await didNotHelp.click();
+    await dialog.getByRole('button', { name: 'Continue this lesson' }).click();
+    await expect(didNotHelp).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Back to course' }).click();
+    const instead = page.getByRole('region', { name: 'Other options' });
+    await expect(
+      instead.getByRole('listitem').filter({ hasText: `Try another explanation of “${CONCEPT}”` }),
+    ).toBeVisible();
+    await instead
+      .getByRole('listitem')
+      .filter({ hasText: `Continue “${LESSON}”` })
+      .getByRole('button', { name: 'Continue lesson' })
+      .click();
+    await expectPart(page, 1);
+    await expect(didNotHelp).toHaveAttribute('aria-pressed', 'true');
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'lesson-did-not-help-said');
+
+    // ---- Pressed again, it is taken back, with nothing to choose ----
+    await didNotHelp.click();
+    await expect(didNotHelp).toHaveAttribute('aria-pressed', 'false');
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back to course' }).click();
+    await expect(suggestion(page, `Continue “${LESSON}”`)).toBeVisible();
+    await expect(page.getByText(`Try another explanation of “${CONCEPT}”`)).toHaveCount(0);
+    expect(adle.problems).toEqual([]);
+  });
+
   test('another explanation is written a different way, then suggested', async ({ profileDir }) => {
     test.setTimeout(180_000);
     const provider = await startFakeProvider();

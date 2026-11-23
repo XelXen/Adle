@@ -675,6 +675,62 @@ def test_saying_an_explanation_did_not_help_changes_what_is_suggested(
     assert overview(client, course)["plan"]["recommended"]["kind"] == "resume_lesson"
 
 
+def test_a_report_made_by_mistake_can_be_taken_back(
+    client: TestClient, services: Services, course: dict[str, Any], lesson: dict[str, Any]
+) -> None:
+    lesson_id = lesson["lesson_id"]
+    client.put(f"/v1/lessons/{lesson_id}/progress", json={"position": 1})
+    before = overview(client, course)["plan"]
+    client.post(f"/v1/lessons/{lesson_id}/unhelpful", json={"segment_id": "seg_sum"})
+    assert client.get(f"/v1/lessons/{lesson_id}").json()["unhelpful_parts"] == ["seg_sum"]
+    assert any(
+        step["kind"] == "another_explanation"
+        for step in [overview(client, course)["plan"]["recommended"]]
+        + overview(client, course)["plan"]["alternatives"]
+    )
+
+    response = client.delete(f"/v1/lessons/{lesson_id}/unhelpful/seg_sum")
+    assert response.status_code == 204
+    # As if it had never been said: the lesson says so, and so does what comes next.
+    assert client.get(f"/v1/lessons/{lesson_id}").json()["unhelpful_parts"] == []
+    assert overview(client, course)["plan"] == before
+    # Nothing is removed: taking it back is a row of its own, after the report.
+    with services.database.session() as session:
+        kinds = [event.kind for event in session.scalars(select(LearnerEvent))]
+    assert kinds == ["explanation_unhelpful", "explanation_unhelpful_withdrawn"]
+
+    # Taking back what is not there writes nothing.
+    assert client.delete(f"/v1/lessons/{lesson_id}/unhelpful/seg_sum").status_code == 204
+    assert client.delete(f"/v1/lessons/{lesson_id}/unhelpful/seg_why").status_code == 204
+    with services.database.session() as session:
+        assert len(session.scalars(select(LearnerEvent)).all()) == 2
+
+    # Said again, it stands again.
+    client.post(f"/v1/lessons/{lesson_id}/unhelpful", json={"segment_id": "seg_sum"})
+    assert client.get(f"/v1/lessons/{lesson_id}").json()["unhelpful_parts"] == ["seg_sum"]
+    plan = overview(client, course)["plan"]
+    assert "another_explanation" in [plan["recommended"]["kind"]] + [
+        step["kind"] for step in plan["alternatives"]
+    ]
+
+
+def test_only_a_report_on_a_real_lesson_can_be_taken_back(client: TestClient) -> None:
+    assert (
+        client.delete("/v1/lessons/les_00000000000000000000/unhelpful/seg_why").status_code == 404
+    )
+
+
+def test_a_report_is_taken_back_only_by_a_well_formed_part(
+    client: TestClient, lesson: dict[str, Any]
+) -> None:
+    lesson_id = lesson["lesson_id"]
+    for bad in ("seg_UPPER", "not_a_part", "seg_" + "x" * 41):
+        assert client.delete(f"/v1/lessons/{lesson_id}/unhelpful/{bad}").status_code in (
+            404,
+            422,
+        )
+
+
 def test_only_a_real_part_of_a_real_lesson_can_be_reported(
     client: TestClient, lesson: dict[str, Any]
 ) -> None:

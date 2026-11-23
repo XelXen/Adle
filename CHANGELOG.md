@@ -5,6 +5,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The controls under a lesson fit on one row.** Read aloud, Transcript and "This didn’t
+  help" are icons now (their names show when you point at them), and a note such as
+  "Answer or skip to continue." sits between the buttons instead of pushing them onto a
+  second row.
+- **"This didn’t help" can be undone.** Pressed by mistake, choose Undo in the window it
+  opens, or press it again: it stays pressed while it counts. What Adle suggests next is
+  then as it was.
+
 ## [0.1.0-alpha.6] - 2026-11-23
 
 The sixth alpha. Make a course straight from your files: choose them in the new-course

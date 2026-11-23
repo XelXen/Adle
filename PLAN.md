@@ -1083,6 +1083,15 @@ Evidence: `test_slides.py`, `test_lesson_voice.py`, `test_voice_timing.py`,
 `generation.test.ts`, the slides that make a formula out of a picture stepped through in
 the player, two journeys in `e2e/voice`, and the real runs in `PERFORMANCE.md`.
 
+Then, after the owner looked at a lesson's bar ("make it compact- too much text"; "allow to
+revert back if mistakenly clicked on this didn't help"): **one compact row of controls**,
+Read aloud, Transcript and "This didn't help" as icon toggles and a note between the two
+groups, and **"This didn't help" taken back** by Undo or by pressing it again, with a row
+of its own so that what the learner did is still never rewritten (ADR-054). Evidence:
+`test_standing_reports.py`, the API tests of taking a report back, revision 0012 up and
+down with the learner's rows in `test_database.py`, and the journey in `e2e/learning` that
+undoes, keeps and takes back a report across a lesson opened again.
+
 ### Deviations from this plan (each has an ADR)
 
 - **Narration can be a natural voice that runs on the learner's computer** (ADR-042),

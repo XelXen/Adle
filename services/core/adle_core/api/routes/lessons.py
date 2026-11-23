@@ -57,6 +57,7 @@ def get_lesson(lesson_id: str, services: ServicesDep) -> schemas.LessonForPlayer
             schemas.LessonAuthor.model_validate(loaded.written_by) if loaded.written_by else None
         ),
         writing=loaded.writing,
+        unhelpful_parts=services.learning.unhelpful_parts(lesson_id),
     )
 
 

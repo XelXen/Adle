@@ -372,6 +372,24 @@
   gap: var(--ad-space-2);
 }
 
+/* Between the two groups, what the learner may need to know just now. Its words wrap in
+ * its own room, so the buttons keep one row whenever the two groups fit side by side;
+ * with nothing to say it takes no room at all. */
+.controlNotes {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ad-space-1) var(--ad-space-2);
+  min-width: 0;
+  text-align: center;
+}
+
+.controlNotes:empty {
+  display: none;
+}
+
 /* ---- Filling the screen ----------------------------------------------------------
  * The player itself is what fills it, on the dark ground of the lesson's screen: the
  * screen takes all the room there is, and the bar of controls keeps its place under it

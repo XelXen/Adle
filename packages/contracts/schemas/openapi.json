@@ -845,6 +845,11 @@
             "title": "Scenes",
             "type": "array"
           },
+          "unhelpful_parts": {
+            "items": { "type": "string" },
+            "title": "Unhelpful Parts",
+            "type": "array"
+          },
           "writing": { "default": false, "title": "Writing", "type": "boolean" },
           "written_by": {
             "anyOf": [{ "$ref": "#/components/schemas/LessonAuthor" }, { "type": "null" }]
@@ -4297,6 +4302,47 @@
           }
         },
         "summary": "Report Unhelpful",
+        "tags": ["learning"]
+      }
+    },
+    "/v1/lessons/{lesson_id}/unhelpful/{segment_id}": {
+      "delete": {
+        "description": "The learner takes back \"this did not help\" about a part: it was said by mistake.",
+        "operationId": "lessons.withdraw_unhelpful",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "segment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^seg_[a-z0-9_]{1,40}$",
+              "title": "Segment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Successful Response" },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Withdraw Unhelpful",
         "tags": ["learning"]
       }
     },

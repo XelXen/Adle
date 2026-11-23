@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import sqlite3
 from datetime import UTC, datetime, timedelta, timezone, tzinfo
@@ -851,6 +852,74 @@ def test_learner_evidence_survives_the_rebuild_that_adds_dismissals(
         connection.execute(insert, {"at": stamp, "kind": "dismissal"})
         with pytest.raises(Exception, match="kind_allowed"):
             connection.execute(insert, {"at": stamp, "kind": "rumour"})
+
+
+def _downgrade_to(database: Database, revision: str) -> None:
+    config = migrate_module._alembic_config()
+    with database.engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.downgrade(config, revision)
+
+
+def test_what_the_learner_said_survives_the_rebuild_that_lets_it_be_taken_back(
+    database: Database, backups: Path
+) -> None:
+    """Revision 0012 rebuilds ``learner_events``. Nothing recorded before it may be lost."""
+    _upgrade_to(database, "0011")
+    stamp = "2026-11-23 10:00:00.000000"
+    insert = text(
+        "INSERT INTO learner_events (course_id, occurred_at, kind, detail) "
+        "VALUES ('crs_00000000000000000001', :at, :kind, :detail)"
+    )
+    with database.engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO courses (id, title, description, origin, created_at, updated_at) "
+                "VALUES ('crs_00000000000000000001', 'Kept', '', 'topic', :at, :at)"
+            ),
+            {"at": stamp},
+        )
+        for kind, part in (("explanation_unhelpful", "seg_a"), ("lesson_completed", None)):
+            detail = json.dumps({"segment_id": part} if part else {})
+            connection.execute(insert, {"at": stamp, "kind": kind, "detail": detail})
+
+    outcome = migrate(database, backups)
+    assert (outcome.previous_revision, outcome.current_revision) == ("0011", head_revision())
+
+    with database.engine.begin() as connection:
+        kept = connection.execute(text("SELECT id, kind FROM learner_events ORDER BY id")).all()
+        assert [tuple(row) for row in kept] == [
+            (1, "explanation_unhelpful"),
+            (2, "lesson_completed"),
+        ]
+        indexes = {
+            row[1] for row in connection.execute(text("PRAGMA index_list('learner_events')"))
+        }
+        assert {"ix_learner_events_course_id", "ix_learner_events_concept_id"} <= indexes
+        # The new kind is accepted, and the rule that there are only a few kinds still holds.
+        for kind, part in (
+            ("explanation_unhelpful_withdrawn", "seg_a"),
+            ("explanation_unhelpful", "seg_b"),
+        ):
+            detail = json.dumps({"segment_id": part})
+            connection.execute(insert, {"at": stamp, "kind": kind, "detail": detail})
+        with pytest.raises(Exception, match="kind_allowed"):
+            connection.execute(insert, {"at": stamp, "kind": "rumour", "detail": "{}"})
+    database.dispose()
+
+    # Going back, what was taken back goes with what took it back; what stands is kept.
+    _downgrade_to(database, "0011")
+    with database.engine.begin() as connection:
+        left = connection.execute(text("SELECT kind, detail FROM learner_events ORDER BY id")).all()
+        assert [(row[0], json.loads(row[1]).get("segment_id")) for row in left] == [
+            ("lesson_completed", None),
+            ("explanation_unhelpful", "seg_b"),
+        ]
+        with pytest.raises(Exception, match="kind_allowed"):
+            connection.execute(
+                insert,
+                {"at": stamp, "kind": "explanation_unhelpful_withdrawn", "detail": "{}"},
+            )
 
 
 def test_removing_a_course_removes_what_the_learner_did_in_it(

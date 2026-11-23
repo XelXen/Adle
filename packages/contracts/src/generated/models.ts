@@ -460,6 +460,7 @@ export interface LessonForPlayer {
   pending_scene_ids?: string[];
   progress: LessonProgress;
   scenes: SceneArtifact[];
+  unhelpful_parts?: string[];
   writing?: boolean;
   written_by?: LessonAuthor | null;
 }

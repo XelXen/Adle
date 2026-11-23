@@ -165,6 +165,14 @@
   color: var(--ad-color-ink);
 }
 
+/* A toggle without a frame that is on (`aria-pressed`): tinted, as a secondary one is. */
+.tertiary[aria-pressed='true'],
+.tertiary.iconOnly[aria-pressed='true'],
+.tertiary.iconOnly[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--ad-color-primary-soft);
+  color: var(--ad-color-primary-text);
+}
+
 .destructive {
   background: var(--ad-color-danger);
   color: var(--ad-color-on-danger);

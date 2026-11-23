@@ -1,4 +1,4 @@
-import { ArrowRight, Settings, Sparkles } from 'lucide-react';
+import { ArrowRight, Settings, Sparkles, Undo2 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import type { PlayerLesson } from '@adle/contracts';
@@ -19,19 +19,22 @@ export type ReportState = 'saving' | 'saved' | 'failed';
 /**
  * What a learner can do after saying an explanation did not help. Nothing here
  * sends them back through the same content, and nothing treats it as their fault.
- * Mounted only while open.
+ * Said by mistake, it can be undone here (ADR-054). Mounted only while open.
  */
 export function UnhelpfulDialog({
   lesson,
   report,
   canSkipToQuestion,
   onSkipToQuestion,
+  onUndo,
   onClose,
 }: {
   lesson: PlayerLesson;
   report: ReportState;
   canSkipToQuestion: boolean;
   onSkipToQuestion: () => void;
+  /** Take it back: offered once it is saved, so that the two cannot arrive out of order. */
+  onUndo: () => void;
   onClose: () => void;
 }) {
   const { navigate } = useRouter();
@@ -81,9 +84,16 @@ export function UnhelpfulDialog({
           : 'That’s about the explanation, not you. Adle will take it into account.'
       }
       actions={
-        <Button onClick={onClose} disabled={creating}>
-          Continue this lesson
-        </Button>
+        <>
+          {report === 'saved' ? (
+            <Button variant="tertiary" icon={<Undo2 />} onClick={onUndo} disabled={creating}>
+              Undo
+            </Button>
+          ) : null}
+          <Button onClick={onClose} disabled={creating}>
+            Continue this lesson
+          </Button>
+        </>
       }
     >
       <ul className={styles.ways}>

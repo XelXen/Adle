@@ -28,7 +28,9 @@ from adle_core.application.evidence import (
     EVENT_DISMISSED,
     EVENT_LESSON_COMPLETED,
     EVENT_UNHELPFUL,
+    EVENT_UNHELPFUL_WITHDRAWN,
     events_by_concept,
+    standing_reports,
 )
 from adle_core.application.learner import LearnerService
 from adle_core.errors import ConflictError, NotFoundError, ValidationFailedError
@@ -336,7 +338,9 @@ class LearningService:
             select(LearnerEvent)
             .where(
                 LearnerEvent.course_id == course_id,
-                LearnerEvent.kind.in_((EVENT_DISMISSED, EVENT_UNHELPFUL)),
+                LearnerEvent.kind.in_(
+                    (EVENT_DISMISSED, EVENT_UNHELPFUL, EVENT_UNHELPFUL_WITHDRAWN)
+                ),
             )
             .order_by(LearnerEvent.id)
         ).all()
@@ -397,9 +401,10 @@ class LearningService:
                 )
                 items[item.concept_id][(row.id, item.id)] = item
 
+        # The newest report about each concept that the learner has not taken back.
         unhelpful: dict[str, LearnerEvent] = {}
-        for event in events:
-            if event.kind == EVENT_UNHELPFUL and event.concept_id is not None:
+        for event in standing_reports(events):
+            if event.concept_id is not None:
                 unhelpful[event.concept_id] = event
 
         pictures: list[_Picture] = []
@@ -733,3 +738,43 @@ class LearningService:
                     detail={"segment_id": segment_id},
                 )
             )
+
+    def withdraw_unhelpful(
+        self, lesson_id: str, segment_id: str, *, now: datetime | None = None
+    ) -> None:
+        """The learner takes back "this did not help" about a part: it was said by mistake.
+
+        Nothing is removed (ADR-054): the withdrawal is a row of its own, after the report.
+        With nothing about that part left to take back, nothing is written."""
+        with self._database.session() as session:
+            row = session.get(StoredLesson, lesson_id)
+            if row is None:
+                raise NotFoundError("That lesson no longer exists.")
+            if segment_id not in self._reported_parts(session, lesson_id):
+                return
+            session.add(
+                LearnerEvent(
+                    course_id=row.course_id,
+                    concept_id=row.concept_id,
+                    lesson_id=row.id,
+                    occurred_at=now or utc_now(),
+                    kind=EVENT_UNHELPFUL_WITHDRAWN,
+                    detail={"segment_id": segment_id},
+                )
+            )
+
+    def unhelpful_parts(self, lesson_id: str) -> list[str]:
+        """The parts of a lesson the learner said did not help and has not taken back."""
+        with self._database.read() as session:
+            return self._reported_parts(session, lesson_id)
+
+    @staticmethod
+    def _reported_parts(session: Session, lesson_id: str) -> list[str]:
+        events = session.scalars(
+            select(LearnerEvent).where(
+                LearnerEvent.lesson_id == lesson_id,
+                LearnerEvent.kind.in_((EVENT_UNHELPFUL, EVENT_UNHELPFUL_WITHDRAWN)),
+            )
+        ).all()
+        parts = (report.detail.get("segment_id") for report in standing_reports(events))
+        return list(dict.fromkeys(part for part in parts if isinstance(part, str)))

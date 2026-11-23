@@ -415,6 +415,8 @@ class LessonForPlayer(_Output):
     #: The rest of the lesson is still being written. Its parts are added after these, and
     #: none of these changes (ADR-048).
     writing: bool = False
+    #: The parts the learner said did not help and has not taken back (ADR-054).
+    unhelpful_parts: list[str] = Field(default_factory=list)
 
 
 class LessonProgressUpdate(_Input):

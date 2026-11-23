@@ -207,6 +207,11 @@ export const OPERATIONS = {
     path: '/v1/lessons/{lesson_id}/progress',
     internal: false,
   },
+  'lessons.withdraw_unhelpful': {
+    method: 'DELETE',
+    path: '/v1/lessons/{lesson_id}/unhelpful/{segment_id}',
+    internal: false,
+  },
   'narration.clip': {
     method: 'GET',
     path: '/v1/lessons/{lesson_id}/narration/{clip}',
@@ -524,6 +529,12 @@ export interface OperationTypes {
     query: undefined;
     body: LessonProgressUpdate;
     result: LessonProgress;
+  };
+  'lessons.withdraw_unhelpful': {
+    path: { lesson_id: string; segment_id: string };
+    query: undefined;
+    body: undefined;
+    result: null;
   };
   'narration.clip': {
     path: { lesson_id: string; clip: string };

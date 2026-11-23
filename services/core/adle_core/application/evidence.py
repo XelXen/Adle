@@ -19,6 +19,7 @@ from adle_core.learner_model.misconceptions import Answer, Dismissal, Hypothesis
 
 EVENT_DISMISSED = "misconception_dismissed"
 EVENT_UNHELPFUL = "explanation_unhelpful"
+EVENT_UNHELPFUL_WITHDRAWN = "explanation_unhelpful_withdrawn"
 EVENT_LESSON_COMPLETED = "lesson_completed"
 
 
@@ -37,6 +38,27 @@ def as_answer(attempt: Attempt) -> Answer:
         suggests=attempt.misconception,
         reveals=frozenset(attempt.reveals),
     )
+
+
+def standing_reports(events: Iterable[LearnerEvent]) -> list[LearnerEvent]:
+    """The "this did not help" reports the learner has not taken back, oldest first.
+
+    Taking one back (ADR-054) is a row of its own, written after the report: it withdraws
+    every report about the same part of the same lesson made before it, and a report made
+    after it stands. Rows are taken in the order they were written, by id, which a clock
+    that reads the same twice cannot muddle."""
+    standing: list[LearnerEvent] = []
+    for event in sorted(events, key=lambda item: item.id):
+        if event.kind == EVENT_UNHELPFUL:
+            standing.append(event)
+        elif event.kind == EVENT_UNHELPFUL_WITHDRAWN:
+            standing = [report for report in standing if _part(report) != _part(event)]
+    return standing
+
+
+def _part(event: LearnerEvent) -> tuple[str | None, object]:
+    """The part of a lesson a report, or its withdrawal, is about."""
+    return (event.lesson_id, event.detail.get("segment_id"))
 
 
 def as_dismissal(event: LearnerEvent) -> Dismissal | None:

@@ -257,6 +257,11 @@ most, a file's name.
   use the `--ad-color-stage*` tokens and `IconButton variant="stage"`; the page's own
   tokens there are dark on dark in the light theme. The transcript's lines are all in the
   page whether one is shown or all: hide the others from the eye, never from the tree.
+- **The bar under a lesson is one row** (ADR-054): the lesson's own controls, then what the
+  learner may need to know just now (`.controlNotes`, which wraps in its own room), then
+  what to do about the part. The much-used controls keep their words; Read aloud,
+  Transcript and This didn't help are `IconButton` toggles with `aria-pressed`, named by
+  the words they had. A new note goes in the middle, never into a group of buttons.
 - **Full screen** is the player element itself (`useFullscreen`), by the browser's own
   means; the main process grants it to the app's own page and to nothing else. In a
   journey, give the screen back with the button that took it: a test's Escape does not
@@ -286,6 +291,9 @@ most, a file's name.
   navigation; key a screen on it when "the same place again" means "a new run"
   (`PracticeScreen`).
 - Words for progress are states and counts. No percentage, no bar that reads as a score.
+- "This did not help" can be taken back (ADR-054): its toggle in the bar is pressed while
+  the report stands (`unhelpful_parts`), its dialog offers "Undo" once the report is saved,
+  and pressing the toggle again takes it back with nothing to choose.
 - "This did not help" is recorded first and never argued with. What it offers must not include
   the same content again.
 - A course with concepts opens on the Learn tab. End-to-end journeys that are about the

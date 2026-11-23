@@ -38,7 +38,12 @@ JOB_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
 CONCEPT_ORIGINS = ("learner", "outline", "model", "sample")
 CONCEPT_TAGS = ("conceptual", "calculation", "visual", "procedural")
 OBSERVATION_KINDS = ("answer", "self_report", "dismissal")
-LEARNER_EVENT_KINDS = ("misconception_dismissed", "explanation_unhelpful", "lesson_completed")
+LEARNER_EVENT_KINDS = (
+    "misconception_dismissed",
+    "explanation_unhelpful",
+    "lesson_completed",
+    "explanation_unhelpful_withdrawn",
+)
 MASTERY_STATES = ("not_assessed", "building", "needs_evidence", "demonstrated")
 LESSON_ORIGINS = ("sample", "generated")
 MODEL_USAGE_OUTCOMES = (
@@ -502,7 +507,9 @@ class LearnerEvent(Base):
 
     ``misconception_dismissed`` (``detail.kind``) takes part in working out the
     hypotheses about a concept; ``explanation_unhelpful`` (``detail.segment_id``)
-    in choosing what to suggest next; ``lesson_completed`` records when.
+    in choosing what to suggest next, unless an ``explanation_unhelpful_withdrawn``
+    about the same part of the same lesson comes after it (ADR-054);
+    ``lesson_completed`` records when.
     """
 
     __tablename__ = "learner_events"

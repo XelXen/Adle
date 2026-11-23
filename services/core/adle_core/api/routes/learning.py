@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 from fastapi import Response as HttpResponse
 
 from adle_core.api import schemas
@@ -63,4 +63,19 @@ def report_unhelpful(
 ) -> HttpResponse:
     """The learner says an explanation did not help. It shapes what is suggested next."""
     services.learning.report_unhelpful(lesson_id, body.segment_id)
+    return HttpResponse(status_code=204)
+
+
+@router.delete(
+    "/lessons/{lesson_id}/unhelpful/{segment_id}",
+    operation_id="lessons.withdraw_unhelpful",
+    status_code=204,
+)
+def withdraw_unhelpful(
+    lesson_id: str,
+    segment_id: Annotated[str, Path(pattern=r"^seg_[a-z0-9_]{1,40}$")],
+    services: ServicesDep,
+) -> HttpResponse:
+    """The learner takes back "this did not help" about a part: it was said by mistake."""
+    services.learning.withdraw_unhelpful(lesson_id, segment_id)
     return HttpResponse(status_code=204)

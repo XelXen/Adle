@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Captions,
+  CaptionsOff,
   Check,
   ChevronDown,
   ChevronsDownUp,
@@ -12,11 +13,11 @@ import {
   Hand,
   Info,
   Maximize,
-  MessageCircleQuestion,
   Minimize,
   Pause,
   Play,
   RotateCcw,
+  ThumbsDown,
   Trash2,
   Volume2,
   VolumeX,
@@ -333,7 +334,11 @@ function LessonPlayer({
     if (hidden) list.scrollTop = Math.max(0, top - list.clientHeight / 3);
   }, [state.beatIndex, state.segmentIndex, everyLine]);
   /** Set while the learner is choosing what to do after saying a part did not help. */
-  const [unhelpful, setUnhelpful] = useState<ReportState | null>(null);
+  const [unhelpful, setUnhelpful] = useState<{ part: string; report: ReportState } | null>(null);
+  /** The parts the learner said did not help and has not taken back (ADR-054). */
+  const [reported, setReported] = useState<ReadonlySet<string>>(
+    () => new Set(data.unhelpful_parts ?? []),
+  );
 
   // -- questions the learner asks Adle about a part (ADR-024) ------------------------
   const lessonId = lesson.lesson_id;
@@ -436,17 +441,47 @@ function LessonPlayer({
     controller.replay();
   };
 
-  /** Record that this part did not help, and offer other ways forward. */
+  /** Record that this part did not help, and offer other ways forward. Said already, the
+   *  same button takes it back (ADR-054). */
   const sayUnhelpful = (): void => {
+    const part = segment.id;
+    if (reported.has(part)) {
+      takeBack(part);
+      return;
+    }
     controller.pause();
-    setUnhelpful('saving');
-    const settle = (outcome: ReportState) => (): void =>
+    setUnhelpful({ part, report: 'saving' });
+    const settle = (outcome: ReportState) => (): void => {
+      if (outcome === 'saved') setReported((current) => new Set(current).add(part));
       // Only while the dialog is still open: the learner may already have moved on.
-      setUnhelpful((current) => (current === null ? null : outcome));
+      setUnhelpful((current) => (current === null ? null : { part, report: outcome }));
+    };
     callCore('lessons.report_unhelpful', {
       path: { lesson_id: lesson.lesson_id },
-      body: { segment_id: segment.id },
+      body: { segment_id: part },
     }).then(settle('saved'), settle('failed'));
+  };
+  /** Said by mistake: it no longer counts, and what comes next is as it was. */
+  const takeBack = (part: string): void => {
+    callCore('lessons.withdraw_unhelpful', {
+      path: { lesson_id: lesson.lesson_id, segment_id: part },
+    }).then(
+      () => {
+        setReported((current) => {
+          const next = new Set(current);
+          next.delete(part);
+          return next;
+        });
+        toast.show({ tone: 'success', title: 'Feedback removed' });
+      },
+      (error: unknown) => {
+        toast.show({
+          tone: 'danger',
+          title: 'Couldn’t remove your feedback',
+          description: describeError(error),
+        });
+      },
+    );
   };
   // A question or a pause for thought explains nothing, so there is nothing to report.
   const explains = segment.type !== 'checkpoint' && segment.type !== 'reflection';
@@ -742,31 +777,35 @@ function LessonPlayer({
                   {playing ? 'Pause' : state.status === 'paused' ? 'Resume' : 'Start'}
                 </Button>
               )}
+              {/* Switched on and off often enough to be known by their pictures: their names
+                  are on hover and to assistive technology. */}
               {spoken ? (
-                <Button
+                <IconButton
+                  label="Read aloud"
+                  variant="secondary"
                   aria-pressed={aloud}
                   icon={aloud ? <Volume2 /> : <VolumeX />}
                   onClick={() => readAloud(!aloud)}
-                >
-                  Read aloud
-                </Button>
+                />
               ) : null}
               {aloud ? (
-                <Button
+                <IconButton
+                  label="Transcript"
+                  variant="secondary"
                   aria-pressed={wordsShown}
-                  icon={<Captions />}
+                  icon={wordsShown ? <Captions /> : <CaptionsOff />}
                   onClick={() => setWordsShown((shown) => !shown)}
-                >
-                  Transcript
-                </Button>
+                />
               ) : null}
+            </div>
+            {/* What the learner may need to know just now: it wraps in its own room between
+                the two groups, so that the buttons keep one row. */}
+            <div className={styles.controlNotes}>
               {!spoken && preferences.narration ? (
                 <span className={styles.note}>
                   No voice is installed, so narration is shown as text.
                 </span>
               ) : null}
-            </div>
-            <div className={styles.controlGroup}>
               {!allowed ? <span className={styles.note}>Answer or skip to continue.</span> : null}
               {state.held ? (
                 <span className={styles.note} role="status">
@@ -786,6 +825,8 @@ function LessonPlayer({
                   </Button>
                 </>
               ) : null}
+            </div>
+            <div className={styles.controlGroup}>
               {/* Busy, and still a button: opening it again is the way to watch the answer
                   being written, or to stop it. */}
               <Button
@@ -796,10 +837,14 @@ function LessonPlayer({
               >
                 {answering ? 'Answering' : 'Ask a question'}
               </Button>
+              {/* Pressed while it stands: pressed again, it is taken back (ADR-054). */}
               {explains ? (
-                <Button variant="tertiary" icon={<MessageCircleQuestion />} onClick={sayUnhelpful}>
-                  This didn’t help
-                </Button>
+                <IconButton
+                  label="This didn’t help"
+                  aria-pressed={reported.has(segment.id)}
+                  icon={<ThumbsDown />}
+                  onClick={sayUnhelpful}
+                />
               ) : null}
               <Button
                 variant={settled && allowed && !state.held ? 'primary' : 'secondary'}
@@ -856,11 +901,15 @@ function LessonPlayer({
       {unhelpful !== null ? (
         <UnhelpfulDialog
           lesson={lesson}
-          report={unhelpful}
+          report={unhelpful.report}
           canSkipToQuestion={controller.nextQuestionIndex() !== null}
           onSkipToQuestion={() => {
             setUnhelpful(null);
             controller.skipToNextQuestion();
+          }}
+          onUndo={() => {
+            setUnhelpful(null);
+            takeBack(unhelpful.part);
           }}
           onClose={() => setUnhelpful(null)}
         />

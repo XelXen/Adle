@@ -62,8 +62,12 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   from your materials" no longer offered, and a concept shown as what it is, then the
   learner's learning of it, then where it is in their files (ADR-053). **Both are in
   0.1.0-alpha.6**, published from the release commit `015506d` on 2026-11-23,
-  `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.6`. What is left to them is under
-  "Next actions"
+  `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.6`. Then, after looking at a
+  lesson's bar of controls ("make it compact- too much text"; "allow to revert back if
+  mistakenly clicked on this didn't help"): **one compact row of controls**, Read aloud,
+  Transcript and "This didn't help" as icon toggles, and **"This didn't help" taken back**
+  by Undo or by pressing it again (ADR-054); on `main`, not released yet. What is left to
+  them is under "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -279,9 +283,9 @@ them.
 | TypeScript (`tsc`, 6 projects) | PASS | |
 | Vitest | PASS | 764 tests, 43 files |
 | ruff (lint + format) | PASS | |
-| mypy (strict) | PASS | 113 source files |
-| pytest | PASS | 1667 tests. `test_only_the_newest_copies_of_replaced_data_are_kept` failed now and then (three whole runs) because two restores in one step of Windows' clock (about 15 ms) named their safety copies the same, and the second replaced the first: a copy is now named a microsecond later when its name is taken (`_new_copy`), tested with a clock that stands still |
-| Playwright + Electron (E2E) | PASS | 203 of 203 in 35.3 minutes on the tree of the release commit `015506d`, and in 37.4 minutes on the tree of ADR-052 and ADR-053 (2026-11-23), none retried, among them a course made from its files, named by the AI and set up through to its first lesson. Before: 202 of 202 in 35.3 minutes on the tree of ADR-050 and ADR-051, none retried. Before: 190 of 190 in 32.7 minutes on the release commit `fd2c524`, and in 32.9 minutes on the tree of `449dcf3`, none retried; among them the seventeen slide examples stepped through cue by cue in both themes, and a generated lesson whose slide steps on as its words are read. Before: 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
+| mypy (strict) | PASS | 116 source files |
+| pytest | PASS | 1677 tests, among them which reports of "this did not help" still count, taking one back through the API, and revision 0012 up and down with the learner's rows. Before: `test_only_the_newest_copies_of_replaced_data_are_kept` failed now and then (three whole runs) because two restores in one step of Windows' clock (about 15 ms) named their safety copies the same, and the second replaced the first: a copy is now named a microsecond later when its name is taken (`_new_copy`), tested with a clock that stands still |
+| Playwright + Electron (E2E) | PASS | 204 journeys in 39.7 minutes on the tree of ADR-054 (2026-11-23), 203 at the first try and 1 at its second: a sample scene untouched by that work (`forward_pass.py`, dark) that did not finish within its time, and ran in 17 s again; among them "This didn't help" said, undone in its dialog, left standing across a lesson opened again, and taken back from the bar. Before: 203 of 203 in 35.3 minutes on the tree of the release commit `015506d`, and in 37.4 minutes on the tree of ADR-052 and ADR-053 (2026-11-23), none retried, among them a course made from its files, named by the AI and set up through to its first lesson. Before: 202 of 202 in 35.3 minutes on the tree of ADR-050 and ADR-051, none retried. Before: 190 of 190 in 32.7 minutes on the release commit `fd2c524`, and in 32.9 minutes on the tree of `449dcf3`, none retried; among them the seventeen slide examples stepped through cue by cue in both themes, and a generated lesson whose slide steps on as its words are read. Before: 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
@@ -664,6 +668,15 @@ and the model does not think first, so a lesson can be begun about twelve second
 is asked for;
 the teaching style can be chosen for a first lesson; a table's bare TeX is set as a formula;
 a board line is not repeated. Measured by hand through NVIDIA (see "The real providers").
+
+**Asked for by the owner on 2026-11-23, after 0.1.0-alpha.6: done, on `main`, not released
+yet.** The bar under a lesson is one row (ADR-054): the lesson's own controls, a note in the
+middle that wraps in its own room, and what to do about the part; Read aloud, Transcript and
+"This didn't help" are icon toggles named by their old words. "This didn't help" stays
+pressed while it stands; Undo in its dialog, or pressing it again, takes it back with a row
+of its own (`explanation_unhelpful_withdrawn`, revision 0012), and what the course suggests
+is as it was. Seen in the built app at 1280, 1100, 960 and 820 points wide: one row, with a
+note and without.
 
 **Asked for by the owner on 2026-11-23: done, and released in 0.1.0-alpha.6.** Every voice
 timed where it runs, a slow one giving a lesson a head start (ADR-052). A course made from
