@@ -281,6 +281,12 @@ everything and decides nothing.
   out (`LessonDraft`); a board line left open is left off; a figure that cannot be drawn is
   told in words, and a shade under a cumulative curve is drawn as its rise. Anything else
   that does not validate is still the one retry, told what was wrong.
+- **A course left unnamed is named by Adle** (ADR-053, `courses.named_by_adle`): from its
+  first file (`SourceService._store`), then from the suggestions' `course_title`; never
+  once the learner names it (`CourseService.update` clears it). **A proposal with
+  `setup`** adds everything suggested and begins the first lesson
+  (`GenerationService._set_up`): the learner asked for it in advance; without `setup`
+  nothing is added until the learner picks (ADR-012).
 - **A lesson in a natural voice is made with its voice** (ADR-051). `build_services` wires
   it: `on_begun` warms the voice as a lesson is asked for (`NarrationService.warm`, a job
   in the voice lane that loads the models), `on_stored` starts or wakes the one recording

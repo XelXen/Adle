@@ -1076,7 +1076,10 @@ its formula made of the picture's own numbers before it becomes the rule (ADR-05
 recorded part by part by one recording on one engine, ready once its first part can be
 heard, a line not recorded yet waited for and never read in another voice by itself
 (ADR-051); and every voice timed where it runs, a slow one giving a lesson a head start
-(ADR-052). Evidence: `test_slides.py`, `test_lesson_voice.py`, `test_voice_timing.py`, `recorded.test.ts`,
+(ADR-052); and a course made straight from its files, named by Adle and set up if asked,
+with a concept shown as what it is and then the learner's learning of it (ADR-053).
+Evidence: `test_slides.py`, `test_lesson_voice.py`, `test_voice_timing.py`,
+`test_course_setup.py`, `recorded.test.ts`,
 `generation.test.ts`, the slides that make a formula out of a picture stepped through in
 the player, two journeys in `e2e/voice`, and the real runs in `PERFORMANCE.md`.
 

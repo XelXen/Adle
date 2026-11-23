@@ -14,6 +14,7 @@ import {
   KIND_PROPOSAL,
   lessonDisclosure,
   lessonNotice,
+  readSetUp,
   readLessonOutcome,
   titled,
   readProposal,
@@ -434,5 +435,30 @@ describe('keptNeeds', () => {
     ]);
     expect(keptNeeds(proposal, new Set([1]), 1)).toEqual([]);
     expect(keptNeeds(proposal, new Set([0, 1]), 5)).toEqual([]);
+  });
+});
+
+describe('readSetUp', () => {
+  it('reads a course set up by Adle, and nothing from suggestions waiting to be reviewed', () => {
+    const setUp = job({
+      kind: KIND_PROPOSAL,
+      result: {
+        concepts: [],
+        accepted: true,
+        setup: true,
+        first_concept_id: 'con_1',
+        lesson_job_id: 'job_9',
+      },
+    });
+    expect(readSetUp(setUp)).toEqual({ firstConceptId: 'con_1', lessonJobId: 'job_9' });
+    // No lesson could be begun: the concepts are there all the same.
+    expect(
+      readSetUp(job({ kind: KIND_PROPOSAL, result: { accepted: true, setup: true } })),
+    ).toEqual({ firstConceptId: null, lessonJobId: null });
+    expect(readSetUp(job({ kind: KIND_PROPOSAL, result: { accepted: false } }))).toBeNull();
+    expect(
+      readSetUp(job({ kind: KIND_PROPOSAL, status: 'running', result: { setup: true } })),
+    ).toBeNull();
+    expect(readSetUp(null)).toBeNull();
   });
 });

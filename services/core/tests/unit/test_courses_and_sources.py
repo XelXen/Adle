@@ -93,7 +93,6 @@ def test_a_topic_course_needs_a_topic(client: TestClient) -> None:
 @pytest.mark.parametrize(
     "body",
     [
-        {"origin": "materials"},
         {"title": "   ", "origin": "materials"},
         {"title": "x" * 201, "origin": "materials"},
         {"title": "T", "origin": "sample"},  # only Adle itself creates sample courses

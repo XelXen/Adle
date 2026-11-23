@@ -199,6 +199,7 @@ export interface Course {
   description: string;
   id: string;
   last_opened_at: string | null;
+  named_by_adle?: boolean;
   origin: 'sample' | 'topic' | 'materials';
   source_count: number;
   title: string;
@@ -208,7 +209,7 @@ export interface Course {
 export interface CourseCreate {
   description?: string;
   origin: 'topic' | 'materials';
-  title: string;
+  title?: string | null;
   topic?: string | null;
 }
 export interface CourseList {
@@ -770,6 +771,9 @@ export interface ProposalAcceptance {
    * @maxItems 40
    */
   selected: number[];
+}
+export interface ProposalRequest {
+  setup?: boolean;
 }
 export interface ProviderCheck {
   provider_id: string;

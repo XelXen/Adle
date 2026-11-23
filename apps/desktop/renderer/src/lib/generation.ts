@@ -138,6 +138,26 @@ export function readProposal(job: Job | null): Proposal | null {
   };
 }
 
+/** What a course set up by Adle got (ADR-053): its first concept, and that lesson's job. */
+export interface SetUp {
+  firstConceptId: string | null;
+  lessonJobId: string | null;
+}
+
+/**
+ * Whether a finished proposal set its course up (ADR-053): its concepts were added without
+ * a review, and the first lesson begun. Null for suggestions waiting to be reviewed.
+ */
+export function readSetUp(job: Job | null): SetUp | null {
+  if (!job || job.kind !== KIND_PROPOSAL || job.status !== 'succeeded') return null;
+  const result = job.result;
+  if (!isRecord(result) || result.setup !== true || result.accepted !== true) return null;
+  return {
+    firstConceptId: typeof result.first_concept_id === 'string' ? result.first_concept_id : null,
+    lessonJobId: typeof result.lesson_job_id === 'string' ? result.lesson_job_id : null,
+  };
+}
+
 /**
  * The lesson a job has produced, or null if it has not produced one.
  *

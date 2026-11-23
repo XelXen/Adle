@@ -64,11 +64,18 @@ class _Output(BaseModel):
 
 
 class CourseCreate(_Input):
-    title: Title
+    #: Left out, Adle names the course (ADR-053).
+    title: Title | None = None
     description: LongText = ""
     #: A learner creates a course from a topic or from materials. Sample courses are built in.
     origin: Literal["topic", "materials"]
     topic: LongText | None = None
+
+
+class ProposalRequest(_Input):
+    #: The learner asked Adle to set the course up: what is suggested is added, and the
+    #: first lesson begun (ADR-053).
+    setup: StrictBool = False
 
 
 class CourseUpdate(_Input):
@@ -87,6 +94,8 @@ class Course(_Output):
     created_at: datetime
     updated_at: datetime
     last_opened_at: datetime | None
+    #: Its name was left to Adle, who names it from its files and its concepts (ADR-053).
+    named_by_adle: bool = False
 
 
 class CourseList(_Output):

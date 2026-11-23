@@ -588,9 +588,11 @@ def curriculum_request(
     passages: Sequence[Passage],
     problems: Sequence[str] = (),
     pages: Sequence[str] = (),
+    name_it: bool = False,
 ) -> ChatRequest:
     """The request for a proposed list of concepts for a course. ``pages`` stand in for the
-    headings of materials that have none: how each page begins, from first to last."""
+    headings of materials that have none: how each page begins, from first to last. With
+    ``name_it`` the learner left the course's name to Adle, and the answer names it too."""
     system = (
         "You design the curriculum of a short course for Adle, an app that teaches one concept "
         "at a time to one learner. You are an expert teacher of the subject. You decide which "
@@ -639,6 +641,12 @@ def curriculum_request(
             "A few excerpts, to show the level and the notation:\n\n" + "\n\n".join(blocks)
         )
     parts.append(_CURRICULUM_FORMAT)
+    if name_it:
+        parts.append(
+            'The learner left the course unnamed. Add "course_title" to the object, before '
+            '"concepts": a short name for the whole course as a learner would call it, plain '
+            'words of at most 60 characters ("Probability and counting", not "Chapter 1").'
+        )
     if problems:
         listed = "\n".join(f"- {problem}" for problem in problems[:MAX_PROBLEMS_IN_RETRY])
         parts.append(

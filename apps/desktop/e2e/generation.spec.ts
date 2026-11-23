@@ -8,8 +8,10 @@ import type { Page } from '@playwright/test';
 
 import { expect, launchApp, type LaunchedApp, test, waitForCore } from './support/app';
 import {
+  chooseInFileDialog,
   courseCard,
   createCourse,
+  doc,
   expectNoAccessibilityViolations,
   openCourseTab,
   providerKeyField,
@@ -192,6 +194,49 @@ async function addConcept(page: Page, name: string): Promise<void> {
 }
 
 test.describe('generation with the AI provider', () => {
+  test('a course made from files is named by Adle and set up, its first lesson written', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await open(profileDir);
+    const { adle, page, provider } = session;
+    const suggested = JSON.parse(cannedAnswer('curriculum')) as Record<string, unknown>;
+    provider.queue(
+      JSON.stringify({ course_title: 'Calculus from first ideas', ...suggested }),
+      cannedAnswer('lesson'),
+    );
+    await page
+      .getByRole('button', { name: /New course|Create your first course/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'New course' });
+    // From files, the default; the name left to Adle; set up by Adle, the default with a key.
+    await expect(dialog.getByRole('radio', { name: 'From my files' })).toBeChecked();
+    await expect(dialog.getByRole('checkbox', { name: 'Set it up for me' })).toBeChecked();
+    await expectNoAccessibilityViolations(page);
+    await chooseInFileDialog(adle.app, [doc('neural-networks-syllabus.md')]);
+    await dialog.getByRole('button', { name: 'Choose files…' }).click();
+
+    // Named by the AI as it suggests the concepts, which are added: nothing to review.
+    await expect(
+      page.getByRole('heading', { name: 'Calculus from first ideas', level: 1 }),
+    ).toBeVisible({ timeout: 60_000 });
+    await expect(pathList(page).getByRole('listitem')).toHaveCount(3);
+    await expect(page.getByRole('button', { name: 'Review suggestions' })).toHaveCount(0);
+    // And the first concept's lesson is written, as if it had been asked for.
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toBeVisible({
+      timeout: 60_000,
+    });
+    expect(provider.requests.map((request) => request.kind).slice(0, 2)).toEqual([
+      'curriculum',
+      'lesson',
+    ]);
+    // What was asked for named the course and was grounded in the file.
+    expect(provider.requests[0]!.prompt).toContain('course_title');
+    expect(provider.requests[0]!.prompt).toContain('neural-networks-syllabus.md');
+    await close(session);
+  });
+
   test('suggest concepts, choose among them, then have a lesson written and play it', async ({
     profileDir,
   }) => {

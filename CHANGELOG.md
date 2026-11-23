@@ -7,11 +7,24 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Make a course straight from your files.** Choose them in the new-course dialog. Leave
+  the name empty and Adle names the course, first from your files and then from what it
+  covers. Tick "Set it up for me" and Adle adds the concepts it suggests and writes the
+  first lesson, so you go from your files to a lesson in one step.
+- **A concept's page is easier to read**: first what the concept is (its description,
+  learning objectives and prerequisites), then your learning (how well you know it, and
+  its lessons), then where it is in your files, with editing and removing it at the end.
 - **Every natural voice is timed on your computer**, the lightest too: when it is set up,
   and as it records. If it is slower than speech there, a lesson waits for enough of its
   voice to be recorded that you will never catch up with it, and "Usually takes about"
   says so beforehand. Settings tells you when a voice is slower than speech on your
   computer.
+
+### Removed
+
+- "Start from your materials", which made concepts from your files' headings alone. The
+  AI's suggestions use those headings, link each concept to its pages, and come with
+  descriptions, objectives and prerequisites.
 
 ## [0.1.0-alpha.5] - 2026-11-22
 

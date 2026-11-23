@@ -1,7 +1,9 @@
 /**
  * Building and inspecting a curriculum: a first draft from the headings of the
  * learner's own materials, then refining it by hand. No AI is involved, and the
- * test session has no network.
+ * test session has no network. The interface no longer offers the headings as a draft of
+ * their own (AI suggestions grounded in them do it better): the journey sets that draft
+ * up through the core's own operation, and goes on from there in the interface.
  */
 import type { Page } from '@playwright/test';
 
@@ -10,7 +12,6 @@ import {
   courseCard,
   createCourse,
   expectNoAccessibilityViolations,
-  importAndWait,
   openCourseTab,
   screenshot,
 } from './support/courses';
@@ -21,6 +22,15 @@ const pathRow = (page: Page, title: string) =>
     .getByRole('listitem')
     .filter({ has: page.getByRole('button', { name: new RegExp(`^${title}`) }) });
 const detail = (page: Page, title: string) => page.getByRole('region', { name: title });
+
+async function invoke<T>(page: Page, operation: string, request?: unknown): Promise<T> {
+  const answer = await page.evaluate(
+    ([name, body]) => window.adle!.core.invoke(name as never, body as never),
+    [operation, request] as const,
+  );
+  expect(answer.ok, JSON.stringify(answer)).toBe(true);
+  return (answer as { data: T }).data;
+}
 
 /** The concepts in the order the path lists them, read from each row's "Move … earlier" control. */
 async function pathTitles(page: Page): Promise<string[]> {
@@ -45,22 +55,46 @@ test.describe('curriculum', () => {
     const first = await launchApp(profileDir, { onboarded: true, theme: 'light' });
     const { app, page } = first;
     await waitForCore(page);
-    await createCourse(page, 'Neural networks 101');
-    await importAndWait(app, page, ['neural-networks-syllabus.md', 'lecture-notes.pdf']);
+    await createCourse(page, 'Neural networks 101', {
+      app,
+      files: ['neural-networks-syllabus.md', 'lecture-notes.pdf'],
+    });
+    await expect(page.getByRole('list', { name: 'Materials in this course' })).toContainText(
+      'lecture-notes.pdf',
+      { timeout: 30_000 },
+    );
 
     // ---- A first draft from the headings of the materials ----
     await page.getByRole('tab', { name: 'Curriculum' }).click();
     await expect(page.getByRole('heading', { name: 'No concepts yet' })).toBeVisible();
-    await page.getByRole('button', { name: 'Start from your materials' }).click();
-    const outline = page.getByRole('dialog', { name: 'Start from your materials' });
-    await expect(outline.getByRole('checkbox')).toHaveCount(7);
+    // What is offered: AI suggestions grounded in the materials, or a concept by hand.
+    await expect(page.getByRole('button', { name: 'Start from your materials' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Suggest concepts with AI' })).toBeVisible();
+    const courses = await invoke<{ courses: { id: string; title: string }[] }>(
+      page,
+      'courses.list',
+    );
+    const courseId = courses.courses.find((item) => item.title === 'Neural networks 101')!.id;
+    const outline = await invoke<{ candidates: { section_id: string; title: string }[] }>(
+      page,
+      'curriculum.outline_candidates',
+      { path: { course_id: courseId } },
+    );
     // Numbering is dropped, and headings that only organise the document are not offered.
-    await expect(outline.getByRole('checkbox', { name: 'The perceptron' })).toBeChecked();
-    await expect(outline.getByRole('checkbox', { name: 'Assessment' })).toHaveCount(0);
-    await expect(outline.getByText('From neural-networks-syllabus.md')).toBeVisible();
-    await outline.getByRole('checkbox', { name: 'Forward propagation' }).uncheck();
-    await outline.getByRole('checkbox', { name: 'Derivatives and the chain rule' }).uncheck();
-    await outline.getByRole('button', { name: 'Add 5 concepts' }).click();
+    expect(outline.candidates).toHaveLength(7);
+    expect(outline.candidates.map((item) => item.title)).not.toContain('Assessment');
+    const kept = outline.candidates.filter(
+      (item) => !['Forward propagation', 'Derivatives and the chain rule'].includes(item.title),
+    );
+    await invoke(page, 'curriculum.add_from_outline', {
+      path: { course_id: courseId },
+      body: { section_ids: kept.map((item) => item.section_id) },
+    });
+    // Seen as the course's curriculum once it is opened again.
+    await page.getByRole('main').getByRole('button', { name: 'Library', exact: true }).click();
+    await courseCard(page, 'Neural networks 101').click();
+    await openCourseTab(page, 'Curriculum');
+    await selectConcept(page, 'The perceptron');
 
     await expect(pathList(page).getByRole('listitem')).toHaveCount(5);
     expect(await pathTitles(page)).toEqual([
@@ -88,7 +122,7 @@ test.describe('curriculum', () => {
     ).toBeVisible();
 
     // ---- Refine by hand ----
-    await perceptron.getByRole('button', { name: 'Edit', exact: true }).click();
+    await perceptron.getByRole('button', { name: 'Edit concept' }).click();
     const edit = page.getByRole('dialog', { name: 'Edit concept' });
     await edit
       .getByRole('textbox', { name: 'Objective 1' })
@@ -246,7 +280,7 @@ test.describe('curriculum', () => {
 
     // ---- Removing a concept removes the links to it, with a clear confirmation ----
     await selectConcept(second.page, 'Chain rule');
-    await detail(second.page, 'Chain rule').getByRole('button', { name: 'Remove' }).click();
+    await detail(second.page, 'Chain rule').getByRole('button', { name: 'Remove concept' }).click();
     const confirm = second.page.getByRole('dialog', { name: 'Remove “Chain rule”?' });
     await expect(confirm).toContainText('Concepts that depended on it no longer will.');
     await confirm.getByRole('button', { name: 'Remove concept' }).click();

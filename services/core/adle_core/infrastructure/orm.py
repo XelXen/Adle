@@ -79,6 +79,10 @@ class Course(Base):
     origin: Mapped[str] = mapped_column(String(20), nullable=False)
     #: What the learner asked to learn, for courses started from a topic.
     topic: Mapped[str | None] = mapped_column(Text)
+    #: The learner left the name to Adle, and has not named it since (ADR-053).
+    named_by_adle: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
     last_opened_at: Mapped[datetime | None] = mapped_column(UtcDateTime)

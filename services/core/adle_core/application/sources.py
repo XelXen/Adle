@@ -18,7 +18,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from adle_core.application.courses import get_course_or_404
+from adle_core.application.courses import PROVISIONAL_TITLE, get_course_or_404, title_from_file
 from adle_core.application.jobs import JobContext, JobRunner, JobSnapshot
 from adle_core.errors import NotFoundError, ValidationFailedError
 from adle_core.infrastructure.asset_store import AssetStore, hash_file
@@ -369,7 +369,10 @@ class SourceService:
     ) -> None:
         chunks = chunk_document(document.sections)
         with self._database.session() as session:
-            get_course_or_404(session, course_id)
+            course = get_course_or_404(session, course_id)
+            if course.named_by_adle and course.title == PROVISIONAL_TITLE:
+                # Left to Adle to name: for now, after its first file (ADR-053).
+                course.title = title_from_file(display_name)
             session.add(
                 Source(
                     id=source_id,

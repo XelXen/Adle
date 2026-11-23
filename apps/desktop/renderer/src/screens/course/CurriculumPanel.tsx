@@ -40,6 +40,7 @@ import {
   KIND_PROPOSAL,
   readLessonOutcome,
   readProposal,
+  readSetUp,
 } from '../../lib/generation';
 import { useGeneration } from '../../lib/use-generation';
 import { useLessonNotices } from '../../lib/use-lesson-notices';
@@ -51,12 +52,7 @@ import {
   KNOWLEDGE_TONE,
   type TeachingStrategy,
 } from './ConceptDetail';
-import {
-  ConceptDialog,
-  type ConceptDraft,
-  OutlineDialog,
-  PrerequisitesDialog,
-} from './ConceptDialogs';
+import { ConceptDialog, type ConceptDraft, PrerequisitesDialog } from './ConceptDialogs';
 import { ConceptMap } from './ConceptMap';
 import { ProposalDialog } from './ProposalDialog';
 import styles from './Curriculum.module.css';
@@ -82,21 +78,24 @@ type OpenDialog =
   | { kind: 'prerequisites'; concept: Concept }
   | { kind: 'remove'; concept: Concept }
   | { kind: 'remove-lesson'; lesson: LessonSummary }
-  | { kind: 'outline' }
   | { kind: 'proposal'; job: Job }
   | null;
 
 /** Inspect and edit what a course teaches, and in what order. */
-export function CurriculumPanel({ course }: { course: Course }) {
+export function CurriculumPanel({
+  course,
+  onCourseChanged,
+}: {
+  course: Course;
+  /** The AI may have named a course that was left to Adle (ADR-053). */
+  onCourseChanged?: () => void;
+}) {
   const toast = useToast();
   const { navigate } = useRouter();
   const headingId = useId();
   const courseId = course.id;
   const curriculum = useResource(`curriculum:${courseId}`, () =>
     callCore('curriculum.get', { path: { course_id: courseId } }),
-  );
-  const outline = useResource(`outline:${courseId}`, () =>
-    callCore('curriculum.outline_candidates', { path: { course_id: courseId } }),
   );
   const lessons = useResource(`lessons:${courseId}`, () =>
     callCore('lessons.list', { path: { course_id: courseId } }),
@@ -106,6 +105,8 @@ export function CurriculumPanel({ course }: { course: Course }) {
   const [view, setView] = useState<View>('list');
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [removing, setRemoving] = useState(false);
+  /** The lesson a setup began (ADR-053), to be followed like one asked for here. */
+  const [setUpLesson, setSetUpLesson] = useState<string | null>(null);
 
   const sayLesson = useLessonNotices();
   const generation = useGeneration(
@@ -114,8 +115,18 @@ export function CurriculumPanel({ course }: { course: Course }) {
       if (job.kind === KIND_LESSON) {
         lessons.reload();
         sayLesson(job);
-      } else if (job.kind === KIND_PROPOSAL && readProposal(job)) {
-        setDialog((open) => open ?? { kind: 'proposal', job });
+      } else if (job.kind === KIND_PROPOSAL) {
+        onCourseChanged?.();
+        const setUp = readSetUp(job);
+        if (setUp) {
+          // Set up by Adle (ADR-053): its concepts are there, and its first lesson begun.
+          curriculum.reload();
+          lessons.reload();
+          if (setUp.firstConceptId) setSelectedId(setUp.firstConceptId);
+          if (setUp.lessonJobId) setSetUpLesson(setUp.lessonJobId);
+        } else if (readProposal(job)) {
+          setDialog((open) => open ?? { kind: 'proposal', job });
+        }
       }
     },
     (job) => {
@@ -148,6 +159,21 @@ export function CurriculumPanel({ course }: { course: Course }) {
   // Suggestions that arrived while this screen was closed are still waiting to be looked at.
   const { track } = jobs;
   useEffect(() => {
+    if (!setUpLesson) return;
+    let cancelled = false;
+    callCore('jobs.get', { path: { job_id: setUpLesson } }).then(
+      (lesson) => {
+        if (!cancelled) track(lesson);
+      },
+      () => {
+        // Gone already: the lesson is in the list all the same.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [setUpLesson, track]);
+  useEffect(() => {
     let cancelled = false;
     callCore('generation.latest_proposal', { path: { course_id: courseId } }).then(
       ({ job }) => {
@@ -170,7 +196,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
 
   const suggest = (): Promise<void> =>
     begin(courseId, () =>
-      callCore('generation.propose_curriculum', { path: { course_id: courseId } }),
+      callCore('generation.propose_curriculum', { path: { course_id: courseId }, body: null }),
     );
   const createLesson = (conceptId: string, strategy: TeachingStrategy | null): Promise<void> =>
     begin(conceptId, () =>
@@ -184,11 +210,8 @@ export function CurriculumPanel({ course }: { course: Course }) {
   const proposal = readProposal(proposalJob);
   const suggesting = starting.has(courseId) || isJobActive(proposalJob);
 
-  const candidates = outline.resource.status === 'ready' ? outline.resource.data.candidates : [];
-
   const accept = (next: Curriculum): void => {
     curriculum.setData(next);
-    outline.reload();
   };
 
   if (curriculum.resource.status === 'loading') {
@@ -260,24 +283,6 @@ export function CurriculumPanel({ course }: { course: Course }) {
       }),
     );
     setDialog(null);
-  };
-
-  const addFromOutline = async (sectionIds: string[]): Promise<void> => {
-    if (sectionIds.length === 0) return;
-    const before = new Set(data.concepts.map((concept) => concept.id));
-    const next = await callCore('curriculum.add_from_outline', {
-      path: { course_id: courseId },
-      body: { section_ids: sectionIds },
-    });
-    accept(next);
-    const added = next.concepts.filter((concept) => !before.has(concept.id));
-    setSelectedId(added[0]?.id ?? null);
-    setDialog(null);
-    toast.show({
-      tone: 'success',
-      title: `${pluralise(added.length, 'concept')} added from your materials`,
-      description: 'Add objectives and prerequisites when you’re ready.',
-    });
   };
 
   const removeConcept = async (concept: Concept): Promise<void> => {
@@ -353,11 +358,6 @@ export function CurriculumPanel({ course }: { course: Course }) {
 
   const actions = (
     <Stack direction="row" gap={2} wrap>
-      {candidates.length > 0 ? (
-        <Button icon={<ListTree />} onClick={() => setDialog({ kind: 'outline' })}>
-          Start from your materials
-        </Button>
-      ) : null}
       <span className={styles.sending}>
         <Button icon={<Sparkles />} disabled={suggesting} onClick={() => void suggest()}>
           Suggest concepts with AI
@@ -371,11 +371,7 @@ export function CurriculumPanel({ course }: { course: Course }) {
           after="Nothing is added until you review the suggestions."
         />
       </span>
-      <Button
-        variant={path.length === 0 && candidates.length > 0 ? 'secondary' : 'primary'}
-        icon={<Plus />}
-        onClick={() => setDialog({ kind: 'create' })}
-      >
+      <Button variant="primary" icon={<Plus />} onClick={() => setDialog({ kind: 'create' })}>
         Add a concept
       </Button>
     </Stack>
@@ -450,11 +446,9 @@ export function CurriculumPanel({ course }: { course: Course }) {
             visual={<ListTree />}
             title="No concepts yet"
             description={
-              candidates.length > 0
-                ? 'Start from the headings of your materials, or add concepts one at a time.'
-                : hasMaterials
-                  ? 'Your materials have no headings to start from. Add concepts one at a time; you can still link each to a passage.'
-                  : 'Add the ideas you want to learn, or import materials to start from their headings.'
+              hasMaterials
+                ? 'Have AI suggest concepts from your materials, each linked to the pages it comes from, or add them one at a time.'
+                : 'Have AI suggest concepts for your topic, or add the ideas you want to learn one at a time.'
             }
             actions={actions}
           />
@@ -595,13 +589,6 @@ export function CurriculumPanel({ course }: { course: Course }) {
           path={path}
           onClose={() => setDialog(null)}
           onSave={(prerequisites) => savePrerequisites(dialog.concept, prerequisites)}
-        />
-      ) : null}
-      {dialog?.kind === 'outline' ? (
-        <OutlineDialog
-          candidates={candidates}
-          onClose={() => setDialog(null)}
-          onAdd={addFromOutline}
         />
       ) : null}
       {dialog?.kind === 'proposal' && readProposal(dialog.job) ? (

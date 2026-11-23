@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { type FormEvent, useId, useState } from 'react';
 
-import type { Concept, OutlineCandidate } from '@adle/contracts';
+import type { Concept } from '@adle/contracts';
 import {
   Button,
   Callout,
@@ -13,7 +13,6 @@ import {
 } from '@adle/design-system';
 
 import { describeError } from '../../lib/core-client';
-import { pluralise } from '../../lib/format';
 import styles from './Curriculum.module.css';
 import { dependentsOf } from './curriculum-model';
 
@@ -293,112 +292,6 @@ export function PrerequisitesDialog({
           </Button>
           <Button type="submit" variant="primary" loading={saving} disabled={others.length === 0}>
             Save prerequisites
-          </Button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
-/** Pick which headings of the imported materials become concepts. */
-export function OutlineDialog({
-  candidates,
-  onClose,
-  onAdd,
-}: {
-  candidates: readonly OutlineCandidate[];
-  onClose: () => void;
-  onAdd: (sectionIds: string[]) => Promise<void>;
-}) {
-  const [chosen, setChosen] = useState<Set<string>>(
-    () => new Set(candidates.map((candidate) => candidate.section_id)),
-  );
-  const [formError, setFormError] = useState<string>();
-  const [saving, setSaving] = useState(false);
-
-  const sources = [...new Set(candidates.map((candidate) => candidate.source_name))];
-  const allChosen = chosen.size === candidates.length;
-
-  const submit = async (event: FormEvent): Promise<void> => {
-    event.preventDefault();
-    setFormError(undefined);
-    setSaving(true);
-    try {
-      await onAdd(
-        candidates
-          .filter((candidate) => chosen.has(candidate.section_id))
-          .map((candidate) => candidate.section_id),
-      );
-    } catch (error) {
-      setFormError(describeError(error));
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog
-      open
-      onClose={() => {
-        if (!saving) onClose();
-      }}
-      title="Start from your materials"
-      description="Headings from your materials. Keep the ones you want to learn. You can set prerequisites afterwards."
-      size="medium"
-      dismissible={!saving}
-    >
-      <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
-        <div>
-          <Button
-            size="small"
-            variant="tertiary"
-            onClick={() =>
-              setChosen(
-                allChosen
-                  ? new Set()
-                  : new Set(candidates.map((candidate) => candidate.section_id)),
-              )
-            }
-          >
-            {allChosen ? 'Clear all' : 'Select all'}
-          </Button>
-        </div>
-        <div className={styles.choices}>
-          {sources.map((source) => (
-            <fieldset key={source} className={styles.fieldGroup}>
-              <legend className={styles.sourceHeading}>From {source}</legend>
-              {candidates
-                .filter((candidate) => candidate.source_name === source)
-                .map((candidate) => (
-                  <Checkbox
-                    key={candidate.section_id}
-                    label={candidate.title}
-                    checked={chosen.has(candidate.section_id)}
-                    onCheckedChange={(checked) =>
-                      setChosen((current) => {
-                        const next = new Set(current);
-                        if (checked) next.add(candidate.section_id);
-                        else next.delete(candidate.section_id);
-                        return next;
-                      })
-                    }
-                  />
-                ))}
-            </fieldset>
-          ))}
-        </div>
-
-        {formError ? (
-          <p className={styles.formError} role="alert">
-            {formError}
-          </p>
-        ) : null}
-
-        <div className={styles.formActions}>
-          <Button onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" loading={saving} disabled={chosen.size === 0}>
-            {chosen.size === 0 ? 'Add concepts' : `Add ${pluralise(chosen.size, 'concept')}`}
           </Button>
         </div>
       </form>

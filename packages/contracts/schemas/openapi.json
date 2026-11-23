@@ -355,6 +355,7 @@
             "anyOf": [{ "format": "date-time", "type": "string" }, { "type": "null" }],
             "title": "Last Opened At"
           },
+          "named_by_adle": { "default": false, "title": "Named By Adle", "type": "boolean" },
           "origin": {
             "enum": ["sample", "topic", "materials"],
             "title": "Origin",
@@ -390,13 +391,16 @@
             "type": "string"
           },
           "origin": { "enum": ["topic", "materials"], "title": "Origin", "type": "string" },
-          "title": { "maxLength": 200, "minLength": 1, "title": "Title", "type": "string" },
+          "title": {
+            "anyOf": [{ "maxLength": 200, "minLength": 1, "type": "string" }, { "type": "null" }],
+            "title": "Title"
+          },
           "topic": {
             "anyOf": [{ "maxLength": 4000, "type": "string" }, { "type": "null" }],
             "title": "Topic"
           }
         },
-        "required": ["title", "origin"],
+        "required": ["origin"],
         "title": "CourseCreate",
         "type": "object"
       },
@@ -1529,6 +1533,12 @@
         },
         "required": ["selected"],
         "title": "ProposalAcceptance",
+        "type": "object"
+      },
+      "ProposalRequest": {
+        "additionalProperties": false,
+        "properties": { "setup": { "default": false, "title": "Setup", "type": "boolean" } },
+        "title": "ProposalRequest",
         "type": "object"
       },
       "ProviderCheck": {
@@ -3252,6 +3262,16 @@
             "schema": { "title": "Course Id", "type": "string" }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [{ "$ref": "#/components/schemas/ProposalRequest" }, { "type": "null" }],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },

@@ -25,7 +25,6 @@ import {
   createCourse,
   doc,
   expectNoAccessibilityViolations,
-  importAndWait,
   saveProviderKey,
   screenshot,
 } from './support/courses';
@@ -121,8 +120,11 @@ test.describe('your data as a whole', () => {
     const copy = path.join(copies, 'Adle data 2026-11-19.adle');
     const safetyCopies = path.join(profileDir, 'data', 'backups');
 
-    await createCourse(page, 'Thermodynamics');
-    await importAndWait(app, page, ['study-notes.txt']);
+    await createCourse(page, 'Thermodynamics', { app, files: ['study-notes.txt'] });
+    await expect(page.getByRole('list', { name: 'Materials in this course' })).toContainText(
+      'study-notes.txt',
+      { timeout: 30_000 },
+    );
 
     // ---- Save a copy: one file, where the learner said ----
     await openPrivacy(page);
@@ -286,8 +288,11 @@ test.describe('your data as a whole', () => {
     await saveProviderKey(page, 'AIHubMix', KEY);
 
     await openLibrary(page);
-    await createCourse(page, 'To be deleted');
-    await importAndWait(app, page, ['study-notes.txt']);
+    await createCourse(page, 'To be deleted', { app, files: ['study-notes.txt'] });
+    await expect(page.getByRole('list', { name: 'Materials in this course' })).toContainText(
+      'study-notes.txt',
+      { timeout: 30_000 },
+    );
     // Keep a safety copy around too: deleting everything includes those.
     const copies = path.join(profileDir, 'kept elsewhere');
     mkdirSync(copies);

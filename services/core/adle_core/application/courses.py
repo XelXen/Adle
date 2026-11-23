@@ -27,6 +27,22 @@ class CourseRecord:
     created_at: datetime
     updated_at: datetime
     last_opened_at: datetime | None
+    #: Its name was left to Adle (ADR-053).
+    named_by_adle: bool = False
+
+
+#: What a course is called until Adle has something better to call it.
+PROVISIONAL_TITLE = "New course"
+
+
+def title_from_file(display_name: str) -> str:
+    """A course's name from the name of a file in it: "neural-networks_notes.pdf" is
+    "Neural networks notes". Until the AI names it, better than "New course"."""
+    stem = display_name.rsplit(".", 1)[0] if "." in display_name else display_name
+    words = " ".join(stem.replace("_", " ").replace("-", " ").split())
+    if not words:
+        return PROVISIONAL_TITLE
+    return (words[0].upper() + words[1:])[:200]
 
 
 def get_course_or_404(session: Session, course_id: str) -> Course:
@@ -48,6 +64,7 @@ def _record(course: Course, source_count: int, concept_count: int) -> CourseReco
         created_at=course.created_at,
         updated_at=course.updated_at,
         last_opened_at=course.last_opened_at,
+        named_by_adle=bool(course.named_by_adle),
     )
 
 
@@ -93,15 +110,24 @@ class CourseService:
         return _record(course, sources or 0, concepts or 0)
 
     def create(
-        self, *, title: str, description: str = "", origin: str, topic: str | None = None
+        self,
+        *,
+        title: str | None,
+        description: str = "",
+        origin: str,
+        topic: str | None = None,
     ) -> CourseRecord:
+        """A new course. Without a name, Adle names it (ADR-053): "New course" for now,
+        then from its first file, then as the AI suggests with its concepts."""
+        named = (title or "").strip()
         with self._database.session() as session:
             course = Course(
                 id=new_id("crs"),
-                title=title.strip(),
+                title=named or PROVISIONAL_TITLE,
                 description=description.strip(),
                 origin=origin,
                 topic=topic.strip() if topic and topic.strip() else None,
+                named_by_adle=not named,
             )
             session.add(course)
             session.flush()
@@ -123,6 +149,8 @@ class CourseService:
             course = get_course_or_404(session, course_id)
             if title is not None:
                 course.title = title.strip()
+                # Named by the learner: Adle never renames it again.
+                course.named_by_adle = False
             if description is not None:
                 course.description = description.strip()
             session.flush()

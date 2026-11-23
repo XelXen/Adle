@@ -26,8 +26,13 @@ ServicesDep = Annotated[Services, Depends(get_services)]
     response_model=schemas.Job,
     status_code=202,
 )
-def propose_curriculum(course_id: str, services: ServicesDep) -> schemas.Job:
-    return schemas.Job.model_validate(services.generation.propose_curriculum(course_id))
+def propose_curriculum(
+    course_id: str, services: ServicesDep, body: schemas.ProposalRequest | None = None
+) -> schemas.Job:
+    setup = body.setup if body is not None else False
+    return schemas.Job.model_validate(
+        services.generation.propose_curriculum(course_id, setup=setup)
+    )
 
 
 @router.get(

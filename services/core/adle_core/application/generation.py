@@ -1080,8 +1080,12 @@ class GenerationService:
 
     # -- curriculum ------------------------------------------------------------
 
-    def propose_curriculum(self, course_id: str) -> JobSnapshot:
-        """Start a job that asks the model for concepts this course could teach."""
+    def propose_curriculum(self, course_id: str, *, setup: bool = False) -> JobSnapshot:
+        """Start a job that asks the model for concepts this course could teach.
+
+        With ``setup`` the learner asked Adle to set the course up (ADR-053): what is
+        suggested is added, every concept of it, and the first lesson is begun. Without it
+        nothing is added until the learner picks (ADR-012)."""
         with self._database.read() as session:
             get_course_or_404(session, course_id)
         self._require_key()
@@ -1091,15 +1095,18 @@ class GenerationService:
                 return running
             return self._jobs.submit(
                 KIND_CURRICULUM,
-                lambda context: self._propose(course_id, context),
+                lambda context: self._propose(course_id, context, setup=setup),
                 course_id=course_id,
                 subject_id=course_id,
             )
 
-    def _propose(self, course_id: str, context: JobContext) -> dict[str, Any]:
+    def _propose(
+        self, course_id: str, context: JobContext, *, setup: bool = False
+    ) -> dict[str, Any]:
         with self._database.read() as session:
             course = get_course_or_404(session, course_id)
             title, topic, description = course.title, course.topic or "", course.description
+            name_it = bool(course.named_by_adle)
             existing = list(
                 session.scalars(
                     select(Concept.title)
@@ -1146,20 +1153,22 @@ class GenerationService:
                 pages=pages,
                 passages=excerpts,
                 problems=problems,
+                name_it=name_it,
             )
             result = self._ask(request, context, attempt - 1, 2, doing, outline=Outline())
             try:
+                answer = extract_json_object(result.text)
                 proposed = compile_curriculum(
-                    extract_json_object(result.text),
-                    existing_titles=existing,
-                    section_ids=section_ids,
+                    answer, existing_titles=existing, section_ids=section_ids
                 )
             except DraftError as error:
                 logger.info("generation.curriculum_unusable attempt=%s", attempt)
                 problems = error.problems
                 continue
-            context.report(2, 2, "Done")
-            return {
+            named = _course_title(answer.get("course_title")) if name_it else None
+            if named is not None:
+                self._name_course(course_id, named)
+            outcome: dict[str, Any] = {
                 "kind": KIND_CURRICULUM,
                 "concepts": [concept.as_dict() for concept in proposed],
                 "grounded_in_materials": bool(headings),
@@ -1167,10 +1176,55 @@ class GenerationService:
                 "dismissed": False,
                 "written_by": self._written_by([result]),
             }
+            if named is not None:
+                outcome["course_title"] = named
+            if setup:
+                outcome = self._set_up(course_id, outcome, context)
+            context.report(2, 2, "Done")
+            return outcome
         raise GenerationFailedError(
             "The AI’s suggestions weren’t usable, twice. Nothing was added. Try again, or add "
             "concepts by hand."
         )
+
+    def _name_course(self, course_id: str, title: str) -> None:
+        """The course the learner left to Adle to name takes the name the AI gave it, unless
+        the learner has named it meanwhile (ADR-053)."""
+        with self._database.session() as session:
+            course = session.get(Course, course_id)
+            if course is not None and course.named_by_adle:
+                course.title = title
+                course.named_by_adle = False
+
+    def _set_up(
+        self, course_id: str, outcome: dict[str, Any], context: JobContext
+    ) -> dict[str, Any]:
+        """The learner asked Adle to set the course up (ADR-053): every concept suggested is
+        added, as they would have added it, and the first that can be taught has its lesson
+        begun. What cannot be done is said, and the suggestions stay to be reviewed."""
+        concepts = outcome["concepts"]
+        if not concepts:
+            return outcome
+        context.report(1, 2, "Adding the concepts")
+        try:
+            curriculum = self._curriculum.add_proposed(
+                course_id, _proposed_inputs(concepts, list(range(len(concepts))))
+            )
+        except (AdleError, ValidationError) as error:
+            logger.info("generation.setup_not_added code=%s", getattr(error, "code", ""))
+            return outcome
+        outcome = {**outcome, "accepted": True, "setup": True}
+        by_id = {concept.id: concept for concept in curriculum.concepts}
+        order = curriculum.learning_order or [concept.id for concept in curriculum.concepts]
+        first = next((cid for cid in order if by_id.get(cid) and by_id[cid].objectives), None)
+        if first is None:
+            return outcome
+        try:
+            lesson = self.generate_lesson(first)
+        except AdleError as error:
+            logger.info("generation.setup_no_lesson code=%s", error.code)
+            return outcome
+        return {**outcome, "lesson_job_id": lesson.id, "first_concept_id": first}
 
     def latest_proposal(self, course_id: str) -> JobSnapshot | None:
         """The newest proposal job for a course: under way, waiting to be reviewed, or done with."""
@@ -1211,25 +1265,9 @@ class GenerationService:
         if not chosen:
             raise ValidationFailedError("Choose at least one concept to add.")
 
-        position = {index: place for place, index in enumerate(chosen)}
-        inputs = []
-        for index in chosen:
-            concept = concepts[index]
-            inputs.append(
-                ProposedConceptInput(
-                    title=str(concept.get("title", "")),
-                    summary=str(concept.get("summary", "")),
-                    objectives=[str(text) for text in concept.get("objectives", [])],
-                    # A need that was not chosen is dropped; the learner can add it by hand.
-                    needs=[
-                        (position[need["index"]], str(need.get("reason", "")))
-                        for need in concept.get("needs", [])
-                        if isinstance(need, dict) and need.get("index") in position
-                    ],
-                    section_ids=[str(section) for section in concept.get("section_ids", [])],
-                )
-            )
-        curriculum = self._curriculum.add_proposed(job.course_id, inputs)
+        curriculum = self._curriculum.add_proposed(
+            job.course_id, _proposed_inputs(concepts, chosen)
+        )
         self._jobs.set_result(job_id, {**result, "accepted": True})
         return curriculum
 
@@ -1950,3 +1988,36 @@ class GenerationService:
             "seconds": round(seconds, 1),
             "note": self._written_by([result])["note"],
         }
+
+
+def _proposed_inputs(concepts: list[Any], chosen: Sequence[int]) -> list[ProposedConceptInput]:
+    """The concepts chosen from a proposal, as the curriculum takes them. A need on one that
+    was not chosen is dropped; the learner can add it by hand."""
+    position = {index: place for place, index in enumerate(chosen)}
+    inputs = []
+    for index in chosen:
+        concept = concepts[index]
+        inputs.append(
+            ProposedConceptInput(
+                title=str(concept.get("title", "")),
+                summary=str(concept.get("summary", "")),
+                objectives=[str(text) for text in concept.get("objectives", [])],
+                needs=[
+                    (position[need["index"]], str(need.get("reason", "")))
+                    for need in concept.get("needs", [])
+                    if isinstance(need, dict) and need.get("index") in position
+                ],
+                section_ids=[str(section) for section in concept.get("section_ids", [])],
+            )
+        )
+    return inputs
+
+
+def _course_title(value: object) -> str | None:
+    """A course's name as the AI gave it: one plain line of at most 80 characters."""
+    if not isinstance(value, str):
+        return None
+    line = " ".join(value.replace("\n", " ").split()).strip(" .:-\"'“”")
+    if not 2 <= len(line) <= 80 or any(mark in line for mark in "<>{}[]$\\"):
+        return None
+    return line

@@ -1,37 +1,63 @@
-import { FileText, Lightbulb } from 'lucide-react';
+import { FileText, FolderOpen, Lightbulb } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 
 import type { Course } from '@adle/contracts';
-import { Button, Dialog, SegmentedControl, Stack, TextArea, TextField } from '@adle/design-system';
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  SegmentedControl,
+  Stack,
+  TextArea,
+  TextField,
+} from '@adle/design-system';
 
+import { WhatIsSent } from '../../components/WhatIsSent';
+import { getBridge } from '../../lib/bridge';
 import { callCore, describeError } from '../../lib/core-client';
+import { lessonDisclosure } from '../../lib/generation';
+import { destination, usualWait } from '../../lib/provider';
+import { useResource } from '../../lib/use-resource';
 import styles from './HomeScreen.module.css';
 
-type Origin = 'topic' | 'materials';
+type Origin = 'materials' | 'topic';
 
 const ORIGINS = [
-  { value: 'topic', label: 'Start with a topic', icon: <Lightbulb /> },
-  { value: 'materials', label: 'Import my materials', icon: <FileText /> },
+  { value: 'materials', label: 'From my files', icon: <FileText /> },
+  { value: 'topic', label: 'From a topic', icon: <Lightbulb /> },
 ] as const;
 
 export interface NewCourseDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreated: (course: Course) => void;
+  /** The course was made; `settingUp` when Adle is setting it up (ADR-053). */
+  onCreated: (course: Course, settingUp: boolean) => void;
 }
 
-/** Create a course from a topic or from the learner's own materials. */
+/**
+ * Create a course from the learner's own files or from a topic (ADR-053). The files are
+ * chosen here, in the system's own dialog, and the name may be left to Adle, who names the
+ * course from them and from the concepts it suggests. With "Set it up for me", Adle adds
+ * the concepts it suggests and writes the first lesson.
+ */
 export function NewCourseDialog({ open, onClose, onCreated }: NewCourseDialogProps) {
-  const [origin, setOrigin] = useState<Origin>('topic');
+  const [origin, setOrigin] = useState<Origin>('materials');
   const [title, setTitle] = useState('');
   const [topic, setTopic] = useState('');
-  const [errors, setErrors] = useState<{ title?: string; topic?: string; form?: string }>({});
+  const [setUp, setSetUp] = useState(true);
+  const [errors, setErrors] = useState<{ topic?: string; form?: string }>({});
   const [creating, setCreating] = useState(false);
+  const provider = useResource('provider-status', () => callCore('provider.status'));
+  const status = provider.resource.status === 'ready' ? provider.resource.data : undefined;
+  // Setting a course up asks the AI: without a key there is nobody to ask.
+  const canSetUp = status?.key_configured === true;
+  const settingUp = canSetUp && setUp;
 
   const reset = (): void => {
-    setOrigin('topic');
+    setOrigin('materials');
     setTitle('');
     setTopic('');
+    setSetUp(true);
     setErrors({});
   };
 
@@ -43,25 +69,46 @@ export function NewCourseDialog({ open, onClose, onCreated }: NewCourseDialogPro
 
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
-    const problems: typeof errors = {};
-    if (!title.trim()) problems.title = 'Enter a course name.';
     if (origin === 'topic' && !topic.trim()) {
-      problems.topic = 'Describe what you want to learn, in a sentence or two.';
+      setErrors({ topic: 'Describe what you want to learn, in a sentence or two.' });
+      return;
     }
-    setErrors(problems);
-    if (Object.keys(problems).length > 0) return;
-
+    setErrors({});
     setCreating(true);
     try {
+      const named = title.trim();
       const course = await callCore('courses.create', {
         body: {
-          title: title.trim(),
+          ...(named ? { title: named } : {}),
           origin,
           topic: origin === 'topic' ? topic.trim() : null,
         },
       });
+      if (origin === 'materials') {
+        const picked = await getBridge().sources.importWithPicker(course.id);
+        if (!picked.ok || picked.data === null) {
+          // No files chosen: nothing is left behind, and the learner can choose again.
+          await callCore('courses.delete', { path: { course_id: course.id } }).catch(
+            () => undefined,
+          );
+          if (!picked.ok) setErrors({ form: picked.error.message });
+          return;
+        }
+      }
+      let started = false;
+      if (settingUp) {
+        try {
+          await callCore('generation.propose_curriculum', {
+            path: { course_id: course.id },
+            body: { setup: true },
+          });
+          started = true;
+        } catch {
+          // The course is made; its curriculum can still be asked for there.
+        }
+      }
       reset();
-      onCreated(course);
+      onCreated(course, started);
     } catch (error) {
       setErrors({ form: describeError(error) });
     } finally {
@@ -90,22 +137,11 @@ export function NewCourseDialog({ open, onClose, onCreated }: NewCourseDialogPro
             onValueChange={setOrigin}
           />
           <p className={styles.hint}>
-            {origin === 'topic'
-              ? 'Adle suggests a curriculum for the topic. You can add materials later.'
-              : 'Add PDFs, Word documents, Markdown, or text files next. They stay on this computer.'}
+            {origin === 'materials'
+              ? 'PDFs, Word documents, Markdown, or text files. They stay on this computer.'
+              : 'You can add files later.'}
           </p>
         </Stack>
-
-        <TextField
-          label="Course name"
-          value={title}
-          maxLength={200}
-          error={errors.title}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder={
-            origin === 'topic' ? 'Introduction to neural networks' : 'Machine learning, autumn term'
-          }
-        />
 
         {origin === 'topic' ? (
           <TextArea
@@ -119,6 +155,30 @@ export function NewCourseDialog({ open, onClose, onCreated }: NewCourseDialogPro
           />
         ) : null}
 
+        <TextField
+          label="Course name"
+          value={title}
+          maxLength={200}
+          onChange={(event) => setTitle(event.target.value)}
+          description={
+            origin === 'materials'
+              ? 'Optional. Left empty, Adle names it from your files.'
+              : 'Optional. Left empty, Adle names it from your topic.'
+          }
+        />
+
+        <Checkbox
+          label="Set it up for me"
+          description={
+            canSetUp
+              ? 'Adle suggests the concepts and adds them, then writes the first lesson. You can change anything afterwards.'
+              : 'Needs an AI key, in Settings.'
+          }
+          checked={settingUp}
+          disabled={!canSetUp}
+          onCheckedChange={setSetUp}
+        />
+
         {errors.form ? (
           <p className={styles.formError} role="alert">
             {errors.form}
@@ -126,11 +186,29 @@ export function NewCourseDialog({ open, onClose, onCreated }: NewCourseDialogPro
         ) : null}
 
         <div className={styles.formActions}>
+          {settingUp ? (
+            <WhatIsSent
+              what={`${
+                origin === 'materials'
+                  ? 'headings and short excerpts from your files'
+                  : 'your topic'
+              } and your goal, to suggest the concepts; then ${lessonDisclosure(
+                origin === 'materials' ? 'some' : 'none',
+              )}, to write the first lesson`}
+              to={destination(status, 'curriculum')}
+              wait={usualWait(status, 'lesson')}
+            />
+          ) : null}
           <Button onClick={close} disabled={creating}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" loading={creating}>
-            Create course
+          <Button
+            type="submit"
+            variant="primary"
+            icon={origin === 'materials' ? <FolderOpen /> : undefined}
+            loading={creating}
+          >
+            {origin === 'materials' ? 'Choose files…' : 'Create course'}
           </Button>
         </div>
       </form>

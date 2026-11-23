@@ -141,9 +141,9 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
           current === 'learn' ? (
             <LearnPanel course={data} />
           ) : current === 'curriculum' ? (
-            <CurriculumPanel course={data} />
+            <CurriculumPanel course={data} onCourseChanged={course.reload} />
           ) : (
-            <SourcesPanel courseId={courseId} />
+            <SourcesPanel courseId={courseId} onCourseChanged={course.reload} />
           )
         }
       </Tabs>

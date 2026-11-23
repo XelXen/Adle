@@ -24,6 +24,7 @@ import {
   Button,
   Callout,
   Card,
+  cx,
   IconButton,
   Select,
   Spinner,
@@ -258,344 +259,360 @@ export function ConceptDetail({
 
   return (
     <Card as="section" aria-labelledby={headingId} className={styles.detail}>
-      <div className={styles.detailHeader}>
-        <h3 id={headingId} className={styles.detailTitle}>
-          {concept.title}
-        </h3>
-        <div className={styles.knowledgeLine}>
-          <Button size="small" icon={<Pencil />} onClick={onEdit}>
-            Edit
-          </Button>
-          <Button size="small" variant="tertiary" icon={<Trash2 />} onClick={onRemove}>
-            Remove
-          </Button>
-        </div>
-      </div>
+      <h3 id={headingId} className={styles.detailTitle}>
+        {concept.title}
+      </h3>
 
       {concept.summary ? <p className={styles.detailSummary}>{concept.summary}</p> : null}
       {ORIGIN_NOTE[concept.origin] ? (
         <p className={styles.muted}>{ORIGIN_NOTE[concept.origin]}</p>
       ) : null}
 
-      <div className={styles.block}>
-        <h4 className={styles.blockTitle}>Lessons</h4>
-        {lessons.status === 'loading' ? (
-          <Spinner size="small" label="Loading lessons" />
-        ) : lessons.status === 'error' ? (
-          <div className={styles.itemRow}>
-            <p className={styles.formError}>{lessons.message}</p>
-            <Button size="small" onClick={lessons.retry}>
-              Try again
+      {/* What the concept is: what it says, what you will be able to do, what it builds on. */}
+      <div className={styles.group} role="group" aria-labelledby={`${headingId}-about`}>
+        <p className={cx('ad-eyebrow', styles.groupLabel)} id={`${headingId}-about`}>
+          About this concept
+        </p>
+        <div className={styles.block}>
+          <h4 className={styles.blockTitle}>Learning objectives</h4>
+          {concept.objectives.length > 0 ? (
+            <ul className={styles.plainList}>
+              {concept.objectives.map((objective) => (
+                <li key={objective.id}>{objective.statement}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.muted}>
+              None yet. Add at least one to check your understanding against.
+            </p>
+          )}
+        </div>
+
+        <div className={styles.block}>
+          <div className={styles.blockHeader}>
+            <h4 className={styles.blockTitle}>Prerequisites</h4>
+            <Button size="small" variant="tertiary" onClick={onEditPrerequisites}>
+              Edit prerequisites
             </Button>
           </div>
-        ) : lessons.lessons.length === 0 ? (
-          <p className={styles.muted}>No lessons yet.</p>
-        ) : (
-          <ul className={styles.bareList} aria-label="Lessons for this concept">
-            {lessons.lessons.map((lesson) => {
-              const action = lessonAction(lesson.progress);
-              const removable = lessons.lessons.some((other) => other.origin === 'generated');
-              return (
-                <li key={lesson.id} className={styles.itemRow}>
-                  <span className={styles.itemText}>
-                    <span className={styles.itemTitle}>{lesson.title}</span>
-                    <span className={styles.muted}>{describeLesson(lesson)}</span>
-                  </span>
-                  <Button
-                    size="small"
-                    variant={lesson.progress.completed ? 'secondary' : 'primary'}
-                    icon={lesson.progress.completed ? <RotateCcw /> : <Play />}
-                    aria-label={`${action}: ${lesson.title}`}
-                    onClick={() => onOpenLesson(lesson.id)}
-                  >
-                    {action}
-                  </Button>
-                  {/* A lesson a model wrote can be removed, to make room for another way of
-                      teaching the same thing. The sample course's own lessons stay. */}
-                  {lesson.origin === 'generated' ? (
-                    <IconButton
-                      label={`Remove lesson: ${lesson.title}`}
-                      icon={<Trash2 />}
+          {concept.prerequisites.length > 0 ? (
+            <ul className={styles.bareList}>
+              {concept.prerequisites.map((prerequisite) => (
+                <li key={prerequisite.concept_id} className={styles.itemText}>
+                  <span>
+                    <Button
                       size="small"
-                      onClick={() => onRemoveLesson(lesson)}
-                    />
-                  ) : removable ? (
-                    // Its place is kept, so that every row's button stands in one column.
-                    <span className={styles.itemSpacer} aria-hidden="true" />
+                      variant="tertiary"
+                      onClick={() => onSelect(prerequisite.concept_id)}
+                    >
+                      {prerequisite.title}
+                    </Button>
+                  </span>
+                  {prerequisite.reason ? (
+                    <span className={styles.muted}>{prerequisite.reason}</span>
                   ) : null}
                 </li>
-              );
-            })}
-          </ul>
-        )}
-        <GenerationStatus
-          job={generation.job?.status === 'succeeded' ? null : generation.job}
-          starting={generation.starting}
-          refusal={generation.refusal}
-          subject="the lesson"
-          kind="lesson"
-          waitingText="Queued"
-          usualSeconds={generation.usualSeconds}
-          lessonReady={generation.lessonReady}
-          onCancel={generation.onCancel}
-          onRetry={() => generation.onCreate(strategy || null)}
-          onDismiss={generation.onDismiss}
-        />
-        {/* While work is under way, or its failure is on screen with its own way forward,
-            a second button to start the same thing would only be noise. Nor is one offered
-            before the lessons there already are known: it would say "a lesson" where it
-            means "another". */}
-        {lessons.status === 'loading' ||
-        generation.starting ||
-        isJobActive(generation.job) ||
-        generation.refusal !== null ||
-        generation.job?.status === 'failed' ||
-        generation.job?.status === 'cancelled' ? null : (
-          <div className={styles.generation}>
-            {/* The learner can say what kind of explanation they want, for a first lesson
-                as for another; left on Automatic, the writer chooses. */}
-            {lessons.status === 'ready' ? (
-              <div className={styles.strategy}>
-                <Select
-                  label="Teaching style"
-                  value={strategy}
-                  options={STRATEGY_CHOICES}
-                  onValueChange={setStrategy}
-                />
-              </div>
-            ) : null}
-            <div className={styles.sending}>
-              <Button
-                size="small"
-                icon={<Sparkles />}
-                disabled={concept.objectives.length === 0}
-                onClick={() => generation.onCreate(strategy || null)}
-              >
-                {lessons.status === 'ready' && lessons.lessons.length > 0
-                  ? 'Create another lesson with AI'
-                  : 'Create a lesson with AI'}
-              </Button>
-              {concept.objectives.length === 0 ? null : (
-                <WhatIsSent
-                  what={lessonDisclosure(hasMaterials ? 'some' : 'none')}
-                  to={generation.destination}
-                  wait={generation.usualWait}
-                  after="Its pictures follow while you start."
-                />
-              )}
-            </div>
-            {/* The one thing here the learner has to do something about. */}
-            {concept.objectives.length === 0 ? (
-              <p className={styles.aiNote}>Add a learning objective first.</p>
-            ) : null}
-          </div>
-        )}
-      </div>
-
-      <div className={styles.block}>
-        <h4 className={styles.blockTitle}>Learning objectives</h4>
-        {concept.objectives.length > 0 ? (
-          <ul className={styles.plainList}>
-            {concept.objectives.map((objective) => (
-              <li key={objective.id}>{objective.statement}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className={styles.muted}>
-            None yet. Add at least one to check your understanding against.
-          </p>
-        )}
-      </div>
-
-      <div className={styles.block}>
-        <div className={styles.blockHeader}>
-          <h4 className={styles.blockTitle}>Prerequisites</h4>
-          <Button size="small" variant="tertiary" onClick={onEditPrerequisites}>
-            Edit prerequisites
-          </Button>
-        </div>
-        {concept.prerequisites.length > 0 ? (
-          <ul className={styles.bareList}>
-            {concept.prerequisites.map((prerequisite) => (
-              <li key={prerequisite.concept_id} className={styles.itemText}>
-                <span>
-                  <Button
-                    size="small"
-                    variant="tertiary"
-                    onClick={() => onSelect(prerequisite.concept_id)}
-                  >
-                    {prerequisite.title}
-                  </Button>
-                </span>
-                {prerequisite.reason ? (
-                  <span className={styles.muted}>{prerequisite.reason}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className={styles.muted}>None. You can start here.</p>
-        )}
-        {dependents.length > 0 ? (
-          <p className={styles.muted}>
-            Required for: {dependents.map((dependent) => dependent.title).join(', ')}.
-          </p>
-        ) : null}
-      </div>
-
-      <div className={styles.block}>
-        <h4 className={styles.blockTitle}>Your progress</h4>
-        <div className={styles.knowledge}>
-          <div className={styles.knowledgeLine}>
-            <Badge tone={KNOWLEDGE_TONE[concept.knowledge.state]}>{concept.knowledge.label}</Badge>
-            {concept.knowledge.missing.length > 0 ? (
-              <span className={styles.muted}>
-                Still needed: {concept.knowledge.missing.join('; ')}.
-              </span>
-            ) : null}
-          </div>
-          <div className={styles.block}>
-            <span className={styles.muted} id={`${historyId}-rate`}>
-              How well do you know this already?
-            </span>
-            <div
-              className={styles.knowledgeLine}
-              role="group"
-              aria-labelledby={`${historyId}-rate`}
-            >
-              {SELF_REPORTS.map((option) => (
-                <Button
-                  key={option.value}
-                  size="small"
-                  aria-pressed={concept.knowledge.self_report === option.value}
-                  loading={rating === option.value}
-                  disabled={rating !== null && rating !== option.value}
-                  onClick={() => void rate(option.value)}
-                >
-                  {option.label}
-                </Button>
               ))}
-            </div>
-          </div>
-          <div>
-            <Button
-              size="small"
-              variant="tertiary"
-              aria-expanded={shownHistory.status !== 'closed'}
-              aria-controls={historyId}
-              onClick={() => void toggleHistory()}
-            >
-              {shownHistory.status === 'closed' ? 'Show history' : 'Hide history'}
-            </Button>
-          </div>
-          <div id={historyId} aria-live="polite">
-            {shownHistory.status === 'loading' ? (
-              <Spinner size="small" label="Loading history" />
-            ) : shownHistory.status === 'error' ? (
-              <p className={styles.formError}>{shownHistory.message}</p>
-            ) : shownHistory.status === 'ready' ? (
-              shownHistory.evidence.history.length === 0 ? (
-                <p className={styles.muted}>
-                  Nothing yet. Your answers and status changes will appear here.
-                </p>
-              ) : (
-                <ol className={styles.history} aria-label="History, newest first">
-                  {shownHistory.evidence.history.map((entry) => (
-                    <li key={entry.id} className={styles.itemText}>
-                      <span className={styles.historyWhen}>
-                        {formatRelativeDay(entry.occurred_at)}
-                      </span>
-                      <span>{entry.explanation}</span>
-                    </li>
-                  ))}
-                </ol>
-              )
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.block}>
-        <div className={styles.blockHeader}>
-          <h4 className={styles.blockTitle}>In your materials</h4>
-          {hasMaterials ? (
-            <Button
-              size="small"
-              variant="tertiary"
-              icon={<Search />}
-              loading={shownPassages.status === 'loading'}
-              onClick={() => void findPassages()}
-            >
-              Find related passages
-            </Button>
+            </ul>
+          ) : (
+            <p className={styles.muted}>None. You can start here.</p>
+          )}
+          {dependents.length > 0 ? (
+            <p className={styles.muted}>
+              Required for: {dependents.map((dependent) => dependent.title).join(', ')}.
+            </p>
           ) : null}
         </div>
-        {concept.source_refs.length > 0 ? (
-          <ul className={styles.bareList} aria-label="Linked passages">
-            {concept.source_refs.map((ref) => (
-              <li key={ref.id} className={styles.itemRow}>
-                <span className={styles.itemText}>
-                  <span className={styles.itemTitle}>{ref.source_name}</span>
-                  <span className={styles.muted}>{describeLocation(ref)}</span>
+      </div>
+
+      {/* Where you are with it, and the lessons that teach it. */}
+      <div className={styles.group} role="group" aria-labelledby={`${headingId}-learning`}>
+        <p className={cx('ad-eyebrow', styles.groupLabel)} id={`${headingId}-learning`}>
+          Your learning
+        </p>
+        <div className={styles.block}>
+          <h4 className={styles.blockTitle}>Your progress</h4>
+          <div className={styles.knowledge}>
+            <div className={styles.knowledgeLine}>
+              <Badge tone={KNOWLEDGE_TONE[concept.knowledge.state]}>
+                {concept.knowledge.label}
+              </Badge>
+              {concept.knowledge.missing.length > 0 ? (
+                <span className={styles.muted}>
+                  Still needed: {concept.knowledge.missing.join('; ')}.
                 </span>
-                <IconButton
-                  label={`Unlink ${ref.source_name}, ${describeLocation(ref)}`}
-                  icon={<Unlink />}
-                  variant="tertiary"
-                  size="small"
-                  onClick={() => void unlink(ref.id)}
-                />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className={styles.muted}>
-            {hasMaterials
-              ? 'Nothing linked yet. Linking passages keeps lessons close to your course.'
-              : 'No materials imported. Lessons will draw on general knowledge.'}
-          </p>
-        )}
-        <div aria-live="polite">
-          {shownPassages.status === 'error' ? (
-            <Callout tone="danger" title="Search failed">
-              {shownPassages.message}
-            </Callout>
-          ) : shownPassages.status === 'ready' && shownPassages.passages.length === 0 ? (
-            <p className={styles.muted}>
-              No matches. Try a description or objectives that use the terms in your notes.
-            </p>
-          ) : shownPassages.status === 'ready' ? (
-            <ul className={styles.bareList} aria-label="Related passages">
-              {shownPassages.passages.map((passage) => {
-                const linked = linkedSections.has(passage.section_id);
+              ) : null}
+            </div>
+            <div className={styles.block}>
+              <span className={styles.muted} id={`${historyId}-rate`}>
+                How well do you know this already?
+              </span>
+              <div
+                className={styles.knowledgeLine}
+                role="group"
+                aria-labelledby={`${historyId}-rate`}
+              >
+                {SELF_REPORTS.map((option) => (
+                  <Button
+                    key={option.value}
+                    size="small"
+                    aria-pressed={concept.knowledge.self_report === option.value}
+                    loading={rating === option.value}
+                    disabled={rating !== null && rating !== option.value}
+                    onClick={() => void rate(option.value)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Button
+                size="small"
+                variant="tertiary"
+                aria-expanded={shownHistory.status !== 'closed'}
+                aria-controls={historyId}
+                onClick={() => void toggleHistory()}
+              >
+                {shownHistory.status === 'closed' ? 'Show history' : 'Hide history'}
+              </Button>
+            </div>
+            <div id={historyId} aria-live="polite">
+              {shownHistory.status === 'loading' ? (
+                <Spinner size="small" label="Loading history" />
+              ) : shownHistory.status === 'error' ? (
+                <p className={styles.formError}>{shownHistory.message}</p>
+              ) : shownHistory.status === 'ready' ? (
+                shownHistory.evidence.history.length === 0 ? (
+                  <p className={styles.muted}>
+                    Nothing yet. Your answers and status changes will appear here.
+                  </p>
+                ) : (
+                  <ol className={styles.history} aria-label="History, newest first">
+                    {shownHistory.evidence.history.map((entry) => (
+                      <li key={entry.id} className={styles.itemText}>
+                        <span className={styles.historyWhen}>
+                          {formatRelativeDay(entry.occurred_at)}
+                        </span>
+                        <span>{entry.explanation}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.block}>
+          <h4 className={styles.blockTitle}>Lessons</h4>
+          {lessons.status === 'loading' ? (
+            <Spinner size="small" label="Loading lessons" />
+          ) : lessons.status === 'error' ? (
+            <div className={styles.itemRow}>
+              <p className={styles.formError}>{lessons.message}</p>
+              <Button size="small" onClick={lessons.retry}>
+                Try again
+              </Button>
+            </div>
+          ) : lessons.lessons.length === 0 ? (
+            <p className={styles.muted}>No lessons yet.</p>
+          ) : (
+            <ul className={styles.bareList} aria-label="Lessons for this concept">
+              {lessons.lessons.map((lesson) => {
+                const action = lessonAction(lesson.progress);
+                const removable = lessons.lessons.some((other) => other.origin === 'generated');
                 return (
-                  <li key={passage.chunk_id} className={styles.passage}>
-                    <div className={styles.itemRow}>
-                      <span className={styles.itemText}>
-                        <span className={styles.itemTitle}>{passage.source_name}</span>
-                        <span className={styles.muted}>{describeLocation(passage)}</span>
-                      </span>
-                      {linked ? (
-                        <Badge tone="success">Linked</Badge>
-                      ) : (
-                        <Button
-                          size="small"
-                          icon={<LinkIcon />}
-                          loading={linking === passage.section_id}
-                          aria-label={`Link ${passage.source_name}, ${describeLocation(passage)} to this concept`}
-                          onClick={() => void link(passage.section_id)}
-                        >
-                          Link
-                        </Button>
-                      )}
-                    </div>
-                    <p className={styles.passageText}>{passage.text}</p>
+                  <li key={lesson.id} className={styles.itemRow}>
+                    <span className={styles.itemText}>
+                      <span className={styles.itemTitle}>{lesson.title}</span>
+                      <span className={styles.muted}>{describeLesson(lesson)}</span>
+                    </span>
+                    <Button
+                      size="small"
+                      variant={lesson.progress.completed ? 'secondary' : 'primary'}
+                      icon={lesson.progress.completed ? <RotateCcw /> : <Play />}
+                      aria-label={`${action}: ${lesson.title}`}
+                      onClick={() => onOpenLesson(lesson.id)}
+                    >
+                      {action}
+                    </Button>
+                    {/* A lesson a model wrote can be removed, to make room for another way of
+                        teaching the same thing. The sample course's own lessons stay. */}
+                    {lesson.origin === 'generated' ? (
+                      <IconButton
+                        label={`Remove lesson: ${lesson.title}`}
+                        icon={<Trash2 />}
+                        size="small"
+                        onClick={() => onRemoveLesson(lesson)}
+                      />
+                    ) : removable ? (
+                      // Its place is kept, so that every row's button stands in one column.
+                      <span className={styles.itemSpacer} aria-hidden="true" />
+                    ) : null}
                   </li>
                 );
               })}
             </ul>
-          ) : null}
+          )}
+          <GenerationStatus
+            job={generation.job?.status === 'succeeded' ? null : generation.job}
+            starting={generation.starting}
+            refusal={generation.refusal}
+            subject="the lesson"
+            kind="lesson"
+            waitingText="Queued"
+            usualSeconds={generation.usualSeconds}
+            lessonReady={generation.lessonReady}
+            onCancel={generation.onCancel}
+            onRetry={() => generation.onCreate(strategy || null)}
+            onDismiss={generation.onDismiss}
+          />
+          {/* While work is under way, or its failure is on screen with its own way forward,
+              a second button to start the same thing would only be noise. Nor is one offered
+              before the lessons there already are known: it would say "a lesson" where it
+              means "another". */}
+          {lessons.status === 'loading' ||
+          generation.starting ||
+          isJobActive(generation.job) ||
+          generation.refusal !== null ||
+          generation.job?.status === 'failed' ||
+          generation.job?.status === 'cancelled' ? null : (
+            <div className={styles.generation}>
+              {/* The learner can say what kind of explanation they want, for a first lesson
+                  as for another; left on Automatic, the writer chooses. */}
+              {lessons.status === 'ready' ? (
+                <div className={styles.strategy}>
+                  <Select
+                    label="Teaching style"
+                    value={strategy}
+                    options={STRATEGY_CHOICES}
+                    onValueChange={setStrategy}
+                  />
+                </div>
+              ) : null}
+              <div className={styles.sending}>
+                <Button
+                  size="small"
+                  icon={<Sparkles />}
+                  disabled={concept.objectives.length === 0}
+                  onClick={() => generation.onCreate(strategy || null)}
+                >
+                  {lessons.status === 'ready' && lessons.lessons.length > 0
+                    ? 'Create another lesson with AI'
+                    : 'Create a lesson with AI'}
+                </Button>
+                {concept.objectives.length === 0 ? null : (
+                  <WhatIsSent
+                    what={lessonDisclosure(hasMaterials ? 'some' : 'none')}
+                    to={generation.destination}
+                    wait={generation.usualWait}
+                    after="Its pictures follow while you start."
+                  />
+                )}
+              </div>
+              {/* The one thing here the learner has to do something about. */}
+              {concept.objectives.length === 0 ? (
+                <p className={styles.aiNote}>Add a learning objective first.</p>
+              ) : null}
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Where it is in the learner's own files: often long, so after the rest. */}
+      <div className={styles.group}>
+        <div className={styles.block}>
+          <div className={styles.blockHeader}>
+            <h4 className={styles.blockTitle}>In your materials</h4>
+            {hasMaterials ? (
+              <Button
+                size="small"
+                variant="tertiary"
+                icon={<Search />}
+                loading={shownPassages.status === 'loading'}
+                onClick={() => void findPassages()}
+              >
+                Find related passages
+              </Button>
+            ) : null}
+          </div>
+          {concept.source_refs.length > 0 ? (
+            <ul className={styles.bareList} aria-label="Linked passages">
+              {concept.source_refs.map((ref) => (
+                <li key={ref.id} className={styles.itemRow}>
+                  <span className={styles.itemText}>
+                    <span className={styles.itemTitle}>{ref.source_name}</span>
+                    <span className={styles.muted}>{describeLocation(ref)}</span>
+                  </span>
+                  <IconButton
+                    label={`Unlink ${ref.source_name}, ${describeLocation(ref)}`}
+                    icon={<Unlink />}
+                    variant="tertiary"
+                    size="small"
+                    onClick={() => void unlink(ref.id)}
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.muted}>
+              {hasMaterials
+                ? 'Nothing linked yet. Linking passages keeps lessons close to your course.'
+                : 'No materials imported. Lessons will draw on general knowledge.'}
+            </p>
+          )}
+          <div aria-live="polite">
+            {shownPassages.status === 'error' ? (
+              <Callout tone="danger" title="Search failed">
+                {shownPassages.message}
+              </Callout>
+            ) : shownPassages.status === 'ready' && shownPassages.passages.length === 0 ? (
+              <p className={styles.muted}>
+                No matches. Try a description or objectives that use the terms in your notes.
+              </p>
+            ) : shownPassages.status === 'ready' ? (
+              <ul className={styles.bareList} aria-label="Related passages">
+                {shownPassages.passages.map((passage) => {
+                  const linked = linkedSections.has(passage.section_id);
+                  return (
+                    <li key={passage.chunk_id} className={styles.passage}>
+                      <div className={styles.itemRow}>
+                        <span className={styles.itemText}>
+                          <span className={styles.itemTitle}>{passage.source_name}</span>
+                          <span className={styles.muted}>{describeLocation(passage)}</span>
+                        </span>
+                        {linked ? (
+                          <Badge tone="success">Linked</Badge>
+                        ) : (
+                          <Button
+                            size="small"
+                            icon={<LinkIcon />}
+                            loading={linking === passage.section_id}
+                            aria-label={`Link ${passage.source_name}, ${describeLocation(passage)} to this concept`}
+                            onClick={() => void link(passage.section_id)}
+                          >
+                            Link
+                          </Button>
+                        )}
+                      </div>
+                      <p className={styles.passageText}>{passage.text}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.detailActions}>
+        <Button size="small" icon={<Pencil />} onClick={onEdit}>
+          Edit concept
+        </Button>
+        <Button size="small" variant="tertiary" icon={<Trash2 />} onClick={onRemove}>
+          Remove concept
+        </Button>
       </div>
     </Card>
   );

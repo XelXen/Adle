@@ -25,11 +25,15 @@ export async function chooseInFileDialog(
   }, paths);
 }
 
-/** Create a course from the library. Without a topic it is a course "from your materials". */
+/**
+ * Create a course from the library (ADR-053): from a topic, or from files, which are chosen
+ * in the (replaced) file dialog as the course is made. "Set it up for me" is left off unless
+ * `setUp` is given: a journey says when it wants the AI to build its course.
+ */
 export async function createCourse(
   page: Page,
   name: string,
-  options: { topic?: string } = {},
+  options: { topic?: string; files?: string[]; app?: ElectronApplication; setUp?: boolean } = {},
 ): Promise<void> {
   await page
     .getByRole('button', { name: /New course|Create your first course/ })
@@ -37,15 +41,23 @@ export async function createCourse(
     .click();
   const dialog = page.getByRole('dialog', { name: 'New course' });
   await expect(dialog).toBeVisible();
-  if (options.topic === undefined) {
-    await dialog.getByRole('radio', { name: 'Import my materials' }).click();
+  const fromFiles = options.topic === undefined;
+  if (!fromFiles) {
+    await dialog.getByRole('radio', { name: 'From a topic' }).click();
+    await dialog.getByLabel('What do you want to learn?').fill(options.topic ?? '');
+  } else {
+    if (!options.app || !options.files) {
+      throw new Error('A course from files is made with its files: pass them and the app.');
+    }
+    await chooseInFileDialog(options.app, options.files.map(doc));
   }
-  await dialog.getByLabel('Course name').fill(name);
-  if (options.topic !== undefined) {
-    await dialog.getByLabel('What do you want to learn?').fill(options.topic);
+  if (name) await dialog.getByLabel('Course name').fill(name);
+  const setUp = dialog.getByRole('checkbox', { name: 'Set it up for me' });
+  if ((await setUp.isChecked()) !== Boolean(options.setUp) && (await setUp.isEnabled())) {
+    await setUp.setChecked(Boolean(options.setUp));
   }
-  await dialog.getByRole('button', { name: 'Create course' }).click();
-  await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
+  await dialog.getByRole('button', { name: fromFiles ? 'Choose files…' : 'Create course' }).click();
+  if (name) await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
 }
 
 /** Import sample documents through the (replaced) file dialog. Call on the Materials tab. */

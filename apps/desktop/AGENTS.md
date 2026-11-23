@@ -327,6 +327,13 @@ most, a file's name.
   `lib/generation.ts` and the destination the core plans (`destination(status, work)`),
   never a hard-coded name. Do not write the sentence beside the button again, and do not
   add a control that sends without the note. A journey reads it with `openWhatIsSent`.
+- **A course from files is made with its files** (ADR-053): `NewCourseDialog` creates the
+  course, then `importWithPicker`; nothing chosen, and the course is removed again. Its
+  "Set it up for me" asks for the suggestions with `setup`; `readSetUp` reads what that
+  added, and the curriculum then reloads, selects the first concept and follows its lesson.
+  The Materials tab follows an import begun elsewhere (`jobs.list_active`). A journey
+  makes a course with `createCourse(page, name, { files, app })` or `{ topic }`; "Set it
+  up for me" is left off unless it passes `setUp`.
 - Speech uses **local voices only** (`loadLocalVoices`). Do not list or use a voice whose
   `localService` is false.
 - **A natural voice is played from what the core recorded** (ADR-042): `RecordedNarrator`

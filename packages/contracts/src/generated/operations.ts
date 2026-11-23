@@ -39,6 +39,7 @@ import type {
   PracticeSet,
   PrerequisitesUpdate,
   ProposalAcceptance,
+  ProposalRequest,
   ProviderCheck,
   ProviderCredential,
   ProviderSelection,
@@ -390,7 +391,7 @@ export interface OperationTypes {
   'generation.propose_curriculum': {
     path: { course_id: string };
     query: undefined;
-    body: undefined;
+    body: ProposalRequest | null;
     result: Job;
   };
   'jobs.cancel': {

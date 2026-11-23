@@ -262,6 +262,30 @@
   overflow-wrap: anywhere;
 }
 
+/* A concept in two halves, what it is and where you are with it, each under a small label. */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-4);
+  min-width: 0;
+  padding-top: var(--ad-space-4);
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+}
+
+.groupLabel {
+  margin: 0;
+}
+
+/* What is done to the concept itself comes last, out of the way of learning it. */
+.detailActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ad-space-2);
+  padding-top: var(--ad-space-4);
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+}
+
 .detailSummary {
   max-width: var(--ad-layout-reading-max);
   overflow-wrap: anywhere;

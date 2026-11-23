@@ -201,9 +201,14 @@ export function HomeScreen() {
       <NewCourseDialog
         open={creating}
         onClose={() => setCreating(false)}
-        onCreated={(course) => {
+        onCreated={(course, settingUp) => {
           setCreating(false);
-          open(course);
+          // Being set up, the course is seen taking shape on its curriculum (ADR-053).
+          navigate(
+            settingUp
+              ? { name: 'course', courseId: course.id, tab: 'curriculum' }
+              : courseRoute(course),
+          );
         }}
       />
     </Page>

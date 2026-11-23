@@ -80,7 +80,14 @@ function sourceFacts(source: Source): string {
 }
 
 /** Import materials into a course, see what was extracted, and search it. */
-export function SourcesPanel({ courseId }: { courseId: string }) {
+export function SourcesPanel({
+  courseId,
+  onCourseChanged,
+}: {
+  courseId: string;
+  /** Something the course shows changed: a course left to Adle is named after its first file. */
+  onCourseChanged?: () => void;
+}) {
   const toast = useToast();
   const sources = useResource(`sources:${courseId}`, () =>
     callCore('sources.list', { path: { course_id: courseId } }),
@@ -91,7 +98,27 @@ export function SourcesPanel({ courseId }: { courseId: string }) {
   const [removing, setRemoving] = useState<Source | null>(null);
   const [removeBusy, setRemoveBusy] = useState(false);
 
-  const job = useJob(startedJob, () => sources.reload());
+  const job = useJob(startedJob, () => {
+    sources.reload();
+    onCourseChanged?.();
+  });
+  // An import begun elsewhere (with the course, ADR-053) is followed here as well.
+  useEffect(() => {
+    let cancelled = false;
+    callCore('jobs.list_active', { path: { course_id: courseId } }).then(
+      (list) => {
+        if (cancelled) return;
+        const running = list.jobs.find((each) => each.kind === 'import_sources');
+        if (running) setStartedJob((current) => current ?? running);
+      },
+      () => {
+        // Nothing to follow; importing still works.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]);
   const importing = starting || isJobActive(job);
   const results = job && !isJobActive(job) ? importedFiles(job) : [];
 

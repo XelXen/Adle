@@ -13,6 +13,7 @@ import {
   doc,
   expectNoAccessibilityViolations,
   importWithDialog,
+  openCourseTab,
   screenshot,
 } from './support/courses';
 
@@ -28,14 +29,19 @@ test.describe('course materials', () => {
   }) => {
     const { app, page } = adle;
     await waitForCore(page);
-    await createCourse(page, 'Neural networks 101');
+    // Made from its first file, chosen as the course is made (ADR-053).
+    await createCourse(page, 'Neural networks 101', {
+      app,
+      files: ['neural-networks-syllabus.md'],
+    });
     await expect(page.getByText('From your materials')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'No materials yet' })).toBeVisible();
     // The local-only promise is stated where the import happens.
     await expect(page.getByText('Importing uploads nothing.')).toBeVisible();
+    await expect(sourceRow(page, 'neural-networks-syllabus.md')).toContainText('Ready', {
+      timeout: 30_000,
+    });
 
     await importWithDialog(app, page, [
-      'neural-networks-syllabus.md',
       'lecture-notes.pdf',
       'partly-scanned.pdf',
       'scanned-handout.pdf',
@@ -43,7 +49,7 @@ test.describe('course materials', () => {
 
     // One summary says what happened to every file, including the one that failed and why.
     const summary = page.getByRole('status').filter({ hasText: 'imported' });
-    await expect(summary).toContainText('3 files imported · 1 couldn’t be imported', {
+    await expect(summary).toContainText('2 files imported · 1 couldn’t be imported', {
       timeout: 30_000,
     });
     await expect(summary).toContainText('scanned-handout.pdf');
@@ -85,13 +91,13 @@ test.describe('course materials', () => {
   test('imports survive a restart; sources and courses can be removed', async ({ profileDir }) => {
     const first = await launchApp(profileDir, { onboarded: true });
     await waitForCore(first.page);
-    await createCourse(first.page, 'Persistent course');
-    await importWithDialog(first.app, first.page, ['study-notes.txt', 'course-outline.docx']);
-    await expect(
-      first.page.getByRole('status').filter({ hasText: '2 files imported' }),
-    ).toBeVisible({
-      timeout: 30_000,
+    await createCourse(first.page, 'Persistent course', {
+      app: first.app,
+      files: ['study-notes.txt', 'course-outline.docx'],
     });
+    for (const name of ['study-notes.txt', 'course-outline.docx']) {
+      await expect(sourceRow(first.page, name)).toContainText('Ready', { timeout: 30_000 });
+    }
     await first.close();
 
     const second = await launchApp(profileDir);
@@ -143,7 +149,10 @@ test.describe('course materials', () => {
   test('files can be dropped onto the course, and duplicates are recognised', async ({ adle }) => {
     const { app, page } = adle;
     await waitForCore(page);
-    await createCourse(page, 'Dropped materials');
+    // Any course takes materials: this one is made from a topic, its Materials tab empty.
+    await createCourse(page, 'Dropped materials', { topic: 'Neural networks.' });
+    await openCourseTab(page, 'Materials');
+    await expect(page.getByRole('heading', { name: 'No materials yet' })).toBeVisible();
 
     // Build a real drop: file-backed File objects, as the operating system provides them.
     const picker = await page.evaluateHandle(() => {
@@ -193,10 +202,11 @@ test.describe('course materials', () => {
     await page.getByRole('button', { name: 'New course' }).click();
     const dialog = page.getByRole('dialog', { name: 'New course' });
 
+    await dialog.getByRole('radio', { name: 'From a topic' }).click();
     await dialog.getByRole('button', { name: 'Create course' }).click();
-    await expect(dialog.getByText('Enter a course name.')).toBeVisible();
+    // A name may be left to Adle (ADR-053); what to learn may not.
     await expect(dialog.getByText('Describe what you want to learn')).toBeVisible();
-    await expect(dialog.getByLabel('Course name')).toHaveAttribute('aria-invalid', 'true');
+    await expect(dialog.getByText('Enter a course name.')).toHaveCount(0);
 
     await dialog.getByLabel('Course name').fill('Calculus refresher');
     await dialog.getByLabel('What do you want to learn?').fill('Limits and derivatives.');
@@ -215,7 +225,7 @@ test.describe('course materials', () => {
   test('a course that no longer exists says so and offers a way back', async ({ adle }) => {
     const { page } = adle;
     await waitForCore(page);
-    await createCourse(page, 'Short-lived');
+    await createCourse(page, 'Short-lived', { topic: 'Anything.' });
     // Delete it behind the screen's back, then reload the route.
     await page.evaluate(async () => {
       const list = (await window.adle!.core.invoke('courses.list')) as {
