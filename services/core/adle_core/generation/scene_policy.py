@@ -73,7 +73,7 @@ UNSUPPORTED_SCENE_BASES: Final = frozenset(
 
 #: The closed event vocabulary. Must match `SCENE_EVENT_NAMES` in
 #: packages/event-protocol (checked by tests/unit/test_scene_policy.py).
-EVENT_NAMES: Final = ("passed", "explored", "progress", "step")
+EVENT_NAMES: Final = ("passed", "explored", "progress", "step", "layout")
 
 #: Attribute (and constant subscript) names that lead out of the Python-like
 #: world into JavaScript objects, the DOM, or the renderer's canvas.

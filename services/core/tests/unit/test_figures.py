@@ -495,3 +495,18 @@ def test_a_table_may_have_eight_rows_and_no_more() -> None:
     assert compile_figure(eight, beat_seconds=BEATS).kind == "table"
     with pytest.raises(FigureError, match="rows"):
         compile_figure({**eight, "rows": [["1", "2", "3"]] * 9}, beat_seconds=BEATS)
+
+
+@pytest.mark.parametrize("name", sorted(EXAMPLES))
+def test_every_figure_says_how_it_is_laid_out_as_each_page_ends(name: str) -> None:
+    source = compile_figure(EXAMPLES[name], beat_seconds=BEATS).source
+    tree = ast.parse(source)
+    scene = next(node for node in tree.body if isinstance(node, ast.ClassDef))
+    methods = {node.name: node for node in scene.body if isinstance(node, ast.FunctionDef)}
+    assert {"words_of", "meet", "within", "audit"} <= set(methods)
+    for page in ("construct", "blueprint"):
+        if page not in methods:
+            continue
+        last = methods[page].body[-1]
+        # The last thing the page does: its words and edges looked at as they are drawn.
+        assert ast.unparse(last) == "self.audit()", (name, page)

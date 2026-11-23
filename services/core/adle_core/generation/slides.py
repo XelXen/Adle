@@ -51,6 +51,7 @@ from adle_core.generation.figures import (
     _tried,
     _without_blanks,
 )
+from adle_core.generation.layout import LAYOUT_METHODS, LAYOUT_STATE
 from adle_core.generation.scene_policy import check_scene_source
 from adle_core.generation.speech import UNICODE_TEX
 
@@ -1891,8 +1892,8 @@ _LIBRARY: dict[str, str] = {
         start = line.get_start()
         end = line.get_end()
         if abs(end[0] - start[0]) >= abs(end[1] - start[1]):
-            return words.next_to(line, UP, buff=0.12)
-        return words.next_to(line, RIGHT, buff=0.12)
+            return self.pin(words, line, UP, 0.12)
+        return self.pin(words, line, RIGHT, 0.12)
 """,
     "set": """\
     def make_set(self, key, keys, specs, rows, cols, name, hue):
@@ -1944,7 +1945,7 @@ _LIBRARY: dict[str, str] = {
             lift = 0.25
             if len(col_names) > 0:
                 lift = 0.75
-            marks.add(self.shown(name, 30, hue).next_to(cells, UP, buff=lift))
+            marks.add(self.pin(self.shown(name, 30, hue), cells, UP, lift))
         self.e[key + "/frame"] = marks
         self.e[key] = VGroup(marks, cells)
 """,
@@ -1961,7 +1962,7 @@ _LIBRARY: dict[str, str] = {
         if rule:
             marks.add(Line([rule[0], rule[2], 0], [rule[1], rule[2], 0], color=self.muted))
         if name:
-            marks.add(self.shown(name, 30, hue).next_to(cells, UP, buff=0.3))
+            marks.add(self.pin(self.shown(name, 30, hue), cells, UP, 0.3))
         self.e[key + "/frame"] = marks
         self.e[key] = VGroup(marks, cells)
 """,
@@ -1984,7 +1985,7 @@ _LIBRARY: dict[str, str] = {
             links.add(link)
         marks = VGroup()
         if name:
-            marks.add(self.shown(name, 30, hue).next_to(nodes, UP, buff=0.35))
+            marks.add(self.pin(self.shown(name, 30, hue), nodes, UP, 0.35))
         self.e[key + "/frame"] = marks
         self.e[key] = VGroup(marks, links, nodes)
 """,
@@ -2042,9 +2043,9 @@ _LIBRARY: dict[str, str] = {
             if tick[0] != yr[0]:
                 marks.add(MathTex(tick[1], font_size=36, color=self.muted).next_to(axes.c2p(xr[0], tick[0]), LEFT, buff=0.15))
         if x_label:
-            marks.add(self.shown(x_label, 28, self.ink).next_to(axes.c2p(xr[1], cross[1]), RIGHT, buff=0.2))
+            marks.add(self.pin(self.shown(x_label, 28, self.ink), axes.c2p(xr[1], cross[1]), RIGHT, 0.2))
         if y_label:
-            marks.add(self.shown(y_label, 28, self.ink).next_to(axes.c2p(cross[0], yr[1]), UP, buff=0.2))
+            marks.add(self.pin(self.shown(y_label, 28, self.ink), axes.c2p(cross[0], yr[1]), UP, 0.2))
         self.ax[key] = axes
         self.e[key + "/body"] = axes
         self.e[key + "/frame"] = marks
@@ -2101,10 +2102,11 @@ _LIBRARY: dict[str, str] = {
             x = b
         return self.ax[on].c2p(x, self.value(index, x, self.amount.get_value()))
 
-    def marker(self, on, index, tracker, a, b, name, hue):
+    def marker(self, key, on, index, tracker, a, b, name, hue):
         dot = Dot(color=hue, radius=0.1).move_to(self.spot(on, index, tracker.get_value(), a, b))
         if name:
-            return VGroup(dot, self.shown(name, 26, self.ink).next_to(dot, UP + RIGHT, buff=0.1))
+            label = self.keep_clear(key, self.shown(name, 26, self.ink), dot, UP + RIGHT, 0.1)
+            return VGroup(dot, label)
         return VGroup(dot)
 
     def make_point(self, key, on, index, x, a, b, name, hue):
@@ -2112,7 +2114,7 @@ _LIBRARY: dict[str, str] = {
         if x is not None:
             tracker = ValueTracker(x)
         self.trackers[key] = tracker
-        self.e[key] = always_redraw(lambda: self.marker(on, index, tracker, a, b, name, hue))
+        self.e[key] = always_redraw(lambda: self.marker(key, on, index, tracker, a, b, name, hue))
         self.followers.append(key)
 """,
     "tangent": """\
@@ -2150,7 +2152,7 @@ _LIBRARY: dict[str, str] = {
         for tick in ticks:
             marks.add(MathTex(tick[1], font_size=36, color=self.muted).next_to(line.n2p(tick[0]), DOWN, buff=0.2))
         if name:
-            marks.add(self.shown(name, 28, self.ink).next_to(line, RIGHT, buff=0.3))
+            marks.add(self.pin(self.shown(name, 28, self.ink), line, RIGHT, 0.3))
         self.e[key + "/body"] = line
         self.e[key + "/frame"] = marks
         self.e[key] = VGroup(line, marks)
@@ -2161,7 +2163,7 @@ _LIBRARY: dict[str, str] = {
         tip = self.ax[axes].c2p(end[0], end[1])
         self.e[key] = Arrow(tail, tip, buff=0, color=hue, max_tip_length_to_length_ratio=0.2, max_stroke_width_to_length_ratio=10)
         if name:
-            self.e[key + "/name"] = self.shown(name, 28, hue).next_to(tip, UP + RIGHT, buff=0.1)
+            self.e[key + "/name"] = self.pin(self.shown(name, 28, hue), tip, UP + RIGHT, 0.1)
 """,
     "coin": """\
     def coin(self, spec, hue):
@@ -2292,6 +2294,26 @@ def _node_places(count: int, edges: list[list[int]], layout: str) -> list[list[f
     return [[round((index - (count - 1) / 2) * 2.6, 3), 0.0] for index in range(count)]
 
 
+#: A ``run_time`` in a step's code.
+_RUN_TIME = re.compile(r"run_time=(\d+(?:\.\d+)?)")
+#: The quickest a step's animations are made, as a share of how long they were written to
+#: take: quicker than that, a movement can no longer be followed.
+_QUICKEST = 0.45
+
+
+def _fitted(code: str, seconds: float | None) -> str:
+    """A step's code with its animations quick enough to be over by the time the next step
+    begins (ADR-055), at most down to ``_QUICKEST`` of how long they were written to take.
+    A step with time to spare is left as it is: the picture holds while the words go on."""
+    if seconds is None:
+        return code
+    written = sum(float(found) for found in _RUN_TIME.findall(code))
+    if written <= 0 or written <= seconds:
+        return code
+    share = max(_QUICKEST, seconds / written)
+    return _RUN_TIME.sub(lambda found: f"run_time={round(float(found.group(1)) * share, 2)}", code)
+
+
 class _Scene:
     """Writes the scene file for a settled script, keeping track, step by step, of what is
     on the stage: a step acts only on what is there, and brings on what it needs."""
@@ -2323,6 +2345,8 @@ class _Scene:
         out.say("self.trackers = {}")
         out.say("self.rings = []")
         out.say("self.followers = []")
+        for line in LAYOUT_STATE:
+            out.say(line)
         out.say(f"self.amount = ValueTracker({_py(self.param_value)})")
         later: list[str] = []
         for name in c.order:
@@ -2350,6 +2374,9 @@ class _Scene:
                 out.say(f"{_e(name)}.move_to({_e(c.inherits[name])}.get_center())")
         for name in later:
             self.make(out, name, c.elements[name])
+        # Everything is where it goes: a label over other words or past the edge moves now,
+        # before anything is shown (ADR-055).
+        out.say("self.tidy()")
         return out.text()
 
     def make(self, out: _Writer, name: str, element: _Element) -> None:
@@ -2378,7 +2405,7 @@ class _Scene:
             out.say(f"dot = Dot(color={hue}, radius={radius})")
             if label:
                 out.say(
-                    f"words = self.shown({_py(label)}, 28, self.ink).next_to(dot, DOWN, buff=0.15)"
+                    f"words = self.pin(self.shown({_py(label)}, 28, self.ink), dot, DOWN, 0.15)"
                 )
                 out.say(f"{_e(name)} = VGroup(dot, words)")
             else:
@@ -2436,11 +2463,16 @@ class _Scene:
             assert found is not None
             side = _SIDES.get(_words(element.side), "UP")
             follows = name in c.follows
+            # Pinned, or, when it follows something that moves and is drawn again each frame,
+            # kept clear as it is drawn (ADR-055).
+            shown = f"self.shown({_py(_content(element.text))}, 26, {hue})"
+            anchor = f"self.group({_py(list(found.keys))})"
             self.assign(
                 out,
                 name,
-                f"self.shown({_py(_content(element.text))}, 26, {hue}).next_to("
-                f"self.group({_py(list(found.keys))}), {side}, buff=0.14)",
+                f"self.keep_clear({_py(name)}, {shown}, {anchor}, {side}, 0.14)"
+                if follows
+                else f"self.pin({shown}, {anchor}, {side}, 0.14)",
                 follows,
             )
             if not follows:
@@ -2592,10 +2624,13 @@ class _Scene:
             side = _SIDES.get(_words(element.side), "DOWN")
             self.assign(out, name, f"Brace(self.group({_py(keys)}), {side}, color={hue})", follows)
             if label:
+                shown = f"self.shown({_py(label)}, 28, self.ink)"
                 self.assign(
                     out,
                     name + "/name",
-                    f"self.shown({_py(label)}, 28, self.ink).next_to({_e(name)}, {side}, buff=0.12)",
+                    f"self.keep_clear({_py(name + '/name')}, {shown}, {_e(name)}, {side}, 0.12)"
+                    if follows
+                    else f"self.pin({shown}, {_e(name)}, {side}, 0.12)",
                     follows,
                 )
                 if not follows:
@@ -2609,10 +2644,13 @@ class _Scene:
                 follows,
             )
             if label:
+                shown = f"self.shown({_py(label)}, 28, {hue})"
                 self.assign(
                     out,
                     name + "/name",
-                    f"self.shown({_py(label)}, 28, {hue}).next_to({_e(name)}, UP, buff=0.1)",
+                    f"self.keep_clear({_py(name + '/name')}, {shown}, {_e(name)}, UP, 0.1)"
+                    if follows
+                    else f"self.pin({shown}, {_e(name)}, UP, 0.1)",
                     follows,
                 )
 
@@ -2630,9 +2668,9 @@ class _Scene:
             )
             if label:
                 out.say(
-                    f"{_e(name + '/name')} = self.shown({_py(label)}, 28, {hue}).next_to("
+                    f"{_e(name + '/name')} = self.pin(self.shown({_py(label)}, 28, {hue}), "
                     f"self.ax[{_py(axes)}].c2p({_py(end)}, self.value({index}, {_py(end)}, "
-                    "self.amount.get_value())), UP + RIGHT, buff=0.1)"
+                    "self.amount.get_value())), UP + RIGHT, 0.1)"
                 )
                 out.say(f"self.keep({_e(name + '/name')})")
         elif isinstance(element, AreaElement):
@@ -2671,8 +2709,8 @@ class _Scene:
     def caption(self, out: _Writer, name: str, label: list[Any] | None) -> None:
         if label:
             out.say(
-                f"{_e(name + '/frame')} = self.shown({_py(label)}, 28, self.ink).next_to("
-                f"{_e(name + '/body')}, DOWN, buff=0.2)"
+                f"{_e(name + '/frame')} = self.pin(self.shown({_py(label)}, 28, self.ink), "
+                f"{_e(name + '/body')}, DOWN, 0.2)"
             )
             out.say(f"{_e(name)} = VGroup({_e(name + '/body')}, {_e(name + '/frame')})")
         else:
@@ -2838,7 +2876,7 @@ class _Scene:
 
     # -- the steps ---------------------------------------------------------------------------------
 
-    def step(self, number: int, actions: list[_Action]) -> str:
+    def step(self, number: int, actions: list[_Action], seconds: float | None = None) -> str:
         out = _Writer([f"    def step_{number}(self):"])
         if number == 0:
             out.say("self.build()")
@@ -2847,8 +2885,9 @@ class _Scene:
             self.rings = False
         for action in actions:
             getattr(self, f"do_{action.verb}")(out, action)
+        out.say("self.audit()")
         out.say(f'self.post_message("step", {number})')
-        return out.text()
+        return _fitted(out.text(), seconds)
 
     def pieces(self, target: _Target) -> list[str]:
         """What has to be on the stage for a target to be seen: its own pieces, or, for a
@@ -3324,6 +3363,7 @@ class _Scene:
         out.say("")
         out.say("knob.on_input(moved)")
         out.say("self.add(knob, title, reading)")
+        out.say("self.audit()")
         out.say(f'self.post_message("step", {number})')
         return out.text()
 
@@ -3413,8 +3453,11 @@ def _describe(compiler: _Compiler) -> str:
     return "Shows " + ", ".join(said[:-1]) + " and " + said[-1] + "."
 
 
-def compile_slide(raw: object) -> CompiledSlide:
-    """The scene file for a slide script, or SlideError when none of it can be drawn."""
+def compile_slide(raw: object, seconds: Sequence[float] | None = None) -> CompiledSlide:
+    """The scene file for a slide script, or SlideError when none of it can be drawn.
+
+    ``seconds``: for each step, how long until the next one begins (its words, said
+    briskly). A step whose animations would take longer is made quicker (ADR-055)."""
     if not isinstance(raw, dict):
         raise SlideError(["a slide is an object with elements and steps"])
     compiler = _Compiler()
@@ -3429,13 +3472,20 @@ def compile_slide(raw: object) -> CompiledSlide:
     compiler.layout(slider)
     scene = _Scene(compiler)
     build = scene.build()
-    steps = [scene.step(number, actions) for number, actions in enumerate(compiler.steps)]
+    steps = [
+        scene.step(
+            number,
+            actions,
+            seconds[number] if seconds is not None and number < len(seconds) else None,
+        )
+        for number, actions in enumerate(compiler.steps)
+    ]
     pages = [f"[None, self.step_{number}]" for number in range(len(steps))]
     live = ""
     if slider:
         live = scene.live(len(steps))
         pages.append("[self.blueprint, None]")
-    helpers = [_BASE]
+    helpers = [_BASE, LAYOUT_METHODS]
     if "chip" in scene.used:
         helpers.append(_CHIP)
     if "ends" in scene.used:

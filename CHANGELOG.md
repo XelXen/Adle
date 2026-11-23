@@ -14,6 +14,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **"This didn’t help" can be undone.** Pressed by mistake, choose Undo in the window it
   opens, or press it again: it stays pressed while it counts. What Adle suggests next is
   then as it was.
+- **A picture’s words no longer cover each other or run off the screen.** A label that
+  would lie over other words, such as a curve’s name over an axis’s numbers, is drawn on
+  another side of what it names before you see it. Every example picture is checked for
+  this at every step.
+- **A slide keeps up with its words.** A step whose words are short has quicker
+  animations, so the picture no longer falls behind what is being said.
 
 ## [0.1.0-alpha.6] - 2026-11-23
 

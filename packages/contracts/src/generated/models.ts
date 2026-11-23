@@ -623,9 +623,9 @@ export interface SceneArtifact {
    */
   controls?: string[];
   /**
-   * @maxItems 4
+   * @maxItems 5
    */
-  events?: ('passed' | 'explored' | 'progress' | 'step')[];
+  events?: ('passed' | 'explored' | 'progress' | 'step' | 'layout')[];
   id: string;
   interactive: boolean;
   purpose: string;

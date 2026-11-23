@@ -1781,8 +1781,11 @@
             "type": "array"
           },
           "events": {
-            "items": { "enum": ["passed", "explored", "progress", "step"], "type": "string" },
-            "maxItems": 4,
+            "items": {
+              "enum": ["passed", "explored", "progress", "step", "layout"],
+              "type": "string"
+            },
+            "maxItems": 5,
             "title": "Events",
             "type": "array"
           },

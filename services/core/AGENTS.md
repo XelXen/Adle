@@ -268,6 +268,17 @@ everything and decides nothing.
   step shows beside its case to the next step, and `show` with `from` makes a formula's
   `{{ }}` parts out of copies of the picture (`TransformFromCopy`, then the whole formula
   put back as one thing).
+- **A picture keeps its words clear of each other and of the edge** (ADR-055,
+  `generation/layout.py`, written into every slide and figure). A label is placed with
+  `self.pin(label, anchor, side, buff)`, never with `next_to` alone, unless it is drawn
+  again each frame (it follows something); `tidy` at the end of `build` moves a pinned
+  label to the first clear side; a point's name keeps to a clear side (`self.sides`).
+  Each step, and each figure's page, ends with `self.audit()`, which says `layout` when
+  words overlap or something lies past the edge: the journeys fail on it for every
+  example, so a template that puts words over words is found by `npm run e2e`. Only words
+  are held apart: a drawing over a drawing is usually meant. A slide's step is no longer
+  than its words (`_fitted`, from `drafts._step_seconds`): never slower than written,
+  never quicker than 0.45 of it.
 - **A lesson's model does not think first** (ADR-049): what thinking used to catch is
   caught in `drafts` instead, deterministically (`_distinct_options`: a wrong option equal
   in value to the right one is left out; `_worked_to`: a numeric key its explanation

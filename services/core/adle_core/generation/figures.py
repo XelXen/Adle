@@ -40,6 +40,7 @@ from pydantic import (
     field_validator,
 )
 
+from adle_core.generation.layout import LAYOUT_METHODS
 from adle_core.generation.speech import UNICODE_TEX
 
 #: The kinds of figure there are, as the lesson format names them.
@@ -536,7 +537,7 @@ def compile_figure(raw: object, *, beat_seconds: Sequence[float]) -> CompiledFig
     source, interactive = writers[figure.kind](figure, beats)
     return CompiledFigure(
         kind=figure.kind,
-        source=source,
+        source=_audited(source),
         interactive=interactive,
         described=describe(figure),
         mended=mended,
@@ -726,6 +727,26 @@ def _scene(name: str, doc: str, body: str, *, interactive: bool = False) -> str:
     base = "InteractiveScene" if interactive else "Scene"
     head = "from manim import *\nimport math\n\n\n"
     return f'{head}class {name}({base}):\n    """{doc}"""\n\n{_PALETTE}\n{body}'
+
+
+def _audited(source: str) -> str:
+    """A figure that says, as its animation ends and as its live page opens, whether any of
+    its words lie over others or anything lies past the edge of the screen (ADR-055)."""
+    lines = source.rstrip("\n").split("\n")
+    ends: list[int] = []
+    inside = False
+    for index, line in enumerate(lines):
+        if line.startswith("    def "):
+            if inside:
+                ends.append(index)
+            inside = line.startswith(("    def construct(self)", "    def blueprint(self)"))
+    if inside:
+        ends.append(len(lines))
+    for end in reversed(ends):
+        while end > 0 and not lines[end - 1].strip():
+            end -= 1
+        lines.insert(end, "        self.audit()")
+    return "\n".join(lines) + "\n\n" + LAYOUT_METHODS
 
 
 def _paced(steps: int, beats: list[float], play: float) -> list[float]:

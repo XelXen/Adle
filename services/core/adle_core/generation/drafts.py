@@ -611,6 +611,40 @@ def _paced(narration: list[dict[str, Any]], steps: int) -> list[dict[str, Any]]:
     return paced
 
 
+#: How fast the words a slide's step goes with are taken to be said when its animations
+#: are fitted to them (ADR-055): brisker than most voices, so that a step is over first.
+_BRISK_WORDS_PER_SECOND = 3.0
+#: The pause between two lines said one after the other.
+_LINE_PAUSE_SECONDS = 0.3
+#: How long the last step may go on after the last word is said.
+_LAST_STEP_AFTER_SECONDS = 0.6
+
+
+def _step_seconds(narration: list[dict[str, Any]], steps: int) -> list[float]:
+    """How long each step of a slide has before the next begins: the words from where it is
+    cued (the first from the start) to where the next one is, said briskly; the last has to
+    the end of what is said, and a moment more."""
+    if not narration or steps <= 0:
+        return []
+    cues = sorted(
+        (line, cue) for line, beat in enumerate(narration) for cue in beat.get("cues", [])
+    )
+    starts = [(0, 0), *cues][:steps]
+    end = (len(narration) - 1, len(narration[-1]["text"]))
+    seconds: list[float] = []
+    for index, (line, char) in enumerate(starts):
+        to_line, to_char = starts[index + 1] if index + 1 < len(starts) else end
+        words = 0
+        for at in range(line, to_line + 1):
+            text = narration[at]["text"]
+            begin = char if at == line else 0
+            stop = to_char if at == to_line else len(text)
+            words += len(text[begin:stop].split())
+        seconds.append(words / _BRISK_WORDS_PER_SECOND + (to_line - line) * _LINE_PAUSE_SECONDS)
+    seconds[-1] += _LAST_STEP_AFTER_SECONDS
+    return seconds
+
+
 def _uncued(narration: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The narration of a part with no slide: its cues have nothing to move."""
     return [{key: value for key, value in beat.items() if key != "cues"} for beat in narration]
@@ -808,13 +842,21 @@ class LessonCompiler:
         if slide is not None:
             # The part's picture is a slide, paced by the words it marked (ADR-049).
             compiled_slide, described = slide
+            paced = _paced(narration, compiled_slide.steps)
+            # Written again with each step no longer than its words (ADR-055).
+            fitted = (
+                _slide(segment.visual, _step_seconds(paced, compiled_slide.steps))
+                if segment.visual is not None
+                else None
+            )
+            if fitted is not None and fitted[0].steps == compiled_slide.steps:
+                compiled_slide = fitted[0]
             if kind == "interaction" and not compiled_slide.interactive:
                 entry.pop("prompt", None)
                 entry["type"] = kind = "visualization"
             # The slide is what this part shows: a board under it would say it twice.
             entry["narration"] = [
-                {key: value for key, value in beat.items() if key != "show"}
-                for beat in _paced(narration, compiled_slide.steps)
+                {key: value for key, value in beat.items() if key != "show"} for beat in paced
             ]
             entry["scene"] = {"scene_id": scene_id, "fallback_text": described}
             figure = FigureScene(
@@ -1055,12 +1097,12 @@ def compile_lesson(draft: LessonDraft, context: LessonContext) -> CompiledLesson
 _LONG_DISPLAY = TypeAdapter(LongDisplay)
 
 
-def _slide(raw: dict[str, Any]) -> Any:
+def _slide(raw: dict[str, Any], seconds: list[float] | None = None) -> Any:
     """A part's slide, drawn, with its description in words (the model's, or Adle's from
     the script); None when nothing of it can be drawn. A slide is never a reason to write
     the lesson again: its part is said in words instead."""
     try:
-        drawn = compile_slide(raw)
+        drawn = compile_slide(raw, seconds)
     except SlideError:
         return None
     if drawn.left_out:

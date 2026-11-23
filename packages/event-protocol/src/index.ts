@@ -39,7 +39,7 @@ export const SCENE_PACINGS: readonly ScenePacing[] = ['normal', 'cued'];
  * This vocabulary is closed: anything else is dropped by the player and,
  * independently, by the host.
  */
-export const SCENE_EVENT_NAMES = ['passed', 'explored', 'progress', 'step'] as const;
+export const SCENE_EVENT_NAMES = ['passed', 'explored', 'progress', 'step', 'layout'] as const;
 export type SceneEventName = (typeof SCENE_EVENT_NAMES)[number];
 export type SceneEventValue = boolean | number | string | null;
 

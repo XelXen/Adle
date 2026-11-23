@@ -80,6 +80,14 @@ for (const file of slides) {
         await adle.page.waitForTimeout(300);
         await shot(steps);
       }
+      // At the end of every step no word lay over another, and nothing past the edge of
+      // the screen (ADR-055): the slide says so as each step ends.
+      expect(
+        (await player.messages())
+          .filter((message) => message.type === 'scene-event' && message.name === 'layout')
+          .map((message) => message.value),
+        `${file} in the ${theme} theme`,
+      ).toEqual([]);
       expect((await player.messages()).filter((message) => message.type === 'error')).toEqual([]);
     });
   }

@@ -164,6 +164,18 @@ Write ordinary manim Community v0.21 Python. Only the Wanim-specific parts are l
   (sentences as `\text{...}` parts) and the same of formulas move what the two share and
   leave the first where it was (`rewritten.py`).
 
+- **A picture that looks at its own words (ADR-055)**, every example in `e2e/fixtures/slides/`
+  and `e2e/fixtures/figures/` run in both themes by `e2e/slide-player.spec.ts` and
+  `e2e/scene-player.spec.ts`, 2026-11-23: `isinstance(m, Text)`,
+  `isinstance(m, SingleStringMathTex)` (true of a `MathTex`) and `isinstance(m, DecimalNumber)`
+  tell a word from a drawing; `m.submobjects` and `self.mobjects` (what is on the stage) can
+  be walked; `a is b`; `for key in a_dict`, `key not in a_list` and `a_dict.get(key, default)`;
+  `get_left()`, `get_right()`, `get_top()` and `get_bottom()` of a word or a group, by
+  index; `next_to` called again moves a label to another side of a mobject or a point, also
+  inside an `always_redraw` function, which may keep a choice in an attribute of the scene.
+  A word's box is the box of what is drawn, so letters set side by side touch and do not
+  overlap.
+
 ### Documented upstream, not yet exercised here
 
 `PathSlider`, `DraggablePoint`, `Chip`, `InputDecimalNumber`, `InputInteger`,

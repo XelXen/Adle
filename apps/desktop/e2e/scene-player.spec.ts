@@ -564,6 +564,16 @@ for (const set of sceneSets) {
           expect((await player.messages()).filter((message) => message.type === 'error')).toEqual(
             [],
           );
+          if (set.name === 'figures') {
+            // As its animation ended and as its live page opened, no word lay over another
+            // and nothing lay past the edge of the screen (ADR-055).
+            expect(
+              (await player.messages())
+                .filter((message) => message.type === 'scene-event' && message.name === 'layout')
+                .map((message) => message.value),
+              `${file} in the ${theme} theme`,
+            ).toEqual([]);
+          }
           await adle.page.screenshot({
             path: path.join(
               desktopDir,

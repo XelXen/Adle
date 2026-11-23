@@ -554,8 +554,8 @@ class SceneArtifact(_Strict):
     controls: list[Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,31}$")]] = Field(
         default_factory=list, max_length=16
     )
-    events: list[Literal["passed", "explored", "progress", "step"]] = Field(
-        default_factory=list, max_length=4
+    events: list[Literal["passed", "explored", "progress", "step", "layout"]] = Field(
+        default_factory=list, max_length=5
     )
     #: How many steps it is paced in, as the narration reaches its cues (ADR-049); 0 for
     #: a scene that plays through.

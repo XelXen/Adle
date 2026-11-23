@@ -106,6 +106,101 @@ class Slide(InteractiveScene):
         for key in self.followers:
             self.e[key].update(0)
 
+    def words_of(self, m, found):
+        # Each piece of text, formula or number as one word, not its letters.
+        word = isinstance(m, Text) or isinstance(m, DecimalNumber)
+        if word or isinstance(m, SingleStringMathTex):
+            for seen in found:
+                if seen is m:
+                    return found
+            found.append(m)
+            return found
+        for part in m.submobjects:
+            self.words_of(part, found)
+        return found
+
+    def meet(self, a, b):
+        across = min(a.get_right()[0], b.get_right()[0]) - max(a.get_left()[0], b.get_left()[0])
+        up = min(a.get_top()[1], b.get_top()[1]) - max(a.get_bottom()[1], b.get_bottom()[1])
+        return across > 0.06 and up > 0.06
+
+    def within(self, m, x, y):
+        across = m.get_left()[0] >= -x and m.get_right()[0] <= x
+        return across and m.get_bottom()[1] >= -y and m.get_top()[1] <= y
+
+    def crowded(self, label, others):
+        # A label lies past the margin, or over a word that is not its own.
+        mine = self.words_of(label, [])
+        for m in mine:
+            if not self.within(m, 6.2, 3.4):
+                return True
+            for other in others:
+                ours = False
+                for word in mine:
+                    if word is other:
+                        ours = True
+                if not ours and self.meet(m, other):
+                    return True
+        return False
+
+    def pin(self, label, anchor, side, buff):
+        # Beside what it names, where it was asked to go; tidy may move it to another side.
+        label.next_to(anchor, side, buff=buff)
+        self.pins.append([label, anchor, side, buff])
+        return label
+
+    def placed(self, label, anchor, side, buff, others):
+        # The first side of what it names where a label lies over nothing and inside the
+        # margin; where it was asked to go when there is none.
+        ways = [side, UP, DOWN, RIGHT, LEFT, UP + RIGHT, UP + LEFT, DOWN + RIGHT, DOWN + LEFT]
+        for gap in [buff, buff + 0.3]:
+            for way in ways:
+                label.next_to(anchor, way, buff=gap)
+                if not self.crowded(label, others):
+                    return way
+        label.next_to(anchor, side, buff=buff)
+        return side
+
+    def keep_clear(self, key, label, anchor, side, buff):
+        # A label drawn again each frame beside something that moves: it keeps its side
+        # while that is clear of the words that stay put, steps to the first clear side
+        # when it is not, and stays there: it does not flit from side to side.
+        way = self.sides.get(key, side)
+        label.next_to(anchor, way, buff=buff)
+        if self.crowded(label, self.still):
+            self.sides[key] = self.placed(label, anchor, way, buff, self.still)
+        return label
+
+    def tidy(self):
+        # Before anything is shown: every word the slide will show is in place, so each label
+        # that lies over one, or past the margin, goes where it lies over none.
+        words = []
+        for key in self.e:
+            if key not in self.followers:
+                self.words_of(self.e[key], words)
+        self.still = words
+        for pin in self.pins:
+            if self.crowded(pin[0], words):
+                self.placed(pin[0], pin[1], pin[2], pin[3], words)
+
+    def audit(self):
+        # As a step ends: words over other words, and anything past the edge of the screen.
+        words = []
+        for m in self.mobjects:
+            self.words_of(m, words)
+        overlapping = 0
+        for i in range(len(words)):
+            for j in range(i + 1, len(words)):
+                if self.meet(words[i], words[j]):
+                    overlapping += 1
+        outside = 0
+        for m in self.mobjects:
+            if not self.within(m, 7.12, 4.02):
+                outside += 1
+        if overlapping > 0 or outside > 0:
+            said = str(overlapping) + " overlapping, " + str(outside) + " past the edge"
+            self.post_message("layout", said)
+
     def chip(self, spec, hue, rounded):
         token = self.shown(spec, 32, self.ink)
         if rounded:
@@ -150,7 +245,7 @@ class Slide(InteractiveScene):
             links.add(link)
         marks = VGroup()
         if name:
-            marks.add(self.shown(name, 30, hue).next_to(nodes, UP, buff=0.35))
+            marks.add(self.pin(self.shown(name, 30, hue), nodes, UP, 0.35))
         self.e[key + "/frame"] = marks
         self.e[key] = VGroup(marks, links, nodes)
 
@@ -160,28 +255,36 @@ class Slide(InteractiveScene):
         self.trackers = {}
         self.rings = []
         self.followers = []
+        self.pins = []
+        self.still = []
+        self.sides = {}
         self.amount = ValueTracker(0.0)
         self.make_nodes('list', ['list.1', 'list.2', 'list.3', 'list.4', 'list.5'], [[False, 'head'], [True, '3'], [True, '7'], [True, '9'], [False, 'null']], [False, True, True, True, False], [[-5.2, 0.0], [-2.6, 0.0], [0.0, 0.0], [2.6, 0.0], [5.2, 0.0]], [['list.e1', 0, 1], ['list.e2', 1, 2], ['list.e3', 2, 3], ['list.e4', 3, 4]], True, None, self.teal)
         self.e['note'] = self.lines([[False, 'Each node points to the next one.']], 34, self.ink)
         self.put(['list'], [0.0, 0.981, 12.4, 4.838], 1)
         self.put(['note'], [0.0, -2.594, 12.4, 1.613], 1)
+        self.tidy()
 
     def step_0(self):
         self.build()
         self.play(LaggedStart(FadeIn(self.e['list/frame']), GrowFromCenter(self.e['list.1']), GrowFromCenter(self.e['list.3']), lag_ratio=0.3), run_time=1.26)
+        self.audit()
         self.post_message("step", 0)
 
     def step_1(self):
         self.play(LaggedStart(GrowArrow(self.e['list.e1']), GrowArrow(self.e['list.e2']), lag_ratio=0.3), run_time=1.14)
+        self.audit()
         self.post_message("step", 1)
 
     def step_2(self):
         self.play(LaggedStart(GrowFromCenter(self.e['list.2']), GrowFromCenter(self.e['list.4']), GrowFromCenter(self.e['list.5']), GrowArrow(self.e['list.e3']), GrowArrow(self.e['list.e4']), lag_ratio=0.3), run_time=1.5)
         self.play(self.ring(['list.4'], self.sun), self.e['list.4'].animate.scale(1.12), run_time=0.45)
         self.play(self.e['list.4'].animate.scale(1 / 1.12), run_time=0.25)
+        self.audit()
         self.post_message("step", 2)
 
     def step_3(self):
         self.unmark()
         self.play(FadeIn(self.e['note'], shift=UP * 0.15), run_time=1.02)
+        self.audit()
         self.post_message("step", 3)

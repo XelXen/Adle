@@ -171,7 +171,8 @@ is built from it, and an alpha or a stable version is published from a release c
   and example first: the picture before the symbol, each symbol in the color of what it
   stands for. The case comes first and alone, and the rule is made out of it (ADR-050): a
   formula never shares a slide's first step with its case, and its numbers can fly out of
-  the picture into it.
+  the picture into it. A picture's words never lie over each other or past the edge of the
+  screen, and a step is never longer than its words (ADR-055).
 - A lesson in a natural voice is made with its voice (ADR-051): ready once its first part
   can be heard, and a line not recorded yet is waited for, never read in another voice
   unless the learner chooses that or no recording will come.

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -16,13 +17,15 @@ from adle_core.generation.drafts import (
     _cued,
     _marked,
     _paced,
+    _step_seconds,
     compile_lesson,
     parse_lesson_draft,
 )
 from adle_core.generation.figures import _cell
+from adle_core.generation.layout import LAYOUT_METHODS
 from adle_core.generation.prompts import visual_example
 from adle_core.generation.scene_policy import check_scene_source
-from adle_core.generation.slides import KINDS, VERBS, SlideError, compile_slide
+from adle_core.generation.slides import KINDS, VERBS, SlideError, _fitted, compile_slide
 from adle_core.lessons.bundle import inspect_scene, parse_bundle
 from adle_core.tools.export_slides import EXAMPLES, steps, written
 from tests.support.model import LESSON
@@ -656,3 +659,110 @@ def test_a_number_s_formula_is_arithmetic_of_a_point_or_the_value_and_nothing_el
     slide = compile_slide(script)
     assert any("which is not a number" in note for note in slide.left_out)
     assert "__import__" not in slide.source
+
+
+# -- words kept clear of words, and of the edge (ADR-055) -------------------------------------------
+
+
+@pytest.mark.parametrize("name", sorted(EXAMPLES))
+def test_every_slide_tidies_its_labels_before_it_shows_them_and_checks_each_step(
+    name: str,
+) -> None:
+    slide = compile_slide(EXAMPLES[name])
+    source = slide.source
+    assert LAYOUT_METHODS in source
+    build = source.split("    def build(self):")[1].split("\n    def ")[0]
+    # Once everything is in place, and before the first step shows any of it.
+    assert build.rstrip().endswith("self.tidy()")
+    # Every step, and a live page, says how it is laid out as it ends: before its step.
+    assert source.count('self.audit()\n        self.post_message("step"') == slide.steps
+
+
+def test_a_label_is_pinned_beside_what_it_names_unless_it_moves_with_it() -> None:
+    source = compile_slide(EXAMPLES["tangent"]).source
+    # The curve's name: pinned, so tidy may move it.
+    assert "self.e['f/name'] = self.pin(self.shown([True, 'f(x)'], 28, self.blue)," in source
+    # A point's name moves with the point: it keeps to a side clear of what stays put.
+    assert "self.keep_clear(key, self.shown(name, 26, self.ink), dot, UP + RIGHT, 0.1)" in source
+
+
+def test_a_label_on_something_that_moves_is_kept_clear_as_it_is_drawn() -> None:
+    source = compile_slide(EXAMPLES["tangents_inline"]).source
+    # "f' < 0" is beside a tangent that moves with its point: drawn again each frame, it
+    # steps aside from the axis's numbers instead of lying over one (seen 2026-11-22).
+    assert (
+        "self.e['negative'] = always_redraw(lambda: self.keep_clear('negative', "
+        "self.shown([False, \"f' < 0\"], 26, self.coral), self.group(['left']), LEFT, 0.14))"
+    ) in source
+
+
+# -- a step no longer than its words (ADR-055) ------------------------------------------------------
+
+STEP = (
+    "    def step_1(self):\n"
+    "        self.play(FadeIn(self.e['a']), run_time=1.4)\n"
+    "        self.play(self.amount.animate.set_value(2.5), run_time=2.0, rate_func=smooth)\n"
+)
+
+
+def test_a_step_with_time_to_spare_is_left_as_written() -> None:
+    assert _fitted(STEP, None) == STEP
+    assert _fitted(STEP, 3.4) == STEP
+    assert _fitted(STEP, 30.0) == STEP
+
+
+def test_a_step_with_less_time_than_its_animations_is_made_quicker() -> None:
+    fitted = _fitted(STEP, 1.7)
+    assert "run_time=0.7)" in fitted
+    assert "run_time=1.0, rate_func=smooth)" in fitted
+
+
+def test_a_step_is_never_made_too_quick_to_follow() -> None:
+    fitted = _fitted(STEP, 0.2)
+    # Down to 0.45 of what it was written to take, and no further.
+    assert "run_time=0.63)" in fitted
+    assert "run_time=0.9, rate_func=smooth)" in fitted
+
+
+def test_each_step_has_until_the_next_one_begins() -> None:
+    narration = _beats(
+        ("The bar is three squares wide and four tall.", []),
+        ("So it is twelve squares.", [3]),
+    )
+    first, last = _step_seconds(narration, 2)
+    # Ten words briskly, and the pause between the lines.
+    assert first == pytest.approx(10 / 3 + 0.3)
+    # Four words, and a moment after the last of them.
+    assert last == pytest.approx(4 / 3 + 0.6)
+    assert _step_seconds([], 3) == []
+
+
+def slide_written_for(beats: list[dict[str, Any]]) -> list[float]:
+    """The run times in the slide of a part said in these words."""
+    draft = copy.deepcopy(LESSON)
+    draft["segments"][0] = {
+        "type": "explanation",
+        "title": "One flip",
+        "beats": beats,
+        "visual": copy.deepcopy(EXAMPLES["sample_space"])
+        | {"steps": EXAMPLES["sample_space"]["steps"][:3]},
+    }
+    source = compile_lesson(parse_lesson_draft(draft), CONTEXT).figures[0].source
+    return [float(value) for value in re.findall(r"run_time=(\d+(?:\.\d+)?)", source)]
+
+
+def test_a_slide_whose_words_come_quickly_is_written_with_quicker_steps() -> None:
+    unhurried = slide_written_for(
+        [
+            {"say": "Flip a coin. Think about every way it can land, slowly and with care."},
+            {"say": "There are [two outcomes], heads and tails, and nothing else at all here."},
+            {"say": "We call the outcome we care about [an event]; here it is heads."},
+        ]
+    )
+    hurried = slide_written_for([{"say": "Flip a coin: [two] [outcomes]."}])
+    assert len(hurried) == len(unhurried)
+    assert sum(hurried) < sum(unhurried)
+    # Quicker, and never too quick to follow.
+    assert all(
+        quick >= round(0.45 * slow, 2) for quick, slow in zip(hurried, unhurried, strict=True)
+    )
