@@ -43,7 +43,12 @@ from adle_core.voice.catalog import DEFAULT_DESIGN, TIERS, Family, Tier
 from adle_core.voice.catalog import tier as find_tier
 from adle_core.voice.hardware import Fit, Hardware, detect, fit
 from adle_core.voice.install import VoiceInstaller, VoiceSetupError
-from adle_core.voice.runtime import VoiceEngine, VoicePaths, VoiceUnavailableError
+from adle_core.voice.runtime import (
+    VoiceEngine,
+    VoiceEngineError,
+    VoicePaths,
+    VoiceUnavailableError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -483,6 +488,13 @@ class NarrationService:
         except NotFoundError:
             # The lesson was removed while it was recorded: there is nothing left to record.
             raise JobCancelledError(None) from None
+        except (VoiceEngineError, OSError):
+            # Stopped in the middle of a line (the lesson removed, its folder gone with it)
+            # is a stop, not a failure: the engine is ended to stop the line, and whichever
+            # of the two is noticed first, it ends the same way.
+            if context.cancelled or not self._lessons.exists(lesson_id):
+                raise JobCancelledError(None) from None
+            raise
         finally:
             self._engines.give_back()
             with self._more_lock:

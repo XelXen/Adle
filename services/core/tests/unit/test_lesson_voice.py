@@ -24,7 +24,7 @@ from adle_core.application.narration import (
 )
 from adle_core.application.services import Services
 from adle_core.voice.catalog import Family
-from adle_core.voice.runtime import VoiceEngine, VoicePaths
+from adle_core.voice.runtime import VoiceEngine, VoiceEngineError, VoicePaths
 from tests.support.model import LESSON, FakeProvider
 from tests.unit.test_lesson_part_by_part import KEY, Partway, a_concept, begun, running
 from tests.unit.test_narration import WITH_CARD, set_up
@@ -270,3 +270,33 @@ def test_removing_a_lesson_stops_its_recording(
     assert client.delete(f"/v1/lessons/{lesson_id}").status_code == 204
     ended = voiced.jobs.wait(started["id"], timeout=30)
     assert ended.status == "cancelled"
+
+
+@pytest.mark.parametrize("how", ["cancelled", "removed"])
+def test_a_line_stopped_half_spoken_ends_the_recording_as_stopped(
+    client: TestClient, services: Services, tmp_path: Path, how: str
+) -> None:
+    """Whichever is noticed first, the stop or the engine ended to stop its line, the
+    recording ends as stopped: a race seen on GitHub's Linux machine, 2026-11-22."""
+    course = client.post("/v1/courses/sample").json()
+    lesson_id = client.get(f"/v1/courses/{course['id']}/lessons").json()["lessons"][0]["id"]
+
+    class Stopped(VoiceEngine):
+        def speak(self, *_: Any, **__: Any) -> Any:
+            if how == "removed":
+                services.lessons.delete(lesson_id)
+            else:
+                running = services.jobs.find_active(KIND_NARRATION, lesson_id)
+                assert running is not None
+                services.jobs.cancel(running.id)
+            raise VoiceEngineError("Stopped.")
+
+    paths = set_up(tmp_path / "voice", "kokoro")
+    narration = NarrationService(
+        services.lessons, services.jobs, paths, hardware=lambda: WITH_CARD, engine=Stopped
+    )
+    try:
+        ended = services.jobs.wait(narration.start(lesson_id).id, timeout=30)
+        assert ended.status == "cancelled", ended.error_message
+    finally:
+        narration.close()
