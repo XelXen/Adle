@@ -286,6 +286,41 @@ nothing followed) is read as it meant it: every slide of the six lessons of 2026
 draws with nothing left out. Three requests; with those earlier the same day, 51 of the 80
 a day allowed by hand.
 
+## Every voice, timed (2026-11-23)
+
+The owner asked for every voice to be timed, the light ones too, "because we dont know how
+weak the hardware would be" (ADR-052). On the development machine, eight lines of a lesson
+said by one engine, each timed (`VoiceEngine.speak`, by hand; the Rich voice's model
+fetched for this into a scratch folder, 2.5 GB, every file checked):
+
+| Voice | First line, disk cold | First line, warm | Later lines: work per second of speech |
+|---|---|---|---|
+| Natural (Kokoro), the processor's 32 threads | 29.7 s | 11.8 s | 0.24 |
+| Natural, 2 threads | | 11.3 s | 0.39 |
+| Natural, 1 thread | | 11.7 s | 0.68 |
+| Rich (Qwen3-TTS 0.6B), the card | 43.5 s | 18.7 s | 0.31 |
+| Expressive (Qwen3-TTS 1.7B), the card | 25.4 s, then 12.6 s | | 0.39 |
+
+The lightest voice is the slowest to start on a cold disk but one, and on one thread of
+this processor it is only one and a half times faster than speech: on a weaker one it
+would be slower than speech. So each voice is timed where it runs, at setup and by every
+line it records, and a voice slower than speech there gives a lesson a head start before
+it is called ready.
+
+A lesson made in each, through NVIDIA, by hand, one request each, the voice warmed as the
+lesson was asked for and timed by Adle itself as it recorded:
+
+| Voice | First part written | Ready: first part heard | Every word written | Whole voice | Speech | Rate Adle measured |
+|---|---|---|---|---|---|---|
+| Natural (sample spaces) | 9.0 s | **13.6 s** | 95.6 s | 95.6 s | 91 s | 0.23 |
+| Rich (the derivative) | 19.9 s | **29.7 s** | 198.8 s | 198.8 s | 129 s | 0.33 |
+| Expressive (2026-11-22, three lessons) | 8 to 23 s | **40 to 49 s** | 64 to 75 s | 71 to 105 s | 89 to 179 s | 0.39 |
+
+Each voice here is faster than speech, so no lesson needed a head start: each was ready
+once its first part could be heard, and its whole voice was there by the time its last
+word was written (the Rich lesson's model took 199 s to write it, that time). Two requests,
+2 of the 80 a day allowed by hand.
+
 ## What was not measured
 
 - **Generating with AIHubMix's model.** That provider has not answered a request yet (see

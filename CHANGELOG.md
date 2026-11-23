@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Every natural voice is timed on your computer**, the lightest too: when it is set up,
+  and as it records. If it is slower than speech there, a lesson waits for enough of its
+  voice to be recorded that you will never catch up with it, and "Usually takes about"
+  says so beforehand. Settings tells you when a voice is slower than speech on your
+  computer.
+
 ## [0.1.0-alpha.5] - 2026-11-22
 
 The fifth alpha. Each part of a lesson now opens on an example you can see, works it out

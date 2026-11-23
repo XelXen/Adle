@@ -1075,7 +1075,8 @@ its formula made of the picture's own numbers before it becomes the rule (ADR-05
 **a lesson in a natural voice made with its voice**, loaded as the lesson is asked for,
 recorded part by part by one recording on one engine, ready once its first part can be
 heard, a line not recorded yet waited for and never read in another voice by itself
-(ADR-051). Evidence: `test_slides.py`, `test_lesson_voice.py`, `recorded.test.ts`,
+(ADR-051); and every voice timed where it runs, a slow one giving a lesson a head start
+(ADR-052). Evidence: `test_slides.py`, `test_lesson_voice.py`, `test_voice_timing.py`, `recorded.test.ts`,
 `generation.test.ts`, the slides that make a formula out of a picture stepped through in
 the player, two journeys in `e2e/voice`, and the real runs in `PERFORMANCE.md`.
 

@@ -3,7 +3,7 @@
 The single place to find out where Adle stands and what to do next. Update it at the end of every
 work session (see `AGENTS.md` → "Keeping the next agent oriented").
 
-- **Last updated:** 2026-11-22
+- **Last updated:** 2026-11-23
 - **Branch:** `main`, the only one (ADR-043, since 2026-11-21; `dev` was folded into it).
   On GitHub: `github.com/XelXen/Adle`, public, since 2026-11-21
 - **Last commit:** see `git log -1`
@@ -53,8 +53,11 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   the rule out of it** (ADR-050), and **a lesson in a natural voice made with its voice**,
   ready once its first part can be heard and never switching voices by itself (ADR-051).
   **That is in 0.1.0-alpha.5**, published from the release commit `2f3c894` on
-  2026-11-22, `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.5`. What is left to them
-  is under "Next actions"
+  2026-11-22, `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.5`. Then, at the owner's
+  word ("still time them because we dont know how weak the hardware would be"): **every
+  voice is timed where it runs**, at setup, by every line and by every lesson, and a voice
+  slower than speech gives a lesson a head start before it is ready (ADR-052); on `main`,
+  not released yet. What is left to them is under "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -268,10 +271,10 @@ them.
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 762 tests, 43 files |
+| Vitest | PASS | 763 tests, 43 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 113 source files |
-| pytest | PASS | 1645 tests. One, `test_only_the_newest_copies_of_replaced_data_are_kept`, failed in two whole runs by the gate script and passed in every run after (three whole runs, twelve of its own file): see Known gaps |
+| pytest | PASS | 1655 tests. One, `test_only_the_newest_copies_of_replaced_data_are_kept`, failed in two whole runs by the gate script and passed in every run after (three whole runs, twelve of its own file): see Known gaps |
 | Playwright + Electron (E2E) | PASS | 202 of 202 in 35.3 minutes on the tree of ADR-050 and ADR-051, none retried. Before: 190 of 190 in 32.7 minutes on the release commit `fd2c524`, and in 32.9 minutes on the tree of `449dcf3`, none retried; among them the seventeen slide examples stepped through cue by cue in both themes, and a generated lesson whose slide steps on as its words are read. Before: 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
@@ -610,6 +613,15 @@ options (now caught in drafts). What the answers scripted is drawn as the model 
 their slides were stepped through in the player and looked at. What the model wrote is
 kept outside the repository.
 
+### Every voice, timed (2026-11-23)
+
+Every voice timed on the development machine, line by line and making a lesson through
+NVIDIA (`PERFORMANCE.md`): ready 13.6 s after the lesson was asked for in Natural, 29.7 s
+in Rich (its pinned model fetched for this into a scratch folder, every file checked, not
+into the owner's profile), 40 to 49 s in Expressive. Natural is 4.3 times faster than
+speech on all of the processor and 1.5 times on one thread of it. Two requests: 2 of the 80
+a day allowed by hand.
+
 ### The case first, and a lesson made with its voice (2026-11-22)
 
 Three lessons by hand through NVIDIA with the prompt of ADR-050, each made with the
@@ -728,9 +740,10 @@ In this order:
 - **A label beside a line can lie over the axes' numbers** (seen in the slide examples of
   2026-11-22: "f' < 0" left of a tangent near the y axis's 4). Labels are placed beside
   what they name and fitted to the stage, not kept clear of other words.
-- **The Natural and Rich voices have not been timed making a lesson** (ADR-051): only
-  Expressive, on the development machine, which has no Rich voice set up. Their usual
-  wait is a guess until a lesson has been made with them here.
+- **No voice has been seen slower than speech on a real computer** (ADR-052): the head
+  start is tested against a stand-in made slow, and by the rule checked second by second,
+  but every voice on the development machine is faster than speech (Natural on one thread
+  of its processor, 0.68). A computer weak enough to need it has not been tried.
 - **A core test that fails now and then:** `test_database.py::
   test_only_the_newest_copies_of_replaced_data_are_kept` kept an older safety copy and not a
   newer one in two whole runs of `npm run check` on 2026-11-22, and passed in every run after.

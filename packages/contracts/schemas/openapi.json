@@ -2319,6 +2319,10 @@
             "title": "Speakers",
             "type": "array"
           },
+          "speed": {
+            "anyOf": [{ "enum": ["faster", "slower"], "type": "string" }, { "type": "null" }],
+            "title": "Speed"
+          },
           "why": { "title": "Why", "type": "string" }
         },
         "required": [

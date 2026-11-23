@@ -58,6 +58,9 @@ class VoiceTier(BaseModel):
     fits: bool
     #: Why it does not, in a sentence, when it does not.
     why: str
+    #: How it compares with speech on this computer, once it has been timed here: a voice
+    #: slower than speech makes a lesson wait longer before it can start (ADR-052).
+    speed: Literal["faster", "slower"] | None = None
 
 
 class VoiceStatus(BaseModel):
@@ -135,6 +138,13 @@ def _sources(tier: Tier) -> list[str]:
     return found
 
 
+def _speed(services: Services, tier: Tier) -> Literal["faster", "slower"] | None:
+    rate = services.narration.timing(tier.id).rate
+    if rate is None:
+        return None
+    return "faster" if rate <= 1.0 else "slower"
+
+
 def _status(services: Services) -> VoiceStatus:
     status = services.narration.status()
     fits = services.narration.fits()
@@ -156,6 +166,7 @@ def _status(services: Services) -> VoiceStatus:
                 ready=tier.id in status.ready,
                 fits=fits[tier.id].fits,
                 why=fits[tier.id].why,
+                speed=_speed(services, tier),
             )
             for tier in TIERS
         ],

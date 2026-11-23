@@ -22,6 +22,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,7 @@ from adle_core.voice.catalog import (
     program_bytes,
 )
 from adle_core.voice.runtime import SETUP_MARK, VoiceEngine, VoicePaths, lock_for, setup_mark
+from adle_core.voice.timing import SETUP_LINES
 
 logger = logging.getLogger(__name__)
 
@@ -162,10 +164,11 @@ class VoiceInstaller:
 
     # -- the whole setup ------------------------------------------------------------------
 
-    def install(self, tier: Tier, report: Report, cancelled: Cancelled) -> None:
-        """Set a size of voice up, whole, or raise ``VoiceSetupError`` saying what failed."""
+    def install(self, tier: Tier, report: Report, cancelled: Cancelled) -> dict[str, float] | None:
+        """Set a size of voice up, whole, or raise ``VoiceSetupError`` saying what failed.
+        What is returned is how fast it is on this computer (``verify``)."""
         try:
-            self._install(tier, report, cancelled)
+            return self._install(tier, report, cancelled)
         except OSError as error:
             if error.errno == errno.ENOSPC:
                 raise VoiceSetupError(
@@ -174,7 +177,7 @@ class VoiceInstaller:
                 ) from error
             raise VoiceSetupError("Couldn’t save the voice. Try again.") from error
 
-    def _install(self, tier: Tier, report: Report, cancelled: Cancelled) -> None:
+    def _install(self, tier: Tier, report: Report, cancelled: Cancelled) -> dict[str, float] | None:
         if self._paths.borrowed:
             raise VoiceSetupError("This voice was set up by hand and is used as it is.")
         lock = lock_for(tier.family)
@@ -198,7 +201,7 @@ class VoiceInstaller:
             target = self._paths.aligner_file()
             self.fetch_download(ALIGNER, target, report, cancelled, done, total)
         report("Trying the voice", 1, 1)
-        self.verify(tier)
+        return self.verify(tier)
 
     def programs(self, tier: Tier, lock: str, report: Report, cancelled: Cancelled) -> None:
         """The family's environment, with exactly the locked programs in it."""
@@ -386,8 +389,11 @@ class VoiceInstaller:
 
     # -- checking it works -------------------------------------------------------------
 
-    def verify(self, tier: Tier) -> None:
-        """The voice says a word, here, before it is called set up."""
+    def verify(self, tier: Tier) -> dict[str, float] | None:
+        """The voice speaks, here, before it is called set up: as much as a lesson's first
+        part, from an engine started cold, timed (ADR-052). What is returned is how long
+        that took (``start``) and how much work a second of its last line's speech took
+        (``rate``), or None where the voice said too little to tell."""
         probe = self._paths.root / "probe.clip"
         voice: dict[str, Any] = {"tier": tier.id}
         if tier.default_speaker:
@@ -399,14 +405,24 @@ class VoiceInstaller:
         if "reference" in voice:
             leftovers += [Path(voice["reference"]), Path(f"{voice['reference']}.txt")]
         engine = VoiceEngine(self._paths, tier.family)
+        began = time.monotonic()
         try:
-            engine.speak("Ready.", voice, probe)
+            last = 0.0
+            spoken = None
+            for line in SETUP_LINES:
+                before = time.monotonic()
+                spoken = engine.speak(line, voice, probe)
+                last = time.monotonic() - before
+            start = time.monotonic() - began
         except AdleError as error:
             raise VoiceSetupError("The voice was set up but couldn’t speak. Try again.") from error
         finally:
             engine.close()
             for leftover in leftovers:
                 leftover.unlink(missing_ok=True)
+        if spoken is None or spoken.seconds <= 0.2:
+            return None
+        return {"start": start, "rate": last / spoken.seconds}
 
     # -- taking it away ------------------------------------------------------------------
 

@@ -6,6 +6,7 @@ import {
   aboutSize,
   computerVoiceInUse,
   downloadNote,
+  speedNote,
   isRecommended,
   setupProgress,
   tierState,
@@ -144,5 +145,17 @@ describe('a setup’s progress', () => {
       valueText: undefined,
     });
     expect(setupProgress(aJob({ status: 'queued' })).label).toBe('Waiting to start');
+  });
+});
+
+describe('speedNote', () => {
+  it('says so where a voice set up here is slower than speech, and says nothing otherwise', () => {
+    expect(speedNote(aTier('kokoro', { ready: true, speed: 'slower' }))).toBe(
+      'Slower than speech on this computer, so a lesson in it takes longer to be ready.',
+    );
+    expect(speedNote(aTier('kokoro', { ready: true, speed: 'faster' }))).toBeNull();
+    expect(speedNote(aTier('kokoro', { ready: true }))).toBeNull();
+    // Not set up here: nothing has been timed.
+    expect(speedNote(aTier('standard', { speed: 'slower' }))).toBeNull();
   });
 });

@@ -255,9 +255,10 @@ def _header_of(text: str) -> LessonHeaderDraft | None:
 #: after it are not read meanwhile. A trial takes a second or two; one that does not come
 #: in time keeps the figure untried, as before trials (ADR-038).
 FIGURE_WAIT_WHILE_WRITING = 15.0
-#: How long a lesson whose words are all written waits for its first part to be heard in the
-#: natural voice before it is said to be ready anyway (ADR-051).
-VOICE_WAIT_SECONDS = 120.0
+#: How long a lesson whose words are all written waits to be ready in its natural voice
+#: before it is said to be ready anyway (ADR-051): its first part heard, and on a computer
+#: where the voice is slower than speech its head start recorded too (ADR-052).
+VOICE_WAIT_SECONDS = 300.0
 
 
 class _LessonBegunError(Exception):

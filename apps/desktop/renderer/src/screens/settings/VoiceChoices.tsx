@@ -24,6 +24,7 @@ import {
   aboutSize,
   computerVoiceInUse,
   downloadNote,
+  speedNote,
   isRecommended,
   setupBytes,
   setupProgress,
@@ -330,6 +331,7 @@ function TierCard({
             />
             <p className={styles.muted}>{tier.description}</p>
             {state.kind === 'unavailable' ? <p className={styles.muted}>{state.why}</p> : null}
+            {speedNote(tier) ? <p className={styles.muted}>{speedNote(tier)}</p> : null}
           </div>
           <div className={styles.dataActions}>
             {(state.kind === 'available' || state.kind === 'waiting') && ownable ? (

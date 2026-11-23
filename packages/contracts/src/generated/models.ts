@@ -976,5 +976,6 @@ export interface VoiceTier {
   ready: boolean;
   sources: string[];
   speakers: VoiceSpeaker[];
+  speed?: ('faster' | 'slower') | null;
   why: string;
 }

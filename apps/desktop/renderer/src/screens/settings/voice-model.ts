@@ -68,6 +68,15 @@ export function setupProgress(job: Job): {
   return { label, value, valueText: undefined };
 }
 
+/**
+ * How a voice that is set up compares with speech on this computer, once it has been timed
+ * here (ADR-052): said where it changes the choice, when a lesson in it waits longer.
+ */
+export function speedNote(tier: VoiceTier): string | null {
+  if (!tier.ready || tier.speed !== 'slower') return null;
+  return 'Slower than speech on this computer, so a lesson in it takes longer to be ready.';
+}
+
 /** Where a setup downloads from, said once, in a list a person would write. */
 export function downloadNote(tier: VoiceTier): string {
   const places = new Intl.ListFormat('en-US', { type: 'conjunction' }).format(tier.sources);

@@ -49,6 +49,16 @@ from adle_core.voice.runtime import (
     VoicePaths,
     VoiceUnavailableError,
 )
+from adle_core.voice.timing import (
+    LESSON_SPEECH,
+    VoiceTiming,
+    kept,
+    kept_ahead,
+    mean,
+    read_timing,
+    speech_of,
+)
+from adle_core.voice.timing import ready_after as timed_ready_after
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +73,13 @@ _CLIP = re.compile(r"^[0-9a-f]{24}$")
 ENGINE_IDLE_SECONDS = 180.0
 #: How long a recording waits for the next part of a lesson that is still being written.
 FOLLOW_QUIET_SECONDS = 600.0
-#: How long after a lesson is asked for its first part can usually be heard, until this
-#: computer has timed it: measured on the development machine (PERFORMANCE.md).
-READY_GUESS_SECONDS: dict[str, float] = {"kokoro": 15.0, "standard": 45.0, "expressive": 55.0}
+#: How long after a lesson is asked for it can usually be heard, until this computer has
+#: timed its voice: measured on the development machine (PERFORMANCE.md, 2026-11-23).
+READY_GUESS_SECONDS: dict[str, float] = {"kokoro": 30.0, "standard": 45.0, "expressive": 50.0}
+#: The lines an engine says while it is still loading what it speaks with, which are not
+#: counted in how fast it is: the Expressive voice designs a lesson's voice with one model
+#: and speaks with another, loaded at its second line.
+_LOADING_LINES = {"expressive": 2}
 #: A warm-up this old is not what a recording that begins now was asked with.
 _WARMUP_COUNTS_FOR = 600.0
 
@@ -112,6 +126,8 @@ class _Engines:
         self._family: Family | None = None
         self._timer: threading.Timer | None = None
         self._busy = 0
+        #: The lines said by the engine there is now, since it was made.
+        self.lines = 0
 
     def take(self, family: Family) -> VoiceEngine:
         stale: VoiceEngine | None = None
@@ -121,6 +137,7 @@ class _Engines:
                 stale, self._engine = self._engine, None
             if self._engine is None:
                 self._engine, self._family = self._make(self._paths, family), family
+                self.lines = 0
             self._busy += 1
             engine = self._engine
         if stale is not None:
@@ -291,7 +308,7 @@ class NarrationService:
         # An engine kept loaded runs from the programs about to be replaced.
         self._engines.close()
         try:
-            self._installer(self._paths).install(
+            timed = self._installer(self._paths).install(
                 tier,
                 report=lambda message, done, total: context.report(done, total, message),
                 cancelled=lambda: context.cancelled,
@@ -300,6 +317,10 @@ class NarrationService:
             # Stopped by the learner is a stop, not a failure.
             context.check_cancelled()
             raise
+        # How fast it is here, said at setup as much as a lesson's first part (ADR-052).
+        if timed is not None:
+            before = self._timing_of(tier.id)
+            self._keep_timing(tier.id, VoiceTiming(ready=before.ready, **timed))
         # The size just set up is the one that reads the lessons from now on.
         self.choose(tier=tier.id, enabled=True)
         context.report(1, 1, "Done")
@@ -448,6 +469,7 @@ class NarrationService:
         quiet_since = time.monotonic()
         try:
             heard = self.voiced_parts(lesson_id)
+            ready = not self.voice_pending(lesson_id)
             while True:
                 context.check_cancelled()
                 more.clear()
@@ -461,7 +483,9 @@ class NarrationService:
                     context.check_cancelled()
                     done = self._recorded_count(folder, voice, lines)
                     context.report(done, len(lines), "Recording the voice")
+                    began = time.monotonic()
                     spoken = engine.speak(text, voice, clip, cancelled=lambda: context.cancelled)
+                    took = time.monotonic() - began
                     timing.write_text(
                         json.dumps(
                             {"seconds": spoken.seconds, "words": spoken.words, "tier": tier.id}
@@ -470,10 +494,16 @@ class NarrationService:
                     )
                     recorded += 1
                     said += 1
+                    self._engines.lines += 1
+                    if self._engines.lines > _LOADING_LINES.get(tier.id, 1):
+                        # How fast it is here, once loaded, line by line (ADR-052).
+                        self._timed_line(tier.id, took, spoken.seconds)
                     now = self.voiced_parts(lesson_id)
-                    if now != heard:
-                        if heard == 0:
-                            self._timed_first_part(tier.id)
+                    became_ready = not ready and not self.voice_pending(lesson_id)
+                    if became_ready:
+                        ready = True
+                        self._timed_ready(tier.id)
+                    if now != heard or became_ready:
                         heard = now
                         self._tell_voiced(lesson_id)
                 if said:
@@ -562,9 +592,44 @@ class NarrationService:
                 for index, segment in enumerate(lesson.segments)
                 if getattr(segment, "narration", None)
             ]
-            return bool(spoken) and self.voiced_parts(lesson_id) <= spoken[0]
+            if not spoken:
+                return False
+            if self.voiced_parts(lesson_id) <= spoken[0]:
+                return True
+            # A voice slower than speech on this computer needs a head start (ADR-052).
+            tier, voice = self._voice(lesson_id)
+            heard, lesson_speech = self._speech(lesson_id, voice)
+            return not kept_ahead(self._timing_of(tier.id).rate, heard, lesson_speech)
         except (AdleError, OSError):
             return False
+
+    def _speech(self, lesson_id: str, voice: dict[str, Any]) -> tuple[float, float]:
+        """How much of a lesson can be heard from its start, and how long it all is: in
+        seconds, each line recorded as long as its clip, any other as long as its words.
+        A lesson still being written is taken to be at least as long as one usually is."""
+        folder = self._folder(lesson_id)
+        heard = 0.0
+        total = 0.0
+        unbroken = True
+        for text in self._lines(lesson_id):
+            seconds: float | None = None
+            if self._has_clip(folder, voice, text):
+                try:
+                    said = json.loads(
+                        (folder / f"{self._name(voice, text)}.json").read_text(encoding="utf-8")
+                    )
+                    seconds = float(said.get("seconds", 0)) if isinstance(said, dict) else None
+                except (OSError, ValueError, TypeError):
+                    seconds = None
+            if seconds is None or seconds <= 0:
+                unbroken = False
+                seconds = speech_of(text)
+            elif unbroken:
+                heard += seconds
+            total += seconds
+        if self._lessons.is_writing(lesson_id):
+            total = max(total, LESSON_SPEECH)
+        return heard, total
 
     def ready_after(self) -> float | None:
         """About how long after a lesson is asked for its first part can be heard, in the
@@ -572,10 +637,33 @@ class NarrationService:
         status = self.status()
         if not status.enabled or status.tier is None:
             return None
-        timed = self._timings().get(status.tier)
-        if isinstance(timed, int | float) and timed > 0:
-            return float(timed)
-        return READY_GUESS_SECONDS.get(status.tier)
+        return timed_ready_after(
+            self._timing_of(status.tier), READY_GUESS_SECONDS.get(status.tier, 45.0)
+        )
+
+    def timing(self, tier_id: str) -> VoiceTiming:
+        """What has been measured of a voice on this computer (ADR-052)."""
+        return self._timing_of(tier_id)
+
+    def _timing_of(self, tier_id: str) -> VoiceTiming:
+        return read_timing(self._timings().get(tier_id))
+
+    def _keep_timing(self, tier_id: str, timing: VoiceTiming) -> None:
+        timings = self._timings()
+        timings[tier_id] = kept(timing)
+        try:
+            self._paths.root.mkdir(parents=True, exist_ok=True)
+            self._timing.write_text(json.dumps(timings), encoding="utf-8")
+        except OSError as error:
+            logger.info("narration.timing_not_kept kind=%s", type(error).__name__)
+
+    def _timed_line(self, tier_id: str, took: float, seconds: float) -> None:
+        """A line said by a loaded engine: how much work a second of its speech took."""
+        if seconds <= 0.2 or took <= 0:
+            return
+        before = self._timing_of(tier_id)
+        rate = mean(before.rate, took / seconds)
+        self._keep_timing(tier_id, VoiceTiming(before.ready, before.start, rate))
 
     def _timings(self) -> dict[str, Any]:
         try:
@@ -584,25 +672,17 @@ class NarrationService:
             return {}
         return found if isinstance(found, dict) else {}
 
-    def _timed_first_part(self, tier_id: str) -> None:
-        """A lesson's first part can be heard: how long that took from when it was asked for
-        is kept, as a running mean, to say how long a lesson usually takes."""
+    def _timed_ready(self, tier_id: str) -> None:
+        """A lesson is ready in its voice: how long that took from when it was asked for is
+        kept, as a running mean, to say how long a lesson usually takes here."""
         began, self._warmed_at = self._warmed_at, None
         if began is None:
             return
         took = time.monotonic() - began
         if took > _WARMUP_COUNTS_FOR:
             return
-        timings = self._timings()
-        before = timings.get(tier_id)
-        timings[tier_id] = round(
-            took if not isinstance(before, int | float) else 0.6 * before + 0.4 * took, 1
-        )
-        try:
-            self._paths.root.mkdir(parents=True, exist_ok=True)
-            self._timing.write_text(json.dumps(timings), encoding="utf-8")
-        except OSError as error:
-            logger.info("narration.timing_not_kept kind=%s", type(error).__name__)
+        before = self._timing_of(tier_id)
+        self._keep_timing(tier_id, VoiceTiming(mean(before.ready, took), before.start, before.rate))
 
     def close(self) -> None:
         """The core is stopping: the engine goes with it."""

@@ -287,7 +287,11 @@ everything and decides nothing.
   that follows the lesson part by part until it is whole (`record_ahead`, `_record`),
   `voice_pending` says whether its first part can be heard yet (the lesson job's
   `voicing`), `on_voiced` tells the lesson job when more can be, and `ready_after` counts
-  the voice in how long a lesson usually takes. The engine is kept loaded between
+  the voice in how long a lesson usually takes. Every voice is timed where it runs
+  (ADR-052, `voice/timing.py`, pure; kept in `voice/timing.json`): at setup
+  (`VoiceInstaller.verify` says a first part's worth from cold), by every line once loaded,
+  and by every lesson made; a voice slower than speech there makes `voice_pending` wait
+  for a head start (`kept_ahead`). Never assume a voice is fast. The engine is kept loaded between
   recordings (`_Engines`) and closed before a voice is set up or removed and when the
   core stops. It does nothing when no voice is chosen. What is said never changes after a
   part is stored: a picture that does not come changes what is shown, not what is said.
