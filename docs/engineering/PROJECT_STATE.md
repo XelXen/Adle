@@ -47,8 +47,12 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   part that teaches a slide Adle draws from what the lesson scripts, a step at each phrase
   its narration marks, and a lesson begun about twelve seconds after it is asked for
   (ADR-049). **That is in 0.1.0-alpha.4**, published from the release commit `fd2c524` on
-  2026-11-22, `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.4`. What is left to them
-  is under "Next actions"
+  2026-11-22, `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.4`. Then, at the owner's
+  word after watching it ("first show example visually and then relate the theory to it";
+  the richer voices so slow that the computer's voice read instead): **the case first, and
+  the rule out of it** (ADR-050), and **a lesson in a natural voice made with its voice**,
+  ready once its first part can be heard and never switching voices by itself (ADR-051).
+  What is left to them is under "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -234,8 +238,13 @@ on Linux (GitHub's machines build it, install it and start it there; nobody has 
 ## Test results
 
 Windows 11, Node 24.3.0, Python 3.12.11, Electron 45.4.1. Every gate, the whole
-end-to-end suite included, on the tree of ADR-049 (a lesson as a slideshow), 2026-11-22: 190
-journeys of 190 in 32.9 minutes, none retried, among them every slide example stepped
+end-to-end suite included, on the tree of ADR-050 and ADR-051 (the case first; a lesson made
+with its voice), 2026-11-22: 202 journeys of 202 in 35.3 minutes, none retried, among them
+every slide example stepped through in both themes (a formula made of the picture, a
+sentence and an equation rewritten out of the ones before, points written inline) and
+four journeys of a natural voice (a lesson ready once its first part can be heard, and one
+waited for at its first line until the other voice is chosen). Before: on the tree of
+ADR-049 (a lesson as a slideshow), 2026-11-22: 190 journeys of 190 in 32.9 minutes, none retried, among them every slide example stepped
 through in both themes and a generated lesson whose slide steps on as its words are read;
 and again on the release commit `fd2c524`, which only sets the version: 190 of 190 in 32.7
 minutes, none retried. Before: on `13e5f99` (ADR-048, a lesson begun at its first part, with
@@ -255,11 +264,11 @@ them.
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 755 tests, 43 files |
+| Vitest | PASS | 762 tests, 43 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 113 source files |
-| pytest | PASS | 1616 tests. One, `test_only_the_newest_copies_of_replaced_data_are_kept`, failed in two whole runs by the gate script and passed in every run after (three whole runs, twelve of its own file): see Known gaps |
-| Playwright + Electron (E2E) | PASS | 190 of 190 in 32.7 minutes on the release commit `fd2c524`, and in 32.9 minutes on the tree of `449dcf3`, none retried; among them the seventeen slide examples stepped through cue by cue in both themes, and a generated lesson whose slide steps on as its words are read. Before: 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
+| pytest | PASS | 1643 tests. One, `test_only_the_newest_copies_of_replaced_data_are_kept`, failed in two whole runs by the gate script and passed in every run after (three whole runs, twelve of its own file): see Known gaps |
+| Playwright + Electron (E2E) | PASS | 202 of 202 in 35.3 minutes on the tree of ADR-050 and ADR-051, none retried. Before: 190 of 190 in 32.7 minutes on the release commit `fd2c524`, and in 32.9 minutes on the tree of `449dcf3`, none retried; among them the seventeen slide examples stepped through cue by cue in both themes, and a generated lesson whose slide steps on as its words are read. Before: 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
@@ -597,6 +606,20 @@ options (now caught in drafts). What the answers scripted is drawn as the model 
 their slides were stepped through in the player and looked at. What the model wrote is
 kept outside the repository.
 
+### The case first, and a lesson made with its voice (2026-11-22)
+
+Three lessons by hand through NVIDIA with the prompt of ADR-050, each made with the
+Expressive voice borrowed read-only from the owner's own setup into a profile of its own
+(`PERFORMANCE.md`): ready (its first part heard) 40.2, 45.0 and 49.0 s after it was asked
+for, every word at 64 to 75 s, the whole voice at 71 to 105 s. No slide shows a formula in
+its first step; the lesson on sample spaces brings its numbers out of its pictures 14
+times; what a model wrote that could not be drawn (a point written inline, a point moved by
+{"x": ...}, a number following a point, a slider that moved nothing) is read as meant, and
+every slide of the day's six lessons draws with nothing left out. Before, the voice was
+loaded again for every part it caught up with: 25 s for its first line and 13 for its
+second each time, against 2 to 3 s a line once loaded. Three requests: 51 of the 80 a day
+allowed by hand.
+
 ## Next actions
 
 **Asked for by the owner on 2026-11-21, after looking at 0.1.0-alpha.1: done, and released
@@ -620,16 +643,26 @@ is asked for;
 the teaching style can be chosen for a first lesson; a table's bare TeX is set as a formula;
 a board line is not repeated. Measured by hand through NVIDIA (see "The real providers").
 
+**Asked for by the owner on 2026-11-22, after watching 0.1.0-alpha.4: done, and released
+in 0.1.0-alpha.5.** The case first, and the rule out of it (ADR-050): a part opens on its
+case alone, works it out in the picture, and only then writes the formula, its numbers
+flying out of the picture before they turn into the rule's symbols; a sentence or an
+equation comes out of the one before it. A lesson in a natural voice is made with its voice
+(ADR-051): loaded as the lesson is asked for, recorded part by part by one recording, ready
+once its first part can be heard, counted in how long a lesson usually takes; a line not
+recorded yet is waited for, and the learner may choose the computer's voice instead.
+
 What remains needs the owner. In the order it matters:
 
-0. **Watch a lesson made as a slideshow** (ADR-049), installed from 0.1.0-alpha.4
-   (`github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.4`): say whether the pictures now
-   carry the idea, whether each step comes at its words, and which subjects still come out
-   as words on a stage. Make a course from your chapter and start its first lesson: through
-   NVIDIA it can be begun about twelve seconds after you ask.
-1. **Try the rest of what 0.1.0-alpha.3 brought**, which 0.1.0-alpha.4 carries too: a
-   lesson begun at its first part (ADR-048), a PDF's whole syllabus (ADR-046), lessons
-   mended rather than written twice (ADR-047), American English (ADR-044).
+0. **Watch a lesson of 0.1.0-alpha.5 in the Expressive voice**, installed from its release
+   (`github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.5`): say whether each part now
+   opens on its case and makes its rule out of it (ADR-050), and whether the lesson is
+   ready when it says so and is never read in another voice by itself (ADR-051). Through
+   NVIDIA with that voice it is ready about 45 s after you ask. Which subjects still come
+   out as words on a stage.
+1. **Try the rest of what 0.1.0-alpha.3 and 0.1.0-alpha.4 brought**: a lesson begun at its
+   first part (ADR-048), a PDF's whole syllabus (ADR-046), lessons mended rather than
+   written twice (ADR-047), American English (ADR-044), a lesson as a slideshow (ADR-049).
 2. **Replace the keys that were pasted into the chat** (two for AIHubMix, two for NVIDIA).
    They are in a transcript; treat them as used. The owner will, later (said 2026-11-21).
 3. **Sit a generated lesson from start to finish**, asking it a question on the way. Install

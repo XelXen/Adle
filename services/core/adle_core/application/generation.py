@@ -255,6 +255,9 @@ def _header_of(text: str) -> LessonHeaderDraft | None:
 #: after it are not read meanwhile. A trial takes a second or two; one that does not come
 #: in time keeps the figure untried, as before trials (ADR-038).
 FIGURE_WAIT_WHILE_WRITING = 15.0
+#: How long a lesson whose words are all written waits for its first part to be heard in the
+#: natural voice before it is said to be ready anyway (ADR-051).
+VOICE_WAIT_SECONDS = 120.0
 
 
 class _LessonBegunError(Exception):
@@ -491,10 +494,11 @@ class _GrowingLesson:
                 return False
         self._briefs.extend(new_briefs)
         self.planned += len(new_figures)
-        self._publish()
         if self._service._on_stored is not None:
-            # A natural voice begins on the parts there are (ADR-042).
+            # A natural voice begins on the parts there are (ADR-042), before the lesson is
+            # said to be there: it is not ready until its first part can be heard (ADR-051).
             self._service._on_stored(self.stored_id)
+        self._publish()
         self._draw(new_figures)
         return True
 
@@ -577,7 +581,8 @@ class _GrowingLesson:
 
     def _publish(self) -> None:
         assert self.stored_id is not None
-        self._job.publish(
+        self._service._say(
+            self._job,
             self._service._lesson_result(
                 self.stored_id,
                 self.title,
@@ -586,7 +591,7 @@ class _GrowingLesson:
                 self.planned - self.made - self._unmade + len(self._briefs),
                 self.notes,
                 self._writers(),
-            )
+            ),
         )
 
 
@@ -760,6 +765,9 @@ class GenerationService:
         asks: AskService,
         trials: SceneTrials | None = None,
         on_stored: Callable[[str], None] | None = None,
+        on_begun: Callable[[], None] | None = None,
+        voice_pending: Callable[[str], bool] | None = None,
+        voice_wait: Callable[[], float | None] | None = None,
     ) -> None:
         self._database = database
         self._jobs = jobs
@@ -773,6 +781,19 @@ class GenerationService:
         #: Told the id of each lesson as soon as its words are stored: the natural voice
         #: begins on them then (``NarrationService.record_ahead``).
         self._on_stored = on_stored
+        #: Told when a lesson is asked for: a natural voice loads its models then, while the
+        #: lesson's first words are written (``NarrationService.warm``, ADR-051).
+        self._on_begun = on_begun
+        #: Whether a lesson's first part is still being recorded in the natural voice.
+        self._voice_pending = voice_pending
+        #: How long after a lesson is asked for its first part can usually be heard.
+        self._voice_wait = voice_wait
+        #: The last thing each lesson job said of its lesson, while the job runs: said again
+        #: when more of the lesson can be heard (``voiced``).
+        self._said: dict[str, tuple[JobContext, dict[str, Any]]] = {}
+        self._said_lock = threading.Lock()
+        #: Woken when more of a lesson can be heard, for a job that waits for its voice.
+        self._voiced_events: dict[str, threading.Event] = {}
         #: Looking for work that is under way and starting it are one step. Without this,
         #: two requests arriving together both find nothing and both begin: the same
         #: lesson written twice, or a provider chosen under a job that has just started.
@@ -961,10 +982,79 @@ class GenerationService:
         purposes = _REQUESTS_FOR[work]
         first = self._gateway.plan(purposes[0]).provider_ids[0]
         found = [self._gateway.seconds_for(first, purpose) for purpose in purposes]
-        return Wait(
-            seconds=sum(seconds for seconds, _ in found),
-            measured=all(measured for _, measured in found),
-        )
+        seconds = sum(seconds for seconds, _ in found)
+        if work == "lesson" and self._voice_wait is not None:
+            # In a natural voice a lesson is ready when its first part can be heard
+            # (ADR-051): that is begun on as the lesson is asked for, beside its words.
+            heard = self._voice_wait()
+            if heard is not None:
+                seconds = max(seconds, round(heard))
+        return Wait(seconds=seconds, measured=all(measured for _, measured in found))
+
+    # -- a lesson's voice (ADR-051) ---------------------------------------------------------
+
+    def voicing(self, lesson_id: str | None) -> bool:
+        """Whether a lesson's first part is still being recorded in the natural voice."""
+        if lesson_id is None or self._voice_pending is None:
+            return False
+        return self._voice_pending(lesson_id)
+
+    def voiced(self, lesson_id: str) -> None:
+        """More of a lesson can be heard in the natural voice: what its job says of it is
+        said again, so that whoever waits for its first part to be heard knows."""
+        with self._said_lock:
+            event = self._voiced_events.get(lesson_id)
+            said = self._said.get(lesson_id)
+            if said is not None:
+                context, result = said
+                updated = {**result, "voicing": self.voicing(lesson_id)}
+                self._said[lesson_id] = (context, updated)
+                context.publish(updated)
+        if event is not None:
+            event.set()
+
+    def _say(self, context: JobContext, result: dict[str, Any]) -> None:
+        """What a lesson job says of its lesson, kept to be said again when its voice
+        catches up (``voiced``). One at a time, so that nothing older is said last."""
+        lesson_id = result.get("lesson_id")
+        with self._said_lock:
+            if isinstance(lesson_id, str):
+                self._said[lesson_id] = (context, result)
+            context.publish(result)
+
+    def _await_voice(self, lesson_id: str, context: JobContext) -> None:
+        """A lesson in a natural voice is ready when its first part can be heard (ADR-051).
+        Its words are all written by now; if that part is still being recorded, the job
+        says so and waits for it, for a while: a voice that is slow or fails holds the
+        lesson back no longer than that, and it can be started meanwhile."""
+        if not self.voicing(lesson_id):
+            return
+        event = threading.Event()
+        with self._said_lock:
+            self._voiced_events[lesson_id] = event
+        context.report(0, 1, "Recording the voice", {"stage": "voicing"})
+        deadline = time.monotonic() + VOICE_WAIT_SECONDS
+        try:
+            while not context.cancelled and time.monotonic() < deadline:
+                if not self.voicing(lesson_id):
+                    return
+                event.wait(timeout=1.0)
+                event.clear()
+        finally:
+            with self._said_lock:
+                self._voiced_events.pop(lesson_id, None)
+
+    def _write_lesson_job(
+        self, concept_id: str, context: JobContext, strategy: str | None
+    ) -> dict[str, Any]:
+        try:
+            return self._write_lesson(concept_id, context, strategy)
+        finally:
+            with self._said_lock:
+                for lesson_id in [
+                    key for key, (owner, _) in self._said.items() if owner is context
+                ]:
+                    del self._said[lesson_id]
 
     def writing(self) -> list[JobSnapshot]:
         """Long work that is waiting or under way, in any course, oldest first."""
@@ -1170,12 +1260,15 @@ class GenerationService:
                     "Remove one before creating another."
                 )
             self._require_key()
-            return self._jobs.submit(
+            job = self._jobs.submit(
                 KIND_LESSON,
-                lambda context: self._write_lesson(concept_id, context, strategy),
+                lambda context: self._write_lesson_job(concept_id, context, strategy),
                 course_id=course_id,
                 subject_id=concept_id,
             )
+        if self._on_begun is not None:
+            self._on_begun()
+        return job
 
     @staticmethod
     def _strategies_used(session: Session, concept_id: str) -> list[str]:
@@ -1388,7 +1481,7 @@ class GenerationService:
             "Drawing the pictures" if figures or briefs else "Finishing the lesson",
             {"stage": "drawing"},
         )
-        context.publish(so_far(len(figures) + len(briefs)))
+        self._say(context, so_far(len(figures) + len(briefs)))
         if self._on_stored is not None and not work.begun_early:
             self._on_stored(stored_id)
         if work.stopped:
@@ -1418,7 +1511,7 @@ class GenerationService:
                             f"The picture for “{figure.title}” couldn’t be shown, so that part "
                             "is explained in words."
                         )
-                    context.publish(so_far(len(figures) - number + len(briefs)))
+                    self._say(context, so_far(len(figures) - number + len(briefs)))
             finally:
                 # A trial nobody waits for any more is not run.
                 for _, trial_id in offered:
@@ -1465,7 +1558,7 @@ class GenerationService:
                             f"“{brief.title}” was meant to be interactive, but came out as an "
                             "animation."
                         )
-                context.publish(so_far(len(briefs) - number))
+                self._say(context, so_far(len(briefs) - number))
         except JobCancelledError:
             # Stopped once there was a lesson: the lesson stays, and what was not drawn is
             # said in words. Stopping before this point saves nothing, as it always did.
@@ -1490,6 +1583,7 @@ class GenerationService:
             # its pictures drawn: there is nothing left to do for it, and nothing to report.
             raise JobCancelledError(None)
 
+        self._await_voice(stored_id, context)
         context.report(total, total, "Done")
         final = so_far(0)
         self._lessons.set_written_by(stored_id, final["written_by"])
@@ -1516,6 +1610,9 @@ class GenerationService:
             "pictures_pending": left,
             "notes": [*notes, *([written_by["note"]] if written_by["note"] else [])],
             "written_by": written_by,
+            # Its first part is still being recorded in the natural voice: it is not ready
+            # to be started until that can be heard (ADR-051).
+            "voicing": self.voicing(lesson_id),
         }
 
     def _write_scene(

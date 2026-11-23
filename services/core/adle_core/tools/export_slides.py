@@ -256,6 +256,91 @@ EXAMPLES: dict[str, dict[str, Any]] = {
             [{"move": "output", "to": {"below": "rule"}}],
         ],
     },
+    # A count made of the picture (ADR-050): the event's mark and the whole set fly into the
+    # numbers of the case, which then become the rule's symbols.
+    "counted_out": {
+        "elements": [
+            {
+                "id": "omega", "kind": "set", "items": ["HH", "HT", "TH", "TT"], "label": "\\Omega",
+                "place": "left", "color": "blue",
+            },
+            {"id": "event", "kind": "outline", "around": ["omega.HH", "omega.HT"], "label": "E", "color": "yellow"},
+            {
+                "id": "count", "kind": "math", "place": "right",
+                "tex": "P(E) = {{\\color{yellow}{2}}} / {{\\color{blue}{4}}}",
+            },
+            {
+                "id": "rule", "kind": "math", "place": "right",
+                "tex": "P(E) = {{\\color{yellow}{|E|}}} / {{\\color{blue}{|\\Omega|}}}",
+            },
+        ],
+        "steps": [
+            [{"show": "omega"}],
+            [{"color": ["omega.HH", "omega.HT"], "to": "yellow"}, {"show": "event"}],
+            [{"show": "count", "from": ["event", "omega"]}],
+            [{"transform": "count", "into": "rule"}],
+        ],
+    },
+    # A sentence or an equation made of the one before it (ADR-050): what they share moves.
+    "rewritten": {
+        "elements": [
+            {"id": "active", "kind": "words", "place": "top", "text": "The dog chased the ball.", "color": "blue"},
+            {"id": "passive", "kind": "words", "place": {"below": "active"}, "text": "The ball was chased by the dog.", "color": "green"},
+            {"id": "first", "kind": "math", "place": "bottom", "tex": "2x + 3 = 7"},
+            {"id": "next", "kind": "math", "place": {"below": "first"}, "tex": "2x = 4"},
+        ],
+        "steps": [
+            [{"show": "active"}],
+            [{"show": "passive"}],
+            [{"show": "first"}],
+            [{"show": "next"}],
+        ],
+    },
+    # As a real model wrote them (2026-11-22): tangents at points written inline, a line to
+    # one, and labels on the tangents.
+    "tangents_inline": {
+        "elements": [
+            {"id": "axes", "kind": "axes", "place": "center", "x": [-3, 3], "y": [-1, 5], "x_label": "x", "y_label": "y"},
+            {"id": "curve", "kind": "curve", "on": "axes", "f": "x^2", "from": -3, "to": 3, "color": "blue"},
+            {"id": "left", "kind": "tangent", "at": {"x": -2, "on": "curve"}, "color": "red"},
+            {"id": "flat", "kind": "tangent", "at": 0, "color": "green"},
+            {"id": "negative", "kind": "label", "on": "left", "text": "f' < 0", "side": "left", "color": "red"},
+            {"id": "zero", "kind": "label", "on": "flat", "text": "f' = 0", "side": "above", "color": "green"},
+            {"id": "secant", "kind": "line", "from": {"x": 1, "on": "curve"}, "to": {"x": 2, "on": "curve"}, "dashed": True},
+        ],
+        "steps": [
+            [{"show": ["axes", "curve"]}],
+            [{"show": ["left", "negative"]}],
+            [{"show": ["flat", "zero"]}],
+            [{"show": "secant"}],
+        ],
+    },
+    # As a real model wrote it: a point moved by {"x": ...}, numbers that follow it, and a
+    # slider nothing followed, which moves the point.
+    "point_readouts": {
+        "elements": [
+            {"id": "axes", "kind": "axes", "place": "left", "x": [-3, 3], "y": [-1, 9]},
+            {"id": "curve", "kind": "curve", "on": "axes", "f": "x^2", "color": "blue"},
+            {"id": "p", "kind": "point", "on": "curve", "x": -2, "color": "red"},
+            {"id": "tangent", "kind": "tangent", "at": "p", "color": "violet"},
+            {"id": "where", "kind": "number", "place": "top right", "value": "p.x", "decimals": 1, "label": "x", "color": "red"},
+            {"id": "slope", "kind": "number", "place": {"below": "where"}, "value": "2*p.x", "decimals": 1, "label": "f'(x)", "color": "violet"},
+            {"id": "x_value", "kind": "param", "value": -2, "min": -3, "max": 3, "slider": True},
+        ],
+        "steps": [
+            [{"show": ["axes", "curve", "p", "tangent", "where", "slope"]}],
+            [{"set": "p", "to": {"x": 0}}, {"set": "x_value", "to": 0}],
+            [{"set": "p", "to": {"x": 2}}, {"set": "x_value", "to": 2}],
+        ],
+    },
+    # A formula shown at once beside its case waits for the next step (ADR-050).
+    "case_first": {
+        "elements": [
+            {"id": "die", "kind": "die", "face": 3, "place": "left", "label": "one roll"},
+            {"id": "odds", "kind": "math", "place": "right", "tex": "P(\\text{odd}) = \\frac{3}{6}"},
+        ],
+        "steps": [[{"show": ["die", "odds"]}], [{"set": "die", "to": 5}]],
+    },
 }  # fmt: skip
 
 

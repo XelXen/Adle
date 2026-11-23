@@ -9,6 +9,7 @@ standard output, as JSON. Everything else it or its libraries print goes to stan
 Requests::
 
     {"id": 1, "op": "hello"}
+    {"id": 1, "op": "load", "voice": {"tier": "expressive"}}
     {"id": 2, "op": "speak", "text": "...", "out": "<file>.ogg",
      "voice": {"tier": "kokoro", "speaker": "af_heart"}}
     {"id": 2, "op": "speak", "text": "...", "out": "<file>.ogg",
@@ -162,6 +163,23 @@ class Voice:
             "memory_gb": round(properties.total_memory / 1024**3, 1),
         }
 
+    def load(self, voice: dict[str, Any]) -> dict[str, Any]:
+        """Load what a voice speaks with before there is anything to say (ADR-051): the model
+        its first line is said with, and the aligner. Nothing is written."""
+        tier = voice.get("tier")
+        if tier == "kokoro":
+            self.kokoro("Ready.", str(voice.get("speaker") or "af_heart"))
+            return {}
+        if tier == "standard":
+            self._model("Qwen3-TTS-12Hz-0.6B-CustomVoice")
+        elif tier == "expressive":
+            # A lesson's voice is designed first, from its description, saying its first line.
+            self._model("Qwen3-TTS-12Hz-1.7B-VoiceDesign")
+        else:
+            raise ValueError(f"unknown voice tier {tier!r}")
+        self._load_aligner()
+        return {}
+
     def speak(self, text: str, voice: dict[str, Any], out: str) -> dict[str, Any]:
         import numpy as np
         import soundfile
@@ -263,18 +281,25 @@ class Voice:
             raise ValueError("nothing was said")
         return np.concatenate(pieces).astype(np.float32), rate, words
 
+    def _load_aligner(self) -> None:
+        import torch
+        import torchaudio
+
+        if self._aligner is None:
+            placed = os.path.join(self.aligner_dir, "hub", "checkpoints", ALIGNER_FILE)
+            if not os.path.exists(placed):
+                raise FileNotFoundError("The aligner is not where it was installed.")
+            torch.hub.set_dir(os.path.join(self.aligner_dir, "hub"))
+            bundle = torchaudio.pipelines.WAV2VEC2_ASR_BASE_960H
+            self._aligner = bundle.get_model().to("cuda")
+
     def align(self, wav: Any, rate: int, text: str) -> list[dict[str, Any]]:
         """Where each word of ``text`` is in ``wav``: forced alignment, letter by letter."""
         import torch
         import torchaudio
 
         bundle = torchaudio.pipelines.WAV2VEC2_ASR_BASE_960H
-        if self._aligner is None:
-            placed = os.path.join(self.aligner_dir, "hub", "checkpoints", ALIGNER_FILE)
-            if not os.path.exists(placed):
-                raise FileNotFoundError("The aligner is not where it was installed.")
-            torch.hub.set_dir(os.path.join(self.aligner_dir, "hub"))
-            self._aligner = bundle.get_model().to("cuda")
+        self._load_aligner()
         labels = bundle.get_labels()
         index = {label: position for position, label in enumerate(labels)}
 
@@ -337,6 +362,8 @@ def main() -> int:
             request = json.loads(line)
             if request.get("op") == "hello":
                 answer = voice.hello()
+            elif request.get("op") == "load":
+                answer = voice.load(dict(request["voice"]))
             elif request.get("op") == "speak":
                 answer = voice.speak(
                     str(request["text"]), dict(request["voice"]), str(request["out"])

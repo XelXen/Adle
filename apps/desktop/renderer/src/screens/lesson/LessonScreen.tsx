@@ -52,7 +52,7 @@ import {
   type PlaybackState,
 } from '../../lesson/controller';
 import { type Narrator, TimedNarrator } from '../../lesson/narration';
-import { RecordedNarrator } from '../../lesson/recorded';
+import { RecordedNarrator, type RecordedState } from '../../lesson/recorded';
 import { SceneCues } from '../../lesson/scene-cues';
 import {
   browserLine,
@@ -85,6 +85,11 @@ const GROUNDING_NOTE: Record<LessonForPlayer['lesson']['grounding'], string> = {
   general_knowledge: 'From general knowledge',
 };
 
+/** A lesson read without a natural voice never waits for one. */
+const NO_RECORDING: RecordedState = { waiting: false, usingFallback: false };
+const noRecording = (): RecordedState => NO_RECORDING;
+const nothingToWatch = (): (() => void) => () => undefined;
+
 /** What a lesson is read with when the learner has not said otherwise. */
 const DEFAULT_READING: LearnerPreferences = {
   pace: 'standard',
@@ -109,9 +114,11 @@ interface Session {
   spoken: Narrator | null;
   /**
    * Plays the lesson's recorded narration in the natural voice, when one is chosen
-   * (ADR-042); a line not recorded yet is read as it would be without it.
+   * (ADR-042); a line not recorded yet is waited for (ADR-051).
    */
   recorded: RecordedNarrator | null;
+  /** The computer has a voice of its own to read with, besides the natural one. */
+  computerVoice: boolean;
 }
 
 function openSession(
@@ -169,7 +176,16 @@ function openSession(
     // Opened at its first part while the rest is written (ADR-048): more parts are coming.
     { more: data.writing ?? false },
   );
-  return { controller, cues, save, saved, silent, spoken, recorded };
+  return {
+    controller,
+    cues,
+    save,
+    saved,
+    silent,
+    spoken,
+    recorded,
+    computerVoice: system !== null,
+  };
 }
 
 /** One lesson, played from start to finish with the learner in control of the pace. */
@@ -269,16 +285,22 @@ function LessonPlayer({
   // parts are written (ADR-048): they are looked for while any is still to come. The words
   // of a part already there stay as they were when it was opened.
   const pictures = useLessonUpdates(lesson.lesson_id, data);
-  const [{ controller, cues, save, saved, silent, spoken, recorded }] = useState(() =>
-    openSession(data, preferences, voices, natural, (error) =>
-      toast.show({
-        tone: 'danger',
-        title: 'Couldn’t save your place',
-        description: describeError(error),
-      }),
-    ),
+  const [{ controller, cues, save, saved, silent, spoken, recorded, computerVoice }] = useState(
+    () =>
+      openSession(data, preferences, voices, natural, (error) =>
+        toast.show({
+          tone: 'danger',
+          title: 'Couldn’t save your place',
+          description: describeError(error),
+        }),
+      ),
   );
   const state = useSyncExternalStore(controller.subscribe, controller.getState);
+  // A line whose natural voice is still being recorded is waited for (ADR-051).
+  const voice = useSyncExternalStore(
+    recorded ? recorded.subscribe : nothingToWatch,
+    recorded ? recorded.getState : noRecording,
+  );
   useEffect(() => {
     controller.extend(pictures.segments, pictures.writing);
   }, [controller, pictures.segments, pictures.writing]);
@@ -296,7 +318,8 @@ function LessonPlayer({
   // bar of controls gets out of the picture's way once nothing is being done with it.
   const theatre = useRef<HTMLDivElement>(null);
   const screen = useFullscreen(theatre);
-  useStillness(theatre, screen.active && state.status === 'playing');
+  // Not while it waits for its voice: what it is waiting for is said in the bar.
+  useStillness(theatre, screen.active && state.status === 'playing' && !voice.waiting);
   // With every line shown, the line being said is kept in view inside the list. Only the
   // list moves: the page stays where the learner put it.
   const lines = useRef<HTMLOListElement>(null);
@@ -750,6 +773,18 @@ function LessonPlayer({
                   <Spinner size="small" /> The next part is being written. It starts when it’s
                   ready.
                 </span>
+              ) : null}
+              {/* The voice does not change by itself in the middle of a lesson (ADR-051):
+                  the learner may choose the other one rather than wait. */}
+              {voice.waiting ? (
+                <>
+                  <span className={styles.note} role="status">
+                    <Spinner size="small" /> Recording the voice for this part.
+                  </span>
+                  <Button variant="tertiary" onClick={() => recorded?.useFallback()}>
+                    {computerVoice ? 'Use the computer’s voice' : 'Read the words instead'}
+                  </Button>
+                </>
               ) : null}
               {/* Busy, and still a button: opening it again is the way to watch the answer
                   being written, or to stop it. */}

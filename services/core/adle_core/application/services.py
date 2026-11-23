@@ -71,6 +71,7 @@ class Services:
     def close(self) -> None:
         """Stop background work and release the database. Safe to call more than once."""
         self.jobs.stop()
+        self.narration.close()
         for client in self.provider_clients:
             client.close()
         self.database.dispose()
@@ -143,6 +144,24 @@ def build_services(
     )
     # Each provider is held to its own limits, unless a test lifts them.
     gateway = ModelGateway(database, provider_clients, limits=quota_limits)
+    # A lesson in a natural voice is made with its voice (ADR-051): its models load as the
+    # lesson is asked for, each part is recorded as it is stored, and the lesson is ready
+    # once its first part can be heard.
+    generation = GenerationService(
+        database,
+        jobs,
+        gateway,
+        curriculum,
+        lessons,
+        learner,
+        retriever,
+        asks,
+        on_stored=narration.record_ahead,
+        on_begun=narration.warm,
+        voice_pending=narration.voice_pending,
+        voice_wait=narration.ready_after,
+    )
+    narration.on_voiced = generation.voiced
     return Services(
         settings=settings,
         launch_token=launch_token,
@@ -163,17 +182,7 @@ def build_services(
         sample_course=SampleCourseService(database, courses, curriculum, lessons),
         provider_clients=provider_clients,
         gateway=gateway,
-        generation=GenerationService(
-            database,
-            jobs,
-            gateway,
-            curriculum,
-            lessons,
-            learner,
-            retriever,
-            asks,
-            on_stored=narration.record_ahead,
-        ),
+        generation=generation,
         narration=narration,
     )
 

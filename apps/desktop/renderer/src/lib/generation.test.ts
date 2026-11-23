@@ -192,6 +192,7 @@ describe('readLessonOutcome', () => {
       title: 'Weights',
       notes: ['One picture could not be made.'],
       picturesPending: 0,
+      voicing: false,
     });
   });
 
@@ -206,6 +207,7 @@ describe('readLessonOutcome', () => {
       title: 'Weights',
       notes: [],
       picturesPending: 2,
+      voicing: false,
     });
     expect(isDrawingPictures(drawing)).toBe(true);
     // Once the work has ended nothing is still to come, whatever the last word on the way was.
@@ -243,6 +245,32 @@ describe('readLessonOutcome', () => {
     // Nor once the work has ended.
     expect(isWritingTheRest({ ...begun, status: 'succeeded' })).toBe(false);
     expect(hasLessonToStart(null)).toBe(false);
+  });
+
+  it('has a lesson in a natural voice to start once its first part can be heard', () => {
+    const result = { lesson_id: 'les_1', title: 'Weights', notes: [], voicing: true };
+    const written = job({
+      kind: KIND_LESSON,
+      status: 'running',
+      result,
+      progress_detail: { stage: 'writing', title: 'Weights', outline: ['Why weights'] },
+    });
+    // There is a lesson, and it is not ready: its first part is still being recorded.
+    expect(readLessonOutcome(written)?.voicing).toBe(true);
+    expect(hasLessonToStart(written)).toBe(false);
+    expect(isWritingTheRest(written)).toBe(false);
+    expect(lessonNotice(written, false)).toBeNull();
+    // All of it written, and waiting for its voice.
+    const recording = { ...written, progress_detail: { stage: 'voicing' as const } };
+    expect(hasLessonToStart(recording)).toBe(false);
+    expect(isDrawingPictures(recording)).toBe(false);
+    // Heard: ready, while the rest is written.
+    const heard = { ...written, result: { ...result, voicing: false } };
+    expect(hasLessonToStart(heard)).toBe(true);
+    expect(isWritingTheRest(heard)).toBe(true);
+    expect(lessonNotice(heard, false)?.title).toBe('Lesson ready');
+    // A job that has ended has nothing left to wait for.
+    expect(readLessonOutcome({ ...written, status: 'succeeded' })?.voicing).toBe(false);
   });
 
   it('is null unless a lesson job has a lesson', () => {

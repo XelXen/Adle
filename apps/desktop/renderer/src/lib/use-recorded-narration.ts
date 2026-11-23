@@ -3,8 +3,9 @@ import { useEffect, useRef } from 'react';
 import type { RecordedNarrator } from '../lesson/recorded';
 import { callCore } from './core-client';
 
-/** How often a recording under way is looked at. */
-const LOOK_EVERY_MS = 2_500;
+/** How often a recording under way is looked at: a line waited for begins this soon after
+ * it is recorded. */
+const LOOK_EVERY_MS = 1_200;
 
 /** The distinct lines a lesson says, as its narration gives them. */
 export function linesOf(lesson: {
@@ -31,7 +32,8 @@ function soundOf(clip: { mime: string; data: string }): string {
  * A lesson's narration in the natural voice (ADR-042). When the voice is chosen, the lines
  * already recorded are handed to the narrator as the lesson opens; if some are not, the
  * lesson is recorded, in the background, and each line is handed over as it is done. A line
- * not yet recorded is read as before: nothing waits for a recording.
+ * not recorded yet is waited for (ADR-051); the narrator is told when no recording will
+ * come for it, and reads it in the other voice then.
  *
  * A lesson still being written has more lines as its parts come (ADR-048): those are looked
  * for too, and what was handed over already stays with the narrator, which plays it by its
@@ -81,15 +83,23 @@ export function useRecordedNarration(
       if (!found.recording) {
         await callCore('narration.record', { path: { lesson_id: lessonId } });
       }
+      narrator.expect(true);
       while (!stopped) {
         await new Promise((resolve) => window.setTimeout(resolve, LOOK_EVERY_MS));
         if (stopped) return;
         found = await take();
-        if (found.lines >= lines || !found.recording) return;
+        if (found.lines >= lines) return;
+        if (!found.recording) {
+          // The recording ended without some of the lines: they will not come.
+          narrator.expect(false);
+          return;
+        }
       }
     };
-    // A recording that cannot be had leaves the lesson read as before: nothing to say.
-    follow().catch(() => undefined);
+    follow().catch(() => {
+      // A recording that cannot be had: what has none is read in the other voice.
+      if (!stopped) narrator.expect(false);
+    });
 
     return () => {
       stopped = true;

@@ -1,5 +1,7 @@
 /**
- * A lesson read in a natural voice recorded on this computer (ADR-042).
+ * A lesson read in a natural voice recorded on this computer (ADR-042), and made with it
+ * (ADR-051): ready once its first part can be heard, and a line still being recorded is
+ * waited for rather than read in another voice.
  *
  * The voice here is a stand-in for the engine (services/core/tests/support/
  * fake_voice_engine.py): the same protocol, silence for sound, a third of a second a word.
@@ -14,10 +16,13 @@ import type { Page } from '@playwright/test';
 import { expect, launchApp, repoRoot, test, waitForCore } from './support/app';
 import {
   courseCard,
+  createCourse,
   expectNoAccessibilityViolations,
   openCourseTab,
+  saveProviderKey,
   screenshot,
 } from './support/courses';
+import { cannedAnswer, startFakeProvider } from './support/fake-provider';
 
 const core = path.join(repoRoot, 'services', 'core');
 const corePython =
@@ -45,6 +50,44 @@ function aVoice(folder: string): string {
     writeFileSync(at, '');
   }
   return models;
+}
+
+/** A recognisable fake key. It only ever reaches the fake provider. */
+const KEY = 'sk-e2e-not-a-real-key-7Hq2mZx94Wd1';
+
+/**
+ * The app with a stand-in voice that takes `delay` seconds over each line, as a voice
+ * slower than the lesson's words, and a provider on this computer; a course with a concept,
+ * and the provider's key. Narration is read aloud, as the learner left it.
+ */
+async function aLessonToMake(profileDir: string, delay: number) {
+  const provider = await startFakeProvider();
+  const models = aVoice(test.info().outputPath('voice'));
+  const adle = await launchApp(profileDir, {
+    onboarded: true,
+    env: {
+      ADLE_PROVIDER_BASE_URL: provider.baseUrl,
+      ADLE_VOICE_KOKORO_PYTHON: corePython,
+      ADLE_VOICE_ENGINE: standIn,
+      ADLE_VOICE_MODELS: models,
+      ADLE_FAKE_VOICE_DELAY: String(delay),
+    },
+  });
+  const { page } = adle;
+  await waitForCore(page);
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await saveProviderKey(page, /Custom endpoint/, KEY);
+  await page.getByRole('button', { name: 'Library', exact: true }).click();
+  await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+  await page.getByRole('button', { name: 'Add a concept' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add a concept' });
+  await dialog.getByLabel('Name').fill('Limits');
+  await dialog.getByRole('textbox', { name: 'Objective 1' }).fill('Estimate a limit from a table.');
+  await dialog.getByRole('button', { name: 'Add concept' }).click();
+  const concept = page.getByRole('region', { name: 'Limits' });
+  await expect(concept).toBeVisible();
+  provider.queue(cannedAnswer('lesson'));
+  return { adle, page, provider, concept };
 }
 
 async function invoke<T>(page: Page, operation: string, request?: unknown): Promise<T> {
@@ -159,6 +202,97 @@ test.describe('the natural voice', () => {
 
     expect(adle.problems).toEqual([]);
     await adle.close();
+  });
+
+  test('a lesson in the natural voice is ready once its first part can be heard', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const { adle, page, provider, concept } = await aLessonToMake(profileDir, 4);
+    await concept.getByRole('button', { name: 'Create a lesson with AI' }).click();
+    const lessons = concept.getByRole('list', { name: 'Lessons for this concept' });
+    // Its first part is written, and listed, before it can be heard: not ready yet.
+    await expect(lessons.getByRole('button', { name: /^Start lesson/ })).toBeVisible({
+      timeout: 60_000,
+    });
+    const ready = page.getByRole('status').filter({ hasText: 'Lesson ready' });
+    await expect(ready).toHaveCount(0);
+    await expect(ready).toBeVisible({ timeout: 90_000 });
+    // Ready means heard: every line of its first part is recorded by then.
+    const courses = await invoke<{ courses: { id: string; title: string }[] }>(
+      page,
+      'courses.list',
+    );
+    const course = courses.courses.find((item) => item.title === 'Calculus refresher')!;
+    const listed = await invoke<{ lessons: { id: string }[] }>(page, 'lessons.list', {
+      path: { course_id: course.id },
+    });
+    const lessonId = listed.lessons[0]!.id;
+    const view = await invoke<{ lesson: { segments: { narration?: { text: string }[] }[] } }>(
+      page,
+      'lessons.get',
+      { path: { lesson_id: lessonId } },
+    );
+    const first = view.lesson.segments.find((segment) => (segment.narration ?? []).length > 0)!;
+    const recorded = await invoke<{ lines: { text: string }[] }>(page, 'narration.get', {
+      path: { lesson_id: lessonId },
+    });
+    const heard = new Set(recorded.lines.map((line) => line.text));
+    for (const beat of first.narration ?? []) expect(heard.has(beat.text)).toBe(true);
+
+    // Started, it is played from its recording at once: nothing is waited for.
+    await lessons.getByRole('button', { name: /^Start lesson/ }).click();
+    const transcript = page.getByRole('complementary', { name: 'Transcript' });
+    await expect(transcript).toBeVisible();
+    const said = transcript.evaluate(async (element) => {
+      const until = performance.now() + 20_000;
+      while (performance.now() < until) {
+        if (element.querySelector('li[aria-current="true"] mark')) return true;
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      return false;
+    });
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    expect(await said).toBe(true);
+    await expect(page.getByText('Recording the voice for this part.')).toHaveCount(0);
+    expect(adle.problems).toEqual([]);
+    await adle.close();
+    await provider.close();
+  });
+
+  test('a line still being recorded is waited for, and the other voice can be chosen instead', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    // Far slower than anyone would wait.
+    const { adle, page, provider, concept } = await aLessonToMake(profileDir, 45);
+    await concept.getByRole('button', { name: 'Create a lesson with AI' }).click();
+    // Its words are all written, its pictures drawn: what it waits for is its voice.
+    await expect(concept.getByRole('progressbar', { name: 'Recording the voice' })).toBeVisible({
+      timeout: 90_000,
+    });
+    await expect(page.getByRole('status').filter({ hasText: 'Lesson ready' })).toHaveCount(0);
+    // The lesson is there before its voice is: opened, it waits at its first line.
+    const lessons = concept.getByRole('list', { name: 'Lessons for this concept' });
+    await lessons.getByRole('button', { name: /^Start lesson/ }).click();
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    const waiting = page.getByText('Recording the voice for this part.');
+    await expect(waiting).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'lesson-waiting-for-its-voice');
+    // Nothing is said meanwhile, in any voice.
+    expect(await page.evaluate(() => speechSynthesis.speaking)).toBe(false);
+    await page
+      .getByRole('button', { name: /^(Use the computer’s voice|Read the words instead)$/ })
+      .click();
+    await expect(waiting).toHaveCount(0);
+    // Read on in the other voice: the lesson goes on.
+    const transcript = page.getByRole('complementary', { name: 'Transcript' });
+    await expect(transcript.locator('li[aria-current="true"]')).toBeVisible();
+    expect(adle.problems).toEqual([]);
+    await adle.close();
+    await provider.close();
   });
 
   test('Settings offers the voices from the lightest to the richest, and the one chosen reads the lessons', async ({

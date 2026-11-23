@@ -17,7 +17,7 @@ class Slide(InteractiveScene):
         self.teal = "#4FC3C9" if dark else "#2B9EA5"
         self.orange = "#F0A45D" if dark else "#E8893A"
         self.e = {}
-        self.set_storyboard([[None, self.step_0], [None, self.step_1], [None, self.step_2], [None, self.step_3]])
+        self.set_storyboard([[None, self.step_0], [None, self.step_1], [None, self.step_2], [None, self.step_3], [None, self.step_4]])
 
     def fit(self, m, w, h):
         if m.width > w:
@@ -142,8 +142,13 @@ class Slide(InteractiveScene):
         self.e['area'] = MathTex(*['\\color{#3DBE7F}{3}', '\\times', '\\color{#7BA4EE}{4}', '= 12'], font_size=52, color=self.ink)
         self.e['area.1'] = self.e['area'][0]
         self.e['area.2'] = self.e['area'][2]
+        self.e['rule'] = MathTex(*['\\color{#3DBE7F}{h}', '\\times', '\\color{#7BA4EE}{w}', '= A'], font_size=52, color=self.ink)
+        self.e['rule.1'] = self.e['rule'][0]
+        self.e['rule.2'] = self.e['rule'][2]
         self.put(['g'], [-3.195, 0.0, 6.01, 6.8], 1)
         self.put(['area'], [3.255, 0.0, 5.89, 6.8], 1)
+        self.fit(self.e['rule'], 5.89, 6.8)
+        self.e['rule'].move_to(self.e['area'].get_center())
         self.e['w'] = Brace(self.group(['g.1.1', 'g.1.2', 'g.1.3', 'g.1.4']), UP, color=self.blue)
         self.e['w/name'] = self.shown([True, '4'], 28, self.ink).next_to(self.e['w'], UP, buff=0.12)
         self.keep(self.e['w/name'])
@@ -167,7 +172,12 @@ class Slide(InteractiveScene):
         self.post_message("step", 2)
 
     def step_3(self):
-        self.play(Write(self.e['area']), run_time=1.32)
-        self.play(self.ring(['area.1'], self.sun), self.ring(['area.2'], self.sun), self.e['area.1'].animate.scale(1.12), self.e['area.2'].animate.scale(1.12), run_time=0.45)
-        self.play(self.e['area.1'].animate.scale(1 / 1.12), self.e['area.2'].animate.scale(1 / 1.12), run_time=0.25)
+        self.play(self.ring(['h/name'], self.green), self.ring(['w/name'], self.blue), TransformFromCopy(self.e['h/name'], self.e['area'][0]), TransformFromCopy(self.e['w/name'], self.e['area'][2]), FadeIn(self.e['area'][1]), FadeIn(self.e['area'][3]), run_time=1.5)
+        self.remove(*self.e['area'].submobjects)
+        self.add(self.e['area'])
         self.post_message("step", 3)
+
+    def step_4(self):
+        self.unmark()
+        self.play(TransformMatchingTex(self.e['area'], self.e['rule']), run_time=1.4)
+        self.post_message("step", 4)

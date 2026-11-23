@@ -332,7 +332,12 @@ most, a file's name.
 - **A natural voice is played from what the core recorded** (ADR-042): `RecordedNarrator`
   plays a line's clip and marks each word at the time the core measured, and
   `useRecordedNarration` hands it the clips as they are recorded. A line not recorded yet
-  is read by the computer's voice; nothing waits for a recording. Settings → Learning →
+  is waited for (ADR-051): the narrator holds it (`state.waiting`, said in the bar with a
+  way to read on in the other voice) and plays it when its clip comes; the other voice
+  reads it only when the learner chooses it for the rest of the lesson (`useFallback`) or
+  no recording will come (`expect(false)`). The voice never changes by itself in the
+  middle of a lesson. A lesson job that says `voicing` has a lesson that is not ready yet
+  (`hasLessonToStart`, `lessonNotice`). Settings → Learning →
   Voice (`VoiceChoices`) sets a voice up, follows the setup, and removes a voice, saying
   first how much is downloaded and from where. A journey uses a stand-in engine
   (`e2e/voice.spec.ts`), never a real download.

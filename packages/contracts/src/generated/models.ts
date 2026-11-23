@@ -319,7 +319,7 @@ export interface Job {
  */
 export interface JobProgressDetail {
   outline?: string[];
-  stage?: ('waiting' | 'thinking' | 'writing' | 'drawing') | null;
+  stage?: ('waiting' | 'thinking' | 'writing' | 'drawing' | 'voicing') | null;
   title?: string | null;
 }
 export interface JobList {

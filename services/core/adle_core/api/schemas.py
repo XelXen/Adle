@@ -660,9 +660,10 @@ class JobProgressDetail(_Output):
     Nothing here is the answer itself: a stage, and the titles of what has been written.
     """
 
-    #: ``waiting`` for a turn, ``thinking`` before the first word, ``writing``, or
-    #: ``drawing`` a picture.
-    stage: Literal["waiting", "thinking", "writing", "drawing"] | None = None
+    #: ``waiting`` for a turn, ``thinking`` before the first word, ``writing``, ``drawing``
+    #: a picture, or ``voicing``: the words are written, and the first part is still being
+    #: recorded in the natural voice (ADR-051).
+    stage: Literal["waiting", "thinking", "writing", "drawing", "voicing"] | None = None
     #: For something written part by part: the titles of the parts so far, in order (at
     #: most 40, each one line of at most 120 characters: ``generation.Outline``). The last
     #: one may still be being written.

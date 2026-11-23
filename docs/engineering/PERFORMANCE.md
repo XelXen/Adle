@@ -246,7 +246,45 @@ set up by Adle's own installer into a folder of their own (ADR-042):
 | Finding each word | its own durations | 0.18 to 0.39 s a line (wav2vec 2.0) | the same |
 
 A lesson is recorded line by line in the background and never waited for: a line not
-recorded yet is read by the computer's voice.
+recorded yet is read by the computer's voice. (Until ADR-051, below.)
+
+## A lesson made with its voice (2026-11-22)
+
+The Expressive voice (Qwen3-TTS 1.7B) on the development machine, eight lines of a lesson
+said by one engine, timed one by one (`VoiceEngine.speak`, by hand):
+
+| Line | Took | Speech |
+|---|---|---|
+| 1: the engine started, the voice-design model loaded and warmed, the voice designed | 25.4 s | 6.8 s |
+| 2: that model put away, the model that speaks in the designed voice loaded | 12.6 s | 3.0 s |
+| 3 to 8 | 1.8 to 3.2 s each | 4.5 to 8.3 s each |
+
+Once loaded the voice is 2.5 times faster than speech (0.39 s of work a second of
+speech); what was slow was loading it, and the recording of a lesson loaded it again for
+every part it caught up with (ADR-051). Now it is loaded as the lesson is asked for and
+kept for the whole lesson. Three lessons asked for through NVIDIA with the prompt of
+ADR-050 and made with the Expressive voice, by hand, one request each:
+
+| Lesson | First part written | Ready: first part heard | Every word written | Whole voice | Lines | Speech |
+|---|---|---|---|---|---|---|
+| Sample spaces and events | 8.3 s | **40.2 s** | 70.1 s | 71.1 s | 20 | 89 s |
+| The derivative as a slope | 17.3 s | **45.0 s** | 75.4 s | 101.7 s | 17 | 179 s |
+| Active and passive voice | 23.1 s | **49.0 s** | 64.1 s | 104.7 s | 16 | 173 s |
+
+The whole voice was there within 41 s of the last word, while a learner who started at
+"ready" was still in its second or third part: none of them would have waited for a line.
+
+What the prompt of ADR-050 gave, read offline: no slide shows a formula in its first step
+(19 slides, as before); in the lesson on sample spaces, which three times began a part with
+a definition before, a part begins with one once, and its numbers come out of its pictures
+14 times (a 4 out of the whole sample space, a 2 out of the event, both into 2/4); the
+grammar lesson points at the words of real sentences with arrows and labels, and with
+ADR-050 five of its sentences come out of the one before; the derivative lesson moves its
+points step by step (17 steps that set them). What it wrote that could not be drawn (a
+point written inline, a point moved by {"x": ...}, a number following a point, a slider
+nothing followed) is read as it meant it: every slide of the six lessons of 2026-11-22
+draws with nothing left out. Three requests; with those earlier the same day, 51 of the 80
+a day allowed by hand.
 
 ## What was not measured
 

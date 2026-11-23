@@ -5,6 +5,26 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The example first, and the rule out of it.** Each part of a lesson now opens on a case
+  you can see (two coin tosses, a grid of squares, a real sentence) with nothing else on
+  the screen, works it out in the picture as it is explained, and only then writes the
+  formula: in the example's own numbers first, which fly out of the picture into place,
+  and then as the general rule. A name comes after you have seen what it names.
+- **A lesson in a natural voice is made with its voice.** The voice starts loading as soon
+  as you ask for the lesson, each part is recorded as it is written, and the lesson is
+  ready once its first part can be heard. "Usually takes about" counts the voice too.
+- **The voice no longer changes in the middle of a lesson.** A line whose voice is still
+  being recorded is waited for, and the lesson says so; you can choose the computer's
+  voice for the rest of the lesson instead.
+
+### Fixed
+
+- The richer natural voices were loaded again for every part of a lesson, which made them
+  slow and left the computer's voice reading most lines; a part written while the voice
+  was busy could be left unrecorded.
+
 ## [0.1.0-alpha.4] - 2026-11-22
 
 The fourth alpha. A lesson is now a slideshow: every part that teaches has a picture, and

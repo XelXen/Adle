@@ -153,6 +153,16 @@ Write ordinary manim Community v0.21 Python. Only the Wanim-specific parts are l
     `Transform` and `copy()` all run.
   - **`Ellipse(width=..., height=...)` and `Flash(...)` stop the scene** ("non-finite point
     or vector value"). The scene policy refuses both.
+- **A formula made of the picture (ADR-050)**, `e2e/fixtures/slides/prompt_example.py` and
+  `counted_out.py` stepped through in both themes by `e2e/slide-player.spec.ts`, and looked
+  at, 2026-11-22: `self.play(TransformFromCopy(source, formula[i]), ...,
+  FadeIn(formula[j]), ...)` turns a copy of each source (a brace's label, a whole set as a
+  `VGroup`) into a part of a `MathTex`, the source staying; then
+  `self.remove(*formula.submobjects)` and `self.add(formula)` leave the formula one thing on
+  the stage, drawn once, and a later `TransformMatchingTex(formula, other)` turns all of it
+  into the other with no copy left behind. `TransformMatchingTex(sentence.copy(), other)`
+  (sentences as `\text{...}` parts) and the same of formulas move what the two share and
+  leave the first where it was (`rewritten.py`).
 
 ### Documented upstream, not yet exercised here
 

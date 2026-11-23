@@ -1,11 +1,16 @@
 """A stand-in for the voice engine (adle_core/voice/engine.py), for tests: the same protocol,
 no models. It "says" each line as silence, a third of a second a word, and puts each word
-where its third of a second is. A line containing FAIL is refused, as the engine refuses."""
+where its third of a second is. A line containing FAIL is refused, as the engine refuses.
+
+``ADLE_FAKE_VOICE_DELAY`` makes it take that many seconds over each line it says, as a voice
+slower than the lesson would (ADR-051); it loads nothing, at once."""
 
 from __future__ import annotations
 
 import json
+import os
 import sys
+import time
 import wave
 
 from adle_core.voice.engine import words_of
@@ -17,6 +22,7 @@ PER_WORD = 0.3
 def speak(text: str, out: str) -> dict[str, object]:
     if "FAIL" in text:
         raise ValueError("refused")
+    time.sleep(float(os.environ.get("ADLE_FAKE_VOICE_DELAY") or 0))
     words = words_of(text)
     seconds = max(1, len(words)) * PER_WORD
     with wave.open(out, "wb") as clip:
@@ -39,6 +45,8 @@ def main() -> int:
         try:
             if request.get("op") == "hello":
                 answer: dict[str, object] = {"cuda": False, "threads": 1}
+            elif request.get("op") == "load":
+                answer = {}
             elif request.get("op") == "speak":
                 answer = speak(request["text"], request["out"])
             else:

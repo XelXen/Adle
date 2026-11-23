@@ -512,6 +512,11 @@ class LessonService:
         with self._database.read() as session:
             return session.get(StoredLesson, lesson_id) is not None
 
+    def is_writing(self, lesson_id: str) -> bool:
+        """Whether more of the lesson's parts are still to come (ADR-048)."""
+        with self._database.read() as session:
+            return bool(_get_or_404(session, lesson_id).writing)
+
     def delete(self, lesson_id: str) -> None:
         with self._database.session() as session:
             session.delete(_get_or_404(session, lesson_id))

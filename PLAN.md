@@ -1068,11 +1068,23 @@ Evidence: `test_slides.py`, `cues.test.ts`, `scene-trial.test.ts`, every slide s
 through in the player in both themes (`e2e/slide-player`), a lesson's slides stepping on
 as its words are read (`e2e/generation`), and the real runs in `PERFORMANCE.md`.
 
+Then, at the owner's word after watching those ("first show example visually and then
+relate the theory to it"; a natural voice slow enough that the computer's voice read
+instead): **the case first, and the rule out of it**, a part opening on its case alone and
+its formula made of the picture's own numbers before it becomes the rule (ADR-050); and
+**a lesson in a natural voice made with its voice**, loaded as the lesson is asked for,
+recorded part by part by one recording on one engine, ready once its first part can be
+heard, a line not recorded yet waited for and never read in another voice by itself
+(ADR-051). Evidence: `test_slides.py`, `test_lesson_voice.py`, `recorded.test.ts`,
+`generation.test.ts`, the slides that make a formula out of a picture stepped through in
+the player, two journeys in `e2e/voice`, and the real runs in `PERFORMANCE.md`.
+
 ### Deviations from this plan (each has an ADR)
 
 - **Narration can be a natural voice that runs on the learner's computer** (ADR-042),
   downloaded at their word. Section 12 had the computer's own voices only (ADR-013); those
-  remain the first choice and what reads anything not yet recorded.
+  remain the first choice, and read a lesson in a natural voice only when the learner
+  chooses it or no recording will come (ADR-051).
 - **One branch, and a release is a commit** (ADR-043), where ADR-034 had `dev`, `main`
   and a tag.
 - **Most pictures are not written by a model** (ADR-045). Section 9 has every scene written

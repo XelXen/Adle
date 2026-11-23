@@ -23,10 +23,12 @@ every scene does.
 
 from __future__ import annotations
 
+import json
 import math
 import re
+from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError
@@ -264,6 +266,55 @@ def _filled(raw: dict[str, Any], later: dict[str, str]) -> dict[str, Any]:
     if str(raw.get(field_name) or "").strip() or raw.get("id") not in later:
         return raw
     return {**raw, field_name: later[str(raw["id"])]}
+
+
+_CURVE_WORDS = frozenset({"curve", "plot", "graph", "function"})
+
+
+def _hoisted(raw_elements: list[Any]) -> list[Any]:
+    """Points written inline where an element names one (a tangent "at": {"x": 2, "on":
+    "curve"}, a line "to" one, or a tangent "at": 2 on the one curve there is), as a real
+    model wrote them (2026-11-22): each is made a point of its own, named after what named
+    it and placed before it."""
+    curves = [
+        raw.get("id")
+        for raw in raw_elements
+        if isinstance(raw, dict) and _words(raw.get("kind", "")) in _CURVE_WORDS
+    ]
+    taken = {raw.get("id") for raw in raw_elements if isinstance(raw, dict)}
+    found: list[Any] = []
+    for raw in raw_elements:
+        if not isinstance(raw, dict):
+            found.append(raw)
+            continue
+        element = dict(raw)
+        for field_name in ("at", "from", "to"):
+            value = element.get(field_name)
+            x: object = None
+            on: object = None
+            if isinstance(value, dict) and "x" in value:
+                x = value.get("x")
+                on = value.get("on") or (curves[0] if len(curves) == 1 else None)
+            elif (
+                field_name == "at"
+                and isinstance(value, int | float)
+                and not isinstance(value, bool)
+                and len(curves) == 1
+            ):
+                x, on = value, curves[0]
+            if x is None or not isinstance(on, str):
+                continue
+            name = f"{element.get('id', 'point')}_{field_name}"
+            while name in taken:
+                name += "_"
+            taken.add(name)
+            point: dict[str, Any] = {"id": name, "kind": "point", "on": on, "x": x}
+            if element.get("color"):
+                point["color"] = element["color"]
+            found.append(point)
+            element[field_name] = name
+        found.append(element)
+    return found
 
 
 def _number(value: object) -> float:
@@ -521,6 +572,19 @@ _PIECEWISE = frozenset({"set", "grid", "table", "nodes", "bars"})
 _SINGLE = frozenset({"text", "math", "box", "words", "dot", "shape"})
 #: Kinds drawn by what they join or point at, whose words are a piece of their own.
 _LINKS = frozenset({"arrow", "line", "brace", "outline", "vector", "curve"})
+#: Kinds that state a rule rather than show a case: they wait until a case has been seen.
+_THEORY = frozenset({"math", "box"})
+#: Kinds that show a case: a picture, a count, a sentence.
+_CASES = frozenset(KINDS) - _THEORY - {"text", "label", "param"} - _LINKS
+#: Kinds that can come out of the picture ("show" with "from"): one thing, shown whole.
+_ARRIVING = frozenset({"math", "text", "box", "number", "words"})
+#: Words a sentence shares with another that say nothing of their own, and terms of a
+#: formula: they do not make one sentence or formula the other's kin.
+_LITTLE = frozenset(
+    {"a", "an", "the", "of", "to", "in", "on", "and", "or", "is", "are", "was", "were", "be",
+     "by", "for", "it", "at", "as", "with", "=", "+", "-", r"\times", r"\cdot", "(", ")", ",",
+     "/"}
+)  # fmt: skip
 
 VERBS = ("show", "hide", "highlight", "color", "move", "transform", "set")
 _VERB_WORDS = {
@@ -632,6 +696,9 @@ class _Action:
     into: str = ""
     #: set: the value, the face, or the new words.
     value: Any = None
+    #: show: where each {{ }} part of the formula shown comes out of, in order (ADR-050);
+    #: one source for anything else shown whole. None where a part is written in.
+    sources: list[_Target | None] = field(default_factory=list)
 
 
 @dataclass
@@ -741,6 +808,9 @@ class _Compiler:
         self.relative: dict[str, tuple[int, str]] = {}
         #: While settling, the elements already checked: one refers only to those.
         self.ready: set[str] | None = None
+        #: A number that follows a formula: its function, the point it follows, if any, and
+        #: what it reads as the slide begins.
+        self.number_sources: dict[str, tuple[int, str | None, float]] = {}
 
     # -- reading -----------------------------------------------------------------------------------
 
@@ -748,7 +818,7 @@ class _Compiler:
         if not isinstance(raw_elements, list):
             raise SlideError(["a slide's elements are a list"])
         later = _first_settings(raw_steps)
-        for raw in raw_elements[:MAX_ELEMENTS]:
+        for raw in _hoisted(raw_elements[:MAX_ELEMENTS]):
             if isinstance(raw, dict):
                 raw = _filled(raw, later)
             try:
@@ -798,6 +868,7 @@ class _Compiler:
         """Check every element and name its parts, leaving out what refers to nothing: in
         the order written, so that an element refers only to those before it. Then find
         the ranges of the axes from what is drawn on them."""
+        self.slide_the_point()
         if self.param is not None:
             try:
                 self.check(self.param)
@@ -830,6 +901,32 @@ class _Compiler:
             element = self.elements[name]
             if not isinstance(element, ParamElement):
                 self.colors[name] = self.hue(element)
+
+    def slide_the_point(self) -> None:
+        """A slider nothing follows, on a slide with one point that has a place of its own,
+        moves that point, as a real model meant one to (2026-11-22): it set the point and
+        the slider to the same numbers, step by step."""
+        param = self.param
+        if param is None or not param.slider:
+            return
+        word = re.compile(rf"\b{re.escape(param.id)}\b")
+        for name in self.order:
+            if name == param.id:
+                continue
+            dumped = self.elements[name].model_dump(mode="json", by_alias=True, exclude={"id"})
+            if word.search(json.dumps(dumped)):
+                return
+        points = [
+            element
+            for element in self.elements.values()
+            if isinstance(element, PointElement) and not isinstance(element.x, str)
+        ]
+        if len(points) != 1:
+            return
+        point = points[0]
+        if param.min is not None and param.max is not None:
+            param.value = min(max(float(point.x), param.min), param.max)
+        point.x = param.id
 
     def refer(self, ref: str) -> _Target | None:
         """What a name in the script stands for: an element, or a part of one."""
@@ -1000,7 +1097,7 @@ class _Compiler:
                 axes.x0, axes.x1 = min(axes.x0, corner[0]), max(axes.x1, corner[0])
         elif isinstance(element, NumberElement):
             if isinstance(element.value, str) and not self.is_param(element.value):
-                raise ValueError(f'its value is "{element.value[:24]}", which is not a number')
+                self.number_formula(element)
             if isinstance(element.value, str):
                 self.follows.add(element.id)
         elif isinstance(element, BarsElement):
@@ -1067,6 +1164,39 @@ class _Compiler:
         if isinstance(element, LabelElement):
             return [element.on]
         return []
+
+    def number_formula(self, element: NumberElement) -> None:
+        """A number that follows a point or the value through a formula ("p.x", "2*p.x",
+        "a^2" where "a" is the value), as a real model wrote one (2026-11-22): the formula
+        is written again as arithmetic, as a curve's is, and the number follows it."""
+        assert isinstance(element.value, str)
+        text = element.value
+        point: str | None = None
+        for found in re.finditer(r"([A-Za-z_][A-Za-z0-9_]*)\.x\b", text):
+            named = self.elements.get(found.group(1))
+            if not isinstance(named, PointElement) or (
+                self.ready is not None and found.group(1) not in self.ready
+            ):
+                raise ValueError(f'its value is "{text[:24]}", which is not a number')
+            if point not in (None, found.group(1)):
+                raise ValueError("its value follows two points")
+            point = found.group(1)
+        if point is not None:
+            text = re.sub(rf"\b{re.escape(point)}\.x\b", "x", text)
+        try:
+            source = _python_expression(text, self.param.id if self.param else None)
+            _tried(_function(source), [0.0, 1.0], self.trial_values())
+        except FigureError as error:
+            raise ValueError(
+                f'its value is "{element.value[:24]}", which is not a number'
+            ) from error
+        index = len(self.functions)
+        self.functions.append(f"    def f_{index}(self, x, p):\n        return {source}\n")
+        value = self.param.value if self.param else 0.0
+        followed = self.elements.get(point) if point is not None else None
+        at = followed.x if isinstance(followed, PointElement) else value
+        x = value if isinstance(at, str) else float(at)
+        self.number_sources[element.id] = (index, point, _function(source)(x, value))
 
     def is_param(self, value: object) -> bool:
         return isinstance(value, str) and self.param is not None and value == self.param.id
@@ -1237,6 +1367,7 @@ class _Compiler:
             self.steps.append(step)
         while len(self.steps) > 1 and not self.steps[-1]:
             self.steps.pop()
+        self.defer_theory()
 
     def action(self, raw: object) -> _Action:
         if not isinstance(raw, dict) or not raw:
@@ -1278,6 +1409,13 @@ class _Compiler:
         if verb == "color" and hue is None:
             raise ValueError("color: it names no color there is")
         action = _Action(verb, targets, hue or "sun")
+        if verb == "show":
+            given = next(
+                (written[key] for key in ("from", "out of", "coming from") if key in written),
+                None,
+            )
+            if given is not None:
+                action.sources = self.sources(given, targets)
         if verb == "move":
             place = written.get("to", written.get("place", written.get("into")))
             region = _region(place)
@@ -1311,9 +1449,100 @@ class _Compiler:
             action.targets = targets[:1]
         return action
 
+    def sources(self, given: object, targets: list[_Target]) -> list[_Target | None]:
+        """Where what a step shows comes out of ("show" with "from", ADR-050): for a formula
+        with {{ }} parts, one element or part of the picture for each of its parts, in
+        order, or by the part's name; for anything else shown whole, one. A copy of each
+        turns into its part, so that the formula is seen to be made of the picture."""
+        if len(targets) != 1 or not targets[0].whole:
+            self.left_out.append('a "from": it brings one element out of the picture at a time')
+            return []
+        shown = targets[0].element
+        element = self.elements[shown]
+        if element.kind not in _ARRIVING or shown in self.follows:
+            self.left_out.append(f'a "from": a {element.kind} does not come out of the picture')
+            return []
+        formula = self.math.get(shown)
+        slots = len(formula.groups) if formula is not None and formula.groups else 1
+        found: list[_Target | None] = [None] * slots
+        if isinstance(given, dict):
+            for part, ref in list(given.items())[:slots]:
+                written = str(part)
+                place = self.refer(written if "." in written else f"{shown}.{written}")
+                slot = self.slot(place, shown) if place is not None else None
+                if slot is None or slot >= slots:
+                    self.left_out.append(f'a "from" names a part "{written[:24]}" there is not')
+                    continue
+                found[slot] = self.source(ref, shown)
+        else:
+            for slot, ref in enumerate((given if isinstance(given, list) else [given])[:slots]):
+                found[slot] = self.source(ref, shown)
+        return found if any(found) else []
+
+    @staticmethod
+    def slot(target: _Target, shown: str) -> int | None:
+        """Which {{ }} part of a formula a target is, counted from 0."""
+        if target.element != shown or len(target.keys) != 1:
+            return None
+        number = target.keys[0][len(shown) + 1 :]
+        return int(number) - 1 if number.isdigit() else None
+
+    def source(self, ref: object, shown: str) -> _Target | None:
+        if not isinstance(ref, str):
+            return None
+        found = self.refer(ref)
+        if found is None:
+            self.left_out.append(f'a "from" names "{ref[:24]}", which is not on the stage')
+            return None
+        if found.element == shown or isinstance(self.elements[found.element], ParamElement):
+            return None
+        return found
+
+    def defer_theory(self) -> None:
+        """The example comes first, alone (ADR-050): a formula or a rule that the first step
+        would show beside the case it describes is shown at the start of the next step
+        instead, when the narration reaches its first marked words. A slide that is only
+        formulas keeps its first step as it is."""
+        if not self.steps:
+            return
+
+        def rule(target: _Target) -> bool:
+            return self.elements[target.element].kind in _THEORY
+
+        first = self.steps[0]
+        if not any(
+            action.verb == "show"
+            and any(self.elements[target.element].kind in _CASES for target in action.targets)
+            for action in first
+        ):
+            return
+        kept: list[_Action] = []
+        later: list[_Action] = []
+        for action in first:
+            stated = [target for target in action.targets if rule(target)]
+            if not stated:
+                kept.append(action)
+                continue
+            rest = [target for target in action.targets if not rule(target)]
+            if rest:
+                kept.append(replace(action, targets=rest, sources=[]))
+            later.append(replace(action, targets=stated))
+        if not later:
+            return
+        self.steps[0] = kept
+        if len(self.steps) == 1:
+            self.steps.append(later)
+        else:
+            self.steps[1] = later + self.steps[1]
+
     def setting(self, target: _Target, value: object) -> Any:
         """What a "set" changes an element to, checked against what the element is."""
         element = self.elements[target.element]
+        if isinstance(value, dict):
+            # {"x": -1} for a point, {"value": 3} for a number, as models write them.
+            value = next(
+                (value[key] for key in ("x", "value", "to", "face") if key in value), value
+            )
         if isinstance(element, ParamElement):
             number = _number(value)
             assert element.min is not None
@@ -2078,6 +2307,8 @@ class _Scene:
             if isinstance(element, WordsElement)
         }
         self.word_lines: dict[str, list[int]] = {}
+        #: The sentences and formulas brought on, in order: a later one may come out of one.
+        self.shown: list[str] = []
         self.rings = False
         self.param_value = compiler.param.value if compiler.param else 0.0
         self.bar_shape: dict[str, tuple[list[float], float, list[list[Any]], float]] = {}
@@ -2260,13 +2491,26 @@ class _Scene:
         self, out: _Writer, name: str, element: NumberElement, size: int, label: Any, hue: str
     ) -> None:
         follows = isinstance(element.value, str)
-        value = self.param_value if follows else float(element.value)
+        formula = self.c.number_sources.get(name)
+        if formula is not None:
+            value = round(formula[2], 6)
+        else:
+            value = self.param_value if follows else float(element.value)
         font = _TEXT_SIZES[size] + 6
         out.say(
             f"number = DecimalNumber({_py(value)}, num_decimal_places={element.decimals}, "
             f"font_size={round(font * _TEX_SCALE)}, color={hue})"
         )
-        if follows:
+        if formula is not None:
+            # It reads its formula of the point it follows, or of the value (ADR-050).
+            index, point, _ = formula
+            x = f"self.trackers[{_py(point)}]" if point else "self.amount"
+            out.say(
+                "number.add_updater(lambda m: m.set_value("
+                f"self.value({index}, {x}.get_value(), self.amount.get_value())))"
+            )
+            out.say(f"self.followers.append({_py(name + '/value')})")
+        elif follows:
             out.say("number.add_updater(lambda m: m.set_value(self.amount.get_value()))")
             out.say(f"self.followers.append({_py(name + '/value')})")
         out.say(f"{_e(name + '/value')} = number")
@@ -2683,6 +2927,21 @@ class _Scene:
         return f"FadeIn({_e(key)}, shift=UP * 0.15)"
 
     def do_show(self, out: _Writer, action: _Action) -> None:
+        if action.sources and action.targets[0].element not in self.on:
+            self.show_from(out, action)
+            return
+        first = action.targets[0]
+        if len(action.targets) == 1 and first.whole and first.element not in self.on:
+            kin = self.kin(first.element)
+            if kin is not None:
+                # Made of one on the stage (ADR-050): what they share moves into its place.
+                out.say(
+                    f"self.play(TransformMatchingTex({_e(kin)}.copy(), {_e(first.element)}), "
+                    "run_time=1.4)"
+                )
+                self.on |= set(self.c.pieces[first.element])
+                self.shown.append(first.element)
+                return
         coming: list[str] = []
         for target in action.targets:
             element = self.c.elements[target.element]
@@ -2697,6 +2956,11 @@ class _Scene:
                     coming.append(key)
         if not coming:
             return
+        self.shown += [
+            target.element
+            for target in action.targets
+            if target.whole and self.c.elements[target.element].kind in ("math", "words")
+        ]
         entrances = [self.entrance(key) for key in coming]
         self.on |= set(coming)
         run = self.show_time(entrances)
@@ -2707,6 +2971,96 @@ class _Scene:
             out.say(
                 f"self.play(LaggedStart({', '.join(entrances)}, lag_ratio={lag}), run_time={run})"
             )
+
+    def tokens(self, name: str) -> list[str]:
+        """A sentence's words, or a formula's parts, as one is matched with another."""
+        if self.c.elements[name].kind == "words":
+            return [re.sub(r"[^\w']", "", word).lower() for word in self.words.get(name, [])]
+        formula = self.math.get(name)
+        return [part.strip() for part in formula.parts] if formula is not None else []
+
+    def kin(self, name: str) -> str | None:
+        """A sentence or a formula on the stage that this one is made of (ADR-050): of the
+        same kind, on one line each, in plain letters, sharing two of its words or one of
+        its terms that say something, and two fifths of all of them. The one with most in
+        common, the latest of those. A slide shows the next form of a sentence or of an
+        equation coming out of the one before it, as a person would rewrite it."""
+        kind = self.c.elements[name].kind
+        if kind not in ("math", "words") or name in self.c.follows:
+            return None
+        mine = Counter(self.tokens(name))
+        if not mine or len(self.word_lines.get(name, [1])) != 1:
+            return None
+        best: tuple[int, int, str] | None = None
+        for order, other in enumerate(self.shown):
+            if other == name or other not in self.on or self.c.elements[other].kind != kind:
+                continue
+            if len(self.word_lines.get(other, [1])) != 1:
+                continue
+            words = [*self.words.get(name, []), *self.words.get(other, [])]
+            if not all(word.isascii() for word in words):
+                continue
+            shared = mine & Counter(self.tokens(other))
+            telling = sum(count for token, count in shared.items() if token not in _LITTLE)
+            if telling < (2 if kind == "words" else 1):
+                continue
+            if sum(shared.values()) < 0.4 * sum(mine.values()):
+                continue
+            found = (sum(shared.values()), order, other)
+            if best is None or found[:2] > best[:2]:
+                best = found
+        return best[2] if best is not None else None
+
+    def show_from(self, out: _Writer, action: _Action) -> None:
+        """A formula made of the picture (ADR-050): a copy of each source turns into its part,
+        the source staying where it is, while the rest of the formula is written around
+        them. Then the formula is one thing on the stage again, as if it had been written."""
+        name = action.targets[0].element
+        sources = [source for source in action.sources if source is not None]
+        self.ensure(out, sources)
+        formula = self.c.math.get(name)
+        taken: dict[int, _Target] = {}
+        if formula is not None and formula.groups:
+            for slot, source in enumerate(action.sources):
+                if source is not None and slot < len(formula.groups):
+                    taken[formula.groups[slot]] = source
+        # Each source lights up in its own color as its copy leaves it, until the next step.
+        lit: list[str] = []
+        for source in sources:
+            keys = self.source_keys(source)
+            lit.append(f"self.ring({_py(keys)}, self.{self.c.colors.get(source.element, 'sun')})")
+        self.rings = True
+        if taken:
+            assert formula is not None
+            moves = [
+                f"TransformFromCopy({self.copied(source)}, {_e(name)}[{index}])"
+                for index, source in taken.items()
+            ]
+            rest = [
+                f"FadeIn({_e(name)}[{index}])"
+                for index in range(len(formula.parts))
+                if index not in taken
+            ]
+            out.say(f"self.play({', '.join(lit + moves + rest)}, run_time=1.5)")
+            out.say(f"self.remove(*{_e(name)}.submobjects)")
+            out.say(f"self.add({_e(name)})")
+        else:
+            move = f"TransformFromCopy({self.copied(sources[0])}, {_e(name)})"
+            out.say(f"self.play({', '.join([*lit[:1], move])}, run_time=1.4)")
+        self.on |= set(self.c.pieces[name])
+
+    def source_keys(self, target: _Target) -> list[str]:
+        """What a copy is taken of: the words on a brace, an arrow or a line when it is named
+        whole (they carry the number), else what is on the stage of what was named."""
+        pieces = self.c.pieces[target.element]
+        words = f"{target.element}/name"
+        if target.whole and self.c.elements[target.element].kind in _LINKS and words in pieces:
+            return [words]
+        return [key for key in self.pieces(target) if key in self.on] or list(target.keys)
+
+    def copied(self, target: _Target) -> str:
+        keys = self.source_keys(target)
+        return _e(keys[0]) if len(keys) == 1 else f"self.group({_py(keys)})"
 
     @staticmethod
     def show_time(entrances: list[str]) -> float:

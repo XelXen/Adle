@@ -240,7 +240,9 @@ function Waiting({
                 {job.kind === KIND_LESSON
                   ? isDrawingPictures(job)
                     ? 'Drawing your lesson’s pictures'
-                    : 'Writing your lesson'
+                    : writing?.stage === 'voicing'
+                      ? 'Recording your lesson’s voice'
+                      : 'Writing your lesson'
                   : 'Suggesting concepts'}
               </p>
               <ProgressBar label={headline} showLabel value={value} />

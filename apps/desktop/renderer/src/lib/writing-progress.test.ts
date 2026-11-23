@@ -110,6 +110,12 @@ describe('writingHeadline', () => {
     ).toBe('Drawing picture 1 of 2');
     expect(writingHeadline(null, 'lesson', 'Queued')).toBe('Queued');
   });
+
+  it('says when a lesson’s words are written and its voice is being recorded', () => {
+    const voicing = { stage: 'voicing', title: '', outline: [] } satisfies WritingProgress;
+    expect(writingHeadline(voicing, 'lesson', 'x')).toBe('Recording the voice');
+    expect(readWritingProgress(job({ stage: 'voicing', outline: [] }))?.stage).toBe('voicing');
+  });
 });
 
 describe('writingFraction', () => {

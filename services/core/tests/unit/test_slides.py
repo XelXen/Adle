@@ -499,3 +499,160 @@ def test_a_stage_with_no_places_puts_pictures_left_and_words_right() -> None:
     assert "self.put(['omega'], [-" in slide.source
     assert "self.put(['rule'], [" in slide.source
     assert "self.put(['omega', 'rule']" not in slide.source
+
+
+# -- the case first, and the formula out of it (ADR-050) ---------------------------------------
+
+
+def _step_of(source: str, number: int) -> str:
+    """The lines of one step of a scene the module wrote."""
+    start = source.index(f"    def step_{number}(self):")
+    end = source.find("    def ", start + 10)
+    return source[start : end if end > 0 else len(source)]
+
+
+def test_a_formula_comes_out_of_the_picture_part_by_part() -> None:
+    slide = compile_slide(visual_example()["visual"])
+    built = _step_of(slide.source, 3)
+    # The 3 and the 4 on the braces turn into the formula's parts; the rest is written in.
+    assert "TransformFromCopy(self.e['h/name'], self.e['area'][0])" in built
+    assert "TransformFromCopy(self.e['w/name'], self.e['area'][2])" in built
+    assert "FadeIn(self.e['area'][1])" in built
+    assert "FadeIn(self.e['area'][3])" in built
+    # Then it is one formula on the stage again, which the next step turns into the rule.
+    assert "self.remove(*self.e['area'].submobjects)" in built
+    assert "self.add(self.e['area'])" in built
+    assert "TransformMatchingTex(self.e['area'], self.e['rule'])" in _step_of(slide.source, 4)
+
+
+def test_where_a_formula_s_parts_come_from_may_be_given_by_part() -> None:
+    script = copy.deepcopy(EXAMPLES["counted_out"])
+    script["steps"][2] = [{"show": "count", "from": {"count.2": "omega", "1": "event"}}]
+    slide = compile_slide(script)
+    assert slide.left_out == []
+    built = _step_of(slide.source, 2)
+    assert "TransformFromCopy(self.e['event/name'], self.e['count'][1])" in built
+    assert "TransformFromCopy(self.group(['omega/frame'" in built
+    assert "self.e['count'][3])" in built
+
+
+@pytest.mark.parametrize(
+    ("action", "said"),
+    [
+        ({"show": "count", "from": ["nowhere"]}, 'a "from" names "nowhere"'),
+        ({"show": ["count", "rule"], "from": ["event"]}, "one element out of the picture"),
+        ({"show": "omega", "from": ["event"]}, "a set does not come out of the picture"),
+    ],
+)
+def test_a_from_that_cannot_be_followed_is_said_and_the_thing_is_shown_as_usual(
+    action: dict[str, Any], said: str
+) -> None:
+    script = copy.deepcopy(EXAMPLES["counted_out"])
+    script["steps"][2] = [action]
+    slide = compile_slide(script)
+    assert any(said in note for note in slide.left_out), slide.left_out
+    built = _step_of(slide.source, 2)
+    assert "TransformFromCopy" not in built
+
+
+def test_the_case_comes_first_and_its_formula_waits_for_the_next_step() -> None:
+    slide = compile_slide(EXAMPLES["case_first"])
+    assert slide.steps == 2
+    assert "self.e['odds']" not in _step_of(slide.source, 0).replace("self.e['odds'] =", "")
+    first_play = next(
+        line for line in _step_of(slide.source, 1).splitlines() if "self.play(" in line
+    )
+    assert "Write(self.e['odds'])" in first_play
+
+
+def test_a_case_and_its_formula_shown_at_once_with_no_steps_become_two_steps() -> None:
+    slide = compile_slide(
+        {
+            "elements": [
+                {"id": "omega", "kind": "set", "items": ["H", "T"], "place": "left"},
+                {"id": "rule", "kind": "math", "tex": "P(H) = \frac{1}{2}", "place": "right"},
+            ]
+        }
+    )
+    assert slide.steps == 2
+    assert "Write(self.e['rule'])" in _step_of(slide.source, 1)
+
+
+def test_a_slide_of_formulas_alone_keeps_its_first_step() -> None:
+    slide = compile_slide(
+        {
+            "elements": [
+                {"id": "a", "kind": "math", "tex": "2x + 3 = 7"},
+                {"id": "b", "kind": "math", "tex": "2x = 4", "place": {"below": "a"}},
+            ],
+            "steps": [[{"show": ["a", "b"]}]],
+        }
+    )
+    assert slide.steps == 1
+
+
+def test_a_sentence_or_an_equation_comes_out_of_the_one_before_it() -> None:
+    slide = compile_slide(EXAMPLES["rewritten"])
+    assert "TransformMatchingTex(self.e['active'].copy(), self.e['passive'])" in _step_of(
+        slide.source, 1
+    )
+    assert "TransformMatchingTex(self.e['first'].copy(), self.e['next'])" in _step_of(
+        slide.source, 3
+    )
+    # The first of each is written as ever, and the one it came out of stays.
+    assert "Write(self.e['active'])" in _step_of(slide.source, 0)
+    assert "Write(self.e['first'])" in _step_of(slide.source, 2)
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        # Only little words in common.
+        ("The cat sat on the mat.", "The dog ran to the park."),
+        # One word that says something, of seven.
+        ("The cat sat.", "Then a big dog barked at the cat loudly."),
+    ],
+)
+def test_a_sentence_that_shares_little_with_another_is_written_as_itself(
+    first: str, second: str
+) -> None:
+    slide = compile_slide(
+        {
+            "elements": [
+                {"id": "a", "kind": "words", "place": "top", "text": first},
+                {"id": "b", "kind": "words", "place": "bottom", "text": second},
+            ],
+            "steps": [[{"show": "a"}], [{"show": "b"}]],
+        }
+    )
+    assert "TransformMatchingTex" not in slide.source
+    assert "Write(self.e['b'])" in _step_of(slide.source, 1)
+
+
+def test_points_written_inline_are_points_of_their_own() -> None:
+    """As a real model wrote them (2026-11-22): a tangent "at" a point written inline, or
+    at a number on the one curve there is, and a line between two such points."""
+    slide = compile_slide(EXAMPLES["tangents_inline"])
+    assert slide.left_out == []
+    for name in ("left_at", "flat_at", "secant_from", "secant_to"):
+        assert f"self.make_point('{name}', 'axes', 0, " in slide.source
+
+
+def test_numbers_follow_a_point_and_a_slider_that_moved_nothing_moves_the_point() -> None:
+    slide = compile_slide(EXAMPLES["point_readouts"])
+    assert slide.left_out == []
+    assert slide.interactive
+    # The point follows the slider now (no x of its own), and the numbers follow the point.
+    assert "self.make_point('p', 'axes', 0, None, " in slide.source
+    assert "self.value(1, self.trackers['p'].get_value()" in slide.source
+    assert "self.value(2, self.trackers['p'].get_value()" in slide.source
+    # Moved by {"x": ...}: set as a number would be.
+    assert "set_value(2.0)" in slide.source or "set_value(2)" in slide.source
+
+
+def test_a_number_s_formula_is_arithmetic_of_a_point_or_the_value_and_nothing_else() -> None:
+    script = copy.deepcopy(EXAMPLES["point_readouts"])
+    script["elements"][4]["value"] = "__import__('os').p.x"
+    slide = compile_slide(script)
+    assert any("which is not a number" in note for note in slide.left_out)
+    assert "__import__" not in slide.source

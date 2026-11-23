@@ -172,13 +172,76 @@ describe('RecordedNarrator', () => {
     expect(clip.src).toBe('');
   });
 
-  it('reads a line it has no clip for as the lesson read it before', () => {
+  it('waits for a line not recorded yet, and plays it in the natural voice when it comes', () => {
     const { clip, fallback, narrator } = setUp();
-    narrator.speak('A line nobody recorded.', { onEnd: vi.fn() });
-    expect(fallback.spoken).toEqual(['A line nobody recorded.']);
+    const states: boolean[] = [];
+    narrator.subscribe(() => states.push(narrator.getState().waiting));
+    const onEnd = vi.fn();
+    narrator.speak('A line still being recorded.', { onEnd });
+    expect(narrator.getState().waiting).toBe(true);
+    expect(narrator.has('A line still being recorded.')).toBe(false);
+    // The voice does not change by itself (ADR-051): nothing is read meanwhile.
+    expect(fallback.spoken).toEqual([]);
     expect(clip.plays).toBe(0);
-    expect(narrator.has(LINE)).toBe(true);
-    expect(narrator.has('A line nobody recorded.')).toBe(false);
+    narrator.add('A line still being recorded.', { url: 'blob:adle://app/two', words: [] });
+    expect(narrator.getState().waiting).toBe(false);
+    expect(clip.src).toBe('blob:adle://app/two');
+    expect(clip.plays).toBe(1);
+    clip.emit('ended');
+    expect(onEnd).toHaveBeenCalledOnce();
+    expect(states).toEqual([true, false]);
+  });
+
+  it('reads a line in the other voice once no recording will come for it', () => {
+    const { clip, fallback, narrator } = setUp();
+    narrator.speak('A line that failed.', { onEnd: vi.fn() });
+    narrator.expect(false);
+    expect(fallback.spoken).toEqual(['A line that failed.']);
+    expect(narrator.getState().waiting).toBe(false);
+    // From then on a line without a clip is read so at once; one with a clip still plays.
+    narrator.speak('Another line.', { onEnd: vi.fn() });
+    expect(fallback.spoken).toEqual(['A line that failed.', 'Another line.']);
+    narrator.speak(LINE, { onEnd: vi.fn() });
+    expect(clip.plays).toBe(1);
+  });
+
+  it('reads the rest of the lesson in the other voice when the learner chooses it', () => {
+    const { clip, fallback, narrator } = setUp();
+    narrator.speak('A line still being recorded.', { onEnd: vi.fn() });
+    narrator.useFallback();
+    expect(fallback.spoken).toEqual(['A line still being recorded.']);
+    expect(narrator.getState()).toEqual({ waiting: false, usingFallback: true });
+    // Even a line that has its clip: the voice does not change back in the middle.
+    narrator.speak(LINE, { onEnd: vi.fn() });
+    expect(fallback.spoken).toEqual(['A line still being recorded.', LINE]);
+    expect(clip.plays).toBe(0);
+  });
+
+  it('begins a line waited for while paused only when the lesson goes on', () => {
+    const { clip, narrator } = setUp();
+    const utterance = narrator.speak('Later.', { onEnd: vi.fn() });
+    utterance.pause();
+    narrator.add('Later.', { url: 'blob:adle://app/three', words: [] });
+    expect(clip.plays).toBe(0);
+    utterance.resume();
+    expect(clip.plays).toBe(1);
+  });
+
+  it('plays nothing for a line waited for and then left', () => {
+    const { clip, narrator } = setUp();
+    narrator.speak('Gone.', { onEnd: vi.fn() }).cancel();
+    expect(narrator.getState().waiting).toBe(false);
+    narrator.add('Gone.', { url: 'blob:adle://app/four', words: [] });
+    expect(clip.plays).toBe(0);
+  });
+
+  it('does not take a clip paused before it began playing for one that cannot be played', async () => {
+    const { clip, fallback, narrator } = setUp();
+    clip.play = () => Promise.reject(new DOMException('interrupted', 'AbortError'));
+    narrator.speak(LINE, { onEnd: vi.fn() }).pause();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fallback.spoken).toEqual([]);
   });
 
   it('reads the line another way when its clip cannot be played', async () => {

@@ -169,7 +169,12 @@ is built from it, and an alpha or a stable version is published from a release c
 - A lesson is a slideshow (ADR-049): every part that teaches has a slide, and the slide
   takes a step when the narration reaches the words its script marked. Teach by intuition
   and example first: the picture before the symbol, each symbol in the color of what it
-  stands for.
+  stands for. The case comes first and alone, and the rule is made out of it (ADR-050): a
+  formula never shares a slide's first step with its case, and its numbers can fly out of
+  the picture into it.
+- A lesson in a natural voice is made with its voice (ADR-051): ready once its first part
+  can be heard, and a line not recorded yet is waited for, never read in another voice
+  unless the learner chooses that or no recording will come.
 - A lesson is watched (ADR-035): its pictures on one dark screen in either theme, the
   words being said along its foot with the spoken word marked, the whole screen if wanted.
 

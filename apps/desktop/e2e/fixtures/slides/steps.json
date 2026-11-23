@@ -3,6 +3,14 @@
     "interactive": true,
     "steps": 5
   },
+  "case_first.py": {
+    "interactive": false,
+    "steps": 2
+  },
+  "counted_out.py": {
+    "interactive": false,
+    "steps": 4
+  },
   "dice_and_count.py": {
     "interactive": false,
     "steps": 3
@@ -35,7 +43,15 @@
     "interactive": false,
     "steps": 4
   },
+  "point_readouts.py": {
+    "interactive": true,
+    "steps": 4
+  },
   "prompt_example.py": {
+    "interactive": false,
+    "steps": 5
+  },
+  "rewritten.py": {
     "interactive": false,
     "steps": 4
   },
@@ -58,6 +74,10 @@
   "tangent.py": {
     "interactive": true,
     "steps": 6
+  },
+  "tangents_inline.py": {
+    "interactive": false,
+    "steps": 4
   },
   "tree.py": {
     "interactive": false,

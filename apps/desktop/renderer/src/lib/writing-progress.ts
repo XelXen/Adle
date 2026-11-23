@@ -15,7 +15,13 @@ import type { Job, JobProgressDetail } from '@adle/contracts';
 /** The stages long work goes through, as the core names them (`JobProgressDetail`). */
 export type WritingStage = NonNullable<JobProgressDetail['stage']>;
 
-const STAGES: ReadonlySet<string> = new Set(['waiting', 'thinking', 'writing', 'drawing']);
+const STAGES: ReadonlySet<string> = new Set([
+  'waiting',
+  'thinking',
+  'writing',
+  'drawing',
+  'voicing',
+]);
 
 export interface WritingProgress {
   stage: WritingStage | null;
@@ -82,6 +88,9 @@ export function writingHeadline(
         return progress.title ? `Writing “${progress.title}”` : 'Writing the lesson';
       }
       return subject === 'suggestions' ? 'Choosing concepts' : 'Writing the answer';
+    case 'voicing':
+      // Its words are written; its first part is being recorded in the natural voice.
+      return subject === 'lesson' ? 'Recording the voice' : fallback;
     default:
       // Waiting for a turn, drawing a picture, or nothing said: the core's own sentence.
       return fallback;

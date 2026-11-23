@@ -670,7 +670,10 @@
           "outline": { "items": { "type": "string" }, "title": "Outline", "type": "array" },
           "stage": {
             "anyOf": [
-              { "enum": ["waiting", "thinking", "writing", "drawing"], "type": "string" },
+              {
+                "enum": ["waiting", "thinking", "writing", "drawing", "voicing"],
+                "type": "string"
+              },
               { "type": "null" }
             ],
             "title": "Stage"

@@ -1,8 +1,14 @@
-"""A lesson's narration in a natural voice, recorded on this computer (ADR-042).
+"""A lesson's narration in a natural voice, recorded on this computer (ADR-042, ADR-051).
 
 When the natural voice is set up and chosen, each line a lesson says is recorded once, as a
 clip with the time of each of its words, and kept beside the data. The lesson then plays the
-clips and marks each word as it is said; a line without a clip is read as before.
+clips and marks each word as it is said.
+
+A lesson is made with its voice (ADR-051). Its models are loaded as soon as a lesson is
+asked for, while its first words are written; it is recorded part by part as its parts are
+written, by one recording that follows it until it is whole, on one engine that stays
+loaded; and it can be started once its first part can be heard. Loading a model takes far
+longer than saying a line with it, so nothing is loaded twice for one lesson.
 
 A clip is named by the voice and the words it says, so that a lesson whose words or voice
 change is recorded again and nothing is spoken in a voice that was not chosen. The clips of a
@@ -16,15 +22,24 @@ import json
 import logging
 import re
 import shutil
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from adle_core.application.jobs import LANE_VOICE, JobContext, JobRunner, JobSnapshot
+from adle_core.application.jobs import (
+    LANE_VOICE,
+    JobCancelledError,
+    JobContext,
+    JobRunner,
+    JobSnapshot,
+)
 from adle_core.application.lessons import LessonService
-from adle_core.errors import ConflictError, NotFoundError
+from adle_core.errors import AdleError, ConflictError, NotFoundError
 from adle_core.infrastructure.ids import is_id
-from adle_core.voice.catalog import DEFAULT_DESIGN, TIERS, Tier
+from adle_core.voice.catalog import DEFAULT_DESIGN, TIERS, Family, Tier
 from adle_core.voice.catalog import tier as find_tier
 from adle_core.voice.hardware import Fit, Hardware, detect, fit
 from adle_core.voice.install import VoiceInstaller, VoiceSetupError
@@ -35,7 +50,19 @@ logger = logging.getLogger(__name__)
 KIND_NARRATION = "narration_recording"
 #: Setting a size of voice up: its programs, its models, a word said to check it.
 KIND_VOICE_SETUP = "voice_setup"
+#: Loading a voice's models while a lesson's first words are written (ADR-051).
+KIND_VOICE_WARMUP = "voice_warmup"
 _CLIP = re.compile(r"^[0-9a-f]{24}$")
+
+#: How long the voice's engine stays loaded after its last line, for the next lesson.
+ENGINE_IDLE_SECONDS = 180.0
+#: How long a recording waits for the next part of a lesson that is still being written.
+FOLLOW_QUIET_SECONDS = 600.0
+#: How long after a lesson is asked for its first part can usually be heard, until this
+#: computer has timed it: measured on the development machine (PERFORMANCE.md).
+READY_GUESS_SECONDS: dict[str, float] = {"kokoro": 15.0, "standard": 45.0, "expressive": 55.0}
+#: A warm-up this old is not what a recording that begins now was asked with.
+_WARMUP_COUNTS_FOR = 600.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +87,70 @@ class NarrationClip:
     words: list[dict[str, float | int]]
 
 
+class _Engines:
+    """The engine of the voice in use, kept loaded between recordings for a while (ADR-051):
+    loading a model takes far longer than saying a line with it. One engine at a time, used
+    by one recording at a time (the voice lane runs one job at a time); closed when it has
+    been idle for a while, when a voice is set up or removed, and when the core stops."""
+
+    def __init__(
+        self,
+        paths: VoicePaths,
+        make: Callable[[VoicePaths, Family], VoiceEngine],
+        idle_seconds: float = ENGINE_IDLE_SECONDS,
+    ) -> None:
+        self._paths = paths
+        self._make = make
+        self._idle = idle_seconds
+        self._lock = threading.Lock()
+        self._engine: VoiceEngine | None = None
+        self._family: Family | None = None
+        self._timer: threading.Timer | None = None
+        self._busy = 0
+
+    def take(self, family: Family) -> VoiceEngine:
+        stale: VoiceEngine | None = None
+        with self._lock:
+            self._stop_timer()
+            if self._engine is not None and self._family != family:
+                stale, self._engine = self._engine, None
+            if self._engine is None:
+                self._engine, self._family = self._make(self._paths, family), family
+            self._busy += 1
+            engine = self._engine
+        if stale is not None:
+            stale.close()
+        return engine
+
+    def give_back(self) -> None:
+        with self._lock:
+            self._busy = max(0, self._busy - 1)
+            if self._busy == 0 and self._engine is not None:
+                self._timer = threading.Timer(self._idle, self._close_idle)
+                self._timer.daemon = True
+                self._timer.start()
+
+    def _close_idle(self) -> None:
+        with self._lock:
+            if self._busy:
+                return
+            engine, self._engine, self._family = self._engine, None, None
+        if engine is not None:
+            engine.close()
+
+    def close(self) -> None:
+        with self._lock:
+            self._stop_timer()
+            engine, self._engine, self._family = self._engine, None, None
+        if engine is not None:
+            engine.close()
+
+    def _stop_timer(self) -> None:
+        if self._timer is not None:
+            self._timer.cancel()
+            self._timer = None
+
+
 class NarrationService:
     def __init__(
         self,
@@ -68,14 +159,27 @@ class NarrationService:
         paths: VoicePaths,
         hardware: Callable[[], Hardware] = detect,
         installer: Callable[[VoicePaths], VoiceInstaller] = VoiceInstaller,
+        engine: Callable[[VoicePaths, Family], VoiceEngine] = VoiceEngine,
+        idle_seconds: float = ENGINE_IDLE_SECONDS,
     ) -> None:
         self._lessons = lessons
         self._jobs = jobs
         self._paths = paths
         self._installer = installer
         self._preferences = paths.root / "preferences.json"
+        self._timing = paths.root / "timing.json"
         self._detect = hardware
         self._hardware: Hardware | None = None
+        self._engines = _Engines(paths, engine, idle_seconds)
+        #: Woken when a lesson that is being recorded has another part to record.
+        self._more: dict[str, threading.Event] = {}
+        #: Lessons with a recording asked for and not yet ended, queued or under way.
+        self._recording: set[str] = set()
+        self._more_lock = threading.Lock()
+        #: When the last warm-up began: a lesson was asked for then (``ready_after``).
+        self._warmed_at: float | None = None
+        #: Told the id of a lesson when another of its parts can be heard.
+        self.on_voiced: Callable[[str], None] | None = None
 
     def hardware(self) -> Hardware:
         """What this computer has, found once: it does not change while Adle runs."""
@@ -179,6 +283,8 @@ class NarrationService:
         )
 
     def _install(self, tier: Tier, context: JobContext) -> dict[str, Any]:
+        # An engine kept loaded runs from the programs about to be replaced.
+        self._engines.close()
         try:
             self._installer(self._paths).install(
                 tier,
@@ -202,8 +308,9 @@ class NarrationService:
             raise NotFoundError("There is no such voice.")
         if self._paths.borrowed:
             raise ConflictError("The voice here was set up by hand, and is used as it is.")
-        if self._jobs.any_active([KIND_VOICE_SETUP, KIND_NARRATION]):
+        if self._jobs.any_active([KIND_VOICE_SETUP, KIND_NARRATION, KIND_VOICE_WARMUP]):
             raise ConflictError("The voice is busy. Wait for it to finish, then try again.")
+        self._engines.close()
         keep = [other for other in self._paths.ready_tiers() if other.id != tier.id]
         self._installer(self._paths).remove(tier, keep)
         self._forget_recordings(tier.id)
@@ -260,11 +367,42 @@ class NarrationService:
                     lines.append(beat.text)
         return lines
 
+    def warm(self) -> None:
+        """A lesson was just asked for: load the voice's models now, while its first words
+        are written, so that its first part can be recorded as soon as it is stored. With
+        no voice chosen, or one already at work, nothing is done."""
+        try:
+            status = self.status()
+            tier = find_tier(status.tier or "")
+            if not status.enabled or tier is None:
+                return
+            self._warmed_at = time.monotonic()
+            if self._jobs.any_active([KIND_VOICE_SETUP, KIND_NARRATION, KIND_VOICE_WARMUP]):
+                return
+            voice: dict[str, Any] = {"tier": tier.id}
+            if tier.id in status.speakers:
+                voice["speaker"] = status.speakers[tier.id]
+            self._jobs.submit(
+                KIND_VOICE_WARMUP,
+                lambda context: self._warm(tier, voice),
+                subject_id=tier.id,
+                lane=LANE_VOICE,
+            )
+        except (AdleError, OSError) as error:
+            logger.info("narration.not_warmed kind=%s", type(error).__name__)
+
+    def _warm(self, tier: Tier, voice: dict[str, Any]) -> dict[str, Any]:
+        engine = self._engines.take(tier.family)
+        try:
+            engine.request({"op": "load", "voice": voice})
+        finally:
+            self._engines.give_back()
+        return {"kind": "voice_warmup", "tier": tier.id}
+
     def record_ahead(self, lesson_id: str) -> None:
-        """Record a lesson as soon as its words are stored, when a natural voice reads the
-        lessons: the clips are made while the learner is elsewhere, and not while the
-        lesson plays in the computer's voice waiting for them. A picture that arrives later
-        changes nothing that is said. With no voice chosen, nothing is done."""
+        """Record a lesson as soon as its first words are stored, when a natural voice reads
+        the lessons, and each part after as it is stored (ADR-051). A picture that arrives
+        later changes nothing that is said. With no voice chosen, nothing is done."""
         try:
             if self.status().enabled:
                 self.start(lesson_id)
@@ -272,42 +410,88 @@ class NarrationService:
             logger.info("narration.not_recorded_ahead kind=%s", type(error).__name__)
 
     def start(self, lesson_id: str) -> JobSnapshot:
-        """Record what a lesson says, in the background. Work already under way is returned."""
+        """Record what a lesson says, in the background. A recording under way is returned,
+        and told that there may be more to record."""
         self._voice(lesson_id)
         self._lessons.get_lesson(lesson_id)
-        running = self._jobs.find_active(KIND_NARRATION, lesson_id)
-        if running is not None:
-            return running
-        return self._jobs.submit(
-            KIND_NARRATION,
-            lambda context: self._record(lesson_id, context),
-            subject_id=lesson_id,
-            lane=LANE_VOICE,
-        )
+        with self._more_lock:
+            running = self._jobs.find_active(KIND_NARRATION, lesson_id)
+            if running is not None:
+                self._more.setdefault(lesson_id, threading.Event()).set()
+                return running
+            self._more[lesson_id] = threading.Event()
+            self._recording.add(lesson_id)
+            return self._jobs.submit(
+                KIND_NARRATION,
+                lambda context: self._record(lesson_id, context),
+                subject_id=lesson_id,
+                lane=LANE_VOICE,
+            )
 
     def _record(self, lesson_id: str, context: JobContext) -> dict[str, Any]:
+        """Record every line the lesson has, in the order it says them; while it is still
+        being written, wait for its next part and record that too. One engine, loaded once,
+        for the whole of it."""
         tier, voice = self._voice(lesson_id)
-        lines = self._lines(lesson_id)
         folder = self._folder(lesson_id)
         folder.mkdir(parents=True, exist_ok=True)
-        engine = VoiceEngine(self._paths, tier.family)
+        with self._more_lock:
+            more = self._more.setdefault(lesson_id, threading.Event())
+        engine = self._engines.take(tier.family)
         recorded = 0
+        lines: list[str] = []
+        quiet_since = time.monotonic()
         try:
-            for number, text in enumerate(lines):
+            heard = self.voiced_parts(lesson_id)
+            while True:
                 context.check_cancelled()
-                name = self._name(voice, text)
-                clip, timing = folder / f"{name}.clip", folder / f"{name}.json"
-                if clip.is_file() and timing.is_file():
+                more.clear()
+                lines = self._lines(lesson_id)
+                said = 0
+                for text in lines:
+                    name = self._name(voice, text)
+                    clip, timing = folder / f"{name}.clip", folder / f"{name}.json"
+                    if clip.is_file() and timing.is_file():
+                        continue
+                    context.check_cancelled()
+                    done = self._recorded_count(folder, voice, lines)
+                    context.report(done, len(lines), "Recording the voice")
+                    spoken = engine.speak(text, voice, clip, cancelled=lambda: context.cancelled)
+                    timing.write_text(
+                        json.dumps(
+                            {"seconds": spoken.seconds, "words": spoken.words, "tier": tier.id}
+                        ),
+                        encoding="utf-8",
+                    )
+                    recorded += 1
+                    said += 1
+                    now = self.voiced_parts(lesson_id)
+                    if now != heard:
+                        if heard == 0:
+                            self._timed_first_part(tier.id)
+                        heard = now
+                        self._tell_voiced(lesson_id)
+                if said:
+                    # Parts may have come while these were said: the lesson is read again.
+                    quiet_since = time.monotonic()
                     continue
-                context.report(number, len(lines), "Recording the narration")
-                spoken = engine.speak(text, voice, clip, cancelled=lambda: context.cancelled)
-                timing.write_text(
-                    json.dumps({"seconds": spoken.seconds, "words": spoken.words, "tier": tier.id}),
-                    encoding="utf-8",
-                )
-                recorded += 1
+                if not self._lessons.is_writing(lesson_id):
+                    break
+                if time.monotonic() - quiet_since > FOLLOW_QUIET_SECONDS:
+                    break
+                more.wait(timeout=1.0)
+        except NotFoundError:
+            # The lesson was removed while it was recorded: there is nothing left to record.
+            raise JobCancelledError(None) from None
         finally:
-            engine.close()
+            self._engines.give_back()
+            with self._more_lock:
+                if self._more.get(lesson_id) is more:
+                    del self._more[lesson_id]
+                self._recording.discard(lesson_id)
+            # Ended, however it ended: whoever waits for the lesson's voice is told, so that
+            # a voice that failed holds nothing back.
+            self._tell_voiced(lesson_id)
         context.report(len(lines), len(lines), "Done")
         return {
             "kind": "narration",
@@ -315,6 +499,102 @@ class NarrationService:
             "lines": len(lines),
             "recorded": recorded,
         }
+
+    def _recorded_count(self, folder: Path, voice: dict[str, Any], lines: list[str]) -> int:
+        return sum(1 for text in lines if self._has_clip(folder, voice, text))
+
+    def _has_clip(self, folder: Path, voice: dict[str, Any], text: str) -> bool:
+        name = self._name(voice, text)
+        return (folder / f"{name}.clip").is_file() and (folder / f"{name}.json").is_file()
+
+    def _tell_voiced(self, lesson_id: str) -> None:
+        if self.on_voiced is None:
+            return
+        try:
+            self.on_voiced(lesson_id)
+        except Exception as error:
+            # A listener's failure must not stop the voice.
+            logger.info("narration.voiced_not_told kind=%s", type(error).__name__)
+
+    # -- how far a lesson can be heard ----------------------------------------------------------
+
+    def voiced_parts(self, lesson_id: str) -> int:
+        """How many of a lesson's parts, from its first, can be heard in the voice chosen
+        now: every line of each recorded. A part that says nothing needs no voice."""
+        try:
+            _, voice = self._voice(lesson_id)
+        except VoiceUnavailableError:
+            return 0
+        folder = self._folder(lesson_id)
+        count = 0
+        for segment in self._lessons.get_lesson(lesson_id).segments:
+            said = [beat.text for beat in getattr(segment, "narration", None) or []]
+            if not all(self._has_clip(folder, voice, text) for text in said):
+                break
+            count += 1
+        return count
+
+    def voice_pending(self, lesson_id: str) -> bool:
+        """Whether a lesson's first part is still being recorded in the voice chosen, and so
+        cannot be heard yet (ADR-051). False when no voice is chosen, and when no recording
+        is under way for it: a voice that failed holds nothing back."""
+        try:
+            if not self.status().enabled:
+                return False
+            with self._more_lock:
+                if lesson_id not in self._recording:
+                    return False
+            lesson = self._lessons.get_lesson(lesson_id)
+            spoken = [
+                index
+                for index, segment in enumerate(lesson.segments)
+                if getattr(segment, "narration", None)
+            ]
+            return bool(spoken) and self.voiced_parts(lesson_id) <= spoken[0]
+        except (AdleError, OSError):
+            return False
+
+    def ready_after(self) -> float | None:
+        """About how long after a lesson is asked for its first part can be heard, in the
+        voice chosen now: as timed on this computer, or as usual. None with no voice."""
+        status = self.status()
+        if not status.enabled or status.tier is None:
+            return None
+        timed = self._timings().get(status.tier)
+        if isinstance(timed, int | float) and timed > 0:
+            return float(timed)
+        return READY_GUESS_SECONDS.get(status.tier)
+
+    def _timings(self) -> dict[str, Any]:
+        try:
+            found = json.loads(self._timing.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return found if isinstance(found, dict) else {}
+
+    def _timed_first_part(self, tier_id: str) -> None:
+        """A lesson's first part can be heard: how long that took from when it was asked for
+        is kept, as a running mean, to say how long a lesson usually takes."""
+        began, self._warmed_at = self._warmed_at, None
+        if began is None:
+            return
+        took = time.monotonic() - began
+        if took > _WARMUP_COUNTS_FOR:
+            return
+        timings = self._timings()
+        before = timings.get(tier_id)
+        timings[tier_id] = round(
+            took if not isinstance(before, int | float) else 0.6 * before + 0.4 * took, 1
+        )
+        try:
+            self._paths.root.mkdir(parents=True, exist_ok=True)
+            self._timing.write_text(json.dumps(timings), encoding="utf-8")
+        except OSError as error:
+            logger.info("narration.timing_not_kept kind=%s", type(error).__name__)
+
+    def close(self) -> None:
+        """The core is stopping: the engine goes with it."""
+        self._engines.close()
 
     # -- what has been recorded ------------------------------------------------------------
 
@@ -356,11 +636,14 @@ class NarrationService:
         return data, _sound_kind(data)
 
     def forget(self, lesson_id: str) -> None:
-        """A lesson that has gone takes its clips with it."""
+        """A lesson that has gone takes its clips with it, and its recording stops."""
         try:
             folder = self._folder(lesson_id)
         except NotFoundError:
             return
+        running = self._jobs.find_active(KIND_NARRATION, lesson_id)
+        if running is not None:
+            self._jobs.cancel(running.id)
         shutil.rmtree(folder, ignore_errors=True)
 
     def tidy(self) -> None:

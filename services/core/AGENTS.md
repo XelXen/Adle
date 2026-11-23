@@ -259,6 +259,10 @@ everything and decides nothing.
   of element or verb is a template, an example in `tools/export_slides.py`, and
   `npm run slides` (the player steps through every example in both themes). The prompt's
   own example (`prompts.visual_example`) is one of them: change it and run `npm run slides`.
+  The case comes first (ADR-050): `defer_theory` moves a formula or a rule that a first
+  step shows beside its case to the next step, and `show` with `from` makes a formula's
+  `{{ }}` parts out of copies of the picture (`TransformFromCopy`, then the whole formula
+  put back as one thing).
 - **A lesson's model does not think first** (ADR-049): what thinking used to catch is
   caught in `drafts` instead, deterministically (`_distinct_options`: a wrong option equal
   in value to the right one is left out; `_worked_to`: a numeric key its explanation
@@ -277,10 +281,16 @@ everything and decides nothing.
   out (`LessonDraft`); a board line left open is left off; a figure that cannot be drawn is
   told in words, and a shade under a cumulative curve is drawn as its rise. Anything else
   that does not validate is still the one retry, told what was wrong.
-- **A natural voice begins on a lesson as soon as its words are stored**
-  (`NarrationService.record_ahead`, which `build_services` gives `GenerationService` as
-  `on_stored`). It does nothing when no voice is chosen. What is said never changes after
-  that: a picture that does not come changes what is shown, not what is said.
+- **A lesson in a natural voice is made with its voice** (ADR-051). `build_services` wires
+  it: `on_begun` warms the voice as a lesson is asked for (`NarrationService.warm`, a job
+  in the voice lane that loads the models), `on_stored` starts or wakes the one recording
+  that follows the lesson part by part until it is whole (`record_ahead`, `_record`),
+  `voice_pending` says whether its first part can be heard yet (the lesson job's
+  `voicing`), `on_voiced` tells the lesson job when more can be, and `ready_after` counts
+  the voice in how long a lesson usually takes. The engine is kept loaded between
+  recordings (`_Engines`) and closed before a voice is set up or removed and when the
+  core stops. It does nothing when no voice is chosen. What is said never changes after a
+  part is stored: a picture that does not come changes what is shown, not what is said.
 - **Text from the learner or their documents goes in a `_block(...)`** in `prompts.py`. Never
   concatenate it into an instruction. That includes what a document is called: a file's
   name and a heading go inside the block with the excerpt (`_excerpt`).

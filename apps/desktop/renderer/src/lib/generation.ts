@@ -71,6 +71,11 @@ export interface LessonOutcome {
    * (ADR-031); this is 0 once the work has ended.
    */
   picturesPending: number;
+  /**
+   * Its first part is still being recorded in the natural voice: it is ready to be
+   * started once that can be heard (ADR-051).
+   */
+  voicing: boolean;
 }
 
 function readWrittenBy(value: unknown): WrittenBy | null {
@@ -151,16 +156,20 @@ export function readLessonOutcome(job: Job | null): LessonOutcome | null {
     title: typeof result.title === 'string' ? result.title : '',
     notes: strings(result.notes),
     picturesPending: job.status === 'running' ? Math.max(0, Math.round(pending)) : 0,
+    voicing: job.status === 'running' && result.voicing === true,
   };
 }
 
 /**
  * Whether a job has a lesson to start already while it is still running: the lesson was
  * begun at its first part and the rest of it is being written (ADR-048), or all of it is
- * written and its pictures are being drawn (ADR-031).
+ * written and its pictures are being drawn (ADR-031). In a natural voice, once its first
+ * part can be heard (ADR-051).
  */
 export function hasLessonToStart(job: Job | null): boolean {
-  return job !== null && job.status === 'running' && readLessonOutcome(job) !== null;
+  if (job === null || job.status !== 'running') return false;
+  const outcome = readLessonOutcome(job);
+  return outcome !== null && !outcome.voicing;
 }
 
 /**
@@ -170,7 +179,7 @@ export function hasLessonToStart(job: Job | null): boolean {
 export function isWritingTheRest(job: Job | null): boolean {
   if (!hasLessonToStart(job)) return false;
   const stage = readWritingProgress(job)?.stage ?? null;
-  return stage !== null && stage !== 'drawing';
+  return stage !== null && stage !== 'drawing' && stage !== 'voicing';
 }
 
 /** Whether all of a job's lesson is written, and what is left is its pictures (ADR-031). */
@@ -271,6 +280,8 @@ export function lessonNotice(job: Job, saidBefore: boolean): LessonNotice | null
   const outcome = readLessonOutcome(job);
   if (!outcome) return null;
   if (!saidBefore) {
+    // Not ready until its first part can be heard (ADR-051).
+    if (outcome.voicing) return null;
     let about = outcome.notes;
     if (isWritingTheRest(job)) about = ['The rest of it is being written.'];
     else if (outcome.picturesPending > 0) about = ['Its pictures are still being drawn.'];

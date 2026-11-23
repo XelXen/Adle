@@ -159,8 +159,9 @@ teal or gray; "size": small, normal or large; "label": a short name shown with i
 a symbol: "\\Omega"). An element refers only to elements before it. A part of an element
 is named by the element's id, a dot, and the part: in an element "coins", "coins.H". Kinds:
 - "text": "text", one short sentence (may contain $math$).
-- "math": "tex", TeX without dollar signs. Put {{ }} around the parts a step points at: in
-  an element "rule", "{{P(E)}} = {{\\frac{3}{8}}}" makes the parts "rule.1" and "rule.2".
+- "math": "tex", TeX without dollar signs. Put {{ }} around the parts a step points at or
+  brings "from" the picture: in an element "rule", "{{P(E)}} = {{\\frac{3}{8}}}" makes the
+  parts "rule.1" and "rule.2".
   Color a symbol as the thing it stands for: "\\frac{\\color{yellow}{3}}{\\color{blue}{8}}".
 - "box": "text": a rule or a definition in a rounded box.
 - "words": "text": a sentence whose words can be pointed at: in an element "sentence",
@@ -203,6 +204,10 @@ plays as the part begins. Each later step plays when the narration reaches the n
 in [square brackets]: put brackets around the words at which each later step should
 happen, in order. Adle fits a count that is off. Actions:
 - {"show": "id"} or {"show": ["id", ...]}: draw it; a part shows just that part ("coins.H").
+- {"show": "id of a formula", "from": ["id", ...]}: the formula comes out of the picture. A
+  copy of each thing named (a brace's or an arrow's words, a member of a set, a cell, a
+  number) flies into the formula's {{ }} parts, in order, so the learner sees where each
+  number or symbol comes from.
 - {"hide": "id"}.
 - {"highlight": "id"}: point at it (an element or a part), until the next step.
 - {"color": "id", "to": "yellow"}: color it for good, to tie a thing to its symbol.
@@ -213,10 +218,13 @@ happen, in order. Adle fits a count that is off. Actions:
   a number, a coin's face, a die's face, the bars' new "values", a formula's new TeX (it is
   rewritten, the parts it keeps staying put), a text's or a sentence's new words.
 
-An example, for a part on why the area of a rectangle is width times height:
+An example, for a part on why the area of a rectangle is height times width. The case
+comes first and alone, then the count in its own numbers, out of the picture, then the
+rule:
 {"type": "explanation", "title": "Area counts squares",
  "beats": [{"say": "Here is a rectangle made of small squares. [Count one row]: four squares."},
-  {"say": "There are [three rows] like it. So the area is [three times four], twelve squares."}],
+  {"say": "There are [three rows] like it, so there are [three times four], twelve squares."},
+  {"say": "[Every rectangle] works the same way: its area is its height times its width."}],
  "visual": {"elements": [
    {"id": "g", "kind": "grid", "place": "left",
     "rows": [["","","",""],["","","",""],["","","",""]]},
@@ -225,12 +233,15 @@ An example, for a part on why the area of a rectangle is width times height:
    {"id": "h", "kind": "brace", "over": "g.col 1", "side": "left", "label": "3",
     "color": "green"},
    {"id": "area", "kind": "math", "place": "right",
-    "tex": "{{\\color{green}{3}}} \\times {{\\color{blue}{4}}} = 12"}],
+    "tex": "{{\\color{green}{3}}} \\times {{\\color{blue}{4}}} = 12"},
+   {"id": "rule", "kind": "math", "place": "right",
+    "tex": "{{\\color{green}{h}}} \\times {{\\color{blue}{w}}} = A"}],
   "steps": [[{"show": "g"}],
    [{"color": "g.row 1", "to": "blue"}, {"show": "w"}],
    [{"color": "g.col 1", "to": "green"}, {"show": "h"}],
-   [{"show": "area"}, {"highlight": ["area.1", "area.2"]}]],
-  "description": "Three rows of four squares, and beside them $3 \\times 4 = 12$."}}"""
+   [{"show": "area", "from": ["h", "w"]}],
+   [{"transform": "area", "into": "rule"}]],
+  "description": "3 rows of 4 squares, then $3 \\times 4 = 12$, then $h \\times w = A$."}}"""
 
 
 def visual_example() -> dict[str, Any]:
@@ -242,14 +253,24 @@ def visual_example() -> dict[str, Any]:
 #: How to teach: what makes a lesson worth watching. Kept beside the format it fills.
 _TEACHING = """\
 How to teach this lesson (this is what makes it good):
-- Begin with something the learner can see or picture: a concrete case with small numbers,
-  an everyday situation, a real example sentence. Name the general idea only once it has
-  been seen, and then give it its symbol.
+- Example first, theory after, always. The learner watches a case happen and works it out
+  with you; only then is the general rule said, as a summary of what they just saw.
+- So a part that teaches goes in this order. Its narration opens on the case itself
+  ("Toss a coin twice."), never on a definition ("A sample space is..."). Its visual
+  begins with the case alone on the stage: the objects, small numbers, a real sentence; no
+  formula and no definition yet. Its next steps act on that case as you speak (color,
+  move, highlight, count with "set", flip a coin, roll a die), so the idea is seen
+  happening. Only then comes the formula: first in the case's own numbers, brought out of
+  the picture with "from", each number in the color of what it counts; last, if the part
+  states a rule, "transform" those numbers into the rule's symbols.
+- A name or a definition comes after two or three instances of it: show the instances,
+  point at what they share, then name it.
+- The lesson moves the same way: its first part is a concrete case with no definition in
+  it; the general statement comes in a later part, built from the cases before it; then a
+  new case shows what changes and what stays the same.
 - The picture carries the idea. Every part that teaches has a visual that changes as you
-  speak: show the thing happening, not only its formula. A formula comes after the picture
-  it describes, beside it, each symbol in the color of the thing it stands for, so the
-  learner sees what each symbol means. Then change the example and show what changes and
-  what stays the same.
+  speak, and most of its steps change what is already on the stage rather than add
+  something new.
 - Mathematics and science: show a quantity as a length, an area, a count, a slope or a
   motion; let a "param" or a "set" show how changing one thing changes another; derive the
   formula from the picture, one step at a time.
@@ -341,7 +362,8 @@ STRATEGY_BRIEFS: dict[str, str] = {
     "the steps have in common",
     "analogy": "lead with a comparison from everyday life, then say exactly where the "
     "comparison stops working",
-    "mathematical": "lead with the definition and derive the result one justified step at a time",
+    "mathematical": "begin with one small case worked in numbers, then give the definition "
+    "and derive the result from it one justified step at a time",
     "socratic": "lead with questions the learner can answer, each a small step toward the idea",
     "computational": "lead with a tiny procedure carried out by hand, value by value, the "
     "way a program would run it",
