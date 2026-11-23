@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.6] - 2026-11-23
+
+The sixth alpha. Make a course straight from your files: choose them in the new-course
+dialog, leave the name to Adle if you like, and let it set the course up, adding the
+concepts it suggests and writing the first lesson. A concept's page reads from what it is
+to how you are doing with it. Every natural voice is timed on your own computer, and a
+lesson in a voice slower than speech there waits until you will not catch up with it.
+
 ### Changed
 
 - **Make a course straight from your files.** Choose them in the new-course dialog. Leave

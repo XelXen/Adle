@@ -1,6 +1,6 @@
 [project]
 name = "adle-core"
-version = "0.1.0a5"
+version = "0.1.0a6"
 description = "Adle local core service: ingestion, curriculum, learner model, and AI orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
