@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.7] - 2026-11-23
+
+The seventh alpha. The controls under a lesson fit on one row, with icons for reading
+aloud, the transcript and "This didn’t help", and "This didn’t help" can be undone. A
+picture’s words no longer cover each other or run off the screen, and a slide keeps up
+with what is being said.
+
 ### Changed
 
 - **The controls under a lesson fit on one row.** Read aloud, Transcript and "This didn’t
