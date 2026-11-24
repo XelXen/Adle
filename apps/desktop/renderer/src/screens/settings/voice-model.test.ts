@@ -8,6 +8,7 @@ import {
   downloadNote,
   speedNote,
   isRecommended,
+  recordingNote,
   setupProgress,
   tierState,
 } from './voice-model';
@@ -48,7 +49,7 @@ function aJob(overrides: Partial<Job> = {}): Job {
 
 function aStatus(overrides: Partial<VoiceStatus> = {}): VoiceStatus {
   return {
-    tiers: [aTier('kokoro'), aTier('standard'), aTier('expressive')],
+    tiers: [aTier('kokoro'), aTier('expressive')],
     tier: null,
     enabled: false,
     speakers: {},
@@ -56,6 +57,9 @@ function aStatus(overrides: Partial<VoiceStatus> = {}): VoiceStatus {
     gpu: null,
     borrowed: false,
     setting_up: null,
+    design: 'A warm voice.',
+    design_presets: [],
+    recording: [],
     ...overrides,
   };
 }
@@ -79,39 +83,36 @@ describe('the sizes of a download', () => {
 
 describe('where a voice stands', () => {
   it('is in use, set up, being set up, waiting, offered, or out of reach', () => {
-    const job = aJob({ subject_id: 'standard' });
+    const job = aJob({ subject_id: 'expressive' });
     const status = aStatus({
-      tiers: [
-        aTier('kokoro', { ready: true }),
-        aTier('standard'),
-        aTier('expressive', { fits: false, why: 'It needs an NVIDIA graphics card.' }),
-      ],
+      tiers: [aTier('kokoro', { ready: true }), aTier('expressive')],
       tier: 'kokoro',
       enabled: true,
       setting_up: job,
     });
-    const [kokoro, standard, expressive] = status.tiers;
+    const [kokoro, expressive] = status.tiers;
     expect(tierState(status, kokoro!)).toEqual({ kind: 'in-use' });
-    expect(tierState(status, standard!)).toEqual({ kind: 'setting-up', job });
-    expect(tierState(status, expressive!)).toEqual({
-      kind: 'unavailable',
-      why: 'It needs an NVIDIA graphics card.',
-    });
+    expect(tierState(status, expressive!)).toEqual({ kind: 'setting-up', job });
     expect(computerVoiceInUse(status)).toBe(false);
 
     const off = { ...status, enabled: false, setting_up: null };
     expect(tierState(off, kokoro!)).toEqual({ kind: 'ready' });
-    expect(tierState(off, standard!)).toEqual({ kind: 'available' });
+    expect(tierState(off, expressive!)).toEqual({ kind: 'available' });
     expect(computerVoiceInUse(off)).toBe(true);
     // One voice is set up at a time.
     const another = { ...off, setting_up: aJob({ subject_id: 'kokoro' }) };
-    expect(tierState(another, standard!)).toEqual({ kind: 'waiting' });
+    expect(tierState(another, expressive!)).toEqual({ kind: 'waiting' });
+    const unable = aTier('expressive', { fits: false, why: 'It needs an NVIDIA graphics card.' });
+    expect(tierState(off, unable)).toEqual({
+      kind: 'unavailable',
+      why: 'It needs an NVIDIA graphics card.',
+    });
   });
 
   it('offers the richest this computer runs as the best, until one is set up', () => {
-    const status = aStatus({ recommended: 'standard' });
-    expect(status.tiers.map((tier) => isRecommended(status, tier))).toEqual([false, true, false]);
-    const one = aStatus({ tiers: [aTier('kokoro', { ready: true }), aTier('standard')] });
+    const status = aStatus({ recommended: 'expressive' });
+    expect(status.tiers.map((tier) => isRecommended(status, tier))).toEqual([false, true]);
+    const one = aStatus({ tiers: [aTier('kokoro', { ready: true }), aTier('expressive')] });
     expect(one.tiers.some((tier) => isRecommended(one, tier))).toBe(false);
   });
 });
@@ -156,6 +157,22 @@ describe('speedNote', () => {
     expect(speedNote(aTier('kokoro', { ready: true, speed: 'faster' }))).toBeNull();
     expect(speedNote(aTier('kokoro', { ready: true }))).toBeNull();
     // Not set up here: nothing has been timed.
-    expect(speedNote(aTier('standard', { speed: 'slower' }))).toBeNull();
+    expect(speedNote(aTier('expressive', { speed: 'slower' }))).toBeNull();
+  });
+});
+
+describe('recordingNote', () => {
+  it('says which lesson is being recorded in a voice just chosen, and how far it has come', () => {
+    expect(recordingNote([])).toBeNull();
+    const first = { lesson_id: 'les_1', title: 'Weights and bias', done: 3, total: 20 };
+    expect(recordingNote([first])).toBe(
+      'Recording “Weights and bias” in this voice (3 of 20 lines).',
+    );
+    expect(recordingNote([first, { ...first, lesson_id: 'les_2', done: 0 }])).toBe(
+      'Recording “Weights and bias” in this voice (3 of 20 lines), then 1 more lesson.',
+    );
+    expect(recordingNote([{ ...first, total: 0 }])).toBe(
+      'Recording “Weights and bias” in this voice.',
+    );
   });
 });

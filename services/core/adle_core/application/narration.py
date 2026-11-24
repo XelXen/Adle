@@ -11,8 +11,13 @@ loaded; and it can be started once its first part can be heard. Loading a model 
 longer than saying a line with it, so nothing is loaded twice for one lesson.
 
 A clip is named by the voice and the words it says, so that a lesson whose words or voice
-change is recorded again and nothing is spoken in a voice that was not chosen. The clips of a
-lesson go when the lesson goes.
+change is recorded again and nothing is spoken in a voice that was not chosen. Every voice's
+clips are kept: a voice chosen again plays what it recorded (ADR-057). The clips of a lesson
+go when the lesson goes, and a voice's when the voice is removed.
+
+When the voice changes, the lessons the learner opened last and has not finished are
+recorded in the new one at once, before they are opened; a recording under way goes on in
+the voice chosen now, from its next line (ADR-057).
 """
 
 from __future__ import annotations
@@ -37,9 +42,19 @@ from adle_core.application.jobs import (
     JobSnapshot,
 )
 from adle_core.application.lessons import LessonService
-from adle_core.errors import AdleError, ConflictError, NotFoundError
+from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
 from adle_core.infrastructure.ids import is_id
-from adle_core.voice.catalog import DEFAULT_DESIGN, TIERS, Family, Tier
+from adle_core.lessons.ir import is_plain_text
+from adle_core.voice.catalog import (
+    DEFAULT_DESIGN,
+    MAX_DESIGN_CHARACTERS,
+    REFERENCE_TEXT,
+    RETIRED,
+    SAMPLE_TEXT,
+    TIERS,
+    Family,
+    Tier,
+)
 from adle_core.voice.catalog import tier as find_tier
 from adle_core.voice.hardware import Fit, Hardware, detect, fit
 from adle_core.voice.install import VoiceInstaller, VoiceSetupError
@@ -67,6 +82,11 @@ KIND_NARRATION = "narration_recording"
 KIND_VOICE_SETUP = "voice_setup"
 #: Loading a voice's models while a lesson's first words are written (ADR-051).
 KIND_VOICE_WARMUP = "voice_warmup"
+#: A short sample of a voice, for the learner to hear before choosing it (ADR-057).
+KIND_VOICE_SAMPLE = "voice_sample"
+#: How many of the lessons the learner opened last, and has not finished, are recorded in a
+#: new voice as soon as it is chosen, the latest first (ADR-057).
+RECORD_AHEAD_LESSONS = 2
 _CLIP = re.compile(r"^[0-9a-f]{24}$")
 
 #: How long the voice's engine stays loaded after its last line, for the next lesson.
@@ -74,8 +94,9 @@ ENGINE_IDLE_SECONDS = 180.0
 #: How long a recording waits for the next part of a lesson that is still being written.
 FOLLOW_QUIET_SECONDS = 600.0
 #: How long after a lesson is asked for it can usually be heard, until this computer has
-#: timed its voice: measured on the development machine (PERFORMANCE.md, 2026-11-23).
-READY_GUESS_SECONDS: dict[str, float] = {"kokoro": 30.0, "standard": 45.0, "expressive": 50.0}
+#: timed its voice: measured on the development machine (PERFORMANCE.md, 2026-11-23; the
+#: Expressive voice's again on 2026-11-24, now designed saying a passage first, ADR-057).
+READY_GUESS_SECONDS: dict[str, float] = {"kokoro": 30.0, "expressive": 65.0}
 #: The lines an engine says while it is still loading what it speaks with, which are not
 #: counted in how fast it is: the Expressive voice designs a lesson's voice with one model
 #: and speaks with another, loaded at its second line.
@@ -95,6 +116,18 @@ class VoiceStatus:
     speakers: dict[str, str]
     #: A voice a developer pointed Adle at: used as it is, never removed.
     borrowed: bool
+    #: Who reads the lessons in the Expressive voice, as the learner described them (ADR-057).
+    design: str = DEFAULT_DESIGN
+
+
+@dataclass(frozen=True, slots=True)
+class VoiceRecording:
+    """A lesson being recorded in the voice chosen now."""
+
+    lesson_id: str
+    title: str
+    done: int
+    total: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,8 +233,28 @@ class NarrationService:
         self._more_lock = threading.Lock()
         #: When the last warm-up began: a lesson was asked for then (``ready_after``).
         self._warmed_at: float | None = None
+        #: Lessons recorded ahead of their being opened, in a voice just chosen (ADR-057):
+        #: they step aside for what the learner opens or waits for.
+        self._ahead: set[str] = set()
         #: Told the id of a lesson when another of its parts can be heard.
         self.on_voiced: Callable[[str], None] | None = None
+        self._retire()
+
+    def _retire(self) -> None:
+        """A voice no longer offered (ADR-057) is taken off this computer, with what it
+        recorded, as the core starts: what a voice still offered here needs is kept."""
+        if self._paths.borrowed:
+            return
+        for retired in RETIRED:
+            if not any((self._paths.models / repo.folder).exists() for repo in retired.repos):
+                continue
+            try:
+                self._installer(self._paths).remove(retired, self._paths.ready_tiers())
+                self._forget_recordings(retired.id)
+            except (OSError, VoiceSetupError) as error:
+                logger.info("narration.not_retired kind=%s", type(error).__name__)
+            else:
+                logger.info("narration.retired tier=%s", retired.id)
 
     def hardware(self) -> Hardware:
         """What this computer has, found once: it does not change while Adle runs."""
@@ -244,19 +297,35 @@ class NarrationService:
             value = picked.get(each.id)
             known = {speaker.id for speaker in each.speakers}
             speakers[each.id] = value if value in known else each.default_speaker
+        design = chosen.get("design")
         return VoiceStatus(
             ready=ready,
             tier=tier,
             enabled=tier is not None and chosen.get("enabled", True) is not False,
             speakers=speakers,
             borrowed=self._paths.borrowed,
+            design=design if isinstance(design, str) and design.strip() else DEFAULT_DESIGN,
         )
 
     def choose(
-        self, *, enabled: bool | None = None, tier: str | None = None, speaker: str | None = None
+        self,
+        *,
+        enabled: bool | None = None,
+        tier: str | None = None,
+        speaker: str | None = None,
+        design: str | None = None,
     ) -> VoiceStatus:
-        """Turn the natural voice on or off, choose a size of it, or a voice of a size."""
+        """Turn the natural voice on or off, choose a size of it, a voice of a size, or say
+        who reads in the Expressive voice (an empty description is Adle's own again). A
+        voice that changes is recorded at once in what the learner is likely to open next."""
+        before = self._identity()
         chosen = self._chosen()
+        if design is not None:
+            described = _described(design)
+            if described:
+                chosen["design"] = described
+            else:
+                chosen.pop("design", None)
         if enabled is not None:
             chosen["enabled"] = enabled
         if tier is not None:
@@ -273,7 +342,40 @@ class NarrationService:
             chosen["speakers"] = speakers
         self._paths.root.mkdir(parents=True, exist_ok=True)
         self._preferences.write_text(json.dumps(chosen), encoding="utf-8")
+        if self._identity() != before:
+            self._record_recent()
         return self.status()
+
+    def _identity(self) -> tuple[Any, ...]:
+        """What makes the voice lessons are read in sound as it does: a change to any of it
+        is a new voice."""
+        status = self.status()
+        if not status.enabled or status.tier is None:
+            return (False,)
+        design = status.design if status.tier == "expressive" else None
+        return (True, status.tier, status.speakers.get(status.tier), design)
+
+    def _record_recent(self) -> None:
+        """The lessons the learner opened last and has not finished, recorded now in the
+        voice chosen, before they are opened (ADR-057). Nothing with no voice chosen."""
+        try:
+            if not self.status().enabled:
+                return
+            for lesson_id in self._lessons.unfinished(RECORD_AHEAD_LESSONS):
+                self.start(lesson_id, ahead=True)
+        except (AdleError, OSError) as error:
+            logger.info("narration.not_recorded_ahead kind=%s", type(error).__name__)
+
+    def _step_aside(self, keep: str | None = None) -> None:
+        """Lessons recorded ahead of time stop for what the learner is waiting for: the voice
+        works on one thing at a time. A lesson's clips so far are kept."""
+        with self._more_lock:
+            ahead = [lesson_id for lesson_id in self._ahead if lesson_id != keep]
+            self._ahead.difference_update(ahead)
+        for lesson_id in ahead:
+            running = self._jobs.find_active(KIND_NARRATION, lesson_id)
+            if running is not None:
+                self._jobs.cancel(running.id)
 
     # -- setting a voice up, and taking it away ---------------------------------------------
 
@@ -340,6 +442,7 @@ class NarrationService:
         keep = [other for other in self._paths.ready_tiers() if other.id != tier.id]
         self._installer(self._paths).remove(tier, keep)
         self._forget_recordings(tier.id)
+        shutil.rmtree(self._samples(tier.id), ignore_errors=True)
         return self.status()
 
     def _forget_recordings(self, tier_id: str) -> None:
@@ -364,14 +467,26 @@ class NarrationService:
         if not status.enabled or tier is None:
             raise VoiceUnavailableError()
         if tier.id == "expressive":
-            # Designed from what the lesson says of its narrator, written with it; a lesson
-            # that says nothing (the sample course's, or one written before) is read in
-            # Adle's own.
+            # The learner's voice, delivered as the lesson says it is delivered, written with
+            # it (ADR-057). A lesson that says nothing (the sample course's) is delivered
+            # as the voice is.
             folder = self._folder(lesson_id)
-            design = self._lessons.get_lesson(lesson_id).voice or DEFAULT_DESIGN
-            reference = folder / f"voice-{_digest(design)}.wav"
-            return tier, {"tier": tier.id, "design": design, "reference": str(reference)}
+            delivery = self._lessons.get_lesson(lesson_id).voice
+            design = f"{status.design} Its delivery here: {delivery}" if delivery else status.design
+            return tier, self._designed(design, folder)
         return tier, {"tier": tier.id, "speaker": status.speakers[tier.id]}
+
+    @staticmethod
+    def _designed(design: str, folder: Path) -> dict[str, Any]:
+        """The Expressive voice of a description: designed once, saying a passage made for
+        it, kept in ``folder``, and every line spoken as a copy of it."""
+        reference = folder / f"voice-{_digest(design + chr(10) + REFERENCE_TEXT)}.wav"
+        return {
+            "tier": "expressive",
+            "design": design,
+            "reference": str(reference),
+            "reference_text": REFERENCE_TEXT,
+        }
 
     def _folder(self, lesson_id: str) -> Any:
         if not is_id(lesson_id, "les"):
@@ -435,12 +550,19 @@ class NarrationService:
         except (VoiceUnavailableError, NotFoundError, ConflictError, OSError) as error:
             logger.info("narration.not_recorded_ahead kind=%s", type(error).__name__)
 
-    def start(self, lesson_id: str) -> JobSnapshot:
+    def start(self, lesson_id: str, *, ahead: bool = False) -> JobSnapshot:
         """Record what a lesson says, in the background. A recording under way is returned,
-        and told that there may be more to record."""
+        and told that there may be more to record. ``ahead``: recorded before the learner
+        opens it, in a voice just chosen; otherwise lessons recorded ahead step aside."""
         self._voice(lesson_id)
         self._lessons.get_lesson(lesson_id)
+        if not ahead:
+            self._step_aside(keep=lesson_id)
         with self._more_lock:
+            if ahead:
+                self._ahead.add(lesson_id)
+            else:
+                self._ahead.discard(lesson_id)
             running = self._jobs.find_active(KIND_NARRATION, lesson_id)
             if running is not None:
                 self._more.setdefault(lesson_id, threading.Event()).set()
@@ -458,12 +580,29 @@ class NarrationService:
         """Record every line the lesson has, in the order it says them; while it is still
         being written, wait for its next part and record that too. One engine, loaded once,
         for the whole of it."""
-        tier, voice = self._voice(lesson_id)
+        # The voice is read after what makes it the voice, so that a change between the two
+        # is seen at the first line (ADR-057).
+        identity = self._identity()
+        try:
+            tier, voice = self._voice(lesson_id)
+        except VoiceUnavailableError:
+            identity = (False,)
         folder = self._folder(lesson_id)
-        folder.mkdir(parents=True, exist_ok=True)
         with self._more_lock:
             more = self._more.setdefault(lesson_id, threading.Event())
+        if not identity[0]:
+            # The natural voice was turned off before this began: nothing is recorded.
+            with self._more_lock:
+                if self._more.get(lesson_id) is more:
+                    del self._more[lesson_id]
+                self._recording.discard(lesson_id)
+                self._ahead.discard(lesson_id)
+            self._tell_voiced(lesson_id)
+            return {"kind": "narration", "lesson_id": lesson_id, "lines": 0, "recorded": 0}
+        folder.mkdir(parents=True, exist_ok=True)
         engine = self._engines.take(tier.family)
+        family = tier.family
+        turned_off = False
         recorded = 0
         lines: list[str] = []
         quiet_since = time.monotonic()
@@ -476,6 +615,18 @@ class NarrationService:
                 lines = self._lines(lesson_id)
                 said = 0
                 for text in lines:
+                    chosen = self._identity()
+                    if chosen != identity:
+                        # Another voice was chosen: what is left is said in it (ADR-057).
+                        if not chosen[0]:
+                            turned_off = True
+                            break
+                        identity = chosen
+                        tier, voice = self._voice(lesson_id)
+                        if tier.family != family:
+                            self._engines.give_back()
+                            engine = self._engines.take(tier.family)
+                            family = tier.family
                     name = self._name(voice, text)
                     clip, timing = folder / f"{name}.clip", folder / f"{name}.json"
                     if clip.is_file() and timing.is_file():
@@ -506,6 +657,8 @@ class NarrationService:
                     if now != heard or became_ready:
                         heard = now
                         self._tell_voiced(lesson_id)
+                if turned_off:
+                    break
                 if said:
                     # Parts may have come while these were said: the lesson is read again.
                     quiet_since = time.monotonic()
@@ -531,6 +684,7 @@ class NarrationService:
                 if self._more.get(lesson_id) is more:
                     del self._more[lesson_id]
                 self._recording.discard(lesson_id)
+                self._ahead.discard(lesson_id)
             # Ended, however it ended: whoever waits for the lesson's voice is told, so that
             # a voice that failed holds nothing back.
             self._tell_voiced(lesson_id)
@@ -688,6 +842,87 @@ class NarrationService:
         """The core is stopping: the engine goes with it."""
         self._engines.close()
 
+    def recordings(self) -> list[VoiceRecording]:
+        """The lessons being recorded now, and how far each has come."""
+        found: list[VoiceRecording] = []
+        for job in self._jobs.list_all_active([KIND_NARRATION]):
+            if job.subject_id is None:
+                continue
+            try:
+                title = self._lessons.get_lesson(job.subject_id).title
+            except NotFoundError:
+                continue
+            found.append(
+                VoiceRecording(job.subject_id, title, job.progress_done, job.progress_total)
+            )
+        return found
+
+    # -- a sample of a voice ---------------------------------------------------------------------
+
+    def sample(
+        self, tier_id: str, *, speaker: str | None = None, design: str | None = None
+    ) -> JobSnapshot:
+        """A few words in a voice set up here, for the learner to hear before choosing it: a
+        speaker of the Natural voice, or the Expressive voice of a description (ADR-057).
+        Made once and kept; lessons recorded ahead of time step aside for it."""
+        tier = find_tier(tier_id)
+        if tier is None or tier.id not in self.status().ready:
+            raise NotFoundError("That voice is not set up here.")
+        voice = self._sample_voice(tier, speaker, design)
+        name = self._name(voice, SAMPLE_TEXT)
+        running = self._jobs.find_active(KIND_VOICE_SAMPLE, name)
+        if running is not None:
+            return running
+        self._step_aside()
+        return self._jobs.submit(
+            KIND_VOICE_SAMPLE,
+            lambda context: self._sample(tier, voice, name, context),
+            subject_id=name,
+            lane=LANE_VOICE,
+        )
+
+    def _sample_voice(self, tier: Tier, speaker: str | None, design: str | None) -> dict[str, Any]:
+        if tier.id == "expressive":
+            described = _described(design) if design is not None else ""
+            folder = self._samples(tier.id)
+            return self._designed(described or self.status().design, folder)
+        chosen = speaker or self.status().speakers.get(tier.id) or tier.default_speaker
+        if chosen not in {item.id for item in tier.speakers}:
+            raise NotFoundError("There is no such voice.")
+        return {"tier": tier.id, "speaker": chosen}
+
+    def _samples(self, tier_id: str) -> Path:
+        return self._paths.root / "samples" / tier_id
+
+    def _sample(
+        self, tier: Tier, voice: dict[str, Any], name: str, context: JobContext
+    ) -> dict[str, Any]:
+        folder = self._samples(tier.id)
+        folder.mkdir(parents=True, exist_ok=True)
+        clip = folder / f"{name}.clip"
+        if not clip.is_file():
+            context.report(0, 1, "Making a sample")
+            engine = self._engines.take(tier.family)
+            try:
+                engine.speak(SAMPLE_TEXT, voice, clip, cancelled=lambda: context.cancelled)
+            finally:
+                self._engines.give_back()
+        # What stepped aside for it carries on.
+        self._record_recent()
+        context.report(1, 1, "Done")
+        return {"kind": "voice_sample", "sample": name}
+
+    def sample_clip(self, name: str) -> tuple[bytes, str]:
+        """A sample made before, and the kind of sound it is."""
+        if not _CLIP.match(name):
+            raise NotFoundError("Sample not found.")
+        for tier in TIERS:
+            path = self._samples(tier.id) / f"{name}.clip"
+            if path.is_file():
+                data = path.read_bytes()
+                return data, _sound_kind(data)
+        raise NotFoundError("Sample not found.")
+
     # -- what has been recorded ------------------------------------------------------------
 
     def clips(self, lesson_id: str) -> list[NarrationClip]:
@@ -751,6 +986,18 @@ class NarrationService:
     def ensure_not_recording(self, lesson_id: str) -> None:
         if self._jobs.find_active(KIND_NARRATION, lesson_id) is not None:
             raise ConflictError("The narration of this lesson is being recorded.")
+
+
+def _described(text: str) -> str:
+    """A learner's description of a voice, as one plain line: empty for Adle's own."""
+    described = " ".join(text.split())
+    if len(described) > MAX_DESIGN_CHARACTERS:
+        raise ValidationFailedError(
+            f"Describe the voice in {MAX_DESIGN_CHARACTERS} characters or fewer."
+        )
+    if described and not is_plain_text(described):
+        raise ValidationFailedError("Describe the voice in plain words.")
+    return described
 
 
 def _digest(text: str) -> str:

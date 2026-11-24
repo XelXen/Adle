@@ -313,19 +313,32 @@ test.describe('the natural voice', () => {
     await page.getByRole('tab', { name: 'Learning' }).click();
 
     const voices = page.getByRole('list', { name: 'Voices' });
+    // Rich is no longer offered (ADR-057).
     await expect(voices.getByRole('heading')).toHaveText([
       'Computer’s voice',
       'Natural',
-      'Rich',
       'Expressive',
     ]);
     const natural = voices.getByRole('listitem', { name: 'Natural' });
-    await expect(natural.getByText('In use')).toBeVisible();
+    await expect(natural.getByText('In use').first()).toBeVisible();
     // Set up by hand, as here: nothing is offered to set it up or take it away.
     await expect(voices.getByRole('button', { name: /^(Set up|Remove)/ })).toHaveCount(0);
 
-    // A speaker of the voice in use.
-    await natural.getByRole('combobox', { name: 'Speaker' }).selectOption('bf_emma');
+    // A speaker heard before it is chosen: a sample, made by the voice and played here.
+    await natural.getByRole('button', { name: 'Listen to Emma' }).click();
+    await expect(natural.getByRole('button', { name: 'Listen to Emma' })).toBeEnabled({
+      timeout: 30_000,
+    });
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(
+      (await invoke<{ speakers: Record<string, string> }>(page, 'voice.status')).speakers.kokoro,
+    ).toBe('af_heart');
+    // Then chosen.
+    await natural.getByRole('button', { name: 'Use Emma' }).click();
+    await expect(natural.getByRole('button', { name: 'Use Emma' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await expect
       .poll(
         async () =>

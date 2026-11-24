@@ -20,7 +20,7 @@ import httpx2 as httpx
 import pytest
 
 from adle_core.voice import install as install_module
-from adle_core.voice.catalog import TIERS, ModelFile, ModelRepo, Speaker, Tier, TierId
+from adle_core.voice.catalog import RETIRED, TIERS, ModelFile, ModelRepo, Speaker, Tier, TierId
 from adle_core.voice.catalog import tier as find_tier
 from adle_core.voice.install import (
     VoiceInstaller,
@@ -238,7 +238,7 @@ def test_a_file_another_size_has_already_is_copied_and_not_downloaded(
     second = a_tier(
         ("speech/model.bin", WEIGHTS),
         ("config.json", CONFIG),
-        tier_id="standard",
+        tier_id="expressive",
         repo="test/Second",
     )
     monkeypatch.setattr(install_module, "TIERS", (first, second))
@@ -473,7 +473,7 @@ def test_every_program_a_voice_runs_with_is_pinned_with_its_hashes(
 
 def test_removing_a_size_keeps_what_another_size_here_still_needs(tmp_path: Path) -> None:
     paths = paths_in(tmp_path / "voice")
-    for each in TIERS:
+    for each in (*TIERS, *RETIRED):
         for repo in each.repos:
             for file in repo.files:
                 path = paths.models / repo.folder / file.path
@@ -481,16 +481,18 @@ def test_removing_a_size_keeps_what_another_size_here_still_needs(tmp_path: Path
                 path.write_bytes(b"")
     paths.aligner_file().parent.mkdir(parents=True, exist_ok=True)
     paths.aligner_file().write_bytes(b"")
-    kokoro, standard, expressive = TIERS
+    kokoro, expressive = TIERS
+    (rich,) = RETIRED
     if setup_mark("qwen") is None:
         pytest.skip("Qwen3-TTS is not offered on this system.")
     assert paths.ready_tiers() == list(TIERS)
 
     installer = VoiceInstaller(paths)
-    installer.remove(standard, [kokoro, expressive])
+    # Rich, retired (ADR-057), goes as a size taken away does.
+    installer.remove(rich, [kokoro, expressive])
     assert paths.ready_tiers() == [kokoro, expressive]
     # Its own model went; the programs and the aligner stay, for the other Qwen voice.
-    assert not (paths.models / standard.repos[0].folder).exists()
+    assert not (paths.models / rich.repos[0].folder).exists()
     assert paths.environment("qwen").is_dir()
     assert paths.aligner_file().is_file()
 

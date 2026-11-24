@@ -175,7 +175,9 @@ is built from it, and an alpha or a stable version is published from a release c
   edge of the screen, and a step is never longer than its words (ADR-055, ADR-056).
 - A lesson in a natural voice is made with its voice (ADR-051): ready once its first part
   can be heard, and a line not recorded yet is waited for, never read in another voice
-  unless the learner chooses that or no recording will come.
+  unless the learner chooses that or no recording will come. A voice chosen is recorded at
+  once in the lessons opened last, and can be heard before it is chosen; the learner says
+  who reads in the Expressive voice, each lesson only how it is delivered (ADR-057).
 - A lesson is watched (ADR-035): its pictures on one dark screen in either theme, the
   words being said along its foot with the spoken word marked, the whole screen if wanted.
 

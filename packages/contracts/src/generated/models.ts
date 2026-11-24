@@ -942,12 +942,41 @@ export interface UnhelpfulReport {
   segment_id: string;
 }
 export interface VoiceChoice {
+  design?: string | null;
   enabled?: boolean | null;
   speaker?: string | null;
-  tier?: ('kokoro' | 'standard' | 'expressive') | null;
+  tier?: ('kokoro' | 'expressive') | null;
+}
+/**
+ * A description of a voice to start from.
+ *
+ */
+export interface VoiceDesignPreset {
+  name: string;
+  text: string;
+}
+/**
+ * A lesson being recorded in the voice chosen now (ADR-057).
+ *
+ */
+export interface VoiceRecording {
+  done: number;
+  lesson_id: string;
+  title: string;
+  total: number;
+}
+/**
+ * A few words in a voice set up here: a speaker of a size, or the Expressive voice of a
+ * description (the one chosen when none is given).
+ *
+ */
+export interface VoiceSampleRequest {
+  design?: string | null;
+  speaker?: string | null;
+  tier: 'kokoro' | 'expressive';
 }
 export interface VoiceSetup {
-  tier: 'kokoro' | 'standard' | 'expressive';
+  tier: 'kokoro' | 'expressive';
 }
 export interface VoiceSpeaker {
   description: string;
@@ -956,14 +985,17 @@ export interface VoiceSpeaker {
 }
 export interface VoiceStatus {
   borrowed: boolean;
+  design: string;
+  design_presets: VoiceDesignPreset[];
   enabled: boolean;
   gpu: string | null;
-  recommended: ('kokoro' | 'standard' | 'expressive') | null;
+  recommended: ('kokoro' | 'expressive') | null;
+  recording: VoiceRecording[];
   setting_up: Job | null;
   speakers: {
     [k: string]: string | undefined;
   };
-  tier: ('kokoro' | 'standard' | 'expressive') | null;
+  tier: ('kokoro' | 'expressive') | null;
   tiers: VoiceTier[];
 }
 /**
@@ -973,7 +1005,7 @@ export interface VoiceStatus {
 export interface VoiceTier {
   description: string;
   fits: boolean;
-  id: 'kokoro' | 'standard' | 'expressive';
+  id: 'kokoro' | 'expressive';
   min_memory_gb: number | null;
   model_bytes: number;
   name: string;

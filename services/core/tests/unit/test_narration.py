@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 
 from adle_core.application.narration import KIND_NARRATION, NarrationService
 from adle_core.application.services import Services
-from adle_core.voice.catalog import ALIGNER, DEFAULT_DESIGN, TIERS, Tier
+from adle_core.voice.catalog import ALIGNER, DEFAULT_DESIGN, REFERENCE_TEXT, RETIRED, TIERS, Tier
 from adle_core.voice.catalog import tier as find_tier
 from adle_core.voice.engine import spoken_number, words_of
 from adle_core.voice.hardware import Hardware, fit, nvidia_card
@@ -75,7 +75,7 @@ def set_up(root: Path, *tiers: str) -> VoicePaths:
 @pytest.fixture
 def voiced(services: Services, tmp_path: Path) -> Services:
     """The services, with a natural voice of every size set up."""
-    paths = set_up(tmp_path / "voice", "kokoro", "standard", "expressive")
+    paths = set_up(tmp_path / "voice", "kokoro", "expressive")
     services.narration = NarrationService(
         services.lessons, services.jobs, paths, hardware=lambda: WITH_CARD
     )
@@ -109,13 +109,13 @@ def record(client: TestClient, services: Services, lesson_id: str) -> Any:
 
 
 def test_each_size_says_what_it_needs_and_the_richest_that_fits_is_offered() -> None:
-    kokoro, standard, expressive = TIERS
-    assert [tier.id for tier in TIERS] == ["kokoro", "standard", "expressive"]
+    kokoro, expressive = TIERS
+    # Rich is no longer offered (ADR-057).
+    assert [tier.id for tier in TIERS] == ["kokoro", "expressive"]
     assert fit(kokoro, DESKTOP).fits
-    assert not fit(standard, DESKTOP).fits
-    assert fit(standard, DESKTOP).why == "It needs an NVIDIA graphics card."
+    assert not fit(expressive, DESKTOP).fits
+    assert fit(expressive, DESKTOP).why == "It needs an NVIDIA graphics card."
     small = Hardware(system="linux", machine="x86_64", gpu="Small card", gpu_memory_gb=6.0)
-    assert fit(standard, small).fits
     assert fit(expressive, small).why == (
         "It needs an NVIDIA graphics card with 8 GB of memory; this one has 6 GB."
     )
@@ -170,7 +170,7 @@ def test_a_number_is_found_as_it_is_said() -> None:
 def test_without_a_voice_lessons_are_read_as_before(client: TestClient) -> None:
     status = client.get("/v1/voice").json()
     assert (status["tier"], status["enabled"]) == (None, False)
-    assert [tier["ready"] for tier in status["tiers"]] == [False, False, False]
+    assert [tier["ready"] for tier in status["tiers"]] == [False, False]
     lesson = a_lesson(client)
     assert client.get(f"/v1/lessons/{lesson['id']}/narration").json() == {
         "lines": [],
@@ -184,19 +184,19 @@ def test_the_richest_voice_here_reads_the_lessons_and_any_can_be_chosen(
     client: TestClient, voiced: Services
 ) -> None:
     status = client.get("/v1/voice").json()
-    assert [tier["id"] for tier in status["tiers"]] == ["kokoro", "standard", "expressive"]
+    assert [tier["id"] for tier in status["tiers"]] == ["kokoro", "expressive"]
     assert all(tier["ready"] and tier["fits"] for tier in status["tiers"])
     assert (status["tier"], status["enabled"], status["recommended"]) == (
         "expressive",
         True,
         "expressive",
     )
-    assert status["speakers"] == {"kokoro": "af_heart", "standard": "Aiden"}
+    assert status["speakers"] == {"kokoro": "af_heart"}
     assert status["gpu"] == "NVIDIA GeForce RTX 4080"
     kokoro = status["tiers"][0]
     assert kokoro["min_memory_gb"] is None
     assert [speaker["name"] for speaker in kokoro["speakers"]][:2] == ["Heart", "Bella"]
-    assert status["tiers"][2]["speakers"] == []
+    assert status["tiers"][1]["speakers"] == []
 
     chosen = client.put("/v1/voice", json={"tier": "kokoro", "speaker": "bf_emma"}).json()
     assert (chosen["tier"], chosen["speakers"]["kokoro"]) == ("kokoro", "bf_emma")
@@ -303,7 +303,7 @@ def test_a_clip_is_named_by_the_core_and_never_by_a_path(
 def test_a_lesson_that_goes_takes_its_recordings_with_it(
     client: TestClient, voiced: Services, tmp_path: Path
 ) -> None:
-    client.put("/v1/voice", json={"tier": "standard"})
+    client.put("/v1/voice", json={"tier": "kokoro"})
     lesson = a_lesson(client)
     record(client, voiced, lesson["id"])
     folder = tmp_path / "voice" / "clips" / lesson["id"]
@@ -332,25 +332,46 @@ def test_the_expressive_voice_is_designed_from_what_the_lesson_says_of_its_narra
 
     monkeypatch.setattr(VoiceEngine, "speak", heard)
     record(client, voiced, lesson["id"])
-    # The sample course's lessons say nothing of their narrator: Adle's own voice.
+    # The sample course's lessons say nothing of how they are delivered: the voice alone,
+    # Adle's own until the learner describes theirs, designed saying a passage made for it.
     assert {entry["design"] for entry in asked} == {DEFAULT_DESIGN}
+    assert {entry["reference_text"] for entry in asked} == {REFERENCE_TEXT}
 
     stored = voiced.lessons.get_lesson
     monkeypatch.setattr(
         voiced.lessons,
         "get_lesson",
-        lambda lesson_id: stored(lesson_id).model_copy(update={"voice": "A bright, quick voice."}),
+        lambda lesson_id: stored(lesson_id).model_copy(update={"voice": "Brisk and bright."}),
     )
     # Another voice: nothing recorded in the old one is played.
     assert client.get(f"/v1/lessons/{lesson['id']}/narration").json()["lines"] == []
     asked.clear()
     record(client, voiced, lesson["id"])
-    assert {entry["design"] for entry in asked} == {"A bright, quick voice."}
+    # The learner's voice, delivered as the lesson says it is (ADR-057).
+    assert {entry["design"] for entry in asked} == {
+        f"{DEFAULT_DESIGN} Its delivery here: Brisk and bright."
+    }
     # Designed once, for this lesson, and kept beside its recordings.
     (reference,) = {entry["reference"] for entry in asked}
     assert Path(reference).parent.name == lesson["id"]
     lines = client.get(f"/v1/lessons/{lesson['id']}/narration").json()["lines"]
     assert len(lines) == len(lines_of(lesson))
+
+    # The learner describes the voice: every lesson is read in it, with its own delivery.
+    chosen = client.put("/v1/voice", json={"design": "  A deep,   calm voice.  "}).json()
+    assert chosen["design"] == "A deep, calm voice."
+    asked.clear()
+    record(client, voiced, lesson["id"])
+    assert {entry["design"] for entry in asked} == {
+        "A deep, calm voice. Its delivery here: Brisk and bright."
+    }
+    # Emptied, it is Adle's own again; too long, or not words, it is refused.
+    assert client.put("/v1/voice", json={"design": ""}).json()["design"] == DEFAULT_DESIGN
+    assert client.put("/v1/voice", json={"design": "x" * 201}).status_code == 422
+    assert client.put("/v1/voice", json={"design": "As on https://example.com"}).status_code == 422
+    presets = client.get("/v1/voice").json()["design_presets"]
+    assert presets[0] == {"name": "Warm teacher", "text": DEFAULT_DESIGN}
+    assert len(presets) >= 4
 
 
 def test_a_line_the_voice_cannot_say_fails_the_recording_and_is_said_plainly(
@@ -418,7 +439,7 @@ def test_a_size_is_set_up_in_the_background_and_then_reads_the_lessons(
     job = services.jobs.wait(started.json()["id"], timeout=30)
     assert (job.kind, job.status, job.subject_id) == ("voice_setup", "succeeded", "expressive")
     status = client.get("/v1/voice").json()
-    assert [tier["ready"] for tier in status["tiers"]] == [True, False, True]
+    assert [tier["ready"] for tier in status["tiers"]] == [True, True]
     assert (status["tier"], status["enabled"], status["setting_up"]) == ("expressive", True, None)
     # What each size takes to set up is said before it is: its models, and its programs.
     assert all(tier["model_bytes"] > 0 and tier["program_bytes"] > 0 for tier in status["tiers"])
@@ -429,17 +450,17 @@ def test_one_size_is_set_up_at_a_time_and_a_setup_can_be_stopped(
 ) -> None:
     held = threading.Event()
     with_voice(services, tmp_path, installer=an_installer(held=held))
-    first = client.post("/v1/voice/setup", json={"tier": "standard"}).json()
+    first = client.post("/v1/voice/setup", json={"tier": "kokoro"}).json()
     try:
         # Asked again, it is the same setup; another size waits for it.
-        assert client.post("/v1/voice/setup", json={"tier": "standard"}).json()["id"] == first["id"]
+        assert client.post("/v1/voice/setup", json={"tier": "kokoro"}).json()["id"] == first["id"]
         other = client.post("/v1/voice/setup", json={"tier": "expressive"})
         assert other.status_code == 409
         assert other.json()["error"]["message"] == (
             "Another voice is being set up. Wait for it, or stop it."
         )
         setting_up = client.get("/v1/voice").json()["setting_up"]
-        assert (setting_up["id"], setting_up["subject_id"]) == (first["id"], "standard")
+        assert (setting_up["id"], setting_up["subject_id"]) == (first["id"], "kokoro")
         # Nothing is taken away while a voice is being set up.
         assert client.delete("/v1/voice/kokoro").status_code == 409
         assert client.post(f"/v1/jobs/{first['id']}/cancel").status_code == 200
@@ -455,7 +476,7 @@ def test_a_size_this_computer_cannot_run_is_not_set_up(
     client: TestClient, services: Services, tmp_path: Path
 ) -> None:
     with_voice(services, tmp_path, hardware=DESKTOP)
-    refused = client.post("/v1/voice/setup", json={"tier": "standard"})
+    refused = client.post("/v1/voice/setup", json={"tier": "expressive"})
     assert refused.status_code == 409
     assert refused.json()["error"]["message"] == "It needs an NVIDIA graphics card."
     assert client.post("/v1/voice/setup", json={"tier": "huge"}).status_code == 422
@@ -485,7 +506,7 @@ def test_a_voice_set_up_by_hand_is_never_set_up_or_taken_away_from_here(
         hardware=lambda: WITH_CARD,
     )
     for response in (
-        client.post("/v1/voice/setup", json={"tier": "standard"}),
+        client.post("/v1/voice/setup", json={"tier": "expressive"}),
         client.delete("/v1/voice/kokoro"),
     ):
         assert response.status_code == 409
@@ -497,22 +518,216 @@ def test_a_voice_set_up_by_hand_is_never_set_up_or_taken_away_from_here(
 def test_taking_a_size_away_takes_what_it_recorded_and_leaves_the_others(
     client: TestClient, services: Services, tmp_path: Path
 ) -> None:
-    paths = with_voice(services, tmp_path, "kokoro", "standard")
+    paths = with_voice(services, tmp_path, "kokoro", "expressive")
     lesson = a_lesson(client)
     client.put("/v1/voice", json={"tier": "kokoro"})
     record(client, services, lesson["id"])
-    client.put("/v1/voice", json={"tier": "standard"})
+    client.put("/v1/voice", json={"tier": "expressive"})
     record(client, services, lesson["id"])
     folder = paths.clips / lesson["id"]
     assert len(list(folder.glob("*.clip"))) == 2 * len(lines_of(lesson))
 
-    status = client.delete("/v1/voice/standard").json()
-    assert [tier["ready"] for tier in status["tiers"]] == [True, False, False]
+    status = client.delete("/v1/voice/expressive").json()
+    assert [tier["ready"] for tier in status["tiers"]] == [True, False]
     # The voice that is left reads the lessons, and what it recorded is still there.
     assert (status["tier"], status["enabled"]) == ("kokoro", True)
     assert len(list(folder.glob("*.clip"))) == len(lines_of(lesson))
     lines = client.get(f"/v1/lessons/{lesson['id']}/narration").json()["lines"]
     assert len(lines) == len(lines_of(lesson))
-    assert not (paths.models / "Qwen3-TTS-12Hz-0.6B-CustomVoice").exists()
+    assert not (paths.models / "Qwen3-TTS-12Hz-1.7B-VoiceDesign").exists()
     assert not paths.environment("qwen").exists()
     assert client.delete("/v1/voice/huge").status_code == 404
+
+
+# -- a voice changed, a sample of one, and every voice's recordings kept (ADR-057) -----------
+
+
+def speakers_heard(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """What the engine is asked to say from now on."""
+    said: list[str] = []
+    speak = VoiceEngine.speak
+
+    def heard(self: VoiceEngine, text: str, voice: dict[str, Any], *rest: Any, **named: Any) -> Any:
+        said.append(text)
+        return speak(self, text, voice, *rest, **named)
+
+    monkeypatch.setattr(VoiceEngine, "speak", heard)
+    return said
+
+
+def opened(client: TestClient, lesson: dict[str, Any], *, finished: bool = False) -> None:
+    body = {"position": 0, "completed": finished}
+    assert client.put(f"/v1/lessons/{lesson['id']}/progress", json=body).status_code == 200
+
+
+def sample_lessons(client: TestClient) -> list[dict[str, Any]]:
+    """Every lesson of the sample course, as ``a_lesson`` gives the first."""
+    course = client.post("/v1/courses/sample").json()
+    listed = client.get(f"/v1/courses/{course['id']}/lessons").json()["lessons"]
+    return [
+        {
+            "id": item["id"],
+            "course_id": course["id"],
+            "lesson": client.get(f"/v1/lessons/{item['id']}").json()["lesson"],
+        }
+        for item in listed
+    ]
+
+
+def jobs_for(services: Services, lesson_id: str) -> Any:
+    return services.jobs.find_active(KIND_NARRATION, lesson_id)
+
+
+def test_a_voice_chosen_again_plays_what_it_recorded_and_says_nothing_again(
+    client: TestClient, voiced: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lesson = a_lesson(client)
+    client.put("/v1/voice", json={"tier": "kokoro"})
+    record(client, voiced, lesson["id"])
+    client.put("/v1/voice", json={"tier": "expressive"})
+    record(client, voiced, lesson["id"])
+    said = speakers_heard(monkeypatch)
+    client.put("/v1/voice", json={"tier": "kokoro"})
+    lines = client.get(f"/v1/lessons/{lesson['id']}/narration").json()["lines"]
+    assert len(lines) == len(lines_of(lesson))
+    record(client, voiced, lesson["id"])
+    assert said == []
+
+
+def test_a_new_voice_records_the_lessons_opened_last_before_they_are_opened(
+    client: TestClient, voiced: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ADLE_FAKE_VOICE_DELAY", "0.02")
+    client.put("/v1/voice", json={"tier": "kokoro"})
+    first, second, third = sample_lessons(client)[:3]
+    opened(client, first)
+    opened(client, second)
+    opened(client, third, finished=True)
+    status = client.put("/v1/voice", json={"speaker": "bf_emma"}).json()
+    # The two opened last and not finished, without being opened again; not the finished one.
+    assert {item["lesson_id"] for item in status["recording"]} == {first["id"], second["id"]}
+    assert all(item["title"] for item in status["recording"])
+    for lesson in (first, second):
+        job = jobs_for(voiced, lesson["id"])
+        if job is not None:
+            assert voiced.jobs.wait(job.id, timeout=60).status == "succeeded"
+        lines = client.get(f"/v1/lessons/{lesson['id']}/narration").json()["lines"]
+        assert len(lines) == len(lines_of(lesson))
+    assert jobs_for(voiced, third["id"]) is None
+    assert client.get("/v1/voice").json()["recording"] == []
+
+
+def test_a_lesson_the_learner_opens_goes_before_those_recorded_ahead(
+    client: TestClient, voiced: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ADLE_FAKE_VOICE_DELAY", "0.05")
+    client.put("/v1/voice", json={"tier": "kokoro"})
+    ahead, other = sample_lessons(client)[:2]
+    opened(client, ahead)
+    client.put("/v1/voice", json={"speaker": "am_michael"})
+    waiting = jobs_for(voiced, ahead["id"])
+    assert waiting is not None
+    # The learner opens another lesson: the one recorded ahead of time steps aside for it.
+    job = record(client, voiced, other["id"])
+    assert job.status == "succeeded"
+    assert voiced.jobs.wait(waiting.id, timeout=60).status == "cancelled"
+    lines = client.get(f"/v1/lessons/{other['id']}/narration").json()["lines"]
+    assert len(lines) == len(lines_of(other))
+
+
+def test_a_recording_goes_on_in_the_voice_chosen_while_it_runs(
+    client: TestClient, voiced: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ADLE_FAKE_VOICE_DELAY", "0.05")
+    client.put("/v1/voice", json={"tier": "kokoro"})
+    lesson = a_lesson(client)
+    started = client.post(f"/v1/lessons/{lesson['id']}/narration").json()
+    folder = voiced.narration._folder(lesson["id"])
+    waited = threading.Event()
+    for _ in range(400):
+        if len(list(folder.glob("*.clip"))) >= 2:
+            break
+        waited.wait(0.01)
+    client.put("/v1/voice", json={"speaker": "bf_emma"})
+    assert voiced.jobs.wait(started["id"], timeout=60).status == "succeeded"
+    # Every line can be heard in the voice chosen now, without the lesson being asked again.
+    lines = client.get(f"/v1/lessons/{lesson['id']}/narration").json()["lines"]
+    assert len(lines) == len(lines_of(lesson))
+
+
+def test_turning_the_natural_voice_off_ends_a_recording_under_way(
+    client: TestClient, voiced: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ADLE_FAKE_VOICE_DELAY", "0.05")
+    client.put("/v1/voice", json={"tier": "kokoro"})
+    lesson = a_lesson(client)
+    started = client.post(f"/v1/lessons/{lesson['id']}/narration").json()
+    client.put("/v1/voice", json={"enabled": False})
+    job = voiced.jobs.wait(started["id"], timeout=60)
+    assert job.status == "succeeded"
+    assert job.result["recorded"] < len(lines_of(lesson))
+
+
+def test_a_sample_of_a_voice_is_made_once_and_kept(
+    client: TestClient, voiced: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    said = speakers_heard(monkeypatch)
+    asked = client.post("/v1/voice/samples", json={"tier": "kokoro", "speaker": "bf_emma"})
+    assert asked.status_code == 202, asked.text
+    job = voiced.jobs.wait(asked.json()["id"], timeout=60)
+    assert (job.kind, job.status) == ("voice_sample", "succeeded")
+    name = job.result["sample"]
+    clip = client.get(f"/v1/voice/samples/{name}").json()
+    assert clip["mime"] == "audio/wav"
+    assert base64.b64decode(clip["data"])
+    # Asked again, it is the same, and nothing is said again.
+    again = client.post("/v1/voice/samples", json={"tier": "kokoro", "speaker": "bf_emma"})
+    assert voiced.jobs.wait(again.json()["id"], timeout=60).result["sample"] == name
+    assert len(said) == 1
+    # The Expressive voice of a description: one the learner has not chosen yet.
+    designed = client.post(
+        "/v1/voice/samples", json={"tier": "expressive", "design": "A deep, calm voice."}
+    )
+    other = voiced.jobs.wait(designed.json()["id"], timeout=60).result["sample"]
+    assert other != name
+    assert client.get("/v1/voice").json()["design"] == DEFAULT_DESIGN
+    # Only a voice set up here, a speaker it has, and a sample that was made.
+    assert client.post("/v1/voice/samples", json={"tier": "huge"}).status_code == 422
+    nobody = client.post("/v1/voice/samples", json={"tier": "kokoro", "speaker": "nobody"})
+    assert nobody.status_code == 404
+    for wrong in ("x" * 24, "preferences", "a" * 25):
+        assert client.get(f"/v1/voice/samples/{wrong}").status_code == 404
+
+
+def test_a_sample_of_a_voice_not_set_up_here_is_not_made(
+    client: TestClient, services: Services, tmp_path: Path
+) -> None:
+    with_voice(services, tmp_path, "kokoro")
+    refused = client.post("/v1/voice/samples", json={"tier": "expressive"})
+    assert refused.status_code == 404
+
+
+def test_rich_is_taken_off_a_computer_that_has_it_with_what_it_recorded(
+    services: Services, tmp_path: Path
+) -> None:
+    paths = set_up(tmp_path / "voice", "kokoro", "expressive")
+    (rich,) = RETIRED
+    place(paths, rich)
+    kept = paths.clips / "les_00000000000000000001"
+    kept.mkdir(parents=True)
+    for name, tier_id in (("a" * 24, "standard"), ("b" * 24, "kokoro")):
+        (kept / f"{name}.clip").write_bytes(b"RIFF")
+        (kept / f"{name}.json").write_text(json.dumps({"tier": tier_id}), "utf-8")
+    paths.root.mkdir(parents=True, exist_ok=True)
+    (paths.root / "preferences.json").write_text(json.dumps({"tier": "standard"}), "utf-8")
+
+    narration = NarrationService(services.lessons, services.jobs, paths, hardware=lambda: WITH_CARD)
+    assert not (paths.models / rich.repos[0].folder).exists()
+    # The Expressive voice keeps what it shares with it.
+    assert paths.environment("qwen").is_dir()
+    assert paths.aligner_file().is_file()
+    assert not (kept / f"{'a' * 24}.clip").exists()
+    assert (kept / f"{'b' * 24}.clip").exists()
+    # Whoever chose it is read to by the richest voice here.
+    status = narration.status()
+    assert (status.tier, status.enabled) == ("expressive", True)

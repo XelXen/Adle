@@ -165,12 +165,75 @@ _SYMBOLS = {
 }  # fmt: skip
 
 
+#: A factorial (ADR-057): "!" after a single letter or a closing bracket, or after a number
+#: when more of the formula follows ("5! = 120", "5! is", "3! and 4!"). An exclamation after
+#: a word, or after a number that ends a sentence ("That's 120!"), stays one. Never the "!"
+#: of "!=".
+_LETTER_FACTORIAL = re.compile(r"(?<![A-Za-z'’])([A-Za-z])!(?!=)")
+_BRACKET_FACTORIAL = re.compile(r"([)\]}])!(?!=)")
+#: The signs of a product written as themselves: the multiplication sign and the middle dot.
+_PRODUCT = chr(0xD7) + chr(0xB7)
+_NUMBER_FACTORIAL = re.compile(
+    r"(\d)!(?!=)(?=\s*(?:[=+\-*/" + _PRODUCT + r")\]},(]|\b(?:is|equals|means|gives|times|over"
+    r"|divided|and|or|of|counts|ways)\b))"
+)
+_ANY_NUMBER_FACTORIAL = re.compile(r"(\d)!(?!=)")
+#: Mathematics between dollar signs, where there is no exclamation.
+_MATH_SPAN = re.compile(r"\$[^$]*\$")
+
+#: Operators written with two of the keyboard's characters, said.
+_TYPED_OPERATORS = (
+    (re.compile(r"\s*!=\s*"), " is not equal to "),
+    (re.compile(r"\s*<=\s*"), " is less than or equal to "),
+    (re.compile(r"\s*>=\s*"), " is greater than or equal to "),
+    (re.compile(r"\s*->\s*"), " goes to "),
+    (re.compile(r"\s*=>\s*"), " implies "),
+)
+
+#: "..." or "…" in a list or a sum is "and so on", and "and so on, up to" when the list
+#: goes on to its last item ("1, 2, ..., n"). Anywhere else it is a pause, and stays.
+_DOTS = r"(?:\.\.\.|…)"
+_LIST_DOTS_TO = re.compile(r",\s*" + _DOTS + r"\s*,\s*")
+_LIST_DOTS_END = re.compile(r",\s*" + _DOTS + r"(?=\s*(?:[.;:!?)\]]|$))")
+_SUM_DOTS_TO = re.compile(r"([+*" + _PRODUCT + r"])\s*" + _DOTS + r"\s*[+*" + _PRODUCT + r"]\s*")
+_SUM_DOTS_END = re.compile(r"([+*" + _PRODUCT + r"])\s*" + _DOTS + r"(?=\s*(?:[.;:!?)\]=]|$))")
+
+
+def _typed(text: str) -> str:
+    """Mathematics typed with the keyboard's own characters, said: a factorial, an operator
+    of two characters, a list or a sum that goes on (ADR-057). Anything else as it was."""
+    # Inside $...$ there is no exclamation: a "!" after a number there is a factorial.
+    said = _MATH_SPAN.sub(lambda span: _ANY_NUMBER_FACTORIAL.sub(r"\1 factorial", span[0]), text)
+    said = _LETTER_FACTORIAL.sub(r"\1 factorial", said)
+    said = _BRACKET_FACTORIAL.sub(r"\1 factorial", said)
+    said = _NUMBER_FACTORIAL.sub(r"\1 factorial", said)
+    if "factorial" in said:
+        # A line that speaks of factorials means one by every "!" after a number.
+        said = _ANY_NUMBER_FACTORIAL.sub(r"\1 factorial", said)
+    for typed, words in _TYPED_OPERATORS:
+        said = typed.sub(words, said)
+    said = _LIST_DOTS_TO.sub(", and so on, up to ", said)
+    said = _LIST_DOTS_END.sub(", and so on", said)
+    said = _SUM_DOTS_TO.sub(r"\1 and so on, up to ", said)
+    said = _SUM_DOTS_END.sub(r"\1 and so on", said)
+    if said == text:
+        return text
+    return re.sub(r"[ \t]{2,}", " ", said).strip()
+
+
 def spoken(text: str) -> str:
     """``text`` with any notation in it said in words; text without notation as it was."""
-    has_symbols = any(char in UNICODE_TEX for char in text)
-    if not (_NOTATION.search(text) or has_symbols) or not is_plain_text(text):
+    if not is_plain_text(text):
         # A line with a link or markup in it is refused as it was written, never said.
         return text
+    typed = _typed(text)
+    has_symbols = any(char in UNICODE_TEX for char in typed)
+    if not (_NOTATION.search(typed) or has_symbols):
+        if typed == text:
+            return text
+        # "For x is greater than or equal to 0" is said "for x greater than or equal to 0".
+        return _tidy(_CHAINED_IS.sub(r"\1 \2 ", _LOOSE_IS.sub(r"\1 \2 ", typed)))
+    text = typed
     written = "".join(UNICODE_TEX.get(char, char) for char in text.replace("$", " "))
     reader = _Reader(_PIECE.findall(written))
     said = _tidy("".join(reader.read()[0]))

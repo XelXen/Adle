@@ -21,7 +21,7 @@ export function linesOf(lesson: {
 }
 
 /** A clip as the core sends it, made a sound of the page's own. */
-function soundOf(clip: { mime: string; data: string }): string {
+export function soundOf(clip: { mime: string; data: string }): string {
   const binary = atob(clip.data);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);

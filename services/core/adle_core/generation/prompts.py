@@ -294,15 +294,15 @@ The JSON object, its keys in this order:
   "title": "short title of the lesson",
   "strategy": one of {", ".join(f'"{name}"' for name in STRATEGIES)},
   "sources": [numbers of the excerpts used, or empty],
-  "voice": "one sentence: how the narrator of this lesson sounds",
+  "voice": "one sentence: how this lesson is delivered",
   "segments": [ 6 to 9 segments, in teaching order ],
   "practice": [ 3 more questions, in the same form as a checkpoint's "question" ]
 }}
 
-"voice" is read by a speech model that designs the narrator's voice from it: its warmth,
-pitch, pace and manner, suited to the subject and to someone learning it, speaking clear
-English. For example: "A warm, unhurried voice, mid-pitched and clear, with a quiet
-enthusiasm for how things fit together." The voice only: not the lesson, and no name.
+"voice" is read by a speech model, with the voice the learner chose: say only how this
+lesson is delivered, suited to its subject and to someone learning it: its pace, energy and
+feeling. For example: "Unhurried and warm, with a quiet enthusiasm when the pieces fit
+together." Not who speaks (the learner chooses the voice), not the lesson, and no name.
 
 Every segment has "type" and "title". The types, and what else each needs:
 

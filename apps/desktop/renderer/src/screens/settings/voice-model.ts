@@ -85,3 +85,18 @@ export function downloadNote(tier: VoiceTier): string {
     'runs with. Nothing of yours is sent. Once it is set up it works without a connection.'
   );
 }
+
+/**
+ * What is being recorded in the voice chosen now, in one line, or null when nothing is
+ * (ADR-057): a voice just chosen records the lessons opened last, before they are opened.
+ */
+export function recordingNote(recording: VoiceStatus['recording']): string | null {
+  const [first, ...rest] = recording;
+  if (!first) return null;
+  const lines = first.total > 0 ? ` (${first.done} of ${first.total} lines)` : '';
+  const more =
+    rest.length === 0
+      ? ''
+      : `, then ${rest.length} more ${rest.length === 1 ? 'lesson' : 'lessons'}`;
+  return `Recording “${first.title}” in this voice${lines}${more}.`;
+}

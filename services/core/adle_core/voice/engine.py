@@ -12,10 +12,9 @@ Requests::
     {"id": 1, "op": "load", "voice": {"tier": "expressive"}}
     {"id": 2, "op": "speak", "text": "...", "out": "<file>.ogg",
      "voice": {"tier": "kokoro", "speaker": "af_heart"}}
-    {"id": 2, "op": "speak", "text": "...", "out": "<file>.ogg",
-     "voice": {"tier": "standard", "speaker": "Ryan"}}
     {"id": 3, "op": "speak", "text": "...", "out": "<file>.ogg",
-     "voice": {"tier": "expressive", "design": "A calm, warm voice ...", "reference": "<file>.wav"}}
+     "voice": {"tier": "expressive", "design": "A calm, warm voice ...", "reference": "<file>.wav",
+               "reference_text": "Hello, and welcome. ..."}}
 
 Answers: ``{"id": n, "ok": true, ...}`` or ``{"id": n, "ok": false, "error": "..."}``. A spoken
 answer says how long the clip is and where each word of the text is in it, by its place in
@@ -170,9 +169,7 @@ class Voice:
         if tier == "kokoro":
             self.kokoro("Ready.", str(voice.get("speaker") or "af_heart"))
             return {}
-        if tier == "standard":
-            self._model("Qwen3-TTS-12Hz-0.6B-CustomVoice")
-        elif tier == "expressive":
+        if tier == "expressive":
             # A lesson's voice is designed first, from its description, saying its first line.
             self._model("Qwen3-TTS-12Hz-1.7B-VoiceDesign")
         else:
@@ -189,35 +186,30 @@ class Voice:
             wav, rate, words = self.kokoro(text, str(voice.get("speaker") or "af_heart"))
             soundfile.write(out, wav, rate, format="OGG", subtype="VORBIS")
             return {"seconds": round(len(wav) / rate, 3), "words": words}
-        if tier == "standard":
-            model = self._model("Qwen3-TTS-12Hz-0.6B-CustomVoice")
-            wavs, rate = model.generate_custom_voice(
-                text=text, speaker=str(voice.get("speaker") or "Ryan"), language=LANGUAGE
-            )
-        elif tier == "expressive":
+        if tier == "expressive":
             reference = str(voice["reference"])
             design = str(voice.get("design") or "")
             if not os.path.exists(reference):
-                # The voice is designed once, from its description, saying this first line;
-                # every later line is spoken in that voice, so it does not change between
-                # them.
+                # The voice is designed once, from its description, saying a passage made
+                # for it (ADR-057): long and varied enough for every line to be spoken in a
+                # clean copy of it, so that the voice does not change between them.
+                designed = str(voice.get("reference_text") or text)
                 designer = self._model("Qwen3-TTS-12Hz-1.7B-VoiceDesign")
                 wavs, rate = designer.generate_voice_design(
-                    text=text, instruct=design, language=LANGUAGE
+                    text=designed, instruct=design, language=LANGUAGE
                 )
                 soundfile.write(reference, np.asarray(wavs[0], dtype=np.float32), rate)
                 with open(reference + ".txt", "w", encoding="utf-8") as said:
-                    said.write(text)
-            else:
-                with open(reference + ".txt", encoding="utf-8") as said:
-                    reference_text = said.read()
-                speaker = self._model("Qwen3-TTS-12Hz-1.7B-Base")
-                wavs, rate = speaker.generate_voice_clone(
-                    text=text,
-                    language=LANGUAGE,
-                    ref_audio=reference,
-                    ref_text=reference_text,
-                )
+                    said.write(designed)
+            with open(reference + ".txt", encoding="utf-8") as said:
+                reference_text = said.read()
+            speaker = self._model("Qwen3-TTS-12Hz-1.7B-Base")
+            wavs, rate = speaker.generate_voice_clone(
+                text=text,
+                language=LANGUAGE,
+                ref_audio=reference,
+                ref_text=reference_text,
+            )
         else:
             raise ValueError(f"unknown voice tier {tier!r}")
         wav = np.asarray(wavs[0], dtype=np.float32)

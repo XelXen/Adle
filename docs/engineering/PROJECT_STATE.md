@@ -72,7 +72,14 @@ work session (see `AGENTS.md` → "Keeping the next agent oriented").
   slide's step no longer than its words** (ADR-055), and then no line run through a
   word either (ADR-056). **All of it is in 0.1.0-alpha.7**, published from the release
   commit `9b7a633` on 2026-11-23, `github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.7`.
-  What is left to them is under "Next actions"
+  Then, at the owner's word about the voice ("voice never pronounces it as that"; "the
+  expressive voice doesn't sound very nice"; "get rid of rich"; "allow samples"; record
+  "if the voice is changed in settings"): **mathematics typed with the keyboard said as it
+  is meant**, **Rich removed**, **the Expressive voice described by the learner** (with
+  presets) and each lesson adding only its delivery, designed saying a passage made for it,
+  **a sample of any voice before it is chosen**, and **a new voice recording the lessons
+  opened last at once** (ADR-057); on `main`, not released yet. What is left to them is
+  under "Next actions"
 - **Commits:** a commit is GPG-signed if the owner answers the passphrase prompt (a
   `pinentry` window on the desktop) within a few minutes. If not, it is made unsigned, as
   the owner asked on 2026-11-21. `git log --format='%h %G? %s'` shows which is which.
@@ -286,11 +293,11 @@ them.
 | Prettier | PASS | |
 | ESLint (type-aware, a11y, hooks) | PASS | 0 warnings |
 | TypeScript (`tsc`, 6 projects) | PASS | |
-| Vitest | PASS | 764 tests, 43 files |
+| Vitest | PASS | 768 tests, 43 files |
 | ruff (lint + format) | PASS | |
 | mypy (strict) | PASS | 117 source files |
-| pytest | PASS | 1725 tests, among them the figures of a lesson offered for their trials in one step however slow the gate (`89f6b40`); among them a line through a word counted and one beside it not (ADR-056); among them every slide pinning its labels, tidying them and saying how it is laid out as each step ends, every figure saying so as each page ends, and a step's animations fitted to its words; and which reports of "this did not help" still count, taking one back through the API, and revision 0012 up and down with the learner's rows. Before: `test_only_the_newest_copies_of_replaced_data_are_kept` failed now and then (three whole runs) because two restores in one step of Windows' clock (about 15 ms) named their safety copies the same, and the second replaced the first: a copy is now named a microsecond later when its name is taken (`_new_copy`), tested with a clock that stands still |
-| Playwright + Electron (E2E) | PASS | 204 of 204 in 33.7 minutes on the tree of the release commit `9b7a633`, none retried. Before: 204 of 204 in 33.8 minutes on the tree of the release of 0.1.0-alpha.7 with ADR-056 (2026-11-23), none retried, among them every slide and figure example with no word over another or under a line, and nothing past the edge, at any step. Before: 204 of 204 in 46.1 minutes on the tree of ADR-055 (2026-11-23), none retried, among them every slide example stepped through and every figure example run in both themes with no word over another and nothing past the edge at any step. Before: 204 journeys in 39.7 minutes on the tree of ADR-054 (2026-11-23), 203 at the first try and 1 at its second: a sample scene untouched by that work (`forward_pass.py`, dark) that did not finish within its time, and ran in 17 s again; among them "This didn't help" said, undone in its dialog, left standing across a lesson opened again, and taken back from the bar. Before: 203 of 203 in 35.3 minutes on the tree of the release commit `015506d`, and in 37.4 minutes on the tree of ADR-052 and ADR-053 (2026-11-23), none retried, among them a course made from its files, named by the AI and set up through to its first lesson. Before: 202 of 202 in 35.3 minutes on the tree of ADR-050 and ADR-051, none retried. Before: 190 of 190 in 32.7 minutes on the release commit `fd2c524`, and in 32.9 minutes on the tree of `449dcf3`, none retried; among them the seventeen slide examples stepped through cue by cue in both themes, and a generated lesson whose slide steps on as its words are read. Before: 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
+| pytest | PASS | 1751 tests, among them typed mathematics said, Rich taken off a computer that has it, the learner's description with each lesson's delivery, samples made once, a new voice recording the lessons opened last, a lesson opened going first, a recording following the voice, and switching back saying nothing again (ADR-057); among them the figures of a lesson offered for their trials in one step however slow the gate (`89f6b40`); among them a line through a word counted and one beside it not (ADR-056); among them every slide pinning its labels, tidying them and saying how it is laid out as each step ends, every figure saying so as each page ends, and a step's animations fitted to its words; and which reports of "this did not help" still count, taking one back through the API, and revision 0012 up and down with the learner's rows. Before: `test_only_the_newest_copies_of_replaced_data_are_kept` failed now and then (three whole runs) because two restores in one step of Windows' clock (about 15 ms) named their safety copies the same, and the second replaced the first: a copy is now named a microsecond later when its name is taken (`_new_copy`), tested with a clock that stands still |
+| Playwright + Electron (E2E) | PASS | 204 journeys in 34.7 minutes on the tree of ADR-057 (2026-11-24), 203 at the first try and 1 at its second: a slide untouched by that work (`machine.py`, light) that did not say its step was done within 30 s, and stepped through in 10.2 s again; among them a Natural speaker heard before it is chosen, then chosen. Before: 204 of 204 in 33.7 minutes on the tree of the release commit `9b7a633`, none retried. Before: 204 of 204 in 33.8 minutes on the tree of the release of 0.1.0-alpha.7 with ADR-056 (2026-11-23), none retried, among them every slide and figure example with no word over another or under a line, and nothing past the edge, at any step. Before: 204 of 204 in 46.1 minutes on the tree of ADR-055 (2026-11-23), none retried, among them every slide example stepped through and every figure example run in both themes with no word over another and nothing past the edge at any step. Before: 204 journeys in 39.7 minutes on the tree of ADR-054 (2026-11-23), 203 at the first try and 1 at its second: a sample scene untouched by that work (`forward_pass.py`, dark) that did not finish within its time, and ran in 17 s again; among them "This didn't help" said, undone in its dialog, left standing across a lesson opened again, and taken back from the bar. Before: 203 of 203 in 35.3 minutes on the tree of the release commit `015506d`, and in 37.4 minutes on the tree of ADR-052 and ADR-053 (2026-11-23), none retried, among them a course made from its files, named by the AI and set up through to its first lesson. Before: 202 of 202 in 35.3 minutes on the tree of ADR-050 and ADR-051, none retried. Before: 190 of 190 in 32.7 minutes on the release commit `fd2c524`, and in 32.9 minutes on the tree of `449dcf3`, none retried; among them the seventeen slide examples stepped through cue by cue in both themes, and a generated lesson whose slide steps on as its words are read. Before: 154 of 154 in 26.7 minutes on `13e5f99`, none retried; among them a lesson seen taking shape and begun at its first part, one begun there that waits at the end of what is written and goes on by itself, and the seventeen figure examples (two rises; tanh and erf) in both themes. The tree before the review's fixes: 152 of 152 in 26.3 minutes, none retried. Before: 149 in 26.8 minutes on the tree of ADR-045 to ADR-047, 148 at the first try and 1 at its second: a sample scene untouched by that work (`backprop_chain.py`, dark) that did not finish within its minute, and ran in 16 s again. 30 of them run the fifteen figure examples in both themes, and one writes a lesson with four figures and goes through it to its slider. Before: 116 journeys in 19.5 minutes on `f3a75e6`, 115 at the first try and 1 at its second: a sample scene (untouched by that work) that did not finish within its minute while other checks ran beside it, and ran in its usual 17 s again. The voice's two journeys passed three times each with retries off. 22 journeys run the sample course's scenes in both themes. Wherever a journey checks a screen for accessibility it also checks that nothing pressable lies where the window is moved |
 | Third-party licences (`npm run licenses:check`) | PASS | Part of the gate; 412 npm and 41 Python packages, none refused, none unstated |
 | `npm audit` (all dependencies) | PASS | 0 vulnerabilities, 2026-11-21 |
 | `pip-audit` (everything in `uv.lock`) | PASS | No known vulnerabilities, 2026-11-21 |
@@ -674,6 +681,19 @@ is asked for;
 the teaching style can be chosen for a first lesson; a table's bare TeX is set as a formula;
 a board line is not repeated. Measured by hand through NVIDIA (see "The real providers").
 
+**Asked for by the owner on 2026-11-23, after 0.1.0-alpha.7: done, on `main`, not released
+yet.** A lesson's narration says "n factorial", "and so on, up to n", "is not equal to"
+where a model typed "n!", "1, 2, ..., n", "!=" (`speech._typed`). Rich is gone, and a
+computer that has it set up has it removed as the core starts, keeping what Expressive
+shares. Settings → Voice: the Natural voice's speakers each with "Listen" and "Use"; the
+Expressive voice in the learner's words, from a preset ("Warm teacher", "Calm and low",
+"Bright and lively", "British narrator", "Gentle storyteller") or their own, heard before it
+is saved; each lesson adds only how it is delivered. A new voice records the two lessons
+opened last at once, Settings says which and how far, and a lesson opened or a sample asked
+for goes first; a recording under way follows the voice chosen. Every voice's recordings
+were already kept, and are tested to be: switching back says nothing again (ADR-057).
+The real Expressive voice, borrowed read-only from the owner's set-up voice, designed a passage and said two lines as copies of it, by hand: every word placed, the first line 63.2 s from cold, the second 2.9 s for 7.4 s of speech (PERFORMANCE.md).
+
 **Asked for by the owner on 2026-11-23, later: done, and released in 0.1.0-alpha.7.** A
 picture's words are kept clear of each other and of the edge of the screen (ADR-055): a
 label is pinned beside what it names and, before anything is shown, moved to the first side
@@ -713,7 +733,11 @@ recorded yet is waited for, and the learner may choose the computer's voice inst
 
 What remains needs the owner. In the order it matters:
 
-0. **Try 0.1.0-alpha.7**, installed from its release
+0. **Listen to the voice of the next version** (ADR-057): the Expressive voice from "Calm
+   and low" or your own words, a Natural speaker heard with "Listen" before it is chosen, a
+   lesson with "n!" in it, and a voice changed in Settings with a lesson left half done (it
+   should be recording before you open it). And **try 0.1.0-alpha.7**, installed from its
+   release
    (`github.com/XelXen/Adle/releases/tag/v0.1.0-alpha.7`): the bar under a lesson on one
    row, "This didn't help" undone (ADR-054), and a slide's labels clear of other words, of
    lines and of the edge, its steps keeping up with the voice (ADR-055, ADR-056). Then, as
@@ -793,6 +817,10 @@ In this order:
 - **How long a step's words take is worked out at 3 words a second**, not measured: a
   voice much slower than that leaves the picture holding a little sooner, one much faster
   can still leave a step's animation running past its next cue.
+- **The Expressive voice of a learner's description has been heard by nobody yet**
+  (ADR-057): the reference passage and the design were checked with the real engine by
+  hand, for what it makes and how long it takes, not for how it sounds. Whether "Calm and
+  low" sounds calm and low is the owner's to say.
 - **No voice has been seen slower than speech on a real computer** (ADR-052): the head
   start is tested against a stand-in made slow, and by the rule checked second by second,
   but every voice on the development machine is faster than speech (Natural on one thread

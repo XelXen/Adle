@@ -489,8 +489,9 @@ class Lesson(_Strict):
     #: Questions that are not part of the lesson's flow. They are asked when the learner
     #: practises or reviews, so that a review is more than the lesson's questions again.
     practice: list[AssessmentItem] = Field(default_factory=list, max_length=MAX_PRACTICE_ITEMS)
-    #: How the narrator sounds, written with the lesson, for the voice that is designed for
-    #: it when the Expressive voice reads it (ADR-042). The voice only: never what it says.
+    #: How the lesson is delivered (pace, energy, feeling), written with it, added to the
+    #: voice the learner chose when the Expressive voice reads it (ADR-042, ADR-057). Lessons
+    #: written before said who speaks too. Never what it says.
     voice: VoiceDescription | None = None
 
     @model_validator(mode="after")

@@ -12,7 +12,11 @@ const core = {
   status: null as unknown as VoiceStatus,
   jobs: new Map<string, Job>(),
   asked: [] as string[],
+  sampled: [] as Record<string, unknown>[],
 };
+
+/** What was played, by where it was played from. */
+const played: string[] = [];
 
 vi.mock('../../lib/core-client', () => ({
   describeError: (error: unknown) => (error instanceof Error ? error.message : String(error)),
@@ -57,7 +61,28 @@ vi.mock('../../lib/core-client', () => ({
         core.status.enabled = core.status.tier !== null;
         return Promise.resolve(copy(core.status));
       }
+      case 'voice.sample': {
+        core.sampled.push({ ...body });
+        const job: Job = {
+          id: `job_sample_${core.sampled.length}`,
+          kind: 'voice_sample',
+          course_id: null,
+          subject_id: null,
+          status: 'running',
+          progress_done: 0,
+          progress_total: 1,
+          progress_message: 'Making a sample',
+          result: null,
+          error_code: null,
+          error_message: null,
+        };
+        core.jobs.set(job.id, job);
+        return Promise.resolve(copy(job));
+      }
+      case 'voice.sample_clip':
+        return Promise.resolve({ mime: 'audio/wav', data: 'UklGRg==' });
       case 'voice.choose': {
+        if (typeof body.design === 'string') core.status.design = body.design;
         if (typeof body.enabled === 'boolean') core.status.enabled = body.enabled;
         if (typeof body.tier === 'string') core.status.tier = body.tier as VoiceStatus['tier'];
         if (typeof body.speaker === 'string')
@@ -126,7 +151,24 @@ async function press(name: string): Promise<void> {
 beforeEach(() => {
   vi.useFakeTimers();
   core.asked.length = 0;
+  core.sampled.length = 0;
+  played.length = 0;
   core.jobs.clear();
+  vi.stubGlobal(
+    'Audio',
+    class {
+      constructor(readonly src: string) {}
+      play(): Promise<void> {
+        played.push(this.src);
+        return Promise.resolve();
+      }
+      pause(): void {
+        played.push(`paused ${this.src}`);
+      }
+    },
+  );
+  URL.createObjectURL = () => 'blob:sample';
+  URL.revokeObjectURL = () => undefined;
   core.status = {
     tiers: [
       aTier('kokoro', 'Natural', {
@@ -135,25 +177,39 @@ beforeEach(() => {
           { id: 'bf_emma', name: 'Emma', description: 'A calm British voice.' },
         ],
       }),
-      aTier('standard', 'Rich', { model_bytes: 2_880_000_000, program_bytes: 2_909_000_000 }),
       aTier('expressive', 'Expressive', {
+        model_bytes: 2_880_000_000,
+        program_bytes: 2_909_000_000,
         fits: false,
         why: 'It needs an NVIDIA graphics card with 8 GB of memory; this one has 6 GB.',
       }),
     ],
     tier: null,
     enabled: false,
-    speakers: { kokoro: 'af_heart', standard: 'Aiden' },
-    recommended: 'standard',
+    speakers: { kokoro: 'af_heart' },
+    recommended: 'kokoro',
     gpu: 'A small card',
     borrowed: false,
     setting_up: null,
+    design: 'A warm, clear voice.',
+    design_presets: [
+      { name: 'Warm teacher', text: 'A warm, clear voice.' },
+      { name: 'Calm and low', text: 'A calm, low voice.' },
+    ],
+    recording: [],
   };
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
+
+/** The Expressive voice set up and fitting, in use or only ready. */
+function expressiveHere(inUse: boolean): void {
+  Object.assign(core.status.tiers[1]!, { fits: true, why: '', ready: true });
+  if (inUse) Object.assign(core.status, { tier: 'expressive', enabled: true });
+}
 
 describe('the voices to choose from', () => {
   it('go from the computer’s own to the richest, and say why one cannot run here', async () => {
@@ -162,11 +218,10 @@ describe('the voices to choose from', () => {
     const names = within(screen.getByRole('list', { name: 'Voices' }))
       .getAllByRole('heading')
       .map((heading) => heading.textContent);
-    expect(names).toEqual(['Computer’s voice', 'Natural', 'Rich', 'Expressive']);
+    expect(names).toEqual(['Computer’s voice', 'Natural', 'Expressive']);
     expect(within(card('Computer’s voice')).getByText('In use')).toBeInTheDocument();
     expect(within(card('Natural')).getByText('about 0.6 GB')).toBeInTheDocument();
-    expect(within(card('Rich')).getByText('Best for this computer')).toBeInTheDocument();
-    expect(within(card('Rich')).getByText('about 5.8 GB')).toBeInTheDocument();
+    expect(within(card('Natural')).getByText('Best for this computer')).toBeInTheDocument();
     const expressive = card('Expressive');
     expect(
       within(expressive).getByText(
@@ -177,15 +232,16 @@ describe('the voices to choose from', () => {
   });
 
   it('set one up in the background, show how far it has come, and say when it is ready', async () => {
+    Object.assign(core.status.tiers[1]!, { fits: true, why: '' });
     show();
     await look();
-    await press('Set up the Rich voice');
+    await press('Set up the Expressive voice');
     expect(core.asked).toContain('voice.install');
     // One at a time: the other waits.
     expect(screen.getByRole('button', { name: 'Set up the Natural voice' })).toBeDisabled();
     expect(within(card('Natural')).getByText('Another voice is being set up.')).toBeVisible();
     expect(
-      within(card('Rich')).getByRole('progressbar', { name: 'Waiting to start' }),
+      within(card('Expressive')).getByRole('progressbar', { name: 'Waiting to start' }),
     ).toBeVisible();
 
     const job = core.jobs.get('job_setup')!;
@@ -196,17 +252,19 @@ describe('the voices to choose from', () => {
       progress_total: 2_880_000_000,
     });
     await look();
-    const bar = within(card('Rich')).getByRole('progressbar', { name: 'Downloading the voice' });
+    const bar = within(card('Expressive')).getByRole('progressbar', {
+      name: 'Downloading the voice',
+    });
     expect(bar).toHaveAttribute('aria-valuetext', '1.2 of 2.9 GB');
 
     Object.assign(job, { status: 'succeeded', progress_message: 'Done' });
     core.status.setting_up = null;
     core.status.tiers[1]!.ready = true;
-    Object.assign(core.status, { tier: 'standard', enabled: true });
+    Object.assign(core.status, { tier: 'expressive', enabled: true });
     await look();
-    expect(within(card('Rich')).getByText('In use')).toBeInTheDocument();
+    expect(within(card('Expressive')).getAllByText('In use')[0]).toBeInTheDocument();
     expect(within(card('Computer’s voice')).queryByText('In use')).toBeNull();
-    expect(screen.getByRole('status')).toHaveTextContent('The Rich voice is ready');
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent('The Expressive voice is ready');
   });
 
   it('stop a setup when asked, and offer it again', async () => {
@@ -243,12 +301,14 @@ describe('the voices to choose from', () => {
     core.status.tiers[0]!.ready = true;
     show();
     await look();
-    const speaker = within(card('Natural')).getByRole('combobox', { name: 'Speaker' });
-    await act(async () => {
-      fireEvent.change(speaker, { target: { value: 'bf_emma' } });
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    const heart = within(card('Natural')).getByRole('button', { name: 'Use Heart' });
+    expect(heart).toHaveAttribute('aria-pressed', 'true');
+    await press('Use Emma');
     expect(core.status.speakers.kokoro).toBe('bf_emma');
+    expect(within(card('Natural')).getByRole('button', { name: 'Use Emma' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await press('Use the computer’s voice');
     expect(core.status.enabled).toBe(false);
     expect(within(card('Computer’s voice')).getByText('In use')).toBeInTheDocument();
@@ -279,5 +339,75 @@ describe('the voices to choose from', () => {
     show();
     await look();
     expect(screen.queryByRole('button', { name: /^Set up|^Remove/ })).toBeNull();
+  });
+});
+
+describe('listening before choosing, and the voice in the learner’s words (ADR-057)', () => {
+  it('plays a sample of a speaker, made by the core, without choosing it', async () => {
+    core.status.tiers[0]!.ready = true;
+    show();
+    await look();
+    // Set up and not in use: each speaker can be heard; none can be chosen yet.
+    expect(within(card('Natural')).queryByRole('button', { name: 'Use Emma' })).toBeNull();
+    await press('Listen to Emma');
+    expect(core.sampled).toEqual([{ tier: 'kokoro', speaker: 'bf_emma' }]);
+    expect(within(card('Natural')).getByRole('button', { name: 'Listen to Heart' })).toBeDisabled();
+    Object.assign(core.jobs.get('job_sample_1')!, {
+      status: 'succeeded',
+      result: { kind: 'voice_sample', sample: 'a'.repeat(24) },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(core.asked).toContain('voice.sample_clip');
+    expect(played).toEqual(['blob:sample']);
+    expect(core.status.speakers.kokoro).toBe('af_heart');
+    expect(within(card('Natural')).getByRole('button', { name: 'Listen to Heart' })).toBeEnabled();
+  });
+
+  it('describes the Expressive voice in the learner’s words, from a preset or their own', async () => {
+    expressiveHere(true);
+    show();
+    await look();
+    const expressive = card('Expressive');
+    const voice = within(expressive).getByRole('textbox', { name: 'The voice' });
+    expect(voice).toHaveValue('A warm, clear voice.');
+    const save = within(expressive).getByRole('button', { name: 'Save' });
+    expect(save).toBeDisabled();
+    const presets = within(expressive).getByRole('combobox', { name: 'Start from' });
+    await act(async () => {
+      fireEvent.change(presets, { target: { value: 'Calm and low' } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(voice).toHaveValue('A calm, low voice.');
+    await act(async () => {
+      fireEvent.change(voice, { target: { value: 'A deep, slow voice.' } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(presets).toHaveValue('');
+    // Heard before it is kept.
+    await press('Listen to this voice');
+    expect(core.sampled).toEqual([{ tier: 'expressive', design: 'A deep, slow voice.' }]);
+    await act(async () => {
+      within(expressive).getByRole('button', { name: 'Save' }).click();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(core.status.design).toBe('A deep, slow voice.');
+    expect(
+      screen.getAllByRole('status').some((item) => item.textContent?.includes('Voice saved')),
+    ).toBe(true);
+  });
+
+  it('says which lessons are being recorded in a voice just chosen, until they are', async () => {
+    Object.assign(core.status, { tier: 'kokoro', enabled: true });
+    core.status.tiers[0]!.ready = true;
+    core.status.recording = [{ lesson_id: 'les_1', title: 'Weights and bias', done: 3, total: 20 }];
+    show();
+    await look();
+    const note = 'Recording “Weights and bias” in this voice (3 of 20 lines).';
+    expect(within(card('Natural')).getByText(note)).toBeVisible();
+    core.status.recording = [];
+    await look();
+    expect(within(card('Natural')).queryByText(note)).toBeNull();
   });
 });

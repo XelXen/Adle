@@ -2234,30 +2234,67 @@
       "VoiceChoice": {
         "additionalProperties": false,
         "properties": {
+          "design": {
+            "anyOf": [{ "maxLength": 200, "type": "string" }, { "type": "null" }],
+            "title": "Design"
+          },
           "enabled": { "anyOf": [{ "type": "boolean" }, { "type": "null" }], "title": "Enabled" },
           "speaker": {
             "anyOf": [{ "maxLength": 40, "type": "string" }, { "type": "null" }],
             "title": "Speaker"
           },
           "tier": {
-            "anyOf": [
-              { "enum": ["kokoro", "standard", "expressive"], "type": "string" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "enum": ["kokoro", "expressive"], "type": "string" }, { "type": "null" }],
             "title": "Tier"
           }
         },
         "title": "VoiceChoice",
         "type": "object"
       },
+      "VoiceDesignPreset": {
+        "description": "A description of a voice to start from.",
+        "properties": {
+          "name": { "title": "Name", "type": "string" },
+          "text": { "title": "Text", "type": "string" }
+        },
+        "required": ["name", "text"],
+        "title": "VoiceDesignPreset",
+        "type": "object"
+      },
+      "VoiceRecording": {
+        "description": "A lesson being recorded in the voice chosen now (ADR-057).",
+        "properties": {
+          "done": { "title": "Done", "type": "integer" },
+          "lesson_id": { "title": "Lesson Id", "type": "string" },
+          "title": { "title": "Title", "type": "string" },
+          "total": { "title": "Total", "type": "integer" }
+        },
+        "required": ["lesson_id", "title", "done", "total"],
+        "title": "VoiceRecording",
+        "type": "object"
+      },
+      "VoiceSampleRequest": {
+        "additionalProperties": false,
+        "description": "A few words in a voice set up here: a speaker of a size, or the Expressive voice of a\ndescription (the one chosen when none is given).",
+        "properties": {
+          "design": {
+            "anyOf": [{ "maxLength": 200, "type": "string" }, { "type": "null" }],
+            "title": "Design"
+          },
+          "speaker": {
+            "anyOf": [{ "maxLength": 40, "type": "string" }, { "type": "null" }],
+            "title": "Speaker"
+          },
+          "tier": { "enum": ["kokoro", "expressive"], "title": "Tier", "type": "string" }
+        },
+        "required": ["tier"],
+        "title": "VoiceSampleRequest",
+        "type": "object"
+      },
       "VoiceSetup": {
         "additionalProperties": false,
         "properties": {
-          "tier": {
-            "enum": ["kokoro", "standard", "expressive"],
-            "title": "Tier",
-            "type": "string"
-          }
+          "tier": { "enum": ["kokoro", "expressive"], "title": "Tier", "type": "string" }
         },
         "required": ["tier"],
         "title": "VoiceSetup",
@@ -2276,14 +2313,22 @@
       "VoiceStatus": {
         "properties": {
           "borrowed": { "title": "Borrowed", "type": "boolean" },
+          "design": { "title": "Design", "type": "string" },
+          "design_presets": {
+            "items": { "$ref": "#/components/schemas/VoiceDesignPreset" },
+            "title": "Design Presets",
+            "type": "array"
+          },
           "enabled": { "title": "Enabled", "type": "boolean" },
           "gpu": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Gpu" },
           "recommended": {
-            "anyOf": [
-              { "enum": ["kokoro", "standard", "expressive"], "type": "string" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "enum": ["kokoro", "expressive"], "type": "string" }, { "type": "null" }],
             "title": "Recommended"
+          },
+          "recording": {
+            "items": { "$ref": "#/components/schemas/VoiceRecording" },
+            "title": "Recording",
+            "type": "array"
           },
           "setting_up": { "anyOf": [{ "$ref": "#/components/schemas/Job" }, { "type": "null" }] },
           "speakers": {
@@ -2292,10 +2337,7 @@
             "type": "object"
           },
           "tier": {
-            "anyOf": [
-              { "enum": ["kokoro", "standard", "expressive"], "type": "string" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "enum": ["kokoro", "expressive"], "type": "string" }, { "type": "null" }],
             "title": "Tier"
           },
           "tiers": {
@@ -2312,7 +2354,10 @@
           "recommended",
           "gpu",
           "borrowed",
-          "setting_up"
+          "setting_up",
+          "design",
+          "design_presets",
+          "recording"
         ],
         "title": "VoiceStatus",
         "type": "object"
@@ -2322,7 +2367,7 @@
         "properties": {
           "description": { "title": "Description", "type": "string" },
           "fits": { "title": "Fits", "type": "boolean" },
-          "id": { "enum": ["kokoro", "standard", "expressive"], "title": "Id", "type": "string" },
+          "id": { "enum": ["kokoro", "expressive"], "title": "Id", "type": "string" },
           "min_memory_gb": {
             "anyOf": [{ "type": "number" }, { "type": "null" }],
             "title": "Min Memory Gb"
@@ -4727,6 +4772,73 @@
           }
         },
         "summary": "Choose Voice",
+        "tags": ["voice"]
+      }
+    },
+    "/v1/voice/samples": {
+      "post": {
+        "description": "A sample of a voice, made in the background, once (ADR-057): the job's result names it.",
+        "operationId": "voice.sample",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/VoiceSampleRequest" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Sample Voice",
+        "tags": ["voice"]
+      }
+    },
+    "/v1/voice/samples/{name}": {
+      "get": {
+        "operationId": "voice.sample_clip",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": { "title": "Name", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/NarrationClip" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Voice Sample",
         "tags": ["voice"]
       }
     },

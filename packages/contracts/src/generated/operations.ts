@@ -54,6 +54,7 @@ import type {
   SourceRefCreate,
   UnhelpfulReport,
   VoiceChoice,
+  VoiceSampleRequest,
   VoiceSetup,
   VoiceStatus,
 } from './models';
@@ -248,6 +249,8 @@ export const OPERATIONS = {
   'voice.choose': { method: 'PUT', path: '/v1/voice', internal: false },
   'voice.install': { method: 'POST', path: '/v1/voice/setup', internal: false },
   'voice.remove': { method: 'DELETE', path: '/v1/voice/{tier}', internal: false },
+  'voice.sample': { method: 'POST', path: '/v1/voice/samples', internal: false },
+  'voice.sample_clip': { method: 'GET', path: '/v1/voice/samples/{name}', internal: false },
   'voice.status': { method: 'GET', path: '/v1/voice', internal: false },
 } as const;
 
@@ -655,6 +658,18 @@ export interface OperationTypes {
     query: undefined;
     body: undefined;
     result: VoiceStatus;
+  };
+  'voice.sample': {
+    path: undefined;
+    query: undefined;
+    body: VoiceSampleRequest;
+    result: Job;
+  };
+  'voice.sample_clip': {
+    path: { name: string };
+    query: undefined;
+    body: undefined;
+    result: NarrationClip;
   };
   'voice.status': {
     path: undefined;

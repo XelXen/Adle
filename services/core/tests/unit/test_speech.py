@@ -149,3 +149,63 @@ def test_a_line_said_longer_than_a_caption_ends_at_a_sentence() -> None:
 )
 def test_mathematics_written_in_its_own_symbols_is_said_in_words(written: str, said: str) -> None:
     assert spoken(written) == said
+
+
+# -- mathematics typed with the keyboard's own characters (ADR-057) ---------------------------
+
+TYPED = [
+    ("There are n! ways to arrange n books.", "There are n factorial ways to arrange n books."),
+    ("So 5! = 120, and 0! is 1.", "So 5 factorial = 120, and 0 factorial is 1."),
+    (
+        "Choose k of n: n!/(k!(n-k)!).",
+        "Choose k of n: n factorial/(k factorial(n-k) factorial).",
+    ),
+    ("A factorial grows fast: 10! is over three million.", None),
+    ("If a != b, they differ.", "If a is not equal to b, they differ."),
+    (
+        "For x >= 0 the area is y <= 1.",
+        "For x greater than or equal to 0 the area is y is less than or equal to 1.",
+    ),
+    ("As n -> 0, the gap closes.", "As n goes to 0, the gap closes."),
+    ("The counting numbers are 1, 2, 3, ...", "The counting numbers are 1, 2, 3, and so on"),
+    ("Add 1, 2, ..., n.", "Add 1, 2, and so on, up to n."),
+    ("The sum 1 + 2 + ... + n grows.", "The sum 1 + 2 + and so on, up to n grows."),
+    ("Keep doubling: 1 + 2 + 4 + …", "Keep doubling: 1 + 2 + 4 + and so on"),
+]
+
+
+@pytest.mark.parametrize(("written", "said"), TYPED)
+def test_mathematics_typed_with_the_keyboard_is_said_in_words(
+    written: str, said: str | None
+) -> None:
+    out = spoken(written)
+    if said is None:
+        # A number's "!" in a line that speaks of factorials is one.
+        assert "10 factorial is over" in out
+    else:
+        assert out == said
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Great work!",
+        "That's 120!",
+        "Wait... think about it first.",
+        "The answer, if you can believe it, is yes!",
+        "For x < 0 the density is zero.",
+    ],
+)
+def test_an_exclamation_and_a_pause_stay_what_they_are(line: str) -> None:
+    assert spoken(line) == line
+
+
+def test_a_factorial_between_dollar_signs_is_one_wherever_it_stands() -> None:
+    assert spoken("By definition $5!$ counts the orders of five things.") == (
+        "By definition 5 factorial counts the orders of five things."
+    )
+
+
+def test_what_it_says_of_typed_mathematics_is_narration_the_lesson_takes() -> None:
+    for written, _ in TYPED:
+        TypeAdapter(Spoken).validate_python(spoken(written))

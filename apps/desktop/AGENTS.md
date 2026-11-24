@@ -360,7 +360,10 @@ most, a file's name.
   (`hasLessonToStart`, `lessonNotice`). Settings → Learning →
   Voice (`VoiceChoices`) sets a voice up, follows the setup, and removes a voice, saying
   first how much is downloaded and from where, and says when one set up here is slower
-  than speech (`speedNote`, ADR-052). A journey uses a stand-in engine
+  than speech (`speedNote`, ADR-052). Each speaker can be heard before it is chosen, and
+  the Expressive voice is described in the learner's words, from a preset or their own,
+  and heard before it is saved (`useVoiceSample`, ADR-057); while lessons are recorded in
+  a voice just chosen, the card in use says which (`recordingNote`). A journey uses a stand-in engine
   (`e2e/voice.spec.ts`), never a real download.
 - End-to-end journeys that are not about speech call `showNarrationAsText(page)` first.
 - No end-to-end test reaches a real provider: start `startFakeProvider()` and pass its

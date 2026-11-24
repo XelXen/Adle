@@ -1,8 +1,9 @@
 """What a natural voice is made of, pinned and checkable (ADR-042).
 
-Three natural voices, from the lightest to the richest, past the computer's own voice:
-Kokoro (82M, runs on the processor), Qwen3-TTS 0.6B and Qwen3-TTS 1.7B (on an NVIDIA graphics
-card). Each comes from a fixed revision on Hugging Face with every file's size and hash, all of
+Two natural voices, the lighter first, past the computer's own voice: Kokoro (82M, runs on
+the processor) and Qwen3-TTS 1.7B (on an NVIDIA graphics card). A third, Qwen3-TTS 0.6B
+("Rich"), is no longer offered (ADR-057): a computer that has it set up has it removed.
+Each comes from a fixed revision on Hugging Face with every file's size and hash, all of
 them under Apache-2.0. Qwen3-TTS does not say when it says each word, so its voices come with
 the aligner that finds out (torchaudio's English wav2vec 2.0 model, from fairseq, MIT); Kokoro
 knows, from its own durations. Nothing is fetched that is not listed here, and nothing listed
@@ -228,20 +229,9 @@ TIERS: tuple[Tier, ...] = (
         aligned=False,
     ),
     Tier(
-        "standard",
-        "Rich",
-        "A richer voice, on an NVIDIA graphics card. Qwen3-TTS 0.6B.",
-        "qwen",
-        (CUSTOM_VOICE_0_6B,),
-        min_memory_gb=4.0,
-        speakers=QWEN_SPEAKERS,
-        default_speaker="Aiden",
-        aligned=True,
-    ),
-    Tier(
         "expressive",
         "Expressive",
-        "A voice designed for each lesson, to suit what it teaches, on an NVIDIA graphics "
+        "A voice you describe, given a delivery to suit each lesson, on an NVIDIA graphics "
         "card. Qwen3-TTS 1.7B.",
         "qwen",
         (VOICE_DESIGN_1_7B, BASE_1_7B),
@@ -252,10 +242,63 @@ TIERS: tuple[Tier, ...] = (
     ),
 )
 
-#: How a lesson sounds when nothing more is known about it.
+#: No longer offered (ADR-057), and removed from a computer that has it set up, with what it
+#: recorded: what another voice here still needs is kept.
+RETIRED: tuple[Tier, ...] = (
+    Tier(
+        "standard",
+        "Rich",
+        "A richer voice, on an NVIDIA graphics card. Qwen3-TTS 0.6B.",
+        "qwen",
+        (CUSTOM_VOICE_0_6B,),
+        min_memory_gb=4.0,
+        speakers=QWEN_SPEAKERS,
+        default_speaker="Aiden",
+        aligned=True,
+    ),
+)
+
+#: Who reads the lessons in the Expressive voice, when the learner has not said (ADR-057):
+#: the voice itself. How each lesson is delivered is the lesson's own, written with it.
 DEFAULT_DESIGN = (
-    "A warm, clear and patient teacher's voice, mid-pitched and unhurried, "
-    "gently enthusiastic, speaking natural English."
+    "A warm, clear, mid-pitched voice of a patient teacher, speaking natural American "
+    "English at an easy pace."
+)
+#: Voices to start from, as the learner sees them, each a description the voice is made from.
+DESIGN_PRESETS: tuple[tuple[str, str], ...] = (
+    ("Warm teacher", DEFAULT_DESIGN),
+    (
+        "Calm and low",
+        "A calm, low, resonant voice, relaxed and reassuring, speaking slowly and clearly in "
+        "natural English.",
+    ),
+    (
+        "Bright and lively",
+        "A bright, youthful, energetic voice with a friendly smile in it, speaking clearly in "
+        "natural American English.",
+    ),
+    (
+        "British narrator",
+        "A clear, measured British English voice, mid-pitched and articulate, like a "
+        "documentary narrator.",
+    ),
+    (
+        "Gentle storyteller",
+        "A soft, gentle, expressive voice, unhurried, like someone reading a story to a "
+        "curious friend.",
+    ),
+)
+#: The longest description of a voice a learner may write.
+MAX_DESIGN_CHARACTERS = 200
+#: What a voice is designed saying: long enough, and varied enough, for every line after
+#: to be spoken in a clean copy of it. A lesson's short first line was not (ADR-057).
+REFERENCE_TEXT = (
+    "Hello, and welcome. Today we will look closely at one idea, step by step, and see how "
+    "each small piece fits together. Ready? Let's begin, and take our time."
+)
+#: What a sample of a voice says.
+SAMPLE_TEXT = (
+    "Here is how I sound. We will work through each idea together, one clear step at a time."
 )
 
 

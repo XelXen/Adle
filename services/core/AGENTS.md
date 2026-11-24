@@ -296,7 +296,8 @@ everything and decides nothing.
   themes). A figure passes the policy, is tried in the player and is settled like a scene.
 - **What can be mended in a lesson's answer is mended, not asked for again** (ADR-047):
   notation in narration is said in words (`generation/speech.py`, pure; a line with a link
-  or markup is left as it is, to be refused); a practice question that is not whole is left
+  or markup is left as it is, to be refused), mathematics typed with the keyboard too
+  (`_typed`: a factorial, "!=", "<=", "->", a list that goes on, ADR-057); a practice question that is not whole is left
   out (`LessonDraft`); a board line left open is left off; a figure that cannot be drawn is
   told in words, and a shade under a cumulative curve is drawn as its rise. Anything else
   that does not validate is still the one retry, told what was wrong.
@@ -320,6 +321,15 @@ everything and decides nothing.
   recordings (`_Engines`) and closed before a voice is set up or removed and when the
   core stops. It does nothing when no voice is chosen. What is said never changes after a
   part is stored: a picture that does not come changes what is shown, not what is said.
+  **A voice the learner shapes** (ADR-057): two natural voices (`TIERS`); one no longer
+  offered is in `RETIRED` and taken off a computer as the core starts (`_retire`). The
+  Expressive voice is the learner's description (`status().design`, presets in
+  `DESIGN_PRESETS`) plus the lesson's delivery (`Lesson.voice`), designed saying
+  `REFERENCE_TEXT`. A change of voice (`_identity`) records the lessons opened last at once
+  (`_record_recent`, `start(ahead=True)`); a recording follows the voice chosen line by line,
+  and lessons recorded ahead step aside for what the learner opens or a sample
+  (`_step_aside`). Samples are made in the voice lane and kept under `samples/<size>/`.
+  Every voice's clips are kept; only removing a voice removes them.
 - **Text from the learner or their documents goes in a `_block(...)`** in `prompts.py`. Never
   concatenate it into an instruction. That includes what a document is called: a file's
   name and a heading go inside the block with the excerpt (`_excerpt`).

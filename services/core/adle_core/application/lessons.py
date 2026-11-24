@@ -507,6 +507,18 @@ class LessonService:
             session.flush()
             return _progress(progress)
 
+    def unfinished(self, limit: int) -> list[str]:
+        """The lessons the learner has opened and not finished, the one opened last first:
+        what they are likely to open next."""
+        with self._database.read() as session:
+            rows = session.scalars(
+                select(LessonProgress.lesson_id)
+                .where(LessonProgress.completed.is_(False))
+                .order_by(LessonProgress.updated_at.desc(), LessonProgress.lesson_id)
+                .limit(limit)
+            ).all()
+        return list(rows)
+
     def exists(self, lesson_id: str) -> bool:
         """Whether the lesson is still there: the learner can remove one at any time."""
         with self._database.read() as session:

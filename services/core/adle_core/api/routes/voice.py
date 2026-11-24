@@ -1,9 +1,9 @@
 """The natural voice, and a lesson's narration recorded in it (ADR-042).
 
 The interface asks whether the voice is set up and which is chosen, chooses, sets a size up
-or takes it away, asks for a lesson's lines to be recorded, and fetches what has been: each
-line with where its words are, and each clip as sound. A clip is named by the core and never
-by a path.
+or takes it away, asks for a sample of a voice (ADR-057), asks for a lesson's lines to be
+recorded, and fetches what has been: each line with where its words are, and each clip as
+sound. A clip is named by the core and never by a path.
 """
 
 from __future__ import annotations
@@ -17,7 +17,14 @@ from pydantic import BaseModel, ConfigDict, StrictBool, StringConstraints
 from adle_core.api import schemas
 from adle_core.application.narration import KIND_NARRATION
 from adle_core.application.services import Services, get_services
-from adle_core.voice.catalog import TIERS, Tier, download_size, program_bytes
+from adle_core.voice.catalog import (
+    DESIGN_PRESETS,
+    MAX_DESIGN_CHARACTERS,
+    TIERS,
+    Tier,
+    download_size,
+    program_bytes,
+)
 from adle_core.voice.install import torch_index
 
 router = APIRouter(tags=["voice"])
@@ -31,7 +38,26 @@ class VoiceSpeaker(BaseModel):
     description: str
 
 
-TierId = Literal["kokoro", "standard", "expressive"]
+TierId = Literal["kokoro", "expressive"]
+#: A learner's description of the Expressive voice: empty for Adle's own (ADR-057).
+Design = Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_DESIGN_CHARACTERS)]
+
+
+class VoiceDesignPreset(BaseModel):
+    """A description of a voice to start from."""
+
+    name: str
+    text: str
+
+
+class VoiceRecording(BaseModel):
+    """A lesson being recorded in the voice chosen now (ADR-057)."""
+
+    lesson_id: str
+    title: str
+    #: Its lines recorded, and its lines in all.
+    done: int
+    total: int
 
 
 class VoiceTier(BaseModel):
@@ -79,6 +105,13 @@ class VoiceStatus(BaseModel):
     borrowed: bool
     #: The setup under way, if one is: which size, and how far it has come.
     setting_up: schemas.Job | None
+    #: Who reads the lessons in the Expressive voice, as the learner described them, or
+    #: Adle's own; each lesson adds how it is delivered (ADR-057).
+    design: str
+    #: Descriptions to start from.
+    design_presets: list[VoiceDesignPreset]
+    #: The lessons being recorded now: in a voice just chosen, those the learner opened last.
+    recording: list[VoiceRecording]
 
 
 class VoiceSetup(BaseModel):
@@ -93,6 +126,17 @@ class VoiceChoice(BaseModel):
     enabled: StrictBool | None = None
     tier: TierId | None = None
     speaker: Annotated[str, StringConstraints(max_length=40)] | None = None
+    design: Design | None = None
+
+
+class VoiceSampleRequest(BaseModel):
+    """A few words in a voice set up here: a speaker of a size, or the Expressive voice of a
+    description (the one chosen when none is given)."""
+
+    model_config = ConfigDict(extra="forbid")
+    tier: TierId
+    speaker: Annotated[str, StringConstraints(max_length=40)] | None = None
+    design: Design | None = None
 
 
 class NarrationWord(BaseModel):
@@ -177,6 +221,14 @@ def _status(services: Services) -> VoiceStatus:
         gpu=services.narration.hardware().gpu,
         borrowed=status.borrowed,
         setting_up=schemas.Job.model_validate(setup) if setup else None,
+        design=status.design,
+        design_presets=[VoiceDesignPreset(name=name, text=text) for name, text in DESIGN_PRESETS],
+        recording=[
+            VoiceRecording(
+                lesson_id=item.lesson_id, title=item.title, done=item.done, total=item.total
+            )
+            for item in services.narration.recordings()
+        ],
     )
 
 
@@ -187,8 +239,26 @@ def voice_status(services: ServicesDep) -> VoiceStatus:
 
 @router.put("/voice", operation_id="voice.choose", response_model=VoiceStatus)
 def choose_voice(body: VoiceChoice, services: ServicesDep) -> VoiceStatus:
-    services.narration.choose(enabled=body.enabled, tier=body.tier, speaker=body.speaker)
+    services.narration.choose(
+        enabled=body.enabled, tier=body.tier, speaker=body.speaker, design=body.design
+    )
     return _status(services)
+
+
+@router.post(
+    "/voice/samples", operation_id="voice.sample", response_model=schemas.Job, status_code=202
+)
+def sample_voice(body: VoiceSampleRequest, services: ServicesDep) -> schemas.Job:
+    """A sample of a voice, made in the background, once (ADR-057): the job's result names it."""
+    return schemas.Job.model_validate(
+        services.narration.sample(body.tier, speaker=body.speaker, design=body.design)
+    )
+
+
+@router.get("/voice/samples/{name}", operation_id="voice.sample_clip", response_model=NarrationClip)
+def voice_sample(name: str, services: ServicesDep) -> NarrationClip:
+    data, mime = services.narration.sample_clip(name)
+    return NarrationClip(mime=mime, data=base64.b64encode(data).decode("ascii"))
 
 
 @router.post(

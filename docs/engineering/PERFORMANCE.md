@@ -321,6 +321,24 @@ once its first part could be heard, and its whole voice was there by the time it
 word was written (the Rich lesson's model took 199 s to write it, that time). Two requests,
 2 of the 80 a day allowed by hand.
 
+## A voice designed saying a passage (2026-11-24)
+
+The Expressive voice is now designed from the learner's description and the lesson's
+delivery saying a passage made for it, and every line, the first too, is spoken as a copy
+of that (ADR-057). By hand on the development machine, the voice borrowed read-only from
+the owner's set-up voice, two lines from a cold start (`VoiceEngine.speak`):
+
+| | Took | Speech | Words placed by the aligner |
+|---|---|---|---|
+| First line: both models loaded, the passage designed, the line copied | 63.2 s | 4.2 s | 12 of 12 |
+| Second line | 2.9 s | 7.4 s | 20 of 20 |
+
+Later lines are as fast as before (0.39 of the speech they make). The first line costs a
+design and a second model more than it did, so a lesson in this voice is ready later than
+the 40 to 49 s measured before; how much later in a lesson, with the voice warmed while it
+is written, is not measured yet, and Adle's guess until a computer has timed it is 65 s.
+How the voice sounds was not judged: that is the owner's to say.
+
 ## What was not measured
 
 - **Generating with AIHubMix's model.** That provider has not answered a request yet (see

@@ -5,6 +5,26 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Mathematics is said as it is meant.** "n!" is read "n factorial", "1, 2, ..., n" as
+  "1, 2, and so on, up to n", and "a != b" as "a is not equal to b". An exclamation, or a
+  pause in a sentence, stays what it is.
+- **Describe the Expressive voice yourself.** In Settings, write who reads your lessons, or
+  start from a preset such as “Calm and low” or “British narrator”. Each lesson still sets
+  how it is delivered. The voice is now made from a passage written for the purpose, so it
+  sounds steadier from line to line.
+- **Listen before you choose.** Each speaker of the Natural voice, and the Expressive voice
+  you describe, can be heard in Settings without choosing it.
+- **A new voice gets to work at once.** When you change the voice, the lessons you opened
+  last are recorded in it straight away, and Settings says how far it has come. A lesson you
+  open goes first. Switching back to a voice plays what it recorded before.
+
+### Removed
+
+- **The Rich voice.** It is no longer offered, and its files are removed from a computer
+  that has it; the Expressive voice keeps what it shares with it.
+
 ## [0.1.0-alpha.7] - 2026-11-23
 
 The seventh alpha. The controls under a lesson fit on one row, with icons for reading
