@@ -11,6 +11,7 @@ import re
 import unicodedata
 from importlib.metadata import version
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 from adle_core.ingestion.types import (
@@ -26,7 +27,9 @@ from adle_core.ingestion.types import (
 #: Bumped whenever extraction output changes, so cached extractions can be invalidated.
 #: Bumped when what a parser makes of the same file changes. "2": Word documents keep
 #: their equations, the descriptions of their pictures, and their tables as tables (ADR-041).
-PARSER_REVISION = "3"
+#: "4": a PDF page drawn with more than pypdf's budget of work is read again with a larger
+#: one, instead of being skipped.
+PARSER_REVISION = "4"
 
 LINE_BREAK = chr(10)
 #: Unicode replacement character: what a decoder emits for bytes it cannot read.
@@ -395,9 +398,28 @@ def _sections_by_heading(
     return sections
 
 
+#: The work pypdf may do reading one page's drawing, on a second try (its own default is
+#: 2,000,000). A detailed diagram, such as a molecule drawn atom by atom, goes past the
+#: default and took 13 s at this size (2026-11-24); without it the page's words were lost.
+_LARGE_PAGE_BUDGET = 10_000_000
+#: The most time all second tries of one file may take together, so that a file full of
+#: such drawings skips some of them rather than running past the limit of a whole parse.
+_LARGE_PAGES_SECONDS = 60.0
+
+
+def _counted(count: int, one: str, many: str) -> str:
+    """ "1 page", "3 pages": the count with the word that goes with it."""
+    return f"{count} {one if count == 1 else many}"
+
+
+def _for_example(pages: list[int]) -> str:
+    """Which page, or the first of them."""
+    return f"page {pages[0]}" if len(pages) == 1 else f"for example page {pages[0]}"
+
+
 def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
-    from pypdf import PdfReader
-    from pypdf.errors import PyPdfError
+    from pypdf import PdfReader, apply_configuration
+    from pypdf.errors import LimitReachedError, PyPdfError
 
     try:
         reader = PdfReader(path, strict=False)
@@ -428,9 +450,25 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
     empty_pages: list[int] = []
     garbled_pages: list[int] = []
     unreadable_pages: list[int] = []
+    large_seconds = 0.0
     for number in range(1, page_count + 1):
         try:
             raw = reader.pages[number - 1].extract_text() or ""
+        except LimitReachedError:
+            # A page drawn in more detail than pypdf reads by default: once more with a
+            # larger budget, while the time set aside for such pages lasts.
+            if large_seconds >= _LARGE_PAGES_SECONDS:
+                unreadable_pages.append(number)
+                continue
+            began = monotonic()
+            try:
+                with apply_configuration(stream_parsing_work_maximum_count=_LARGE_PAGE_BUDGET):
+                    raw = reader.pages[number - 1].extract_text() or ""
+            except Exception:
+                unreadable_pages.append(number)
+                continue
+            finally:
+                large_seconds += monotonic() - began
         except Exception:
             unreadable_pages.append(number)
             continue
@@ -443,6 +481,12 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
             garbled_pages.append(number)
         pages.append((number, text, max(0.2, 1.0 - 4 * garbled)))
 
+    if not pages and unreadable_pages and not empty_pages:
+        raise IngestionError(
+            "malformed_document",
+            "Adle could not read any page of this PDF. Save it as text or as a Word "
+            "document and import that instead.",
+        )
     if not pages:
         raise IngestionError(
             "scanned_document",
@@ -465,19 +509,31 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
 
     warnings: list[str] = []
     if empty_pages:
+        one = len(empty_pages) == 1
         warnings.append(
-            f"{len(empty_pages)} of {page_count} pages had no selectable text "
-            f"(for example page {empty_pages[0]}). They may be images or scans and were skipped."
+            f"{len(empty_pages)} of {_counted(page_count, 'page', 'pages')} had no selectable "
+            f"text ({_for_example(empty_pages)}). "
+            + (
+                "It may be an image or a scan and was skipped."
+                if one
+                else "They may be images or scans and were skipped."
+            )
         )
     if garbled_pages:
         warnings.append(
-            f"The text on {len(garbled_pages)} pages (for example page {garbled_pages[0]}) "
-            "may be garbled. Check passages quoted from them."
+            f"The text on {_counted(len(garbled_pages), 'page', 'pages')} "
+            f"({_for_example(garbled_pages)}) may be garbled. "
+            + (
+                "Check passages quoted from it."
+                if len(garbled_pages) == 1
+                else "Check passages quoted from them."
+            )
         )
     if unreadable_pages:
         warnings.append(
-            f"{len(unreadable_pages)} pages (for example page {unreadable_pages[0]}) "
-            "could not be read and were skipped."
+            f"{_counted(len(unreadable_pages), 'page', 'pages')} "
+            f"({_for_example(unreadable_pages)}) could not be read and "
+            + ("was skipped." if len(unreadable_pages) == 1 else "were skipped.")
         )
 
     return _require_content(

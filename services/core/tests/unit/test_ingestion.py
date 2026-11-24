@@ -133,8 +133,57 @@ def test_partly_scanned_pdf_imports_what_it_can_and_says_what_it_skipped() -> No
     document = extract_in_process(DOCUMENTS / "partly-scanned.pdf", "partly-scanned.pdf")
     assert [section.page_number for section in document.sections] == [1, 3]
     assert len(document.warnings) == 1
-    assert "1 of 3 pages had no selectable text" in document.warnings[0]
-    assert "page 2" in document.warnings[0]
+    assert document.warnings[0] == (
+        "1 of 3 pages had no selectable text (page 2). "
+        "It may be an image or a scan and was skipped."
+    )
+
+
+def test_a_page_drawn_past_the_readers_budget_is_read_with_a_larger_one() -> None:
+    # A detailed diagram (a molecule drawn atom by atom) is more work than pypdf reads by
+    # default, and the whole page's words were lost (2026-11-24). Under a budget this
+    # small every page of these notes is such a page: each is read on its second try,
+    # exactly as it reads with none, and nothing is said.
+    from pypdf import apply_configuration
+
+    plain = extract_in_process(DOCUMENTS / "lecture-notes.pdf", "lecture-notes.pdf")
+    with apply_configuration(stream_parsing_work_maximum_count=50):
+        heavy = extract_in_process(DOCUMENTS / "lecture-notes.pdf", "lecture-notes.pdf")
+    assert heavy.sections == plain.sections
+    assert heavy.warnings == ()
+
+
+def test_second_tries_stop_when_their_time_is_spent(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Each second try takes a second of this clock, and two are allowed: the third heavy
+    # page is skipped and said, in the singular.
+    from pypdf import apply_configuration
+
+    from adle_core.ingestion import parsers
+
+    ticks = iter(range(100))
+    monkeypatch.setattr(parsers, "monotonic", lambda: float(next(ticks)))
+    monkeypatch.setattr(parsers, "_LARGE_PAGES_SECONDS", 2.0)
+    with apply_configuration(stream_parsing_work_maximum_count=50):
+        document = extract_in_process(DOCUMENTS / "lecture-notes.pdf", "lecture-notes.pdf")
+    assert document.warnings == ("1 page (page 3) could not be read and was skipped.",)
+    assert 3 not in {section.page_number for section in document.sections}
+
+
+def test_a_pdf_no_page_of_which_can_be_read_is_not_called_a_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pypdf import apply_configuration
+
+    from adle_core.ingestion import parsers
+
+    monkeypatch.setattr(parsers, "_LARGE_PAGES_SECONDS", 0.0)
+    with (
+        apply_configuration(stream_parsing_work_maximum_count=50),
+        pytest.raises(IngestionError) as raised,
+    ):
+        extract_in_process(DOCUMENTS / "lecture-notes.pdf", "lecture-notes.pdf")
+    assert raised.value.code == "malformed_document"
+    assert "could not read any page" in raised.value.message
 
 
 # -- rejections ------------------------------------------------------------

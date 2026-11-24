@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A page with a detailed drawing is read.** A PDF page drawn in fine detail, such as a
+  molecule drawn atom by atom, was skipped along with its words. It is read now, and what
+  an import says about skipped pages counts them properly ("1 page", not "1 pages").
+
 ## [0.1.0-alpha.8] - 2026-11-24
 
 The eighth alpha, about the voice. Mathematics is said as it is meant, "n factorial" and "and
