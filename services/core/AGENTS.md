@@ -272,10 +272,13 @@ everything and decides nothing.
   `generation/layout.py`, written into every slide and figure). A label is placed with
   `self.pin(label, anchor, side, buff)`, never with `next_to` alone, unless it is drawn
   again each frame (it follows something); `tidy` at the end of `build` moves a pinned
-  label to the first clear side; a point's name keeps to a clear side (`self.sides`).
+  label to the first clear side; a point's name keeps to a clear place (`self.sides`:
+  side, distance, whether it was clear, and where its point was), and where none was clear
+  looks again only once its point has moved 0.2: a search every frame stalls a slide.
   Each step, and each figure's page, ends with `self.audit()`, which says `layout` when
-  words overlap, a line runs through a word (ADR-056: a `Line` of any kind or a
-  `ParametricFunction` through the middle of its box), or something lies past the edge:
+  words overlap, a line runs through a word (ADR-056: a `Line` of any kind, a
+  `ParametricFunction`, or a `NumberLine`, which draws an axis itself, ADR-058, through
+  the middle of its box), or something lies past the edge:
   the journeys fail on it for every example, so a template that puts words over words is
   found by `npm run e2e`. A drawing over a drawing is usually meant and is not looked at.
   The methods live on the scene: a name they take (`still_lines`, `lines_of`, `pin`, ...)

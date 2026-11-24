@@ -52,7 +52,12 @@ for (const file of slides) {
           `m.type === 'error' || (m.type === 'scene-event' && m.name === 'step' && m.value === ${step})`,
           30_000,
         );
-        expect(done?.type, JSON.stringify(done)).toBe('scene-event');
+        // A step that does not come says where the slide stopped: the frame's last
+        // messages, its page among them, each with when it came (`t`, from the mount).
+        const said = done
+          ? JSON.stringify(done)
+          : `no step ${step} in 30 s; last: ${JSON.stringify((await player.messages()).slice(-6))}`;
+        expect(done?.type, said).toBe('scene-event');
         // Held: nothing more happens until the host says so.
         await adle.page.waitForTimeout(250);
         const after = (await player.messages()).filter(

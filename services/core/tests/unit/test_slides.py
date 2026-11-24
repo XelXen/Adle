@@ -682,10 +682,15 @@ def test_a_line_through_a_word_counts_and_one_beside_it_does_not() -> None:
     # The methods every slide carries look for lines through words as well (ADR-056):
     # the lines that stay put are kept with the words that do, for a label to keep clear of,
     # and a step ends saying how many words a line runs through.
-    assert "self.still_lines = lines" in LAYOUT_METHODS
+    assert "self.still_lines = paths" in LAYOUT_METHODS
     assert (
-        "for line in self.still_lines:\n                if self.struck(m, line):" in LAYOUT_METHODS
+        "for path in self.still_lines:\n                if self.struck(m, path):" in LAYOUT_METHODS
     )
+    # An axis is a line too: a number line draws it itself, not as a line of its own.
+    assert "if isinstance(m, NumberLine):" in LAYOUT_METHODS
+    # A line's path is read once, with the box round it, and a word outside that box is
+    # passed over without looking at each piece.
+    assert "if box[1] < x0 or box[0] > x1 or box[3] < y0 or box[2] > y1:" in LAYOUT_METHODS
     assert '" under a line, "' in LAYOUT_METHODS
     # Only the middle of a word: a line that grazes it, or runs beside it, does not count.
     assert "+ 0.2 * w" in LAYOUT_METHODS
@@ -700,6 +705,11 @@ def test_a_label_is_pinned_beside_what_it_names_unless_it_moves_with_it() -> Non
     assert "self.e['f/name'] = self.pin(self.shown([True, 'f(x)'], 28, self.blue)," in source
     # A point's name moves with the point: it keeps to a side clear of what stays put.
     assert "self.keep_clear(key, self.shown(name, 26, self.ink), dot, UP + RIGHT, 0.1)" in source
+    # Where no side is clear it looks again only once the point has moved: a search on every
+    # frame cost a slide its frames, and a step its moment (seen 2026-11-24).
+    assert "kept[2] or abs(here[0] - kept[3]) + abs(here[1] - kept[4]) > 0.2" in LAYOUT_METHODS
+    # It keeps how far from the point it found room, not only on which side.
+    assert "label.next_to(anchor, kept[0], buff=kept[1])" in LAYOUT_METHODS
 
 
 def test_a_label_on_something_that_moves_is_kept_clear_as_it_is_drawn() -> None:

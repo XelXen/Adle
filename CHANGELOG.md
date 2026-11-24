@@ -25,6 +25,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **The Rich voice.** It is no longer offered, and its files are removed from a computer
   that has it; the Expressive voice keeps what it shares with it.
 
+### Fixed
+
+- **No axis runs through a label.** The words on a graph keep clear of its axes, as they
+  already did of its other lines.
+- **A slide with a moving point keeps its pace.** A label that follows the point looks for
+  room less often, so the slide no longer falls behind on a slow computer.
+
 ## [0.1.0-alpha.7] - 2026-11-23
 
 The seventh alpha. The controls under a lesson fit on one row, with icons for reading

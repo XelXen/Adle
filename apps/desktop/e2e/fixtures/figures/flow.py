@@ -85,20 +85,42 @@ class FlowFigure(Scene):
         if isinstance(m, Line) or isinstance(m, ParametricFunction):
             found.append(m)
             return found
+        if isinstance(m, NumberLine):
+            # An axis is drawn by the number line itself; its ticks are lines of their own.
+            found.append(m)
         for part in m.submobjects:
             self.lines_of(part, found)
         return found
 
-    def through(self, a, z, x0, x1, y0, y1):
-        # Whether the straight piece from a to z enters the box (Liang and Barsky).
+    def path_of(self, line):
+        # A line as the straight pieces between its anchors, each as plain numbers, and the
+        # box round them all: read once, it is cheap to look at again and again.
+        points = line.get_anchors()
+        pieces = []
+        for i in range(len(points) - 1):
+            pieces.append([points[i][0], points[i][1], points[i + 1][0], points[i + 1][1]])
+        if len(pieces) == 0:
+            return [[0.0, 0.0, 0.0, 0.0], []]
+        box = [pieces[0][0], pieces[0][0], pieces[0][1], pieces[0][1]]
+        for piece in pieces:
+            box = [
+                min(box[0], piece[0], piece[2]),
+                max(box[1], piece[0], piece[2]),
+                min(box[2], piece[1], piece[3]),
+                max(box[3], piece[1], piece[3]),
+            ]
+        return [box, pieces]
+
+    def through(self, piece, x0, x1, y0, y1):
+        # Whether a straight piece enters the box (Liang and Barsky).
         if x0 >= x1 or y0 >= y1:
             return False
-        dx = z[0] - a[0]
-        dy = z[1] - a[1]
+        dx = piece[2] - piece[0]
+        dy = piece[3] - piece[1]
         low = 0.0
         high = 1.0
-        edges = [[-dx, a[0] - x0], [dx, x1 - a[0]], [-dy, a[1] - y0]]
-        for edge in edges + [[dy, y1 - a[1]]]:
+        edges = [[-dx, piece[0] - x0], [dx, x1 - piece[0]], [-dy, piece[1] - y0]]
+        for edge in edges + [[dy, y1 - piece[1]]]:
             p = edge[0]
             q = edge[1]
             if p == 0:
@@ -118,17 +140,19 @@ class FlowFigure(Scene):
                         high = u
         return True
 
-    def struck(self, word, line):
-        # Whether a line runs through the middle of a word.
+    def struck(self, word, path):
+        # Whether a line (its path) runs through the middle of a word.
         w = word.get_right()[0] - word.get_left()[0]
         h = word.get_top()[1] - word.get_bottom()[1]
         x0 = word.get_left()[0] + 0.2 * w
         x1 = word.get_right()[0] - 0.2 * w
         y0 = word.get_bottom()[1] + 0.25 * h
         y1 = word.get_top()[1] - 0.25 * h
-        points = line.get_anchors()
-        for i in range(len(points) - 1):
-            if self.through(points[i], points[i + 1], x0, x1, y0, y1):
+        box = path[0]
+        if box[1] < x0 or box[0] > x1 or box[3] < y0 or box[2] > y1:
+            return False
+        for piece in path[1]:
+            if self.through(piece, x0, x1, y0, y1):
                 return True
         return False
 
@@ -148,8 +172,8 @@ class FlowFigure(Scene):
         for m in mine:
             if not self.within(m, 6.2, 3.4):
                 return True
-            for line in self.still_lines:
-                if self.struck(m, line):
+            for path in self.still_lines:
+                if self.struck(m, path):
                     return True
             for other in others:
                 ours = False
@@ -167,25 +191,35 @@ class FlowFigure(Scene):
         return label
 
     def placed(self, label, anchor, side, buff, others):
-        # The first side of what it names where a label lies over nothing and inside the
-        # margin; where it was asked to go when there is none.
+        # The first side of what it names, and how far from it, where a label lies over
+        # nothing and inside the margin; where it was asked to go when there is none. It
+        # says which, how far, and whether that place is clear.
         ways = [side, UP, DOWN, RIGHT, LEFT, UP + RIGHT, UP + LEFT, DOWN + RIGHT, DOWN + LEFT]
         for gap in [buff, buff + 0.3]:
             for way in ways:
                 label.next_to(anchor, way, buff=gap)
                 if not self.crowded(label, others):
-                    return way
+                    return [way, gap, True]
         label.next_to(anchor, side, buff=buff)
-        return side
+        return [side, buff, False]
 
     def keep_clear(self, key, label, anchor, side, buff):
-        # A label drawn again each frame beside something that moves: it keeps its side
-        # while that is clear of the words that stay put, steps to the first clear side
-        # when it is not, and stays there: it does not flit from side to side.
-        way = self.sides.get(key, side)
-        label.next_to(anchor, way, buff=buff)
+        # A label drawn again each frame beside something that moves: it keeps its place
+        # while that is clear of the words and lines that stay put, steps to the first clear
+        # place when it is not, and stays there: it does not flit from side to side. Where no
+        # place was clear it looks again only once what it names has moved: a search on
+        # every frame would cost the picture its frames.
+        kept = self.sides.get(key)
+        if kept is None:
+            label.next_to(anchor, side, buff=buff)
+        else:
+            label.next_to(anchor, kept[0], buff=kept[1])
         if self.crowded(label, self.still):
-            self.sides[key] = self.placed(label, anchor, way, buff, self.still)
+            here = anchor.get_center()
+            if kept is None or kept[2] or abs(here[0] - kept[3]) + abs(here[1] - kept[4]) > 0.2:
+                way = side if kept is None else kept[0]
+                found = self.placed(label, anchor, way, buff, self.still)
+                self.sides[key] = [found[0], found[1], found[2], here[0], here[1]]
         return label
 
     def tidy(self):
@@ -198,7 +232,10 @@ class FlowFigure(Scene):
                 self.words_of(self.e[key], words)
                 self.lines_of(self.e[key], lines)
         self.still = words
-        self.still_lines = lines
+        paths = []
+        for line in lines:
+            paths.append(self.path_of(line))
+        self.still_lines = paths
         for pin in self.pins:
             if self.crowded(pin[0], words):
                 self.placed(pin[0], pin[1], pin[2], pin[3], words)
@@ -216,10 +253,13 @@ class FlowFigure(Scene):
             for j in range(i + 1, len(words)):
                 if self.meet(words[i], words[j]):
                     overlapping += 1
+        paths = []
+        for line in lines:
+            paths.append(self.path_of(line))
         struck = 0
         for word in words:
-            for line in lines:
-                if self.struck(word, line):
+            for path in paths:
+                if self.struck(word, path):
                     struck += 1
                     break
         outside = 0
