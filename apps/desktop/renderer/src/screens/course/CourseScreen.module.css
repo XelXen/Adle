@@ -2,6 +2,29 @@
   font-style: italic;
 }
 
+/* What a course is, in a row: where it came from, and what it is taught as. */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2) var(--ad-space-3);
+}
+
+/* ---- How lessons are formed (ADR-061) ----------------------------------- */
+.rulesHeading {
+  margin: 0 0 var(--ad-space-2);
+  font: var(--ad-text-body-strong);
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-1);
+  margin: 0;
+  padding-left: var(--ad-space-5);
+  font: var(--ad-text-body);
+}
+
 .grow {
   flex: 1;
   min-width: 0;

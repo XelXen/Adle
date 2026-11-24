@@ -8,6 +8,7 @@ import { useRouter } from '../../app/router';
 import { callCore } from '../../lib/core-client';
 import { WhatIsSent } from '../../components/WhatIsSent';
 import { type JobFailure, lessonDisclosure, refusalOf } from '../../lib/generation';
+import { useLessonRules, waysFor } from '../../lib/lesson-rules';
 import { destination, usualWait } from '../../lib/provider';
 import { useResource } from '../../lib/use-resource';
 import { STRATEGY_CHOICES, type TeachingStrategy } from '../course/ConceptDetail';
@@ -40,12 +41,26 @@ export function UnhelpfulDialog({
   const { navigate } = useRouter();
   const toast = useToast();
   const provider = useResource('provider-status', () => callCore('provider.status'));
-  // Another explanation should be another kind of explanation.
-  const choices = STRATEGY_CHOICES.filter(
+  // Another explanation should be another kind of explanation, and one that suits the
+  // course's subject (ADR-061).
+  const rules = useLessonRules();
+  const course = useResource(`course:${lesson.course_id}`, () =>
+    callCore('courses.get', { path: { course_id: lesson.course_id } }),
+  );
+  const choices = waysFor(
+    STRATEGY_CHOICES,
+    rules.resource.status === 'ready' ? rules.resource.data : null,
+    course.resource.status === 'ready' ? course.resource.data.subject : null,
+  ).filter(
     (choice): choice is { value: TeachingStrategy; label: string } =>
       choice.value !== '' && choice.value !== lesson.strategy,
   );
-  const [strategy, setStrategy] = useState<TeachingStrategy>(choices[0]?.value ?? 'worked_example');
+  const [chosen, setStrategy] = useState<TeachingStrategy | null>(null);
+  // What was chosen, while it is still offered; else the first that is.
+  const strategy: TeachingStrategy =
+    choices.find((choice) => choice.value === chosen)?.value ??
+    choices[0]?.value ??
+    'worked_example';
   const [creating, setCreating] = useState(false);
   const [refusal, setRefusal] = useState<JobFailure | null>(null);
   const conceptId = lesson.concept_ids[0] ?? '';

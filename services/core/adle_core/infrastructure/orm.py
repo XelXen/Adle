@@ -25,6 +25,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     false,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -87,6 +88,16 @@ class Course(Base):
     #: The learner left the name to Adle, and has not named it since (ADR-053).
     named_by_adle: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
+    )
+    #: The kind of subject it is, a key of ``lessons.axioms.SUBJECTS``: it decides how the
+    #: course's lessons are formed (ADR-061).
+    subject: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="general", server_default="general"
+    )
+    #: Adle placed it (a guess from its name, or as the AI said with its plan) and may
+    #: place it again. Once the learner chooses, their choice stands.
+    subject_by_adle: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
     )
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)

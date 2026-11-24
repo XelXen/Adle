@@ -59,6 +59,7 @@ const RULES = [
   [new RegExp(`^${CORE}generation/layout\\.py$`), [SLIDE, SCENE]],
   [new RegExp(`^${CORE}generation/slides\\.py$`), [SLIDE, 'generation.spec.ts']],
   [new RegExp(`^${CORE}generation/figures\\.py$`), [SCENE, 'generation.spec.ts']],
+  [new RegExp(`^${CORE}generation/examples\\.py$`), [SLIDE, 'generation.spec.ts']],
   [new RegExp(`^${CORE}generation/(scene_policy\\.py|data/)`), PLAYER],
   [new RegExp(`^${CORE}generation/`), AI],
   [new RegExp(`^${CORE}application/(generation|model_gateway|asks|scene_trials)\\.py$`), AI],
@@ -71,6 +72,9 @@ const RULES = [
     ),
     LEARNING,
   ],
+  // How a lesson is formed, and a course's subject (ADR-061).
+  [new RegExp(`^${CORE}lessons/axioms\\.py$`), ['generation.spec.ts', 'curriculum.spec.ts']],
+  [new RegExp(`^${CORE}application/courses\\.py$`), [...MATERIALS, ...CURRICULUM]],
   [new RegExp(`^${CORE}(lessons/|application/lessons\\.py$)`), LESSONS],
   [new RegExp(`^${CORE}sample_course/`), [...LESSONS, SCENE]],
   [/^apps\/desktop\/player\//, PLAYER],
@@ -87,6 +91,7 @@ const RULES = [
     ],
   ],
   [/^apps\/desktop\/renderer\/src\/screens\/course\//, [...MATERIALS, ...CURRICULUM]],
+  [/^apps\/desktop\/renderer\/src\/lib\/lesson-rules\.ts$/, [...CURRICULUM, 'lesson.spec.ts']],
   [/^apps\/desktop\/renderer\/src\/screens\/practice\//, ['learning.spec.ts']],
   [
     /^apps\/desktop\/renderer\/src\/screens\/settings\//,

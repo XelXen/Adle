@@ -31,6 +31,24 @@ describe('the journeys a change needs (ADR-059)', () => {
     ]);
   });
 
+  it('runs the journeys about lessons and courses for a change to how a lesson is formed', () => {
+    expect(journeysFor(['services/core/adle_core/lessons/axioms.py'])).toEqual([
+      'curriculum.spec.ts',
+      'generation.spec.ts',
+    ]);
+    // The example each subject's writer is shown is a slide the player steps through.
+    expect(journeysFor(['services/core/adle_core/generation/examples.py'])).toEqual([
+      'generation.spec.ts',
+      'slide-player.spec.ts',
+    ]);
+    expect(journeysFor(['apps/desktop/renderer/src/lib/lesson-rules.ts'])).toEqual([
+      'curriculum.spec.ts',
+      'generation.spec.ts',
+      'learning.spec.ts',
+      'lesson.spec.ts',
+    ]);
+  });
+
   it('runs the journeys about materials for a change to how a file is read', () => {
     expect(journeysFor(['services/core/adle_core/ingestion/parsers.py'])).toEqual([
       'course-materials.spec.ts',

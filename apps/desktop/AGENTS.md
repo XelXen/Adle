@@ -386,6 +386,12 @@ most, a file's name.
   on `<html data-core>`; a journey waits for it with `expectReadyOnPage(page)`.
 - A break knows where leaving it leads (`rest.returnVia`): back, or somewhere said, such as
   the course after a lesson that has just been finished.
+- **How a course's lessons are formed** (ADR-061) is the core's to say: read it with
+  `useLessonRules` (`lessons.rules`, `lib/lesson-rules.ts`) and show it with
+  `LessonRulesDialog`, opened from the course's header ("Taught as …"), where the learner
+  may choose the subject or hand the choice back to Adle. The teaching styles offered for
+  a lesson are those that suit the course's subject (`waysFor`). Never write a rule, or a
+  subject's name, into the renderer.
 
 ## Renderer conventions
 

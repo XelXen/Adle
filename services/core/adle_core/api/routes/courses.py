@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from adle_core.api import schemas
 from adle_core.application.services import Services, get_services
 from adle_core.errors import ValidationFailedError
+from adle_core.lessons import axioms
 
 router = APIRouter(tags=["courses"])
 
@@ -53,8 +54,30 @@ def get_course(
 def update_course(
     course_id: str, body: schemas.CourseUpdate, services: ServicesDep
 ) -> schemas.Course:
-    record = services.courses.update(course_id, title=body.title, description=body.description)
+    record = services.courses.update(
+        course_id, title=body.title, description=body.description, subject=body.subject
+    )
     return schemas.Course.model_validate(record)
+
+
+@router.get("/lesson-rules", operation_id="lessons.rules", response_model=schemas.LessonRules)
+def lesson_rules() -> schemas.LessonRules:
+    """How a lesson is formed: said to the learner as it is said to a lesson's writer,
+    from the one place it is written down (``lessons/axioms.py``)."""
+    return schemas.LessonRules(
+        rules=axioms.rules_for_learner(),
+        subjects=[
+            schemas.SubjectWay.model_validate(
+                {
+                    "key": subject.key,
+                    "name": subject.name,
+                    "steps": list(subject.steps),
+                    "strategies": list(axioms.ways_for(subject.key)),
+                }
+            )
+            for subject in axioms.offered()
+        ],
+    )
 
 
 @router.delete("/courses/{course_id}", operation_id="courses.delete", status_code=204)

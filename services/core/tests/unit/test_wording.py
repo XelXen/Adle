@@ -19,7 +19,9 @@ import adle_core
 
 CORE = Path(adle_core.__file__).parent
 BRITISH = re.compile(
-    r"\b(?:colour|behaviour|organis|recognis|favourit|centre|learnt|analys(?:e|ed|ing)\b|"
+    # "organism" is spelled so everywhere: only "organise" and its kin are looked for.
+    r"\b(?:colour|behaviour|organis(?!ms?\b)|recognis|favourit|centre|learnt|"
+    r"analys(?:e|ed|ing)\b|"
     r"summaris|realis|maths\b|cancell|labell|modell|grey|programme|judgement|licence|practis|"
     r"towards|whilst|amongst|catalogue|neighbour|honour|favour|minimis|maximis|normalis|"
     r"visualis|optimis|initialis)\w*",
@@ -29,7 +31,7 @@ BRITISH = re.compile(
 #: a model may write in a scene ("colour=" for "color="), which the scene policy must know
 #: by that spelling to refuse it, or in a slide's script ("grey", "centre"), which the
 #: slides module must know by that spelling to understand it (ADR-049).
-IDENTIFIERS = {"cancelled", "practise", "colour", "grey", "centre"}
+IDENTIFIERS = {"cancelled", "practise", "colour", "grey", "centre", "colourless", "no colour"}
 #: Where the database's own names are written.
 SCHEMA = (Path("migrations"), Path("infrastructure", "orm.py"))
 

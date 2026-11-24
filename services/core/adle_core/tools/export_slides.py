@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from adle_core.generation.prompts import visual_example
+from adle_core.generation.examples import EXAMPLES as SUBJECT_EXAMPLES
 from adle_core.generation.slides import compile_slide
 
 #: An example of each kind of element and of each verb, as a model would write them.
@@ -341,11 +341,181 @@ EXAMPLES: dict[str, dict[str, Any]] = {
         ],
         "steps": [[{"show": ["die", "odds"]}], [{"set": "die", "to": 5}]],
     },
+    # What an experiment is done in, in each of its shapes, and everything seen in one
+    # (ADR-061): heat, a new color, more of it, bubbles, a solid, and each of them gone.
+    "vessels": {
+        "elements": [
+            {"id": "a", "kind": "vessel", "shape": "test tube", "liquid": "blue", "level": 0.5, "label": "copper sulfate", "place": "left"},
+            {"id": "b", "kind": "vessel", "shape": "flask", "liquid": "green", "level": 0.4, "label": "a flask", "place": "center"},
+            {"id": "c", "kind": "vessel", "shape": "beaker", "level": 0.2, "label": "water", "place": "right"},
+        ],
+        "steps": [
+            [{"show": ["a", "b", "c"]}],
+            [{"set": "a", "to": "heat"}, {"color": "b", "to": "red"}, {"set": "c", "to": {"level": 0.8}}],
+            [{"set": "a", "to": "bubbles"}, {"set": "b", "to": "precipitate"}, {"set": "c", "to": {"liquid": "purple", "bubbles": True}}],
+            [{"set": "a", "to": "no heat"}, {"highlight": "b"}, {"set": "c", "to": "still"}],
+            [{"hide": "a"}],
+        ],
+    },
+    # Molecules: a chain, a branch, a ring with double bonds, two ions, a triple bond.
+    "molecules": {
+        "elements": [
+            {"id": "water", "kind": "molecule", "atoms": ["H", "O", "H"], "bonds": [[1, 2], [2, 3]], "label": "water", "place": "top left"},
+            {
+                "id": "ethanol", "kind": "molecule", "label": "ethanol", "place": "top right",
+                "atoms": ["C", "C", "O", "H", "H", "H", "H", "H", "H"],
+                "bonds": [[1, 2], [2, 3], [1, 4], [1, 5], [1, 6], [2, 7], [2, 8], [3, 9]],
+            },
+            {
+                "id": "ring", "kind": "molecule", "label": "a ring of carbon", "place": "bottom left",
+                "atoms": ["C", "C", "C", "C", "C", "C"],
+                "bonds": ["1=2", "2-3", "3=4", "4-5", "5=6", "6-1"],
+            },
+            {"id": "salt", "kind": "molecule", "atoms": ["Na+", "Cl-"], "label": "sodium chloride", "place": "bottom"},
+            {"id": "nitrogen", "kind": "molecule", "atoms": ["N", "N"], "bonds": [[1, 2, 3]], "place": "bottom right"},
+        ],
+        "steps": [
+            [{"show": ["water", "ethanol", "ring", "salt", "nitrogen"]}],
+            [{"highlight": "water.2"}, {"color": "ethanol.3", "to": "yellow"}, {"highlight": "ring.b1"}],
+        ],
+    },
+    # A timeline as full as one gets, its events coming one and two at a time.
+    "timeline": {
+        "elements": [
+            {
+                "id": "press", "kind": "timeline", "label": "The printing press", "place": "center",
+                "events": [
+                    {"at": "c. 1440", "text": "Gutenberg builds a press with movable type"},
+                    {"at": "1455", "text": "The Gutenberg Bible is printed"},
+                    {"at": "1470s", "text": "Presses in Italy, France and England"},
+                    {"at": "1500", "text": "Millions of books in print"},
+                    {"at": "1517", "text": "Luther's theses spread in print"},
+                    {"at": "1600", "text": "Newspapers begin"},
+                ],
+            },
+        ],
+        "steps": [
+            [{"show": "press.1"}],
+            [{"show": ["press.2", "press.3"]}],
+            [{"show": "press"}],
+            [{"highlight": "press.5"}, {"color": "press.1455", "to": "yellow"}],
+        ],
+    },
+    # Code: its lines one at a time, a line pointed at and one colored; and code written
+    # as one text with a tab in it, and every mark a line of code may hold.
+    "code": {
+        "elements": [
+            {
+                "id": "c", "kind": "code", "label": "JavaScript", "place": "left",
+                "lines": [
+                    "function total(items) {", "  let sum = 0;", "  for (const item of items) {",
+                    "    sum += item.price * item.count;", "  }", "  return sum;", "}",
+                ],
+            },
+            {"id": "note", "kind": "text", "text": "One pass over the list.", "place": "right"},
+            {
+                "id": "py", "kind": "code", "place": "bottom right",
+                "code": "if x < 10 and name != 'ada':\n\tprint(f\"{x:>4} % 3 = {x % 3}\")",
+            },
+        ],
+        "steps": [
+            [{"show": "c.1"}],
+            [{"show": ["c.2", "c.3"]}],
+            [{"show": "c"}, {"highlight": "c.4"}],
+            [{"color": "c.line 6", "to": "green"}, {"show": ["note", "py"]}],
+        ],
+    },
+    # What six real lessons asked of a slide (2026-11-24, ADR-061). A push drawn as an
+    # arrow out of a cart, its words changed; two carts on one side of the same thing; a
+    # quantity with its unit.
+    "forces": {
+        "elements": [
+            {"id": "law", "kind": "math", "place": "center", "tex": "a = F / m"},
+            {"id": "light", "kind": "shape", "shape": "rectangle", "label": "1 kg", "color": "blue", "place": {"left of": "law", "y": 2}},
+            {"id": "heavy", "kind": "shape", "shape": "rectangle", "label": "4 kg", "color": "red", "place": {"left of": "law", "y": -2}},
+            {"id": "push", "kind": "arrow", "from": "light", "to": {"right of": "light"}, "label": "10 N", "color": "green"},
+            {"id": "pull", "kind": "arrow", "from": "heavy", "toward": "left", "label": "2.5 N", "color": "orange"},
+            {"id": "weight", "kind": "arrow", "from": "heavy", "direction": "down", "color": "gray"},
+            {"id": "lift", "kind": "line", "from": "light", "toward": "above", "color": "gray"},
+            {"id": "note", "kind": "text", "text": "one rule", "place": {"right of": "law"}},
+            {"id": "more", "kind": "text", "text": "for every cart", "place": {"right of": "law"}},
+        ],
+        "steps": [
+            [{"show": ["light", "heavy", "push", "pull", "weight", "lift"]}],
+            [{"show": ["law", "note", "more"]}],
+            [{"set": "push", "to": {"label": "20 N"}}, {"set": "pull", "to": "5 N"}],
+        ],
+    },
+    # A list sorted by hand: its cells set all at once and one at a time, an empty cell
+    # filled, and the arrow that compares two of them moved along.
+    "list_sorted": {
+        "elements": [
+            {"id": "list", "kind": "grid", "rows": [["5", "1", "4", ""]], "col_labels": ["0", "1", "2", "3"], "label": "list", "place": "center"},
+            {"id": "compare", "kind": "arrow", "from": "list.1.1", "to": "list.1.2", "label": "compare", "color": "blue", "curved": True},
+        ],
+        "steps": [
+            [{"show": "list"}],
+            [{"show": "compare"}],
+            [{"set": "list", "to": {"rows": [["1", "5", "4", ""]]}}, {"move": "compare", "to": {"from": "list.1.2", "to": "list.1.3"}}],
+            [{"set": "list", "to": [["1", "4", "5", ""]]}, {"set": "list.1.4", "to": 8}],
+            [{"set": "compare", "to": {"label": "sorted"}}, {"hide": "compare"}],
+        ],
+    },
+    # Causes that all lead to one thing: the edges go round the nodes between their ends,
+    # over a row and beside a column.
+    "causes": {
+        "elements": [
+            {
+                "id": "why", "kind": "nodes", "layout": "row", "place": "top", "color": "green",
+                "nodes": ["debt", "hunger", "anger", "revolt"],
+                "edges": [["debt", "revolt"], ["hunger", "revolt"], ["anger", "revolt"]],
+            },
+            {
+                "id": "steps", "kind": "nodes", "layout": "column", "place": "bottom", "directed": False,
+                "nodes": ["first", "second", "third"], "edges": [[1, 3], [1, 2]],
+            },
+        ],
+        "steps": [[{"show": "why"}], [{"show": "steps"}], [{"highlight": "why.debt->revolt"}]],
+    },
+    # One thing moved through the places of two that are never shown, as a real lesson
+    # moved a molecule through a membrane.
+    "passing": {
+        "elements": [
+            {"id": "wall", "kind": "shape", "shape": "rectangle", "label": "membrane", "color": "orange", "place": "center"},
+            {"id": "outside", "kind": "molecule", "atoms": ["O", "O"], "bonds": [[1, 2, 2]], "place": "top"},
+            {"id": "inside", "kind": "molecule", "atoms": ["O", "O"], "bonds": [[1, 2, 2]], "place": "bottom"},
+        ],
+        "steps": [
+            [{"show": ["wall", "outside"]}],
+            [{"move": "outside", "to": "inside"}],
+            [{"highlight": "inside"}, {"color": "inside", "to": "yellow"}],
+        ],
+    },
+    # Characters written small, a liquid with no color, and something put under what
+    # stands at the foot of the stage: it goes above it instead.
+    "small_marks": {
+        "elements": [
+            {"id": "jar", "kind": "vessel", "liquid": "colorless", "label": "H₂O", "place": "left"},
+            {"id": "ions", "kind": "molecule", "atoms": ["Na⁺", "Cl⁻"], "label": "Na⁺ + Cl⁻ (aq)", "place": "right"},
+            {"id": "unit", "kind": "text", "text": "x² + y² in m/s²", "place": "top"},
+            {"id": "eq", "kind": "math", "tex": "\\mathrm{HCl} + \\mathrm{NaOH} \\rightarrow \\mathrm{NaCl} + \\mathrm{H_2O}", "place": "bottom"},
+            {"id": "care", "kind": "text", "text": "In a laboratory, with goggles.", "place": {"below": "eq"}, "color": "red"},
+        ],
+        "steps": [
+            [{"show": ["jar", "ions", "unit"]}],
+            [{"color": "jar", "to": "pink"}, {"show": ["eq", "care"]}],
+            [{"set": "jar", "to": {"liquid": "colorless"}}],
+        ],
+    },
 }  # fmt: skip
 
 
-#: The example the lesson prompt itself shows a model: it is drawn like the rest.
-EXAMPLES["prompt_example"] = visual_example()["visual"]
+#: The example part a lesson's writer is shown, one for each way a subject is taught
+#: (``generation/examples.py``, ADR-061): each is drawn like the rest. The general one
+#: keeps the name it had when it was the only one.
+for _key, _example in SUBJECT_EXAMPLES.items():
+    _name = "prompt_example" if _key == "area" else f"example_{_key}"
+    EXAMPLES[_name] = _example.part["visual"]
 
 
 def written() -> dict[str, str]:

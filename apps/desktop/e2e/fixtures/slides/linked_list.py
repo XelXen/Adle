@@ -68,6 +68,18 @@ class Slide(InteractiveScene):
             return [other.get_left()[0] - 0.55 - mine.width / 2, other.get_center()[1], 0]
         return [other.get_right()[0] + 0.55 + mine.width / 2, other.get_center()[1], 0]
 
+    def stand_beside(self, key, anchor, ways):
+        # Beside what it was put beside: on the side asked for, or, where that would take it
+        # past the edge (under what already stands at the foot of the stage), on the next
+        # side there is to try.
+        mine = self.e[key]
+        for way in ways:
+            mine.move_to(self.beside([key], [anchor], way))
+            if self.within(mine, 6.2, 3.4):
+                return
+        mine.move_to(self.beside([key], [anchor], ways[0]))
+        self.keep(mine)
+
     def shown(self, spec, size, hue):
         if spec[0]:
             return MathTex(spec[1], font_size=round(size * 1.45), color=hue)
@@ -306,6 +318,10 @@ class Slide(InteractiveScene):
                     break
         outside = 0
         for m in self.mobjects:
+            # A value that a step has moved is among them, and is no drawing: it stands at
+            # its own number, wherever that is (a point's place at 20 on a line of meters).
+            if isinstance(m, ValueTracker):
+                continue
             if not self.within(m, 7.12, 4.02):
                 outside += 1
         if overlapping > 0 or struck > 0 or outside > 0:
@@ -347,11 +363,32 @@ class Slide(InteractiveScene):
             nodes.add(chip)
         links = VGroup()
         for edge in edges:
-            points = self.ends(self.e[keys[edge[1]]], self.e[keys[edge[2]]])
-            if directed:
-                link = Arrow(points[0], points[1], buff=0.08, color=self.muted, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=10)
+            a = self.e[keys[edge[1]]]
+            b = self.e[keys[edge[2]]]
+            if edge[3] == 0:
+                points = self.ends(a, b)
+                if directed:
+                    link = Arrow(points[0], points[1], buff=0.08, color=self.muted, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=10)
+                else:
+                    link = Line(points[0], points[1], color=self.muted)
             else:
-                link = Line(points[0], points[1], color=self.muted)
+                # Past the nodes that stand between its ends: over a row, beside a column.
+                tail = a.get_top() + UP * 0.08
+                tip = b.get_top() + UP * 0.08
+                bend = -PI / 2.6
+                if b.get_center()[0] < a.get_center()[0]:
+                    bend = PI / 2.6
+                if edge[3] == 2:
+                    tail = a.get_right() + RIGHT * 0.08
+                    tip = b.get_right() + RIGHT * 0.08
+                    bend = -PI / 2.6
+                    if b.get_center()[1] > a.get_center()[1]:
+                        bend = PI / 2.6
+                if directed:
+                    link = CurvedArrow(tail, tip, color=self.muted, angle=bend)
+                else:
+                    link = ArcBetweenPoints(tail, tip, bend)
+                    link.set_color(self.muted)
             self.e[edge[0]] = link
             links.add(link)
         marks = VGroup()
@@ -371,7 +408,7 @@ class Slide(InteractiveScene):
         self.still_lines = []
         self.sides = {}
         self.amount = ValueTracker(0.0)
-        self.make_nodes('list', ['list.1', 'list.2', 'list.3', 'list.4', 'list.5'], [[False, 'head'], [True, '3'], [True, '7'], [True, '9'], [False, 'null']], [False, True, True, True, False], [[-5.2, 0.0], [-2.6, 0.0], [0.0, 0.0], [2.6, 0.0], [5.2, 0.0]], [['list.e1', 0, 1], ['list.e2', 1, 2], ['list.e3', 2, 3], ['list.e4', 3, 4]], True, None, self.teal)
+        self.make_nodes('list', ['list.1', 'list.2', 'list.3', 'list.4', 'list.5'], [[False, 'head'], [True, '3'], [True, '7'], [True, '9'], [False, 'null']], [False, True, True, True, False], [[-5.2, 0.0], [-2.6, 0.0], [0.0, 0.0], [2.6, 0.0], [5.2, 0.0]], [['list.e1', 0, 1, 0], ['list.e2', 1, 2, 0], ['list.e3', 2, 3, 0], ['list.e4', 3, 4, 0]], True, None, self.teal)
         self.e['note'] = self.lines([[False, 'Each node points to the next one.']], 34, self.ink)
         self.put(['list'], [0.0, 0.981, 12.4, 4.838], 1)
         self.put(['note'], [0.0, -2.594, 12.4, 1.613], 1)

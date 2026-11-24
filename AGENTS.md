@@ -177,6 +177,13 @@ is built from it, and an alpha or a stable version is published from a release c
   formula never shares a slide's first step with its case, and its numbers can fly out of
   the picture into it. A picture's words never lie over each other, under a line, or past the
   edge of the screen, and a step is never longer than its words (ADR-055, ADR-056).
+- How a lesson is formed is written down once (ADR-061, `lessons/axioms.py`): the rules of
+  every lesson, and what each subject needs besides (mathematics a picture and an example
+  before its equation, a language its rule inside real sentences, chemistry an experiment
+  before its particles and its equation). A course has a subject: guessed from its name,
+  named by the AI with its plan, or chosen by the learner, whose choice stands. The learner
+  can read the rules a course's lessons follow, one press away. A rule about how lessons
+  are taught goes there, never into a prompt alone.
 - A lesson in a natural voice is made with its voice (ADR-051): ready once its first part
   can be heard, and a line not recorded yet is waited for, never read in another voice
   unless the learner chooses that or no recording will come. A voice chosen is recorded at

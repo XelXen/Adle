@@ -977,7 +977,7 @@ Status is updated as work proceeds. The detailed, current picture (test results,
 actions) is in `docs/engineering/PROJECT_STATE.md`. A milestone is "Done" only when its acceptance
 criteria were demonstrated by tests that were actually run.
 
-_Last updated: 2026-11-21._
+_Last updated: 2026-11-24._
 
 | Milestone | Status | Notes and acceptance evidence |
 |---|---|---|
@@ -1091,6 +1091,19 @@ of its own so that what the learner did is still never rewritten (ADR-054). Evid
 `test_standing_reports.py`, the API tests of taking a report back, revision 0012 up and
 down with the learner's rows in `test_database.py`, and the journey in `e2e/learning` that
 undoes, keeps and takes back a report across a lesson opened again.
+
+Then, on 2026-11-24, at the owner's word ("too focused on maths ... every lesson needs
+axiomatic rules as to how a lesson should be formed"): **how a lesson is formed, written
+down once** (ADR-061): seven rules of every lesson and what each of thirteen kinds of
+subject needs besides, each said to the learner and to the lesson's writer; **a course's
+subject**, guessed from its name, named by the AI with its plan, or chosen by the learner;
+an example part for each way a subject is taught; and **a timeline, a vessel for an
+experiment, a molecule and code** among what a slide can draw. Six real lessons in six
+subjects were written by hand and their slides run in the player; what they asked of a
+slide and did not get is drawn now. Evidence: `test_lesson_axioms.py`,
+`test_slide_subjects.py`, `test_slide_real_lessons.py`, the renderer's
+`lesson-rules.test.ts`, the journey in `e2e/curriculum` that reads a course's rules and
+changes its subject, and 42 slide examples stepped through by `e2e/slide-player`.
 
 ### Deviations from this plan (each has an ADR)
 

@@ -272,12 +272,37 @@ everything and decides nothing.
   figure. The narration's [brackets] become `Beat.cues` in `drafts` (`_marked`, `_cued`,
   `_paced`); a scene's `steps` are counted by the policy, never read from input. A new kind
   of element or verb is a template, an example in `tools/export_slides.py`, and
-  `npm run slides` (the player steps through every example in both themes). The prompt's
-  own example (`prompts.visual_example`) is one of them: change it and run `npm run slides`.
+  `npm run slides` (the player steps through every example). The examples a lesson's
+  writer is shown (`generation/examples.py`) are among them: change one and run
+  `npm run slides`.
   The case comes first (ADR-050): `defer_theory` moves a formula or a rule that a first
   step shows beside its case to the next step, and `show` with `from` makes a formula's
   `{{ }}` parts out of copies of the picture (`TransformFromCopy`, then the whole formula
   put back as one thing).
+- **How a lesson is formed is written in `lessons/axioms.py`** (ADR-061), pure: the rules
+  of every lesson (`AXIOMS`) and what each subject needs besides (`SUBJECTS`), each as a
+  line for the learner and a brief for the writer. `prompts.lesson_request` gives the
+  writer the rules, the needs of the course's subject, and that subject's example part
+  (`generation/examples.py`, `Subject.example`): one subject at a time, never all of them.
+  Do not write teaching advice into `prompts.py`. A new subject is an entry there, its key
+  in `schemas.SubjectKey` (a test keeps them equal), and an example; an example obeys the
+  rules it is an example of (`test_lesson_axioms.py`) and is a slide the player steps
+  through. A course's subject (`courses.subject`, `subject_by_adle`) is placed by
+  `courses.place` (a guess from its name, `axioms.guess`, which names nothing when two
+  subjects are as likely), by the AI with its plan (`place_as`, in the plan's own request),
+  or by the learner (`CourseService.update`), whose choice stands; a lesson of a course
+  nobody has placed is formed by a guess from its concept (`generation.subject_of`).
+  Nothing asks a model what subject something is in a request of its own, and the ways of
+  teaching tried for another explanation are those that suit the subject (`next_strategy`).
+- **A timeline, a vessel, a molecule and code are elements like the rest** (ADR-061,
+  `generation/slides.py`). A vessel draws everything it will ever show where it goes
+  (`vessel_seen` reads the steps as written) and keeps what has not happened off the stage
+  (`_Scene.vessels`, `seen`); its shapes are worked out here, not in the scene
+  (`_VESSEL_PROFILES`). A molecule's atoms are placed by the core (`_molecule_places`).
+  Code is drawn a line at a time in the stage's own face (the player has one), each line
+  where a block of them would have it (`make_code`). A link in anything an element says
+  costs the picture that element (`names_a_link`), never the whole slide. Nodes stand as
+  far apart as their names are wide (`_node_places`).
 - **A picture keeps its words clear of each other and of the edge** (ADR-055,
   `generation/layout.py`, written into every slide and figure). A label is placed with
   `self.pin(label, anchor, side, buff)`, never with `next_to` alone, unless it is drawn

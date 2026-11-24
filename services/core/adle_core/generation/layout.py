@@ -244,6 +244,10 @@ LAYOUT_METHODS = f"""\
                     break
         outside = 0
         for m in self.mobjects:
+            # A value that a step has moved is among them, and is no drawing: it stands at
+            # its own number, wherever that is (a point's place at 20 on a line of meters).
+            if isinstance(m, ValueTracker):
+                continue
             if not self.within(m, {SCREEN_HALF_WIDTH}, {SCREEN_HALF_HEIGHT}):
                 outside += 1
         if overlapping > 0 or struck > 0 or outside > 0:

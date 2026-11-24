@@ -16,6 +16,22 @@ from adle_core.lessons import ir as lesson_ir
 from adle_core.lessons.player import PlayerLesson, PlayerQuestion
 
 CourseOrigin = Literal["sample", "topic", "materials"]
+#: The kinds of subject a course may be (``lessons.axioms.SUBJECTS``; a test keeps them equal).
+SubjectKey = Literal[
+    "mathematics",
+    "physics",
+    "chemistry",
+    "biology",
+    "earth_science",
+    "computer_science",
+    "language",
+    "literature",
+    "history",
+    "economics",
+    "social_science",
+    "arts",
+    "general",
+]
 SourceKind = Literal["pdf", "docx", "markdown", "text", "authored"]
 SourceStatus = Literal["extracted", "needs_attention"]
 SectionKind = Literal["document", "page", "heading"]
@@ -81,6 +97,8 @@ class ProposalRequest(_Input):
 class CourseUpdate(_Input):
     title: Title | None = None
     description: LongText | None = None
+    #: The kind of subject the course is, which then stands; or "auto": Adle decides.
+    subject: SubjectKey | Literal["auto"] | None = None
 
 
 class Course(_Output):
@@ -96,10 +114,33 @@ class Course(_Output):
     last_opened_at: datetime | None
     #: Its name was left to Adle, who names it from its files and its concepts (ADR-053).
     named_by_adle: bool = False
+    #: The kind of subject it is, which decides how its lessons are formed (ADR-061).
+    subject: SubjectKey = "general"
+    #: Adle placed it; the learner has not chosen.
+    subject_by_adle: bool = True
 
 
 class CourseList(_Output):
     courses: list[Course]
+
+
+class SubjectWay(_Output):
+    """One kind of subject, and how a lesson of it goes."""
+
+    key: SubjectKey
+    name: str
+    #: How a lesson of it goes, as short steps in order.
+    steps: list[str]
+    #: The ways of teaching that suit it.
+    strategies: list[lesson_ir.Strategy]
+
+
+class LessonRules(_Output):
+    """How Adle forms a lesson (ADR-061): the rules of every lesson, in the order a lesson
+    obeys them, and what each subject needs besides."""
+
+    rules: list[str]
+    subjects: list[SubjectWay]
 
 
 # -- sources ---------------------------------------------------------------

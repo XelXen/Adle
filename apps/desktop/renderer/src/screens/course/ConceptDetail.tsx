@@ -37,6 +37,7 @@ import { callCore, describeError } from '../../lib/core-client';
 import { formatRelativeDay } from '../../lib/format';
 import { WhatIsSent } from '../../components/WhatIsSent';
 import { type JobFailure, lessonDisclosure } from '../../lib/generation';
+import { useLessonRules, waysFor } from '../../lib/lesson-rules';
 import { isJobActive } from '../../lib/use-job';
 import styles from './Curriculum.module.css';
 import {
@@ -139,6 +140,7 @@ export function ConceptDetail({
   onSelect,
   onChanged,
   onReload,
+  subject,
 }: {
   concept: Concept;
   path: readonly Concept[];
@@ -156,6 +158,8 @@ export function ConceptDetail({
   onChanged: (curriculum: Curriculum) => void;
   /** A change after which the curriculum must be read again. */
   onReload: () => void;
+  /** The kind of subject the course is: the teaching styles offered are those that suit it. */
+  subject?: string | null;
 }) {
   const toast = useToast();
   const headingId = useId();
@@ -165,6 +169,13 @@ export function ConceptDetail({
   const [history, setHistory] = useState<HistoryState>({ status: 'closed' });
   const [linking, setLinking] = useState<string | null>(null);
   const [strategy, setStrategy] = useState<TeachingStrategy | ''>('');
+  // A lesson of history is not offered "Step-by-step math" (ADR-061).
+  const rules = useLessonRules();
+  const offered = waysFor(
+    STRATEGY_CHOICES,
+    rules.resource.status === 'ready' ? rules.resource.data : null,
+    subject,
+  );
 
   const dependents = directDependents(path, concept.id);
   const linkedSections = new Set(concept.source_refs.map((ref) => ref.section_id));
@@ -486,7 +497,7 @@ export function ConceptDetail({
                   <Select
                     label="Teaching style"
                     value={strategy}
-                    options={STRATEGY_CHOICES}
+                    options={offered}
                     onValueChange={setStrategy}
                   />
                 </div>

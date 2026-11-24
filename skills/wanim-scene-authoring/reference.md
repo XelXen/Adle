@@ -180,6 +180,26 @@ Write ordinary manim Community v0.21 Python. Only the Wanim-specific parts are l
   (`self.lines = []` made `self.lines(...)` fail with no message): give state names no
   method has.
 
+- **What the pictures of other subjects are drawn with (ADR-061)**, the examples `code.py`,
+  `vessels.py`, `molecules.py`, `timeline.py`, `causes.py`, `list_sorted.py` and `forces.py`
+  in `e2e/fixtures/slides/`, stepped through by `e2e/slide-player.spec.ts` and looked at,
+  2026-11-24:
+  - **`Text` has one face.** `Text(..., font="monospace")` is drawn in the same face as any
+    other text: the font chain the player is given is the only one there is. Code is set in
+    it, and keeps every character.
+  - **`Paragraph(*lines, font_size=..., line_spacing=...)`** lays lines out on their own
+    baselines, keeps the spaces a line begins with, and gives each line's glyphs as
+    `paragraph.chars[i]`. A `Text` of one line's words moved to `chars[i].get_center()`
+    stands where that line stood.
+  - **`ArcBetweenPoints(start, end, bend)`** draws an arc when the bend is given by place.
+    **Given by name (`angle=bend`) it stops the scene** ("non-finite point or vector
+    value"), as does `radius=`; `CurvedArrow(start, end, angle=bend)` runs either way.
+  - `Polygon(*points, color=..., fill_opacity=..., stroke_width=0)` for a filled shape with
+    no outline, a `Transform` of one such polygon into another of other corners (a liquid
+    rising), and of a `Text(" ")` into a `MathTex` (an empty cell filled) all run.
+  - `DIRECTION * number` held in a variable (`way = RIGHT`, then `point + way * 1.5`) adds
+    as a vector; `n % 4` and a list indexed by it run.
+
 ### Documented upstream, not yet exercised here
 
 `PathSlider`, `DraggablePoint`, `Chip`, `InputDecimalNumber`, `InputInteger`,

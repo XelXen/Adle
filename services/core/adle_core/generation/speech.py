@@ -64,6 +64,60 @@ for _name, _point in (
 ):  # fmt: skip
     UNICODE_TEX[chr(_point)] = " \\" + _name + " "
 
+#: Digits and signs written small, below the line or above it ("H₂O", "Na⁺", "x²"), by
+#: code point: the face the player sets words in has none of them, and shows a box instead
+#: (a real lesson of chemistry, 2026-11-24). A formula has them as TeX writes them.
+_LOWERED = {chr(0x2080 + digit): str(digit) for digit in range(10)} | {
+    chr(0x208A): "+",
+    chr(0x208B): "-",
+}
+_RAISED = {
+    chr(0x2070): "0",
+    chr(0x00B9): "1",
+    chr(0x00B2): "2",
+    chr(0x00B3): "3",
+    **{chr(0x2070 + digit): str(digit) for digit in range(4, 10)},
+    chr(0x207A): "+",
+    chr(0x207B): "-",
+}
+SMALL = frozenset(_LOWERED) | frozenset(_RAISED)
+_LOW = "".join(_LOWERED)
+_HIGH = "".join(_RAISED)
+#: A formula of chemistry written with them: the symbols of elements, each perhaps with a
+#: count below the line, and perhaps a charge above it at the end ("SO₄²⁻").
+_SUBSTANCE = re.compile(rf"((?:[A-Z][a-z]?[{_LOW}]*)+)([{_HIGH}]*)")
+
+
+def has_marks(text: str) -> bool:
+    """Whether a text has mathematics written in its own symbols, or characters written
+    small: it is then set as a formula, which can show them."""
+    return any(char in UNICODE_TEX or char in SMALL for char in text)
+
+
+def small_as_tex(text: str) -> str:
+    """Characters written small as TeX writes them: "x²" is "x^2", and a formula of
+    chemistry is set upright, "H₂O" as "\\mathrm{H_2O}", "Na⁺" as "\\mathrm{Na}^+"."""
+    if not any(char in SMALL for char in text):
+        return text
+
+    def script(mark: str, run: str, table: dict[str, str]) -> str:
+        plain = "".join(table[char] for char in run)
+        return mark + (plain if len(plain) == 1 else "{" + plain + "}")
+
+    def substance(found: re.Match[str]) -> str:
+        body, charge = found.group(1), found.group(2)
+        counted = any(char in _LOWERED for char in body)
+        charged = any(_RAISED[char] in "+-" for char in charge)
+        if not counted and not charged:
+            return found.group(0)
+        inner = re.sub(rf"[{_LOW}]+", lambda run: script("_", run.group(0), _LOWERED), body)
+        return "\\mathrm{" + inner + "}" + (script("^", charge, _RAISED) if charge else "")
+
+    text = _SUBSTANCE.sub(substance, text)
+    text = re.sub(rf"[{_LOW}]+", lambda run: script("_", run.group(0), _LOWERED), text)
+    return re.sub(rf"[{_HIGH}]+", lambda run: script("^", run.group(0), _RAISED), text)
+
+
 _PIECE = re.compile(r"\\[A-Za-z]+|\\[^A-Za-z]|[{}^_&\[\]()]|[A-Za-z]+|\d+(?:\.\d+)?|\s+|.", re.S)
 
 _GREEK = {

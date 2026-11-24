@@ -328,4 +328,75 @@ test.describe('curriculum', () => {
     await expectNoAccessibilityViolations(page);
     expect(adle.problems).toEqual([]);
   });
+
+  test('a course says what it is taught as, and the learner can say otherwise', async ({
+    adle,
+  }) => {
+    const { page } = adle;
+    await waitForCore(page);
+    // Placed by its name, with nothing asked of anyone (ADR-061).
+    await createCourse(page, 'Organic chemistry', { topic: 'Things made of carbon.' });
+    const control = page.getByRole('button', { name: 'Taught as Chemistry' });
+    await expect(control).toBeVisible();
+
+    await control.click();
+    const dialog = page.getByRole('dialog', { name: 'How lessons are formed' });
+    await expect(dialog).toBeVisible();
+    // The rules of every lesson, then this subject's own way.
+    await expect(dialog.getByRole('heading', { name: 'Every lesson' })).toBeVisible();
+    await expect(dialog).toContainText('The rule comes after, made from what you saw.');
+    const subject = dialog.getByRole('combobox', { name: 'Taught as' });
+    await expect(subject.locator('option:checked')).toHaveText('Let Adle choose (now: Chemistry)');
+    const way = dialog.getByRole('list', { name: 'How a lesson of Chemistry goes' });
+    await expect(way.getByRole('listitem')).toHaveText([
+      'An experiment: what is mixed, and what you see',
+      'What the particles are doing',
+      'The equation, balanced',
+    ]);
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'course-lesson-rules');
+
+    // The learner's own choice, which then stands.
+    await subject.selectOption({ label: 'History' });
+    await expect(
+      dialog.getByRole('list', { name: 'How a lesson of History goes' }).getByRole('listitem'),
+    ).toHaveText([
+      'One moment: a person, a place, a date',
+      'What led to it, and what came of it',
+      'The claim, and how we know',
+    ]);
+    await expect(subject.locator('option:checked')).toHaveText('History');
+    await dialog.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByRole('button', { name: 'Taught as History' })).toBeVisible();
+
+    // A lesson of history is not offered the ways of mathematics.
+    await page.getByRole('button', { name: 'Add a concept' }).click();
+    const adding = page.getByRole('dialog', { name: 'Add a concept' });
+    await adding.getByLabel('Name').fill('The Haber process');
+    await adding.getByLabel('What it covers').fill('How ammonia came to be made from air.');
+    await adding.getByRole('textbox', { name: 'Objective 1' }).fill('Say why it mattered in 1914.');
+    await adding.getByRole('button', { name: 'Add concept' }).click();
+    await expect(detail(page, 'The Haber process')).toBeVisible();
+    const rules = await invoke<{ subjects: { key: string; strategies: string[] }[] }>(
+      page,
+      'lessons.rules',
+    );
+    const courses = await invoke<{
+      courses: { title: string; subject: string; subject_by_adle: boolean }[];
+    }>(page, 'courses.list');
+    const course = courses.courses.find((item) => item.title === 'Organic chemistry');
+    expect([course?.subject, course?.subject_by_adle]).toEqual(['history', false]);
+    expect(rules.subjects.find((item) => item.key === 'history')?.strategies).toEqual([
+      'visual',
+      'analogy',
+      'worked_example',
+      'socratic',
+    ]);
+
+    // And it is there again when the course is opened again.
+    await page.getByRole('main').getByRole('button', { name: 'Library' }).click();
+    await courseCard(page, 'Organic chemistry').click();
+    await expect(page.getByRole('button', { name: 'Taught as History' })).toBeVisible();
+    expect(adle.problems).toEqual([]);
+  });
 });

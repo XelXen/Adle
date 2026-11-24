@@ -23,6 +23,7 @@ every scene does.
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 import re
@@ -52,8 +53,8 @@ from adle_core.generation.figures import (
     _without_blanks,
 )
 from adle_core.generation.layout import LAYOUT_METHODS, LAYOUT_STATE
-from adle_core.generation.scene_policy import check_scene_source
-from adle_core.generation.speech import UNICODE_TEX
+from adle_core.generation.scene_policy import check_scene_source, names_a_link
+from adle_core.generation.speech import has_marks, small_as_tex
 
 #: The most elements a slide draws, and the most steps it takes (a live page besides).
 MAX_ELEMENTS = 18
@@ -117,12 +118,14 @@ _SIDES = {
 _TALL = {
     "text": 1.0, "math": 1.3, "box": 1.4, "words": 1.2, "number": 1.0, "coin": 1.5,
     "die": 1.5, "dot": 0.6, "shape": 1.8, "set": 3.0, "grid": 3.4, "table": 3.0,
-    "axes": 4.4, "number_line": 1.4, "bars": 3.6, "nodes": 3.0,
+    "axes": 4.4, "number_line": 1.4, "bars": 3.6, "nodes": 3.0, "timeline": 3.6,
+    "vessel": 2.8, "molecule": 2.4, "code": 3.0,
 }  # fmt: skip
 _WIDE = {
     "text": 1.6, "math": 1.4, "box": 1.4, "words": 2.0, "number": 0.9, "coin": 0.8,
     "die": 0.8, "dot": 0.4, "shape": 1.0, "set": 2.0, "grid": 2.0, "table": 2.4,
-    "axes": 2.6, "number_line": 2.4, "bars": 2.4, "nodes": 2.4,
+    "axes": 2.6, "number_line": 2.4, "bars": 2.4, "nodes": 2.4, "timeline": 3.4,
+    "vessel": 1.0, "molecule": 1.6, "code": 2.4,
 }  # fmt: skip
 
 
@@ -149,13 +152,29 @@ def _region(value: object) -> str | None:
 
 
 def _relation(value: object) -> tuple[int, str] | None:
-    """Beside another element: ``{"below": "omega"}``, as (side, element)."""
-    if isinstance(value, dict) and len(value) == 1:
-        ((key, ref),) = value.items()
-        relation = _RELATION_WORDS.get(_words(key), _words(key))
-        if relation in _RELATIONS and isinstance(ref, str) and ref.strip():
-            return (_RELATIONS[relation], ref.strip())
+    """Beside another element: ``{"below": "omega"}``, as (side, element). What else is
+    said with it is passed over (``{"left of": "track", "x": 1}``, as a real model wrote)."""
+    if isinstance(value, dict):
+        for key, ref in value.items():
+            relation = _RELATION_WORDS.get(_words(key), _words(key))
+            if relation in _RELATIONS and isinstance(ref, str) and ref.strip():
+                return (_RELATIONS[relation], ref.strip())
     return None
+
+
+def _offset(value: object) -> tuple[float, float]:
+    """How far from beside another element something is put, across and up, when its place
+    says so with an "x" or a "y": never more than a third of the stage."""
+    if not isinstance(value, dict):
+        return (0.0, 0.0)
+
+    def amount(key: str, most: float) -> float:
+        given = value.get(key)
+        if isinstance(given, bool) or not isinstance(given, int | float):
+            return 0.0
+        return max(-most, min(most, float(given))) if math.isfinite(given) else 0.0
+
+    return (amount("x", 4.0), amount("y", 2.4))
 
 
 def _color(value: object) -> str | None:
@@ -205,13 +224,25 @@ def _content(text: str) -> list[Any]:
 _TOKEN_MATH = re.compile(r"[A-Za-z]|[A-Za-z0-9(),.+\-=_^{}|/*<>' ]{1,14}")
 
 
+#: A number, a space, and a unit of a few letters, perhaps over another and raised to a
+#: power: "10 N", "2.5 m/s^2", "4 kg".
+_QUANTITY = re.compile(
+    r"(-?\d+(?:\.\d+)?)\s+([A-Za-z]{1,4}(?:\^-?\d)?(?:/[A-Za-z]{1,3}(?:\^-?\d)?)?)"
+)
+
+
 def _token(text: str) -> list[Any]:
     """A short name for something on the stage: a formula when it reads as one (H, (1,2),
     x_1, 1/2), words when it is words."""
     text = " ".join(str(text).split())
     if not text:
         raise ValueError("must say something")
-    if "$" in text or "\\" in text or any(char in UNICODE_TEX for char in text):
+    quantity = _QUANTITY.fullmatch(small_as_tex(text)) if "$" not in text else None
+    if quantity is not None and "\\" not in text:
+        # A number and its unit: the unit upright and a little apart, never "10 times N".
+        unit = re.sub(r"[A-Za-z]+", lambda run: "\\mathrm{" + run.group(0) + "}", quantity.group(2))
+        return [True, quantity.group(1) + "\\," + unit]
+    if "$" in text or "\\" in text or has_marks(text):
         return [True, _math(text)]
     # A name of letters alone is a name ("HH", "TT", "fib"), upright: set as a formula it
     # would read as letters multiplied. One letter is a variable, and is set as one.
@@ -257,6 +288,20 @@ def _first_settings(raw_steps: object) -> dict[str, str]:
                 value = action.get("to", action.get("value"))
                 if isinstance(value, str) and value.strip():
                     found.setdefault(action["set"], value)
+    return found
+
+
+def _all_settings(raw_steps: object) -> dict[str, list[Any]]:
+    """Everything each element is set to by the steps, by its id (the part after a dot is
+    not looked at: "glass.liquid" is "glass")."""
+    found: dict[str, list[Any]] = {}
+    if not isinstance(raw_steps, list):
+        return found
+    for step in raw_steps:
+        for action in step if isinstance(step, list) else [step]:
+            if isinstance(action, dict) and isinstance(action.get("set"), str):
+                value = action.get("to", action.get("value"))
+                found.setdefault(action["set"].split(".")[0].strip(), []).append(value)
     return found
 
 
@@ -395,6 +440,9 @@ class ArrowElement(_Element):
     start: Short = Field(alias="from")
     end: Short = Field(alias="to")
     curved: bool = False
+    #: Out of what it starts at, to this side, instead of to another element: a push on a
+    #: cart, water leaving a cell.
+    toward: Literal["below", "above", "left", "right"] | None = None
 
 
 class LineElement(_Element):
@@ -402,6 +450,7 @@ class LineElement(_Element):
     start: Short = Field(alias="from")
     end: Short = Field(alias="to")
     dashed: bool = False
+    toward: Literal["below", "above", "left", "right"] | None = None
 
 
 class BraceElement(_Element):
@@ -510,6 +559,51 @@ class DieElement(_Element):
     face: int = Field(default=1, ge=1, le=6)
 
 
+class TimelineEvent(_Spec):
+    #: When, as it is written: "1969", "July 20", "Day 3".
+    at: Short
+    #: What happened, in a few words.
+    text: Short
+
+
+class TimelineElement(_Element):
+    kind: Literal["timeline"]
+    events: list[TimelineEvent] = Field(min_length=2, max_length=6)
+
+
+class VesselElement(_Element):
+    """Something an experiment is done in: what is in it, and what is seen of it."""
+
+    kind: Literal["vessel"]
+    shape: str = "beaker"
+    #: The color of what is in it. Left out: the element's own color, else blue.
+    liquid: Any = None
+    #: How full it is, from 0 (empty) to 1.
+    level: float = Field(default=0.6, ge=0.0, le=1.0)
+    bubbles: bool = False
+    #: A solid at the bottom: its color, or yes.
+    solid: Any = None
+    heat: bool = False
+
+
+class MoleculeElement(_Element):
+    kind: Literal["molecule"]
+    #: The symbol of each atom, as it is written on it: "H", "O", "Na+".
+    atoms: list[Short] = Field(min_length=1, max_length=12)
+    #: Each two atoms, counted from 1, and how many bonds join them (1 to 3).
+    bonds: list[list[int]] = Field(default_factory=list, max_length=16)
+
+
+class CodeElement(_Element):
+    # Its lines keep the spaces they begin with.
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=False, populate_by_name=True)
+
+    kind: Literal["code"]
+    lines: list[Annotated[str, StringConstraints(min_length=1, max_length=64)]] = Field(
+        min_length=1, max_length=10
+    )
+
+
 class ParamElement(_Element):
     kind: Literal["param"]
     value: Number
@@ -545,6 +639,10 @@ Element = Annotated[
     | NumberElement
     | CoinElement
     | DieElement
+    | TimelineElement
+    | VesselElement
+    | MoleculeElement
+    | CodeElement
     | ParamElement,
     Field(discriminator="kind"),
 ]
@@ -553,7 +651,8 @@ _ELEMENT: TypeAdapter[Any] = TypeAdapter(Element)
 KINDS = (
     "text", "math", "box", "dot", "shape", "set", "grid", "arrow", "line", "brace", "outline",
     "label", "axes", "curve", "area", "point", "tangent", "number_line", "vector", "bars",
-    "table", "words", "nodes", "number", "coin", "die", "param",
+    "table", "words", "nodes", "number", "coin", "die", "timeline", "vessel", "molecule",
+    "code", "param",
 )  # fmt: skip
 _KIND_WORDS = {
     "formula": "math", "equation": "math", "tex": "math", "latex": "math", "sentence": "words",
@@ -563,12 +662,23 @@ _KIND_WORDS = {
     "network": "nodes", "tree": "nodes", "flow": "nodes", "value": "param", "slider": "param",
     "parameter": "param", "region": "area", "marker": "point", "counter": "number",
     "matrix": "grid", "card": "box", "venn": "set", "sample space": "set", "caption": "text",
-    "title": "text", "note": "text",
+    "title": "text", "note": "text", "beaker": "vessel", "test tube": "vessel",
+    "tube": "vessel", "flask": "vessel", "glass": "vessel", "jar": "vessel",
+    "container": "vessel", "cup": "vessel", "events": "timeline", "dates": "timeline",
+    "time line": "timeline", "structure": "molecule", "compound": "molecule",
+    "snippet": "code", "program": "code", "pseudocode": "code", "listing": "code",
+}  # fmt: skip
+#: The shapes a vessel is drawn in, by the words a script may use for one.
+_VESSELS = {
+    "beaker": "beaker", "glass": "beaker", "jar": "beaker", "cup": "beaker",
+    "container": "beaker", "test tube": "tube", "tube": "tube", "testtube": "tube",
+    "flask": "flask", "conical flask": "flask", "erlenmeyer": "flask",
+    "erlenmeyer flask": "flask",
 }  # fmt: skip
 #: Kinds placed on the stage by region; the others are drawn by what they refer to.
 _PLACED = frozenset(_TALL)
 #: Kinds whose pieces come and go one at a time; the rest are shown whole.
-_PIECEWISE = frozenset({"set", "grid", "table", "nodes", "bars"})
+_PIECEWISE = frozenset({"set", "grid", "table", "nodes", "bars", "timeline", "molecule", "code"})
 #: Kinds one of which may be turned into another ("transform").
 _SINGLE = frozenset({"text", "math", "box", "words", "dot", "shape"})
 #: Kinds drawn by what they join or point at, whose words are a piece of their own.
@@ -611,6 +721,224 @@ def _node(element: NodesElement, ref: str | int) -> int | None:
     return names.index(_key(str(ref))) if _key(str(ref)) in names else None
 
 
+_TOWARD = ("below", "above", "left", "right")
+
+
+def _outward(written: dict[str, Any]) -> dict[str, Any]:
+    """An arrow that points out of what it starts at, to one side, as real models write a
+    push on a cart or water leaving a cell (2026-11-24): ``"to": {"right of": "cart"}``, or
+    ``"direction": "right"``. Between two elements it stays an arrow from one to the other."""
+    arrow = dict(written)
+    side: int | None = None
+    beside = _relation(arrow.get("to")) if isinstance(arrow.get("to"), dict) else None
+    if beside is not None:
+        side, ref = beside
+        if arrow.get("from") in (None, ref):
+            arrow["from"] = ref
+        else:
+            # From one thing to beside another is to that other.
+            side = None
+        arrow["to"] = ref
+    said = arrow.get("direction", arrow.get("toward"))
+    if side is None and isinstance(said, str) and _words(said) in _SIDES:
+        side = ("DOWN", "UP", "LEFT", "RIGHT").index(_SIDES[_words(said)])
+        arrow.setdefault("to", arrow.get("from"))
+    arrow.pop("toward", None)
+    if side is not None and arrow.get("to") == arrow.get("from"):
+        arrow["toward"] = _TOWARD[side]
+    return arrow
+
+
+def _events(raw: object) -> object:
+    """A timeline's events as a model may write them: objects with "at" and "text" (or
+    "date", "year", "when" and "label", "event", "what"), pairs, or one object of dates."""
+    if isinstance(raw, dict):
+        raw = [[when, what] for when, what in raw.items()]
+    if not isinstance(raw, list):
+        return raw
+    found: list[Any] = []
+    for item in raw:
+        if isinstance(item, list | tuple) and len(item) == 2:
+            found.append({"at": str(item[0]), "text": str(item[1])})
+        elif isinstance(item, dict):
+            when = next(
+                (item[key] for key in ("at", "date", "year", "when", "time") if key in item), None
+            )
+            what = next(
+                (
+                    item[key]
+                    for key in ("text", "label", "event", "what", "name", "title")
+                    if key in item
+                ),
+                None,
+            )
+            found.append({"at": str(when or "").strip(), "text": str(what or "").strip()})
+        else:
+            found.append(item)
+    return found
+
+
+#: A bond written as words: "1-2", "2=3", "1#2" (and a long dash, or a triple bar).
+_BOND = re.compile(r"\s*(\w+)\s*([-=#\u2013\u2261])\s*(\w+)\s*")
+
+
+def _bonds(raw: object, atoms: object) -> object:
+    """A molecule's bonds as a model may write them: [1, 2], [1, 2, 2], "1=2", or an object
+    with "from", "to" and "order"; an atom by its number from 1, or by its symbol when only
+    one atom has it. A bond that joins nothing there is, is left out."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        return raw
+    symbols = [str(atom).strip() for atom in atoms] if isinstance(atoms, list) else []
+
+    def atom(ref: object) -> int | None:
+        if isinstance(ref, bool):
+            return None
+        if isinstance(ref, int) or (isinstance(ref, str) and ref.strip().isdigit()):
+            number = int(ref)
+            return number if 1 <= number <= len(symbols) else None
+        if isinstance(ref, str) and symbols.count(ref.strip()) == 1:
+            return symbols.index(ref.strip()) + 1
+        return None
+
+    found: list[list[int]] = []
+    for item in raw:
+        order: object = 1
+        if isinstance(item, str):
+            matched = _BOND.fullmatch(item)
+            if matched is None:
+                continue
+            ends: list[object] = [matched.group(1), matched.group(3)]
+            order = {"=": 2, "#": 3, "\u2261": 3}.get(matched.group(2), 1)
+        elif isinstance(item, dict):
+            ends = [item.get("from", item.get("a")), item.get("to", item.get("b"))]
+            order = item.get("order", item.get("bonds", 1))
+        elif isinstance(item, list | tuple) and len(item) in (2, 3):
+            ends = list(item[:2])
+            order = item[2] if len(item) == 3 else 1
+        else:
+            continue
+        first, second = atom(ends[0]), atom(ends[1])
+        if first is None or second is None or first == second:
+            continue
+        if isinstance(order, str):
+            order = {"single": 1, "double": 2, "triple": 3}.get(order.strip().lower(), order)
+        try:
+            count = int(str(order))
+        except ValueError:
+            count = 1
+        pair = sorted((first, second))
+        if not any(bond[:2] == pair for bond in found):
+            found.append([*pair, min(3, max(1, count))])
+    return found
+
+
+def _code_lines(raw: object) -> object:
+    """Code as its lines: tabs as four spaces, nothing after a line's last character, no
+    empty lines (a line is something a step can point at), each as long as fits."""
+    if isinstance(raw, str):
+        raw = raw.replace("\\n", "\n").split("\n")
+    if not isinstance(raw, list):
+        return raw
+    lines = [str(line).replace("\t", "    ").rstrip()[:64] for line in raw if isinstance(line, str)]
+    lines = [line for line in lines if line.strip()]
+    # What every line begins with is no indentation at all.
+    shared = min((len(line) - len(line.lstrip(" ")) for line in lines), default=0)
+    return [line[shared:] for line in lines][:10]
+
+
+#: What a script may say is seen in a vessel, as what is drawn.
+_SEEN: dict[str, tuple[str, Any]] = {
+    "bubbles": ("bubbles", True), "bubbling": ("bubbles", True), "fizz": ("bubbles", True),
+    "fizzing": ("bubbles", True), "fizzes": ("bubbles", True), "gas": ("bubbles", True),
+    "no bubbles": ("bubbles", False), "still": ("bubbles", False),
+    "solid": ("solid", True), "precipitate": ("solid", True), "sediment": ("solid", True),
+    "no solid": ("solid", False), "dissolved": ("solid", False), "dissolve": ("solid", False),
+    "heat": ("heat", True), "heated": ("heat", True), "heating": ("heat", True),
+    "flame": ("heat", True), "boil": ("heat", True), "burner": ("heat", True),
+    "no heat": ("heat", False), "cool": ("heat", False), "cooled": ("heat", False),
+    "empty": ("level", 0.0), "half": ("level", 0.5), "half full": ("level", 0.5),
+    "full": ("level", 0.9),
+}  # fmt: skip
+
+
+#: What a liquid with no color is called. It is drawn as a faint wash, so that it is seen
+#: to be there: a model wrote the end of a titration so (2026-11-24).
+_CLEAR = frozenset(
+    {"colorless", "colourless", "clear", "transparent", "no color", "no colour", "none", "water"}
+)
+CLEAR = "clear"
+
+
+def _liquid(value: object) -> str | None:
+    """The color of what is in a vessel: a hue of the stage, or none at all."""
+    if isinstance(value, str) and _words(value) in _CLEAR:
+        return CLEAR
+    return _color(value)
+
+
+def _liquid_look(hue: str) -> tuple[str, float]:
+    """How a liquid of a hue is drawn: its color in the scene, and how solid."""
+    return ("self.ink", 0.1) if hue == CLEAR else (f"self.{hue}", 0.5)
+
+
+def _truth(value: object) -> bool:
+    if isinstance(value, str):
+        return _words(value) not in ("", "no", "none", "false", "off", "0")
+    return bool(value)
+
+
+def _vessel_changes(value: object) -> dict[str, Any]:
+    """What a script says of a vessel, as what is drawn: the liquid's color ("liquid"), how
+    full ("level"), bubbles, a solid and its color ("solid", "solid_hue"), heat. Said as an
+    object, or in a word ("bubbles", "green", "heat"). ValueError when it says nothing."""
+    found: dict[str, Any] = {}
+    if isinstance(value, str):
+        said = _words(value)
+        if said in _SEEN:
+            key, state = _SEEN[said]
+            found[key] = state
+        elif _liquid(value):
+            found["liquid"] = _liquid(value)
+    elif isinstance(value, dict):
+        for key, given in value.items():
+            name = _words(key)
+            if name in ("liquid", "color", "colour", "contents") and _liquid(given):
+                found["liquid"] = _liquid(given)
+            elif name in ("level", "amount", "fill"):
+                found["level"] = min(1.0, max(0.0, _number(given)))
+            elif name in ("bubbles", "gas", "fizz", "bubbling"):
+                found["bubbles"] = _truth(given)
+            elif name in ("solid", "precipitate", "sediment"):
+                found["solid"] = _truth(given)
+                if _color(given):
+                    found["solid_hue"] = _color(given)
+            elif name in ("heat", "flame", "heated", "burner"):
+                found["heat"] = _truth(given)
+    elif isinstance(value, int | float) and not isinstance(value, bool):
+        found["level"] = min(1.0, max(0.0, float(value)))
+    if not found:
+        raise ValueError("a vessel is set to a color, a level, bubbles, a solid or heat")
+    return found
+
+
+def _vessel(written: dict[str, Any]) -> dict[str, Any]:
+    """A vessel as a model may write it: its shape in any of its names, what is seen in it
+    as words or as yes and no."""
+    vessel = dict(written)
+    vessel["shape"] = _VESSELS.get(_words(vessel.get("shape", "beaker")), "beaker")
+    for key in ("bubbles", "heat"):
+        if key in vessel:
+            vessel[key] = _truth(vessel[key])
+    level = vessel.get("level")
+    if isinstance(level, str) and _words(level) in _SEEN and _SEEN[_words(level)][0] == "level":
+        vessel["level"] = _SEEN[_words(level)][1]
+    elif isinstance(level, int | float) and not isinstance(level, bool) and 1 < level <= 100:
+        vessel["level"] = level / 100
+    return vessel
+
+
 def _element(raw: object) -> _Element:
     """One element as the model wrote it, checked: or ValueError saying why not."""
     if not isinstance(raw, dict):
@@ -619,7 +947,23 @@ def _element(raw: object) -> _Element:
     kind = _words(written.get("kind", ""))
     if kind in ("circle", "square", "rectangle", "triangle") and "shape" not in written:
         written["shape"] = kind
+    if kind in _VESSELS and "shape" not in written:
+        written["shape"] = kind
     kind = _KIND_WORDS.get(kind, kind).replace(" ", "_")
+    if kind == "timeline":
+        written["events"] = _events(written.get("events", written.get("items")))
+    elif kind == "molecule":
+        written["bonds"] = _bonds(written.get("bonds"), written.get("atoms"))
+    elif kind == "code":
+        given = next(
+            (written[key] for key in ("lines", "code", "text", "source") if key in written), None
+        )
+        written["lines"] = _code_lines(given)
+        written["id"] = str(written.get("id", written.get("name", ""))).strip()
+    elif kind == "vessel":
+        written = _vessel(written)
+    elif kind in ("arrow", "line"):
+        written = _outward(written)
     if kind not in KINDS:
         raise ValueError(f'"{kind[:20]}" is not a kind of element')
     if "id" not in written and "name" in written:
@@ -780,6 +1124,253 @@ def _formula(tex: str) -> _Formula:
     return _Formula(_tex_parts(whole), [])
 
 
+# -- shapes the core works out ---------------------------------------------------------------------
+
+#: A vessel's inside, by shape: its foot and its brim, and how wide half of it is at each
+#: height, as (height, half width) from the brim down. A test tube's round foot is made of
+#: short pieces.
+_TUBE_RADIUS = 0.36
+_VESSEL_PROFILES: dict[str, list[tuple[float, float]]] = {
+    "beaker": [(0.95, 0.72), (-0.95, 0.72)],
+    "flask": [(0.95, 0.26), (0.3, 0.26), (-0.95, 0.95)],
+    "tube": [
+        (1.15, _TUBE_RADIUS),
+        *[
+            (
+                round(-1.15 + _TUBE_RADIUS - _TUBE_RADIUS * math.sin(math.pi / 2 * step / 6), 3),
+                round(_TUBE_RADIUS * math.cos(math.pi / 2 * step / 6), 3),
+            )
+            for step in range(7)
+        ],
+    ],
+}
+#: How far below its brim a vessel is full, and how far inside the glass its contents are.
+_BRIM, _INSET = 0.3, 0.05
+
+
+def _half_width(profile: list[tuple[float, float]], y: float) -> float:
+    """Half the width of a vessel's inside at a height, between the points of its profile."""
+    for (above, wide_above), (below, wide_below) in itertools.pairwise(profile):
+        if below <= y <= above:
+            if above - below < 1e-9:
+                return wide_below
+            share = (y - below) / (above - below)
+            return wide_below + share * (wide_above - wide_below)
+    return profile[0][1] if y > profile[0][0] else profile[-1][1]
+
+
+def _vessel_outline(shape: str) -> list[list[float]]:
+    """The glass, as the points of one line from its brim down one side and up the other."""
+    profile = _VESSEL_PROFILES[shape]
+    left = [[round(-wide, 3), y] for y, wide in profile]
+    right = [[round(wide, 3), y] for y, wide in reversed(profile)]
+    return [*left, *(right[1:] if right[0] == left[-1] else right)]
+
+
+def _vessel_surface(shape: str, level: float) -> float:
+    """The height of the top of what is in a vessel filled to a level from 0 to 1."""
+    profile = _VESSEL_PROFILES[shape]
+    foot, brim = profile[-1][0], profile[0][0]
+    return round(foot + _INSET + max(0.0, min(1.0, level)) * (brim - _BRIM - foot - _INSET), 3)
+
+
+def _vessel_liquid(shape: str, level: float) -> list[list[float]]:
+    """What is in a vessel, as the corners of its shape: down one side and up the other.
+    An empty one is a sliver at its foot, so that it can be filled later."""
+    profile = _VESSEL_PROFILES[shape]
+    foot = profile[-1][0] + _INSET
+    top = max(_vessel_surface(shape, level), round(foot + 0.02, 3))
+    heights = [top, *[y for y, _ in profile if foot < y < top], foot]
+    left = [[round(-max(0.02, _half_width(profile, y) - _INSET), 3), round(y, 3)] for y in heights]
+    return [*left, *[[-x, y] for x, y in reversed(left)]]
+
+
+def _vessel_bubbles(shape: str, level: float) -> list[list[float]]:
+    """Where bubbles are drawn: through what is in the vessel, and two above it."""
+    profile = _VESSEL_PROFILES[shape]
+    foot = profile[-1][0] + _INSET
+    top = max(_vessel_surface(shape, level), foot + 0.5)
+    spots = [(-0.5, 0.2, 0.05), (0.35, 0.34, 0.07), (-0.1, 0.5, 0.06), (0.5, 0.66, 0.05),
+             (-0.4, 0.82, 0.07), (0.1, 0.94, 0.05)]  # fmt: skip
+    found = []
+    for across, up, radius in spots:
+        y = foot + up * (top - foot)
+        found.append([round(across * (_half_width(profile, y) - 0.12), 3), round(y, 3), radius])
+    brim = profile[0][0]
+    for across, above, radius in ((-0.18, 0.2, 0.06), (0.2, 0.36, 0.05)):
+        y = min(brim - 0.08, top + above)
+        found.append([round(across * 2 * _half_width(profile, y), 3), round(y, 3), radius])
+    return found
+
+
+def _vessel_solid(shape: str) -> list[list[float]]:
+    """Where the grains of a solid lie: two rows at the foot."""
+    profile = _VESSEL_PROFILES[shape]
+    foot = profile[-1][0] + _INSET
+    found = []
+    for row, count in ((0, 5), (1, 4)):
+        y = foot + 0.1 + 0.13 * row
+        wide = max(0.05, _half_width(profile, y) - 0.14)
+        for index in range(count):
+            share = 0.0 if count == 1 else index / (count - 1) * 2 - 1
+            found.append([round(share * wide, 3), round(y, 3)])
+    return found
+
+
+def _box_middle(points: list[list[float]]) -> tuple[float, float, float]:
+    """The middle of the box round some points, and how tall the box is."""
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    return ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, max(ys) - min(ys))
+
+
+#: The colors atoms are drawn in, as chemists' models color them, in the hues of the stage.
+_ATOM_HUES = {
+    "H": "ink", "C": "muted", "O": "coral", "N": "blue", "Cl": "green", "F": "green",
+    "S": "sun", "P": "orange", "Br": "orange", "I": "violet", "Na": "violet", "K": "violet",
+    "Li": "violet", "Ca": "teal", "Mg": "teal", "Fe": "orange", "Cu": "orange", "Zn": "teal",
+    "Al": "teal", "Si": "sun",
+}  # fmt: skip
+_ATOM = re.compile(r"([A-Za-z][A-Za-z0-9]{0,7}?)(\d*)([+\-\u2212]{1,2})?")
+
+
+def _atom(text: str) -> list[Any]:
+    """An atom's symbol as it is drawn: upright, its count below the line and its charge
+    above it ("Na+", "O2-", "NH4+", "CH3"). What is not a symbol is drawn as it is written."""
+    text = " ".join(str(text).split())
+    if not text:
+        raise ValueError("an atom has no symbol")
+    found = _ATOM.fullmatch(text) if "$" not in text and "\\" not in text else None
+    if found is None:
+        return _token(text)
+    base, digits, sign = found.group(1), found.group(2), found.group(3)
+    charge = ""
+    if sign:
+        # A number before the sign is the charge of one atom ("Fe2+"), and the count of a
+        # group ("NH4+").
+        single = re.fullmatch(r"[A-Z][a-z]?", base) is not None
+        charge = (digits if single else "") + sign.replace("\u2212", "-")
+        digits = "" if single else digits
+    body = re.sub(r"(\d+)", r"_{\1}", base + digits)
+    return [True, "\\mathrm{" + body + "}" + (f"^{{{charge}}}" if charge else "")]
+
+
+def _atom_hue(text: str) -> str:
+    found = re.match(r"[A-Z][a-z]?", " ".join(str(text).split()))
+    symbol = found.group(0) if found else ""
+    return _ATOM_HUES.get(symbol) or _ATOM_HUES.get(symbol[:1], "teal")
+
+
+def _ring(count: int, joined: list[set[int]]) -> list[int] | None:
+    """A ring among atoms, as its atoms in order, or None: found by walking from each atom
+    until one is met again."""
+
+    def walk(path: list[int]) -> list[int] | None:
+        here = path[-1]
+        for other in sorted(joined[here]):
+            if len(path) >= 3 and other == path[0]:
+                return path
+            if other not in path:
+                found = walk([*path, other])
+                if found is not None:
+                    return found
+        return None
+
+    for start in range(count):
+        found = walk([start])
+        if found is not None:
+            return found
+    return None
+
+
+def _molecule_places(count: int, bonds: list[list[int]]) -> list[list[float]]:
+    """Where each atom of a molecule is drawn, a bond 1.15 long: a ring as a regular
+    shape, and each other atom out from the one it is joined to, away from where that one
+    was joined from. Atoms joined to nothing (ions side by side) stand in a row."""
+    length = 1.15
+    joined: list[set[int]] = [set() for _ in range(count)]
+    for first, second, *_ in bonds:
+        joined[first - 1].add(second - 1)
+        joined[second - 1].add(first - 1)
+    places: dict[int, tuple[float, float]] = {}
+    offset = 0.0
+    for start in sorted(range(count), key=lambda atom: (-len(joined[atom]), atom)):
+        if start in places:
+            continue
+        group: dict[int, tuple[float, float]] = {}
+        heading: dict[int, float | None] = {}
+        members = _component(start, joined)
+        ring = _ring_within(members, joined)
+        if ring is not None:
+            radius = length / (2 * math.sin(math.pi / len(ring)))
+            for index, atom in enumerate(ring):
+                angle = math.pi / 2 - 2 * math.pi * index / len(ring)
+                group[atom] = (radius * math.cos(angle), radius * math.sin(angle))
+                heading[atom] = angle
+            waiting = list(ring)
+        else:
+            group[start] = (0.0, 0.0)
+            heading[start] = None
+            waiting = [start]
+        while waiting:
+            atom = waiting.pop(0)
+            fresh = sorted(
+                (other for other in joined[atom] if other not in group),
+                key=lambda other: (-len(joined[other]), other),
+            )
+            if not fresh:
+                continue
+            toward = heading[atom]
+            if toward is None:
+                turn = 0.0 if len(fresh) % 2 == 0 or len(fresh) == 1 else math.pi / 2
+                angles = [turn + 2 * math.pi * index / len(fresh) for index in range(len(fresh))]
+            elif len(fresh) == 1:
+                angles = [toward]
+            else:
+                spread = math.pi / 3 if len(fresh) == 2 else math.pi / 2
+                spread = min(spread, 2 * math.pi / 3) if len(fresh) <= 3 else 2 * math.pi / 3
+                angles = [
+                    toward - spread + 2 * spread * index / (len(fresh) - 1)
+                    for index in range(len(fresh))
+                ]
+            x, y = group[atom]
+            for other, angle in zip(fresh, angles, strict=True):
+                group[other] = (x + length * math.cos(angle), y + length * math.sin(angle))
+                heading[other] = angle
+                waiting.append(other)
+        left = min(x for x, _ in group.values())
+        right = max(x for x, _ in group.values())
+        for atom, (x, y) in group.items():
+            places[atom] = (x - left + offset, y)
+        offset += right - left + length
+    middle_x = (min(x for x, _ in places.values()) + max(x for x, _ in places.values())) / 2
+    middle_y = (min(y for _, y in places.values()) + max(y for _, y in places.values())) / 2
+    return [
+        [round(places[atom][0] - middle_x, 3), round(places[atom][1] - middle_y, 3)]
+        for atom in range(count)
+    ]
+
+
+def _component(start: int, joined: list[set[int]]) -> set[int]:
+    seen = {start}
+    waiting = [start]
+    while waiting:
+        for other in joined[waiting.pop()]:
+            if other not in seen:
+                seen.add(other)
+                waiting.append(other)
+    return seen
+
+
+def _ring_within(members: set[int], joined: list[set[int]]) -> list[int] | None:
+    count = len(joined)
+    inside = [joined[atom] & members if atom in members else set() for atom in range(count)]
+    if sum(len(others) for others in inside) // 2 < len(members):
+        # As many bonds as atoms, less one, is a tree: no ring to look for.
+        return None
+    return _ring(count, inside)
+
+
 # -- the compiler ----------------------------------------------------------------------------------
 
 
@@ -807,11 +1398,15 @@ class _Compiler:
         self.cells: dict[tuple[int, int], list[str]] = {}
         self.inherits: dict[str, str] = {}
         self.relative: dict[str, tuple[int, str]] = {}
+        #: How far from beside it each of those is put, across and up.
+        self.offsets: dict[str, tuple[float, float]] = {}
         #: While settling, the elements already checked: one refers only to those.
         self.ready: set[str] | None = None
         #: A number that follows a formula: its function, the point it follows, if any, and
         #: what it reads as the slide begins.
         self.number_sources: dict[str, tuple[int, str | None, float]] = {}
+        #: What the steps set each element to, as written: a vessel draws what it will show.
+        self.vessel_settings: dict[str, list[Any]] = {}
 
     # -- reading -----------------------------------------------------------------------------------
 
@@ -819,6 +1414,7 @@ class _Compiler:
         if not isinstance(raw_elements, list):
             raise SlideError(["a slide's elements are a list"])
         later = _first_settings(raw_steps)
+        self.vessel_settings = _all_settings(raw_steps)
         for raw in _hoisted(raw_elements[:MAX_ELEMENTS]):
             if isinstance(raw, dict):
                 raw = _filled(raw, later)
@@ -841,6 +1437,9 @@ class _Compiler:
             self.left_out.append(f"the elements after the first {MAX_ELEMENTS}")
 
     def hue(self, element: _Element) -> str:
+        if isinstance(element, VesselElement):
+            # A vessel's color is the color of what is in it.
+            return _liquid(element.liquid) or _color(element.color) or "blue"
         named = _color(element.color)
         if named:
             return named
@@ -856,6 +1455,8 @@ class _Compiler:
         if isinstance(element, (TextElement, MathElement, WordsElement, LabelElement)):
             return "ink"
         if isinstance(element, (BraceElement, LineElement, AxesElement, NumberLineElement)):
+            return "muted"
+        if isinstance(element, (MoleculeElement, CodeElement)):
             return "muted"
         if isinstance(element, (OutlineElement, AreaElement, CoinElement, NumberElement)):
             return "sun"
@@ -1010,6 +1611,11 @@ class _Compiler:
         return self.refer(ref) is not None
 
     def check(self, element: _Element) -> None:
+        # A link in anything an element says would have the whole scene refused: the
+        # element is left out instead (code is where one is most often written).
+        written = json.dumps(element.model_dump(mode="json", by_alias=True, exclude={"id"}))
+        if names_a_link(written):
+            raise ValueError("it has a link in it, and a picture shows none")
         if isinstance(element, (ArrowElement, LineElement)):
             for ref in (element.start, element.end):
                 if not self.known(ref):
@@ -1142,6 +1748,29 @@ class _Compiler:
                 _token(item)
         elif isinstance(element, CoinElement):
             _token(element.face)
+        elif isinstance(element, TimelineElement):
+            for event in element.events:
+                _plain(event.at)
+                for line in _wrapped(event.text, 22)[:3]:
+                    _content(line)
+        elif isinstance(element, MoleculeElement):
+            for symbol in element.atoms:
+                _atom(symbol)
+            count = len(element.atoms)
+            for bond in element.bonds:
+                if len(bond) != 3 or not (1 <= bond[0] <= count and 1 <= bond[1] <= count):
+                    raise ValueError("a bond joins atoms that are not among its atoms")
+                if bond[0] == bond[1] or not 1 <= bond[2] <= 3:
+                    raise ValueError("a bond joins two atoms, with one, two or three bonds")
+        elif isinstance(element, CodeElement):
+            for line in element.lines:
+                _plain(line)
+        elif (
+            isinstance(element, VesselElement)
+            and element.solid is not None
+            and not isinstance(element.solid, bool | str)
+        ):
+            raise ValueError("its solid is a color, or yes or no")
         if element.label and not isinstance(element, ParamElement):
             _token(element.label)
         if isinstance(
@@ -1276,6 +1905,45 @@ class _Compiler:
             self.pieces[name] = [f"{name}/body", f"{name}/frame"]
         elif isinstance(element, (CoinElement, DieElement)):
             self.pieces[name] = [f"{name}/body", *([f"{name}/frame"] if element.label else [])]
+        elif isinstance(element, TimelineElement):
+            keys = [f"{name}.{index + 1}" for index in range(len(element.events))]
+            self.pieces[name] = [
+                f"{name}/body",
+                *([f"{name}/frame"] if element.label else []),
+                *keys,
+            ]
+            numbered(keys, [event.at for event in element.events])
+            for key, event in zip(keys, element.events, strict=True):
+                alias(event.text, (key,))
+        elif isinstance(element, MoleculeElement):
+            keys = [f"{name}.{index + 1}" for index in range(len(element.atoms))]
+            links = [f"{name}.b{index + 1}" for index in range(len(element.bonds))]
+            self.pieces[name] = [*([f"{name}/frame"] if element.label else []), *links, *keys]
+            numbered(keys, element.atoms)
+            for index, (one, other, order) in enumerate(element.bonds):
+                parts[f"b{index + 1}"] = (links[index],)
+                symbols = (_key(element.atoms[one - 1]), _key(element.atoms[other - 1]))
+                for joiner in ("-", "=" if order == 2 else "-", "#" if order == 3 else "-"):
+                    parts.setdefault(f"{one}{joiner}{other}", (links[index],))
+                    parts.setdefault(f"{symbols[0]}{joiner}{symbols[1]}", (links[index],))
+        elif isinstance(element, CodeElement):
+            keys = [f"{name}.{index + 1}" for index in range(len(element.lines))]
+            self.pieces[name] = [f"{name}/frame", *keys]
+            for index, key in enumerate(keys):
+                parts[str(index + 1)] = (key,)
+                parts[f"line {index + 1}"] = (key,)
+                parts[f"line{index + 1}"] = (key,)
+                parts[f"l{index + 1}"] = (key,)
+        elif isinstance(element, VesselElement):
+            seen = self.vessel_seen(element)
+            self.pieces[name] = [
+                f"{name}/body",
+                f"{name}/liquid",
+                *[f"{name}/{piece}" for piece in ("solid", "bubbles", "flame") if piece in seen],
+                *([f"{name}/frame"] if element.label else []),
+            ]
+            parts["liquid"] = (f"{name}/liquid",)
+            parts["glass"] = (f"{name}/body",)
         elif isinstance(element, WordsElement):
             words = self.word_list(name)
             numbered([f"{name}.{index + 1}" for index in range(len(words))], words)
@@ -1289,6 +1957,26 @@ class _Compiler:
             self.pieces[name] = [name, f"{name}/name"]
         self.parts[name] = parts
         self.pieces.setdefault(name, [name])
+
+    def vessel_seen(self, element: VesselElement) -> set[str]:
+        """What is ever seen in a vessel besides its liquid: as it begins, or after a step
+        (read from the script as written, before the steps are checked)."""
+        seen: set[str] = set()
+        if element.bubbles:
+            seen.add("bubbles")
+        if element.solid not in (None, False) and _truth(element.solid):
+            seen.add("solid")
+        if element.heat:
+            seen.add("flame")
+        for value in self.vessel_settings.get(element.id, []):
+            try:
+                changes = _vessel_changes(value)
+            except ValueError:
+                continue
+            for key, piece in (("bubbles", "bubbles"), ("solid", "solid"), ("heat", "flame")):
+                if changes.get(key):
+                    seen.add(piece)
+        return seen
 
     def name_cells(
         self, element: GridElement | TableElement, parts: dict[str, tuple[str, ...]], alias: Any
@@ -1401,12 +2089,28 @@ class _Compiler:
                 self.left_out.append(f'a step names "{ref[:24]}", which is not on the stage')
                 continue
             targets.append(found)
+        if verb != "set":
+            # A value is set, and what follows it is drawn: it is nothing to show, point
+            # at or move (shown, it stopped a real lesson's scene, 2026-11-24).
+            drawn = [
+                found
+                for found in targets
+                if not isinstance(self.elements[found.element], ParamElement)
+            ]
+            if len(drawn) != len(targets):
+                self.left_out.append("a step shows a value, which is set and not drawn")
+            targets = drawn
         if not targets:
             raise ValueError(f"{verb}: nothing it names is on the stage")
         hue = (
             _color(written.get("color")) or _color(written.get("to")) or _color(written.get("with"))
             or _color(written.get("as")) or _color(written.get("hue"))
         )  # fmt: skip
+        if hue is None and verb in ("color", "set") and targets:
+            # A vessel may be made colorless, which is no color of the stage.
+            owner = self.elements[targets[0].element]
+            if isinstance(owner, VesselElement) and _liquid(written.get("to")) == CLEAR:
+                hue = CLEAR
         if verb == "color" and hue is None:
             raise ValueError("color: it names no color there is")
         action = _Action(verb, targets, hue or "sun")
@@ -1419,6 +2123,11 @@ class _Compiler:
                 action.sources = self.sources(given, targets)
         if verb == "move":
             place = written.get("to", written.get("place", written.get("into")))
+            ends = self.new_ends(targets, place)
+            if ends is not None:
+                action.place = ends
+                action.targets = targets[:1]
+                return action
             region = _region(place)
             relation = _relation(place)
             beside = self.refer(relation[1]) if relation is not None else None
@@ -1449,6 +2158,27 @@ class _Compiler:
             action.value = self.setting(targets[0], value)
             action.targets = targets[:1]
         return action
+
+    def new_ends(
+        self, targets: list[_Target], place: object
+    ) -> tuple[str, _Target, _Target] | None:
+        """An arrow or a line moved to join other things ({"move": "arrow", "to": {"from":
+        "list.2", "to": "list.3"}}, as a real model moved a comparison along a list): what
+        it joins next, or None when the move is of another kind."""
+        if len(targets) != 1 or not targets[0].whole or not isinstance(place, dict):
+            return None
+        element = self.elements[targets[0].element]
+        if not isinstance(element, (ArrowElement, LineElement)):
+            return None
+        if "from" not in place and "to" not in place:
+            return None
+        if element.id in self.follows:
+            raise ValueError("move: that arrow follows what it joins already")
+        start = self.refer(str(place.get("from", element.start)))
+        end = self.refer(str(place.get("to", element.end)))
+        if start is None or end is None:
+            raise ValueError("move: it joins nothing that is on the stage")
+        return ("ends", start, end)
 
     def sources(self, given: object, targets: list[_Target]) -> list[_Target | None]:
         """Where what a step shows comes out of ("show" with "from", ADR-050): for a formula
@@ -1539,7 +2269,7 @@ class _Compiler:
     def setting(self, target: _Target, value: object) -> Any:
         """What a "set" changes an element to, checked against what the element is."""
         element = self.elements[target.element]
-        if isinstance(value, dict):
+        if isinstance(value, dict) and not isinstance(element, VesselElement):
             # {"x": -1} for a point, {"value": 3} for a number, as models write them.
             value = next(
                 (value[key] for key in ("x", "value", "to", "face") if key in value), value
@@ -1585,7 +2315,53 @@ class _Compiler:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError("set: a sentence is set to another sentence")
             return value.replace("$", "")[:220].split()[:48]
+        if isinstance(element, VesselElement):
+            return _vessel_changes(value)
+        if isinstance(element, GridElement):
+            return self.grid_setting(element, target, value)
+        if isinstance(element, (ArrowElement, LineElement, BraceElement, OutlineElement)):
+            # Its words: "10 N" on a push that has doubled.
+            words = value.get("label", value.get("text")) if isinstance(value, dict) else value
+            if not element.label or element.id in self.follows:
+                raise ValueError(f"set: that {element.kind} has no words to set")
+            if isinstance(words, bool) or not isinstance(words, str | int | float):
+                raise ValueError(f"set: the words on a {element.kind} are set to other words")
+            return _token(str(words))
         raise ValueError(f"set: a {element.kind} has nothing to set")
+
+    @staticmethod
+    def grid_setting(element: GridElement, target: _Target, value: object) -> dict[str, str]:
+        """What a step sets a grid's cells to, by their keys: every cell, given rows like
+        its own ({"rows": [[...]]}, as a real model wrote a list being sorted), or the one
+        cell named. A cell set to nothing is empty."""
+
+        def held(cell: object) -> str:
+            if isinstance(cell, bool | list | dict) or cell is None:
+                return ""
+            text = " ".join(str(cell).split())[:80]
+            if text:
+                _token(text)
+            return text
+
+        if not target.whole:
+            if len(target.keys) != 1 or isinstance(value, list | dict):
+                raise ValueError("set: a cell is set to what it holds next")
+            return {target.keys[0]: held(value)}
+        rows = value.get("rows") if isinstance(value, dict) else value
+        if (
+            not isinstance(rows, list)
+            or len(rows) != len(element.rows)
+            or any(not isinstance(row, list) for row in rows)
+        ):
+            raise ValueError("set: a grid is set to rows like its own")
+        columns = max(len(row) for row in element.rows)
+        if any(len(row) > columns for row in rows):
+            raise ValueError("set: a grid is set to rows like its own")
+        return {
+            f"{element.id}.{r + 1}.{c + 1}": held(row[c] if c < len(row) else "")
+            for r, row in enumerate(rows)
+            for c in range(columns)
+        }
 
     # -- where things go ---------------------------------------------------------------------------
 
@@ -1612,6 +2388,10 @@ class _Compiler:
                     and (ref in self.boxes or ref in self.relative or ref in self.inherits)
                 ):
                     self.relative[name] = relation
+                    # Along the side it stands on: up or down beside it, across above or
+                    # below it. Toward the thing itself would put it over it.
+                    across, up = _offset(element.place)
+                    self.offsets[name] = (0.0, up) if relation[0] in (2, 3) else (across, 0.0)
                     continue
             region = _region(element.place) or chosen.get(name, "center")
             self.cells.setdefault(_REGIONS[region], []).append(name)
@@ -1656,6 +2436,23 @@ class _Compiler:
                     self.boxes[name] = _Box(box.x, box.y, box.w, box.h * self.tall(name) / weight)
                 self.boxes[f"@{row}.{column}"] = box
 
+    def shown_together(self) -> set[tuple[str, str]]:
+        """The pairs of elements that are on the stage at once as some step ends."""
+        on: set[str] = set()
+        pairs: set[tuple[str, str]] = set()
+        for step in self.steps:
+            for action in step:
+                named = {target.element for target in action.targets}
+                if action.verb == "hide":
+                    on -= named
+                elif action.verb == "transform":
+                    on -= named
+                    on.add(action.into)
+                else:
+                    on |= named
+            pairs |= {(first, second) for first in on for second in on if first < second}
+        return pairs
+
     def chosen_places(self) -> dict[str, str]:
         """Places for a stage whose script gave none (a model asked not to think first
         often gives none, 2026-11-22): what is drawn on the left, and words and formulas
@@ -1683,6 +2480,11 @@ class _Compiler:
             return 0.6 + 0.62 * len(element.rows)
         if isinstance(element, TableElement):
             return 0.5 + 0.5 * (len(element.rows) + (1 if element.header else 0))
+        if isinstance(element, CodeElement):
+            return 0.9 + 0.5 * len(element.lines)
+        if isinstance(element, MoleculeElement):
+            places = _molecule_places(len(element.atoms), element.bonds)
+            return 1.2 + 0.8 * (max(y for _, y in places) - min(y for _, y in places))
         return _TALL.get(element.kind, 1.0)
 
     def wide(self, name: str) -> float:
@@ -1692,6 +2494,13 @@ class _Compiler:
         if isinstance(element, MathElement):
             length = sum(len(part) for part in self.math[name].parts)
             return _WIDE["math"] * min(1.4, 0.4 + length / 30)
+        if isinstance(element, CodeElement):
+            return _WIDE["code"] * min(1.3, 0.5 + max(len(line) for line in element.lines) / 40)
+        if isinstance(element, MoleculeElement):
+            places = _molecule_places(len(element.atoms), element.bonds)
+            return 0.8 + 0.5 * (max(x for x, _ in places) - min(x for x, _ in places))
+        if isinstance(element, TimelineElement):
+            return _WIDE["timeline"] * (0.5 + len(element.events) / 6)
         return _WIDE.get(element.kind, 1.0)
 
     def inheritors(self) -> dict[str, str]:
@@ -1798,6 +2607,18 @@ _BASE = """\
             return [other.get_left()[0] - 0.55 - mine.width / 2, other.get_center()[1], 0]
         return [other.get_right()[0] + 0.55 + mine.width / 2, other.get_center()[1], 0]
 
+    def stand_beside(self, key, anchor, ways):
+        # Beside what it was put beside: on the side asked for, or, where that would take it
+        # past the edge (under what already stands at the foot of the stage), on the next
+        # side there is to try.
+        mine = self.e[key]
+        for way in ways:
+            mine.move_to(self.beside([key], [anchor], way))
+            if self.within(mine, 6.2, 3.4):
+                return
+        mine.move_to(self.beside([key], [anchor], ways[0]))
+        self.keep(mine)
+
     def shown(self, spec, size, hue):
         if spec[0]:
             return MathTex(spec[1], font_size=round(size * 1.45), color=hue)
@@ -1873,6 +2694,32 @@ _LIBRARY: dict[str, str] = {
         start = self.group(a)
         end = self.group(b)
         points = self.ends(start, end)
+        if kind >= 5:
+            # Out of what it starts at, to one side: a push, a pull, something leaving.
+            side = (kind - 5) % 4
+            tail = start.get_bottom()
+            way = DOWN
+            if side == 1:
+                tail = start.get_top()
+                way = UP
+            if side == 2:
+                tail = start.get_left()
+                way = LEFT
+            if side == 3:
+                tail = start.get_right()
+                way = RIGHT
+            # As long as there is room for, short of the edge of the stage.
+            room = 3.7 + tail[1]
+            if side == 1:
+                room = 3.7 - tail[1]
+            if side == 2:
+                room = 6.6 + tail[0]
+            if side == 3:
+                room = 6.6 - tail[0]
+            reach = min(1.5, max(0.5, room))
+            if kind >= 9:
+                return Line(tail + way * 0.12, tail + way * reach, color=hue)
+            return Arrow(tail + way * 0.12, tail + way * reach, buff=0, color=hue, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=10)
         if kind == 4:
             # Between two words of one line: an arc over them, from top to top.
             bend = -PI / 2.2
@@ -1948,6 +2795,15 @@ _LIBRARY: dict[str, str] = {
             marks.add(self.pin(self.shown(name, 30, hue), cells, UP, lift))
         self.e[key + "/frame"] = marks
         self.e[key] = VGroup(marks, cells)
+
+    def recell(self, key, spec, side):
+        # What a cell holds becomes something else, as large as its neighbors' is.
+        cell = self.e[key]
+        fresh = self.shown(spec, 28, self.ink)
+        self.fit(fresh, side - 0.16, side - 0.16)
+        fresh.scale(cell[0].width / side)
+        fresh.move_to(cell[0].get_center())
+        return Transform(cell[1], fresh)
 """,
     "table": """\
     def make_table(self, key, keys, specs, places, rooms, rule, name, hue):
@@ -1976,11 +2832,32 @@ _LIBRARY: dict[str, str] = {
             nodes.add(chip)
         links = VGroup()
         for edge in edges:
-            points = self.ends(self.e[keys[edge[1]]], self.e[keys[edge[2]]])
-            if directed:
-                link = Arrow(points[0], points[1], buff=0.08, color=self.muted, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=10)
+            a = self.e[keys[edge[1]]]
+            b = self.e[keys[edge[2]]]
+            if edge[3] == 0:
+                points = self.ends(a, b)
+                if directed:
+                    link = Arrow(points[0], points[1], buff=0.08, color=self.muted, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=10)
+                else:
+                    link = Line(points[0], points[1], color=self.muted)
             else:
-                link = Line(points[0], points[1], color=self.muted)
+                # Past the nodes that stand between its ends: over a row, beside a column.
+                tail = a.get_top() + UP * 0.08
+                tip = b.get_top() + UP * 0.08
+                bend = -PI / 2.6
+                if b.get_center()[0] < a.get_center()[0]:
+                    bend = PI / 2.6
+                if edge[3] == 2:
+                    tail = a.get_right() + RIGHT * 0.08
+                    tip = b.get_right() + RIGHT * 0.08
+                    bend = -PI / 2.6
+                    if b.get_center()[1] > a.get_center()[1]:
+                        bend = PI / 2.6
+                if directed:
+                    link = CurvedArrow(tail, tip, color=self.muted, angle=bend)
+                else:
+                    link = ArcBetweenPoints(tail, tip, bend)
+                    link.set_color(self.muted)
             self.e[edge[0]] = link
             links.add(link)
         marks = VGroup()
@@ -2215,6 +3092,132 @@ _LIBRARY: dict[str, str] = {
         body.become(fresh)
         self.play(body.animate.stretch_to_fit_height(size), run_time=0.2)
 """,
+    "timeline": """\
+    def make_timeline(self, key, keys, xs, dates, texts, name, hue):
+        line = Line([xs[0] - 0.9, 0, 0], [xs[len(xs) - 1] + 0.9, 0, 0], color=self.muted)
+        events = VGroup()
+        for index in range(len(keys)):
+            dot = Dot(color=hue, radius=0.09).move_to([xs[index], 0, 0])
+            date = self.shown(dates[index], 28, hue)
+            words = self.lines(texts[index], 24, self.ink)
+            side = UP
+            if index % 2 == 1:
+                side = DOWN
+            date.next_to(dot, side, buff=0.2)
+            words.next_to(date, side, buff=0.14)
+            event = VGroup(dot, date, words)
+            self.e[keys[index]] = event
+            events.add(event)
+        self.e[key + "/body"] = line
+        whole = VGroup(line, events)
+        if name:
+            title = self.pin(self.shown(name, 30, hue), whole, UP, 0.3)
+            self.e[key + "/frame"] = title
+            whole.add(title)
+        self.e[key] = whole
+""",
+    "vessel": """\
+    def liquid(self, points, hue, solid):
+        return Polygon(*[[p[0], p[1], 0] for p in points], color=hue, fill_opacity=solid, stroke_width=0)
+
+    def make_vessel(self, key, outline, liquid, hue, solid, grains, grain_hue, bubbles, flame, name):
+        glass = VGroup()
+        for index in range(len(outline) - 1):
+            a = outline[index]
+            b = outline[index + 1]
+            glass.add(Line([a[0], a[1], 0], [b[0], b[1], 0], color=self.ink))
+        self.e[key + "/body"] = glass
+        self.e[key + "/liquid"] = self.liquid(liquid, hue, solid)
+        whole = VGroup(self.e[key + "/liquid"], glass)
+        if len(grains) > 0:
+            settled = VGroup(*[Dot(color=grain_hue, radius=0.065).move_to([p[0], p[1], 0]) for p in grains])
+            self.e[key + "/solid"] = settled
+            whole.add(settled)
+        if len(bubbles) > 0:
+            gas = VGroup(*[Circle(radius=p[2], color=self.ink, stroke_width=2).move_to([p[0], p[1], 0]) for p in bubbles])
+            self.e[key + "/bubbles"] = gas
+            whole.add(gas)
+        under = glass
+        if len(flame) > 0:
+            outer = Polygon(*[[p[0], p[1], 0] for p in flame], color=self.orange, fill_opacity=0.8, stroke_width=0)
+            inner = Polygon(*[[p[0] * 0.5, p[1] * 0.5, 0] for p in flame], color=self.sun, fill_opacity=0.9, stroke_width=0)
+            inner.move_to([outer.get_center()[0], outer.get_bottom()[1] + inner.height / 2 + 0.03, 0])
+            fire = VGroup(outer, inner)
+            self.e[key + "/flame"] = fire
+            whole.add(fire)
+            under = VGroup(glass, fire)
+        if len(name) > 0:
+            words = self.pin(self.lines(name, 26, self.ink), under, DOWN, 0.22)
+            self.e[key + "/frame"] = words
+            whole.add(words)
+        self.e[key] = whole
+
+    def refill(self, key, points, offset, tall, hue, solid):
+        glass = self.e[key + "/body"]
+        k = glass.height / tall
+        fresh = self.liquid(points, hue, solid)
+        fresh.scale(k)
+        middle = glass.get_center()
+        fresh.move_to([middle[0] + k * offset[0], middle[1] + k * offset[1], 0])
+        return Transform(self.e[key + "/liquid"], fresh)
+""",
+    "molecule": """\
+    def make_molecule(self, key, keys, specs, hues, places, bonds, name):
+        atoms = VGroup()
+        for index in range(len(keys)):
+            ball = Circle(radius=0.36, color=hues[index])
+            ball.set_fill(hues[index], 0.28)
+            sign = self.shown(specs[index], 26, self.ink)
+            self.fit(sign, 0.54, 0.44)
+            ball.move_to([places[index][0], places[index][1], 0])
+            sign.move_to(ball.get_center())
+            atom = VGroup(ball, sign)
+            self.e[keys[index]] = atom
+            atoms.add(atom)
+        links = VGroup()
+        for bond in bonds:
+            a = places[bond[1]]
+            b = places[bond[2]]
+            dx = b[0] - a[0]
+            dy = b[1] - a[1]
+            size = math.sqrt(dx * dx + dy * dy)
+            if size < 0.001:
+                size = 1
+            ux = dx / size
+            uy = dy / size
+            strokes = VGroup()
+            for gap in bond[3]:
+                ox = -uy * gap
+                oy = ux * gap
+                strokes.add(Line([a[0] + ux * 0.4 + ox, a[1] + uy * 0.4 + oy, 0], [b[0] - ux * 0.4 + ox, b[1] - uy * 0.4 + oy, 0], color=self.muted))
+            self.e[bond[0]] = strokes
+            links.add(strokes)
+        whole = VGroup(links, atoms)
+        if name:
+            words = self.pin(self.shown(name, 28, self.ink), atoms, DOWN, 0.28)
+            self.e[key + "/frame"] = words
+            whole.add(words)
+        self.e[key] = whole
+""",
+    "code": """\
+    def make_code(self, key, keys, lines, texts, name, hue):
+        # Laid out as one block, so that the lines stand on their own baselines; then each
+        # line is drawn by itself where the block has it, to come and go by itself.
+        guide = Paragraph(*lines, font_size=26, line_spacing=0.9)
+        rows = VGroup()
+        for index in range(len(keys)):
+            row = Text(texts[index], font_size=26, color=self.ink)
+            row.move_to(guide.chars[index].get_center())
+            self.e[keys[index]] = row
+            rows.add(row)
+        back = SurroundingRectangle(rows, color=self.muted, buff=0.28, corner_radius=0.14)
+        back.set_fill(hue, 0.1)
+        marks = VGroup(back)
+        if name:
+            marks.add(self.pin(self.shown(name, 24, self.muted), back, UP, 0.14))
+        self.e[key + "/frame"] = marks
+        self.e[key] = VGroup(marks, rows)
+""",
     "die": """\
     def die(self, spots, hue):
         body = RoundedRectangle(corner_radius=0.16, width=1.1, height=1.1, color=hue)
@@ -2286,13 +3289,20 @@ def _shown_number(value: float) -> str:
     return f"{value:.3g}"
 
 
-def _node_places(count: int, edges: list[list[int]], layout: str) -> list[list[float]]:
+def _node_places(
+    count: int, edges: list[list[int]], layout: str, wide: float = 0.0
+) -> list[list[float]]:
     """Where each node stands, before the whole is fitted to its place: in a row, a
-    column, a circle, or a tree with each node a level below the one it comes from."""
+    column, a circle, or a tree with each node a level below the one it comes from.
+    ``wide`` is how wide the widest of them is drawn: nodes beside each other stand far
+    enough apart for it, so that a long name never lies over the next (seen 2026-11-24)."""
+    across = max(2.6, wide + 0.9)
     if layout in ("column", "vertical", "stack", "down"):
         return [[0.0, round(1.4 * ((count - 1) / 2 - index), 3)] for index in range(count)]
     if layout in ("circle", "cycle", "ring", "loop"):
         radius = max(1.4, 0.55 * count)
+        if count >= 2:
+            radius = max(radius, (wide + 0.6) / (2 * math.sin(math.pi / max(count, 2))))
         return [
             [
                 round(radius * math.cos(math.pi / 2 - 2 * math.pi * index / count), 3),
@@ -2313,12 +3323,12 @@ def _node_places(count: int, edges: list[list[int]], layout: str) -> list[list[f
             position = row.index(index)
             places.append(
                 [
-                    round((position - (len(row) - 1) / 2) * 2.6, 3),
+                    round((position - (len(row) - 1) / 2) * across, 3),
                     round(((depth - 1) / 2 - level[index]) * 1.6, 3),
                 ]
             )
         return places
-    return [[round((index - (count - 1) / 2) * 2.6, 3), 0.0] for index in range(count)]
+    return [[round((index - (count - 1) / 2) * across, 3), 0.0] for index in range(count)]
 
 
 #: A ``run_time`` in a step's code.
@@ -2361,6 +3371,35 @@ class _Scene:
         self.rings = False
         self.param_value = compiler.param.value if compiler.param else 0.0
         self.bar_shape: dict[str, tuple[list[float], float, list[list[Any]], float]] = {}
+        #: The edges of nodes drawn as arcs, which are drawn in and not grown.
+        self.arcs: set[str] = set()
+        #: The words on each arrow, line, brace and outline, as a step may have set them.
+        self.labels: dict[str, Any] = {}
+        #: What each cell of each grid holds now, and how wide a cell of each was made.
+        self.cells: dict[str, str] = {
+            f"{name}.{r + 1}.{c + 1}": (row[c].strip() if c < len(row) else "")
+            for name, element in compiler.elements.items()
+            if isinstance(element, GridElement)
+            for r, row in enumerate(element.rows)
+            for c in range(max(len(each) for each in element.rows))
+        }
+        self.cell_side: dict[str, float] = {}
+        #: An element never shown that something was moved onto: that something stands
+        #: for it from then on.
+        self.stands: dict[str, str] = {}
+        #: What is seen in each vessel now: the pieces of it that are drawn but not shown
+        #: (bubbles that have not begun) stay off the stage until a step brings them.
+        self.vessels: dict[str, dict[str, Any]] = {
+            name: {
+                "bubbles": element.bubbles,
+                "solid": element.solid not in (None, False) and _truth(element.solid),
+                "flame": element.heat,
+                "hue": compiler.colors.get(name, "blue"),
+                "level": element.level,
+            }
+            for name, element in compiler.elements.items()
+            if isinstance(element, VesselElement)
+        }
 
     # -- building ----------------------------------------------------------------------------------
 
@@ -2386,6 +3425,8 @@ class _Scene:
         for (row, column), names in c.cells.items():
             box = c.boxes[f"@{row}.{column}"]
             out.say(f"self.put({_py(names)}, {box.literal()}, {_columns(len(names), box)})")
+        together = c.shown_together()
+        beside: dict[tuple[str, int, float, float], str] = {}
         for name in c.order:
             if name in c.relative:
                 side, ref = c.relative[name]
@@ -2393,8 +3434,24 @@ class _Scene:
                 box = c.box_of(ref)
                 if side in (0, 1):
                     out.say(f"self.fit({_e(name)}, {_py(round(box.w, 3))}, 6.8)")
-                out.say(f"{_e(name)}.move_to(self.beside([{_py(name)}], [{_py(ref)}], {side}))")
-                out.say(f"self.keep({_e(name)})")
+                # Two things on one side of the same thing, seen at once, stand one beyond
+                # the other; one that takes the other's place stands where it stood. One put
+                # a little up or down from there has a place of its own.
+                across, up = c.offsets.get(name, (0.0, 0.0))
+                spot = (ref, side, across, up)
+                last = beside.get(spot)
+                chained = bool(last) and tuple(sorted((str(last), name))) in together
+                anchor = last if chained and last else ref
+                beside[spot] = name
+                # Where there is no room on the side asked for: across from it; or, for
+                # one that stands beyond another, beside that one (across from it is where
+                # the thing they both stand beside is).
+                turns = [3, 2] if side in (0, 1) else [0, 1]
+                ways = [side, *turns] if chained else [side, [1, 0, 3, 2][side]]
+                out.say(f"self.stand_beside({_py(name)}, {_py(anchor)}, {_py(ways)})")
+                if across or up:
+                    out.say(f"{_e(name)}.shift(RIGHT * {_py(across)} + UP * {_py(up)})")
+                    out.say(f"self.keep({_e(name)})")
             elif name in c.inherits:
                 box = c.box_of(c.inherits[name])
                 out.say(f"self.fit({_e(name)}, {_py(round(box.w, 3))}, {_py(round(box.h, 3))})")
@@ -2513,6 +3570,81 @@ class _Scene:
                 f"{_py(list(element.start or [0.0, 0.0]))}, {_py(list(element.to))}, "
                 f"{_py(label)}, {hue})"
             )
+        elif isinstance(element, TimelineElement):
+            self.used.add("timeline")
+            count = len(element.events)
+            keys = [f"{name}.{index + 1}" for index in range(count)]
+            xs = [round((index - (count - 1) / 2) * 2.6, 3) for index in range(count)]
+            # A date is set as words, in the face of the words under it ("c. 1440").
+            dates = [[False, _plain(event.at)[:24]] for event in element.events]
+            texts = [
+                [_content(line) for line in _wrapped(event.text, 22)[:3]]
+                for event in element.events
+            ]
+            out.say(
+                f"self.make_timeline({_py(name)}, {_py(keys)}, {_py(xs)}, {_py(dates)}, "
+                f"{_py(texts)}, {_py(label)}, {hue})"
+            )
+        elif isinstance(element, VesselElement):
+            self.make_vessel(out, name, element, label, hue)
+        elif isinstance(element, MoleculeElement):
+            self.used.add("molecule")
+            count = len(element.atoms)
+            keys = [f"{name}.{index + 1}" for index in range(count)]
+            named = _color(element.color)
+            hues = [f"self.{named or _atom_hue(symbol)}" for symbol in element.atoms]
+            gaps = {1: [0.0], 2: [-0.075, 0.075], 3: [-0.12, 0.0, 0.12]}
+            bonds = [
+                [f"{name}.b{index + 1}", first - 1, second - 1, gaps[order]]
+                for index, (first, second, order) in enumerate(element.bonds)
+            ]
+            out.say(
+                f"self.make_molecule({_py(name)}, {_py(keys)}, "
+                f"{_py([_atom(symbol) for symbol in element.atoms])}, [{', '.join(hues)}], "
+                f"{_py(_molecule_places(count, element.bonds))}, {_py(bonds)}, {_py(label)})"
+            )
+        elif isinstance(element, CodeElement):
+            self.used.add("code")
+            keys = [f"{name}.{index + 1}" for index in range(len(element.lines))]
+            lines = [
+                " " * (len(line) - len(line.lstrip(" "))) + _plain(line) for line in element.lines
+            ]
+            out.say(
+                f"self.make_code({_py(name)}, {_py(keys)}, {_py(lines)}, "
+                f"{_py([_plain(line) for line in element.lines])}, {_py(label)}, {hue})"
+            )
+
+    def make_vessel(
+        self, out: _Writer, name: str, element: VesselElement, label: Any, hue: str
+    ) -> None:
+        """A vessel, with everything that will ever be seen in it drawn where it goes: what
+        is not seen yet stays off the stage until a step shows it."""
+        self.used.add("vessel")
+        seen = self.c.vessel_seen(element)
+        shape = element.shape
+        state = self.vessels[name]
+        solid = _color(element.solid) if isinstance(element.solid, str) else None
+        for value in self.c.vessel_settings.get(name, []):
+            try:
+                solid = solid or _vessel_changes(value).get("solid_hue")
+            except ValueError:
+                continue
+        state["solid_hue"] = solid or "ink"
+        # Its name on two lines at most, so that a long one does not make the vessel small.
+        named = [_content(line) for line in _wrapped(element.label or "", 18)[:2]] if label else []
+        foot = _VESSEL_PROFILES[shape][-1][0]
+        flame = [[0.0, -0.12], [0.2, -0.42], [0.16, -0.6], [0.0, -0.68], [-0.16, -0.6],
+                 [-0.2, -0.42]]  # fmt: skip
+        color, solidity = _liquid_look(state["hue"])
+        out.say(
+            f"self.make_vessel({_py(name)}, {_py(_vessel_outline(shape))}, "
+            f"{_py(_vessel_liquid(shape, element.level))}, {color}, {solidity}, "
+            f"{_py(_vessel_solid(shape) if 'solid' in seen else [])}, "
+            f"self.{state['solid_hue']}, "
+            f"{_py(_vessel_bubbles(shape, element.level) if 'bubbles' in seen else [])}, "
+            f"{_py([[x, round(foot + y, 3)] for x, y in flame] if 'flame' in seen else [])}, "
+            f"{_py(named)})"
+        )
 
     def make_box(
         self, out: _Writer, target: str, specs: list[list[Any]], size: int, hue: str
@@ -2616,20 +3748,9 @@ class _Scene:
         start, end = self.c.refer(element.start), self.c.refer(element.end)
         assert start is not None
         assert end is not None
-        if isinstance(element, ArrowElement):
-            kind = 1 if element.curved else 0
-            # From word to word of one sentence: drawn as an arc over the line, not
-            # through the words between them.
-            sentence = self.c.elements[start.element]
-            if (
-                start.element == end.element
-                and isinstance(sentence, WordsElement)
-                and not start.whole
-                and not end.whole
-            ):
-                kind = 4
-        else:
-            kind = 2 if element.dashed else 3
+        kind = self.link_kind(element, start, end)
+        if label:
+            self.labels[name] = label
         follows = name in self.c.follows
         self.assign(
             out,
@@ -2639,6 +3760,28 @@ class _Scene:
         )
         if label:
             self.assign(out, name + "/name", f"self.tag({_e(name)}, {_py(label)})", follows)
+
+    def link_kind(
+        self, element: ArrowElement | LineElement, start: _Target, end: _Target, aimed: bool = True
+    ) -> int:
+        """How an arrow or a line is drawn, as the scene's ``link`` counts them. ``aimed``:
+        it goes where it was written to go, and not where a step has since pointed it."""
+        if aimed and element.toward is not None:
+            return (5 if isinstance(element, ArrowElement) else 9) + _TOWARD.index(element.toward)
+        if isinstance(element, LineElement):
+            return 2 if element.dashed else 3
+        # From word to word of one sentence, or from cell to cell of one grid: drawn as an
+        # arc over them, not through what lies between (cells that touch leave a straight
+        # arrow no length at all).
+        sentence = self.c.elements[start.element]
+        if (
+            start.element == end.element
+            and isinstance(sentence, (WordsElement, GridElement))
+            and not start.whole
+            and not end.whole
+        ):
+            return 4
+        return 1 if element.curved else 0
 
     def make_around(
         self, out: _Writer, name: str, element: BraceElement | OutlineElement, label: Any, hue: str
@@ -2815,7 +3958,15 @@ class _Scene:
                 filled = col < len(row) and row[col].strip()
                 specs.append(_token(row[col]) if filled else [False, " "])
         longest = max(_shown_width(spec, 28) for spec in specs)
+        # As wide as the widest thing a cell will ever hold: a step may set it to more.
+        for step in self.c.steps:
+            for action in step:
+                if action.verb == "set" and action.targets[0].element == name:
+                    for text in action.value.values():
+                        if text:
+                            longest = max(longest, _shown_width(_token(text), 28))
         side = round(min(1.3, max(0.72, longest + 0.34)), 2)
+        self.cell_side[name] = side
         row_names = [_token(text) for text in element.row_labels[: len(element.rows)]]
         col_names = [_token(text) for text in element.col_labels[:columns]]
         out.say(
@@ -2868,9 +4019,29 @@ class _Scene:
         specs = [_token(node) for node in element.nodes]
         rounds = [len(_key(node)) <= 3 for node in element.nodes]
         edges = [[_node(element, a) or 0, _node(element, b) or 0] for a, b in element.edges]
-        places = _node_places(count, edges, _words(element.layout))
+        widest = max(_shown_width(spec, 32) for spec in specs) + 0.4
+        layout = _words(element.layout)
+        places = _node_places(count, edges, layout, widest)
         keys = [f"{name}.{index + 1}" for index in range(count)]
-        links = [[f"{name}.e{index + 1}", a, b] for index, (a, b) in enumerate(edges)]
+        # An edge between nodes that are not neighbors in a row or a column goes round
+        # the ones between them, not through their names (a real lesson, 2026-11-24).
+        column = layout in ("column", "vertical", "stack", "down")
+        ring = layout in (
+            "circle",
+            "cycle",
+            "ring",
+            "loop",
+            "tree",
+            "hierarchy",
+            "levels",
+            "layers",
+        )
+        round_ = 0 if ring else (2 if column else 1)
+        links = [
+            [f"{name}.e{index + 1}", a, b, round_ if abs(a - b) > 1 else 0]
+            for index, (a, b) in enumerate(edges)
+        ]
+        self.arcs |= {str(link[0]) for link in links if link[3]}
         out.say(
             f"self.make_nodes({_py(name)}, {_py(keys)}, {_py(specs)}, {_py(rounds)}, "
             f"{_py(places)}, {_py(links)}, {_py(element.directed)}, {_py(label)}, {hue})"
@@ -2921,7 +4092,21 @@ class _Scene:
         part of a formula or a sentence, the whole of it."""
         if self.c.elements[target.element].kind in _PIECEWISE and not target.whole:
             return list(target.keys)
-        return list(self.c.pieces[target.element])
+        if target.element in self.vessels and not target.whole:
+            return self.seen(list(target.keys))
+        return self.seen(list(self.c.pieces[target.element]))
+
+    def seen(self, keys: list[str]) -> list[str]:
+        """The pieces among these that are to be seen now: of a vessel, not the bubbles, the
+        solid or the flame that no step has brought yet."""
+        found = []
+        for key in keys:
+            owner, _, piece = key.partition("/")
+            state = self.vessels.get(owner)
+            if state is not None and piece in ("bubbles", "solid", "flame") and not state[piece]:
+                continue
+            found.append(key)
+        return found
 
     def frames(self, name: str) -> list[str]:
         return [key for key in self.c.pieces[name] if "/" in key]
@@ -2959,7 +4144,15 @@ class _Scene:
         element = c.elements[owner]
         kind = element.kind
         piece = key[len(owner) :]
-        if piece == "/body" and kind in ("axes", "number_line"):
+        if piece == "/body" and kind in ("axes", "number_line", "timeline", "vessel"):
+            return f"Create({_e(key)})"
+        if kind == "vessel":
+            if piece == "/bubbles":
+                return f"FadeIn({_e(key)}, shift=UP * 0.3)"
+            if piece == "/solid":
+                return f"FadeIn({_e(key)}, shift=DOWN * 0.3)"
+            return f"GrowFromCenter({_e(key)})" if piece == "/flame" else f"FadeIn({_e(key)})"
+        if piece.startswith(".b") and kind == "molecule":
             return f"Create({_e(key)})"
         if piece == "/frame" and kind == "set":
             return f"Create({_e(key)})"
@@ -2967,8 +4160,9 @@ class _Scene:
             return f"GrowFromCenter({_e(key)})" if piece == "/body" else f"FadeIn({_e(key)})"
         if piece.startswith(".e") and kind == "nodes":
             directed = isinstance(element, NodesElement) and element.directed
-            return f"GrowArrow({_e(key)})" if directed else f"Create({_e(key)})"
-        if piece and kind in ("set", "nodes"):
+            straight = key not in self.arcs
+            return f"GrowArrow({_e(key)})" if directed and straight else f"Create({_e(key)})"
+        if piece and kind in ("set", "nodes", "molecule"):
             return f"GrowFromCenter({_e(key)})"
         if piece:
             return f"FadeIn({_e(key)}, shift=UP * 0.15)"
@@ -3156,7 +4350,7 @@ class _Scene:
 
     def do_hide(self, out: _Writer, action: _Action) -> None:
         going: list[str] = []
-        for target in action.targets:
+        for target in [self.standing(target) for target in action.targets]:
             for key in self.pieces(target):
                 if key in self.on and key not in going:
                     going.append(key)
@@ -3174,11 +4368,12 @@ class _Scene:
             self.do_show(out, _Action("show", missing))
 
     def do_highlight(self, out: _Writer, action: _Action) -> None:
+        action = replace(action, targets=[self.standing(target) for target in action.targets])
         self.ensure(out, action.targets)
         rings: list[str] = []
         pops: list[str] = []
         for target in action.targets:
-            keys = [key for key in target.keys if "/" not in key or target.whole]
+            keys = self.seen([key for key in target.keys if "/" not in key or target.whole])
             rings.append(f"self.ring({_py(keys)}, self.{action.hue})")
             kind = self.c.elements[target.element].kind
             if not target.whole or kind in ("dot", "shape", "coin", "die"):
@@ -3192,6 +4387,7 @@ class _Scene:
             out.say(f"self.play({back}, run_time=0.25)")
 
     def do_color(self, out: _Writer, action: _Action) -> None:
+        action = replace(action, targets=[self.standing(target) for target in action.targets])
         self.ensure(out, action.targets)
         tints: list[str] = []
         for target in action.targets:
@@ -3199,15 +4395,27 @@ class _Scene:
             keys = list(target.keys)
             if target.whole and element.kind in _PIECEWISE:
                 keys = [key for key in keys if "/" not in key]
+            if isinstance(element, VesselElement) and (
+                target.whole or f"{target.element}/liquid" in keys
+            ):
+                # A vessel is colored by what is in it: the glass stays as it is.
+                self.vessels[target.element]["hue"] = action.hue
+                liquid = _e(target.element + "/liquid")
+                color, solidity = _liquid_look(action.hue)
+                tints.append(f"self.tint({liquid}, {color}, {solidity})")
+                continue
             for key in keys:
                 if key in self.c.follows:
                     continue
                 piece = key[len(target.element) :]
-                chip = element.kind in ("set", "grid", "nodes", "bars") and piece[:2] not in (
-                    "",
-                    ".e",
-                )
-                if chip and "/" not in piece:
+                chip = element.kind in ("set", "grid", "nodes", "bars", "molecule") and piece[
+                    :2
+                ] not in ("", ".e", ".b")
+                if isinstance(element, TimelineElement) and piece.startswith("."):
+                    # An event is colored by its mark and its date: its words stay readable.
+                    tints.append(f"self.tint({_e(key)}[0], self.{action.hue}, 0)")
+                    tints.append(f"self.tint({_e(key)}[1], self.{action.hue}, 0)")
+                elif chip and "/" not in piece:
                     tints.append(f"self.tint({_e(key)}[0], self.{action.hue}, 0.45)")
                 else:
                     tints.append(f"self.tint({_e(key)}, self.{action.hue}, 0)")
@@ -3217,6 +4425,10 @@ class _Scene:
     def do_move(self, out: _Writer, action: _Action) -> None:
         """Move what is named; what is drawn from it (an arrow to it, a brace over it, a
         label on it) goes while it moves and is drawn again from where it lands."""
+        if isinstance(action.place, tuple) and action.place[0] == "ends":
+            self.repoint(out, action)
+            return
+        action = replace(action, targets=[self.standing(target) for target in action.targets])
         self.ensure(out, action.targets)
         keys: list[str] = []
         for target in action.targets:
@@ -3243,12 +4455,51 @@ class _Scene:
             point = f"self.beside({_py(keys)}, {_py(list(anchor.keys))}, {side})"
         else:
             point = f"self.group({_py(list(place.keys))}).get_center()"
+            if (
+                place.whole
+                and len(action.targets) == 1
+                and action.targets[0].whole
+                and not set(self.c.pieces[place.element]) & self.on
+            ):
+                # Moved onto something that is not there: it is what stands there now.
+                self.stands[place.element] = action.targets[0].element
         out.say(f"self.play(*self.shift_to({_py(keys)}, {point}), run_time=1.0)")
         if attached:
             for owner in owners:
                 self.make(out, owner, self.c.elements[owner])
             entrances = ", ".join(self.entrance(key) for key in attached)
             out.say(f"self.play({entrances}, run_time=0.6)")
+
+    def repoint(self, out: _Writer, action: _Action) -> None:
+        """An arrow or a line turns to join other things, its words going with it."""
+        name = action.targets[0].element
+        element = self.c.elements[name]
+        assert isinstance(element, (ArrowElement, LineElement))
+        _, start, end = action.place
+        self.ensure(out, [action.targets[0], start, end])
+        self.used |= {"ends", "link"}
+        kind = self.link_kind(element, start, end, aimed=False)
+        out.say(
+            f"fresh = self.link({_py(self.seen(list(start.keys)))}, "
+            f"{_py(self.seen(list(end.keys)))}, {kind}, self.{self.c.colors[name]})"
+        )
+        plays = [f"Transform({_e(name)}, fresh)"]
+        if name in self.labels and f"{name}/name" in self.on:
+            plays.append(
+                f"Transform({_e(name + '/name')}, self.tag(fresh, {_py(self.labels[name])}))"
+            )
+        out.say(f"self.play({', '.join(plays)}, run_time=0.9)")
+
+    def standing(self, target: _Target) -> _Target:
+        """What stands where a target would be. An element that was never shown, and that
+        something was moved onto, is that something from then on: a real model wrote the
+        three places of one molecule as three elements, and moved the first onto the
+        second, then "the second" onto the third (2026-11-24)."""
+        name = target.element
+        if target.whole and name in self.stands and not set(self.c.pieces[name]) & self.on:
+            mover = self.stands[name]
+            return _Target(mover, tuple(self.c.pieces[mover]), True)
+        return target
 
     def region_box(self, region: str) -> _Box:
         row, column = _REGIONS[region]
@@ -3291,10 +4542,40 @@ class _Scene:
             self.param_value = action.value
             return
         hue = f"self.{c.colors[name]}"
-        self.ensure(out, action.targets)
+        self.ensure(out, [_Target(name, tuple(c.pieces[name]), True)])
         box = c.box_of(name)
         fit = f"self.fit(fresh, {_py(round(box.w, 3))}, {_py(round(box.h, 3))})"
-        if isinstance(element, PointElement):
+        if isinstance(element, VesselElement):
+            self.set_vessel(out, name, element, action.value)
+        elif isinstance(element, GridElement):
+            changed = []
+            for key, text in action.value.items():
+                if self.cells.get(key, "") == text:
+                    continue
+                self.cells[key] = text
+                spec = _token(text) if text else [False, " "]
+                changed.append(f"self.recell({_py(key)}, {_py(spec)}, {self.cell_side[name]})")
+            if changed:
+                out.say(f"self.play({', '.join(changed)}, run_time=0.9)")
+        elif isinstance(element, (ArrowElement, LineElement, BraceElement, OutlineElement)):
+            key = name + "/name"
+            if isinstance(element, (ArrowElement, LineElement)):
+                out.say(f"fresh = self.tag({_e(name)}, {_py(action.value)})")
+            else:
+                side = (
+                    _SIDES.get(_words(element.side), "DOWN")
+                    if isinstance(element, BraceElement)
+                    else "UP"
+                )
+                ink = "self.ink" if isinstance(element, BraceElement) else hue
+                out.say(
+                    f"fresh = self.pin(self.shown({_py(action.value)}, 28, {ink}), {_e(name)}, "
+                    f"{side}, 0.12)"
+                )
+            out.say(f"self.play(FadeTransform({_e(key)}, fresh), run_time=0.8)")
+            out.say(f"{_e(key)} = fresh")
+            self.labels[name] = action.value
+        elif isinstance(element, PointElement):
             out.say(
                 f"self.play(self.trackers[{_py(name)}].animate.set_value({_py(action.value)}), "
                 "run_time=1.6, rate_func=smooth)"
@@ -3350,6 +4631,46 @@ class _Scene:
             out.say(f"{_e(name)} = fresh")
             self.word_lines[name] = after
             self.name_words(out, name)
+
+    def set_vessel(
+        self, out: _Writer, name: str, element: VesselElement, changes: dict[str, Any]
+    ) -> None:
+        """What is seen in a vessel changes: its liquid takes a color or rises, bubbles
+        begin or stop, a solid settles or goes, a flame is lit or put out."""
+        state = self.vessels[name]
+        plays: list[str] = []
+        if "level" in changes and abs(changes["level"] - state["level"]) > 1e-6:
+            state["level"] = changes["level"]
+            hue = changes.get("liquid", state["hue"])
+            state["hue"] = hue
+            points = _vessel_liquid(element.shape, state["level"])
+            glass = _box_middle(_vessel_outline(element.shape))
+            liquid = _box_middle(points)
+            offset = [round(liquid[0] - glass[0], 3), round(liquid[1] - glass[1], 3)]
+            color, solidity = _liquid_look(hue)
+            plays.append(
+                f"self.refill({_py(name)}, {_py(points)}, {_py(offset)}, {_py(round(glass[2], 3))}, "
+                f"{color}, {solidity})"
+            )
+        elif "liquid" in changes and changes["liquid"] != state["hue"]:
+            state["hue"] = changes["liquid"]
+            color, solidity = _liquid_look(state["hue"])
+            plays.append(f"self.tint({_e(name + '/liquid')}, {color}, {solidity})")
+        shows = {"bubbles": "bubbles", "solid": "solid", "heat": "flame"}
+        for said, piece in shows.items():
+            key = f"{name}/{piece}"
+            if said not in changes or key not in self.c.pieces[name]:
+                continue
+            if changes[said] and not state[piece]:
+                state[piece] = True
+                self.on.add(key)
+                plays.append(self.entrance(key))
+            elif not changes[said] and state[piece]:
+                state[piece] = False
+                self.on.discard(key)
+                plays.append(f"FadeOut({_e(key)})")
+        if plays:
+            out.say(f"self.play({', '.join(plays)}, run_time=1.2)")
 
     # -- the live page ---------------------------------------------------------------------------
 
@@ -3472,6 +4793,33 @@ def _describe(compiler: _Compiler) -> str:
             said.append("a coin" + (f", {label}" if label else ""))
         elif isinstance(element, DieElement):
             said.append("a die" + (f", {label}" if label else ""))
+        elif isinstance(element, TimelineElement):
+            events = "; ".join(
+                f"{plain(event.at)}, {plain(event.text)}" for event in element.events
+            )
+            said.append(f"a timeline ({events})")
+        elif isinstance(element, VesselElement):
+            names = {"beaker": "a beaker", "tube": "a test tube", "flask": "a flask"}
+            what = names[element.shape] + (f" of {label}" if label else "")
+            seen = [
+                word
+                for word, there in (
+                    ("bubbling", element.bubbles),
+                    ("with a solid at the bottom", element.solid not in (None, False)),
+                    ("heated", element.heat),
+                )
+                if there
+            ]
+            said.append(", ".join([what, *seen]))
+        elif isinstance(element, MoleculeElement):
+            atoms = ", ".join(plain(atom) for atom in element.atoms)
+            said.append((f"a molecule of {label}" if label else "a molecule") + f" ({atoms})")
+        elif isinstance(element, CodeElement):
+            count = len(element.lines)
+            said.append(
+                f"{count} line{'' if count == 1 else 's'} of code"
+                + (f" ({label})" if label else "")
+            )
     said = [phrase for phrase in said if phrase][:12]
     if not said:
         return "A picture."

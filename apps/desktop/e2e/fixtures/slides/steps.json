@@ -7,6 +7,14 @@
     "interactive": false,
     "steps": 2
   },
+  "causes.py": {
+    "interactive": false,
+    "steps": 3
+  },
+  "code.py": {
+    "interactive": false,
+    "steps": 4
+  },
   "counted_out.py": {
     "interactive": false,
     "steps": 4
@@ -23,13 +31,69 @@
     "interactive": false,
     "steps": 3
   },
+  "example_common_cause.py": {
+    "interactive": false,
+    "steps": 4
+  },
+  "example_demand.py": {
+    "interactive": false,
+    "steps": 4
+  },
+  "example_experiment.py": {
+    "interactive": false,
+    "steps": 4
+  },
+  "example_falling.py": {
+    "interactive": false,
+    "steps": 5
+  },
+  "example_leaf.py": {
+    "interactive": false,
+    "steps": 7
+  },
+  "example_meter.py": {
+    "interactive": false,
+    "steps": 3
+  },
+  "example_passage.py": {
+    "interactive": false,
+    "steps": 5
+  },
+  "example_sentence.py": {
+    "interactive": false,
+    "steps": 5
+  },
+  "example_timeline.py": {
+    "interactive": false,
+    "steps": 5
+  },
+  "example_trace.py": {
+    "interactive": false,
+    "steps": 7
+  },
+  "example_water_cycle.py": {
+    "interactive": false,
+    "steps": 6
+  },
+  "forces.py": {
+    "interactive": false,
+    "steps": 3
+  },
   "linked_list.py": {
     "interactive": false,
     "steps": 4
   },
+  "list_sorted.py": {
+    "interactive": false,
+    "steps": 5
+  },
   "machine.py": {
     "interactive": false,
     "steps": 5
+  },
+  "molecules.py": {
+    "interactive": false,
+    "steps": 2
   },
   "number_line.py": {
     "interactive": false,
@@ -38,6 +102,10 @@
   "parts_of_speech.py": {
     "interactive": false,
     "steps": 5
+  },
+  "passing.py": {
+    "interactive": false,
+    "steps": 3
   },
   "passive_voice.py": {
     "interactive": false,
@@ -63,6 +131,10 @@
     "interactive": false,
     "steps": 5
   },
+  "small_marks.py": {
+    "interactive": false,
+    "steps": 3
+  },
   "solve.py": {
     "interactive": false,
     "steps": 4
@@ -79,6 +151,10 @@
     "interactive": false,
     "steps": 4
   },
+  "timeline.py": {
+    "interactive": false,
+    "steps": 4
+  },
   "tree.py": {
     "interactive": false,
     "steps": 2
@@ -86,5 +162,9 @@
   "vectors.py": {
     "interactive": false,
     "steps": 3
+  },
+  "vessels.py": {
+    "interactive": false,
+    "steps": 5
   }
 }

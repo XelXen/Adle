@@ -29,6 +29,7 @@ import type {
   LessonProgress,
   LessonProgressUpdate,
   LessonRequest,
+  LessonRules,
   Narration,
   NarrationClip,
   ObjectivesUpdate,
@@ -203,6 +204,7 @@ export const OPERATIONS = {
     path: '/v1/lessons/{lesson_id}/unhelpful',
     internal: false,
   },
+  'lessons.rules': { method: 'GET', path: '/v1/lesson-rules', internal: false },
   'lessons.save_progress': {
     method: 'PUT',
     path: '/v1/lessons/{lesson_id}/progress',
@@ -531,6 +533,12 @@ export interface OperationTypes {
     query: undefined;
     body: UnhelpfulReport;
     result: null;
+  };
+  'lessons.rules': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: LessonRules;
   };
   'lessons.save_progress': {
     path: { lesson_id: string };

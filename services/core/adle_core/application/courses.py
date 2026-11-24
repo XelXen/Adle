@@ -13,6 +13,7 @@ from adle_core.infrastructure.asset_store import AssetStore
 from adle_core.infrastructure.database import Database, utc_now
 from adle_core.infrastructure.ids import new_id
 from adle_core.infrastructure.orm import Concept, Course, Source
+from adle_core.lessons import axioms
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,10 +30,17 @@ class CourseRecord:
     last_opened_at: datetime | None
     #: Its name was left to Adle (ADR-053).
     named_by_adle: bool = False
+    #: The kind of subject it is, which decides how its lessons are formed (ADR-061).
+    subject: str = axioms.GENERAL
+    #: Adle placed it; the learner has not chosen.
+    subject_by_adle: bool = True
 
 
 #: What a course is called until Adle has something better to call it.
 PROVISIONAL_TITLE = "New course"
+
+#: What the learner says to hand the choice of a course's subject back to Adle.
+AUTO_SUBJECT = "auto"
 
 
 def title_from_file(display_name: str) -> str:
@@ -65,7 +73,28 @@ def _record(course: Course, source_count: int, concept_count: int) -> CourseReco
         updated_at=course.updated_at,
         last_opened_at=course.last_opened_at,
         named_by_adle=bool(course.named_by_adle),
+        subject=axioms.subject(course.subject).key,
+        subject_by_adle=bool(course.subject_by_adle),
     )
+
+
+def place(course: Course) -> None:
+    """Adle's own guess at a course's subject, from what the course says of itself, unless
+    the learner has chosen one (ADR-061). A guess that finds nothing leaves it as it is: a
+    subject the AI named with the course's plan is not undone by a name that says less."""
+    if not course.subject_by_adle:
+        return
+    guessed = axioms.guess(course.title, course.topic, course.description)
+    if guessed != axioms.GENERAL:
+        course.subject = guessed
+
+
+def place_as(course: Course, subject: object) -> None:
+    """The subject the AI named with a course's plan becomes the course's, unless the
+    learner has chosen one, or the AI named none (ADR-061)."""
+    key = axioms.subject_key(subject)
+    if course.subject_by_adle and key is not None and key != axioms.GENERAL:
+        course.subject = key
 
 
 class CourseService:
@@ -128,7 +157,10 @@ class CourseService:
                 origin=origin,
                 topic=topic.strip() if topic and topic.strip() else None,
                 named_by_adle=not named,
+                subject=axioms.GENERAL,
+                subject_by_adle=True,
             )
+            place(course)
             session.add(course)
             session.flush()
             return _record(course, 0, 0)
@@ -143,8 +175,15 @@ class CourseService:
             return self._counted(session, course)
 
     def update(
-        self, course_id: str, *, title: str | None = None, description: str | None = None
+        self,
+        course_id: str,
+        *,
+        title: str | None = None,
+        description: str | None = None,
+        subject: str | None = None,
     ) -> CourseRecord:
+        """Change what the learner may change. ``subject`` is a subject's key, which then
+        stands, or ``"auto"``, which hands the choice back to Adle (ADR-061)."""
         with self._database.session() as session:
             course = get_course_or_404(session, course_id)
             if title is not None:
@@ -153,8 +192,28 @@ class CourseService:
                 course.named_by_adle = False
             if description is not None:
                 course.description = description.strip()
+            if subject == AUTO_SUBJECT:
+                course.subject_by_adle = True
+                course.subject = axioms.GENERAL
+            elif subject is not None:
+                course.subject = axioms.subject(subject).key
+                course.subject_by_adle = False
+            place(course)
             session.flush()
             return self._counted(session, course)
+
+    def settle_subjects(self) -> None:
+        """Courses Adle has not placed are given its guess, as the core starts: one made by
+        a version that knew no subjects is placed too, and so is one whose name says more
+        to a later version than it did to this one."""
+        with self._database.session() as session:
+            unplaced = session.scalars(
+                select(Course).where(
+                    Course.subject == axioms.GENERAL, Course.subject_by_adle.is_(True)
+                )
+            )
+            for course in unplaced:
+                place(course)
 
     def delete(self, course_id: str) -> None:
         """Permanently remove a course, everything derived from it, and its stored files."""

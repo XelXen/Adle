@@ -103,6 +103,15 @@ _CONTROL_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 _URL_LIKE = re.compile(
     r"(?i)(?:https?|wss?|ftp|file)://|\b(?:javascript|vbscript|blob):|\bdata:[a-z]+/"
 )
+
+
+def names_a_link(text: str) -> bool:
+    """Whether a piece of text holds what the policy refuses in any string of a scene: an
+    address, or the beginning of one. Whoever writes a scene from data asks first, so that
+    one such string costs the picture that string and not the whole of it."""
+    return _URL_LIKE.search(text) is not None
+
+
 _FORBIDDEN_NODES: Final = (
     ast.AsyncFunctionDef,
     ast.AsyncFor,

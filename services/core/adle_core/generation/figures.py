@@ -41,7 +41,7 @@ from pydantic import (
 )
 
 from adle_core.generation.layout import LAYOUT_METHODS
-from adle_core.generation.speech import UNICODE_TEX
+from adle_core.generation.speech import UNICODE_TEX, has_marks, small_as_tex
 
 #: The kinds of figure there are, as the lesson format names them.
 FIGURE_KINDS = (
@@ -113,7 +113,7 @@ def _symbols(text: str) -> str:
     that say the same, outside any ``\\text{...}``: what the player's TeX is sure to set."""
     pieces = re.split(r"(\\text\{[^{}]*\})", text)
     return "".join(
-        piece if index % 2 else "".join(UNICODE_TEX.get(char, char) for char in piece)
+        piece if index % 2 else "".join(UNICODE_TEX.get(char, char) for char in small_as_tex(piece))
         for index, piece in enumerate(pieces)
     )
 
@@ -1983,7 +1983,7 @@ def _cell(text: str, *, heading: bool = False) -> list[Any]:
     if heading and re.fullmatch(r"[A-Za-z]", text):
         return [True, text]
     # So is mathematics written in its own symbols ("E ⊆ Ω"), which the text face lacks.
-    if _BARE_TEX.search(text) or any(char in UNICODE_TEX for char in text):
+    if _BARE_TEX.search(text) or has_marks(text):
         once = re.sub(r"\\{2,}", lambda run: "\\" * max(1, len(run.group(0)) // 2), text)
         with contextlib.suppress(ValueError):
             return [True, _tex(once)]

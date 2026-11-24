@@ -123,6 +123,8 @@ def build_services(
     source_files = AssetStore(settings.sources_dir)
     retriever = FtsRetriever(database)
     courses = CourseService(database, source_files)
+    # A course made before courses had subjects is placed by its name (ADR-061).
+    courses.settle_subjects()
     curriculum = CurriculumService(database, retriever)
     lessons = LessonService(database)
     # Nothing is being drawn while the core starts: a lesson still waiting for a picture

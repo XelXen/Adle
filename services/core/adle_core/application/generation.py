@@ -45,7 +45,7 @@ from adle_core.application.asks import (
     AskCitation,
     AskService,
 )
-from adle_core.application.courses import get_course_or_404
+from adle_core.application.courses import get_course_or_404, place_as
 from adle_core.application.curriculum import (
     ConceptRecord,
     CurriculumRecord,
@@ -102,6 +102,7 @@ from adle_core.infrastructure.orm import Attempt, Concept, Course, StoredLesson
 from adle_core.ingestion.types import heading_leaf
 from adle_core.learner_model.next_step import MAX_LESSONS_PER_CONCEPT
 from adle_core.learner_model.preferences import LearnerPreferences
+from adle_core.lessons import axioms
 from adle_core.lessons.bundle import (
     LessonInvalidError,
     SceneRejectedError,
@@ -667,6 +668,8 @@ def _part_brief(lesson: Lesson, index: int, *, answered: bool) -> prompts.PartBr
 @dataclass(frozen=True, slots=True)
 class _LessonInputs:
     course_title: str
+    #: The kind of subject the lesson is formed as (ADR-061).
+    subject: str
     concept: prompts.ConceptBrief
     learner: prompts.LearnerBrief
     passages: list[prompts.Passage]
@@ -689,11 +692,21 @@ STRATEGY_ROTATION = (
 )
 
 
-def next_strategy(used: Sequence[str]) -> str | None:
-    """A way of teaching the concept has not had yet. ``None`` for a first lesson: no constraint."""
+def next_strategy(used: Sequence[str], subject: str | None = None) -> str | None:
+    """A way of teaching the concept has not had yet, of those that suit its subject
+    (ADR-061). ``None`` for a first lesson: no constraint."""
     if not used:
         return None
-    return next((name for name in STRATEGY_ROTATION if name not in used), None)
+    return next((name for name in axioms.ways_for(subject) if name not in used), None)
+
+
+def subject_of(course: Course, *more: str | None) -> str:
+    """The kind of subject a lesson of a course is formed as: the course's own; for one
+    nobody has placed yet, a guess from its name and from what else is said of it (the
+    concept the lesson teaches)."""
+    if course.subject != axioms.GENERAL or not course.subject_by_adle:
+        return axioms.subject(course.subject).key
+    return axioms.guess(course.title, course.topic, course.description, *more)
 
 
 def _listed(names: Sequence[str]) -> str:
@@ -1174,6 +1187,8 @@ class GenerationService:
             named = _course_title(answer.get("course_title")) if name_it else None
             if named is not None:
                 self._name_course(course_id, named)
+            # Whoever plans a course knows what kind of subject it is (ADR-061).
+            placed = self._place_course(course_id, answer.get("subject"))
             outcome: dict[str, Any] = {
                 "kind": KIND_CURRICULUM,
                 "concepts": [concept.as_dict() for concept in proposed],
@@ -1184,6 +1199,8 @@ class GenerationService:
             }
             if named is not None:
                 outcome["course_title"] = named
+            if placed is not None:
+                outcome["subject"] = placed
             if setup:
                 outcome = self._set_up(course_id, outcome, context)
             context.report(2, 2, "Done")
@@ -1192,6 +1209,16 @@ class GenerationService:
             "The AI’s suggestions weren’t usable, twice. Nothing was added. Try again, or add "
             "concepts by hand."
         )
+
+    def _place_course(self, course_id: str, subject: object) -> str | None:
+        """The course takes the subject the AI named with its plan, unless the learner has
+        chosen one (ADR-061). Says the subject it has afterwards; None when it is gone."""
+        with self._database.session() as session:
+            course = session.get(Course, course_id)
+            if course is None:
+                return None
+            place_as(course, subject)
+            return axioms.subject(course.subject).key
 
     def _name_course(self, course_id: str, title: str) -> None:
         """The course the learner left to Adle to name takes the name the AI gave it, unless
@@ -1330,10 +1357,11 @@ class GenerationService:
             concept_row = get_concept_or_404(session, concept_id)
             course: Course = get_course_or_404(session, concept_row.course_id)
             course_id, course_title = course.id, course.title
+            subject = subject_of(course, concept_row.title, concept_row.summary)
             used = [
                 name for name in self._strategies_used(session, concept_id) if name in STRATEGIES
             ]
-        approach = strategy or next_strategy(used)
+        approach = strategy or next_strategy(used, subject)
         curriculum = self._curriculum.get(course_id)
         concept = next((item for item in curriculum.concepts if item.id == concept_id), None)
         if concept is None:
@@ -1342,6 +1370,7 @@ class GenerationService:
         preferences = self._learner.get_preferences()
         return _LessonInputs(
             course_title=course_title,
+            subject=subject,
             concept=prompts.ConceptBrief(
                 title=concept.title,
                 summary=concept.summary,
@@ -1423,6 +1452,7 @@ class GenerationService:
                 problems=problems,
                 approach=inputs.approach,
                 earlier=inputs.earlier,
+                subject=inputs.subject,
             )
             growing = _GrowingLesson(self, inputs.context, context)
             result: ChatResult | None = None

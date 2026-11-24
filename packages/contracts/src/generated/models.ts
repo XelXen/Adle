@@ -202,6 +202,21 @@ export interface Course {
   named_by_adle?: boolean;
   origin: 'sample' | 'topic' | 'materials';
   source_count: number;
+  subject?:
+    | 'mathematics'
+    | 'physics'
+    | 'chemistry'
+    | 'biology'
+    | 'earth_science'
+    | 'computer_science'
+    | 'language'
+    | 'literature'
+    | 'history'
+    | 'economics'
+    | 'social_science'
+    | 'arts'
+    | 'general';
+  subject_by_adle?: boolean;
   title: string;
   topic: string | null;
   updated_at: string;
@@ -217,6 +232,24 @@ export interface CourseList {
 }
 export interface CourseUpdate {
   description?: string | null;
+  subject?:
+    | (
+        | 'mathematics'
+        | 'physics'
+        | 'chemistry'
+        | 'biology'
+        | 'earth_science'
+        | 'computer_science'
+        | 'language'
+        | 'literature'
+        | 'history'
+        | 'economics'
+        | 'social_science'
+        | 'arts'
+        | 'general'
+      )
+    | 'auto'
+    | null;
   title?: string | null;
 }
 export interface Curriculum {
@@ -661,6 +694,40 @@ export interface LessonRequest {
   strategy?:
     | ('visual' | 'worked_example' | 'analogy' | 'mathematical' | 'socratic' | 'computational')
     | null;
+}
+/**
+ * How Adle forms a lesson (ADR-061): the rules of every lesson, in the order a lesson
+ * obeys them, and what each subject needs besides.
+ *
+ */
+export interface LessonRules {
+  rules: string[];
+  subjects: SubjectWay[];
+}
+/**
+ * One kind of subject, and how a lesson of it goes.
+ *
+ */
+export interface SubjectWay {
+  key:
+    | 'mathematics'
+    | 'physics'
+    | 'chemistry'
+    | 'biology'
+    | 'earth_science'
+    | 'computer_science'
+    | 'language'
+    | 'literature'
+    | 'history'
+    | 'economics'
+    | 'social_science'
+    | 'arts'
+    | 'general';
+  name: string;
+  steps: string[];
+  strategies: (
+    'visual' | 'worked_example' | 'analogy' | 'mathematical' | 'socratic' | 'computational'
+  )[];
 }
 /**
  * What of a lesson has been recorded in the voice chosen now, and the recording under way.

@@ -5,6 +5,33 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Lessons formed the way each subject is taught.** Every lesson still begins with
+  something to look at and ends with the rule. What comes between now depends on the
+  subject: an experiment, then the particles, then the equation in chemistry; real
+  sentences worked on before the rule in a language; a moment on a timeline and what led
+  to it in history; a small input run by hand before the code in programming. Thirteen
+  kinds of subject have a way of their own.
+- **A course says what it is taught as.** Adle places a course by its name, or as the AI
+  says when it plans the course. Open **Taught as …** on a course to read the rules its
+  lessons follow, and to choose the subject yourself.
+- **New pictures.** A lesson can draw a timeline; a beaker, test tube or flask in which
+  something is seen to happen (a color, bubbles, a solid, heat); a molecule; and lines of
+  code.
+
+### Changed
+
+- **Teaching styles suit the subject.** A history course is no longer offered
+  "Step-by-step math" when you ask for another explanation.
+
+### Fixed
+
+- **A web address in one label no longer costs a whole picture.** Only that label is left
+  out.
+- **Long names in a diagram no longer lie over each other.** Boxes joined by arrows stand
+  as far apart as their names are wide.
+
 ## [0.1.0-alpha.9] - 2026-11-24
 
 The ninth alpha, about your own notes. A PDF that is a scan or handwriting is kept instead

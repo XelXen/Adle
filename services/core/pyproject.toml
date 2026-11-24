@@ -70,6 +70,8 @@ ignore = [
 "adle_core/generation/figures.py" = ["E501"]
 "adle_core/generation/slides.py" = ["E501"]
 "adle_core/tools/export_slides.py" = ["E501"]
+# Parts as a model would write them: a beat, an element or a step to a line.
+"adle_core/generation/examples.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

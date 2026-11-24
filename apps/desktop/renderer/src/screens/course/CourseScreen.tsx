@@ -16,10 +16,12 @@ import {
 
 import { type CourseTab, useRouter } from '../../app/router';
 import { callCore, CoreRequestError, describeError } from '../../lib/core-client';
+import { taughtAs, useLessonRules } from '../../lib/lesson-rules';
 import { useResource } from '../../lib/use-resource';
 import styles from './CourseScreen.module.css';
 import { CurriculumPanel } from './CurriculumPanel';
 import { LearnPanel } from './LearnPanel';
+import { LessonRulesDialog } from './LessonRulesDialog';
 import { SourcesPanel } from './SourcesPanel';
 
 const TABS: readonly TabItem<CourseTab>[] = [
@@ -44,6 +46,9 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
   );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // How this course's lessons are formed, and as what subject (ADR-061): one press away.
+  const rules = useLessonRules();
+  const [showingRules, setShowingRules] = useState(false);
 
   const backToLibrary = (
     <Button
@@ -112,10 +117,13 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
       eyebrow={backToLibrary}
       description={
         <Stack gap={2}>
-          <span>
+          <span className={styles.facts}>
             <Badge tone={data.origin === 'sample' ? 'accent' : 'neutral'}>
               {ORIGIN_LABEL[data.origin]}
             </Badge>
+            <Button variant="tertiary" size="small" onClick={() => setShowingRules(true)}>
+              {taughtAs(data, rules.resource.status === 'ready' ? rules.resource.data : null)}
+            </Button>
           </span>
           {data.topic ? <span className={styles.topic}>{data.topic}</span> : null}
           {data.description ? <span>{data.description}</span> : null}
@@ -147,6 +155,13 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
           )
         }
       </Tabs>
+
+      <LessonRulesDialog
+        course={data}
+        open={showingRules}
+        onClose={() => setShowingRules(false)}
+        onCourseChanged={course.setData}
+      />
 
       <Dialog
         open={confirmingDelete}

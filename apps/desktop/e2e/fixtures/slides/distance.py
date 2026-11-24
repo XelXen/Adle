@@ -68,6 +68,18 @@ class Slide(InteractiveScene):
             return [other.get_left()[0] - 0.55 - mine.width / 2, other.get_center()[1], 0]
         return [other.get_right()[0] + 0.55 + mine.width / 2, other.get_center()[1], 0]
 
+    def stand_beside(self, key, anchor, ways):
+        # Beside what it was put beside: on the side asked for, or, where that would take it
+        # past the edge (under what already stands at the foot of the stage), on the next
+        # side there is to try.
+        mine = self.e[key]
+        for way in ways:
+            mine.move_to(self.beside([key], [anchor], way))
+            if self.within(mine, 6.2, 3.4):
+                return
+        mine.move_to(self.beside([key], [anchor], ways[0]))
+        self.keep(mine)
+
     def shown(self, spec, size, hue):
         if spec[0]:
             return MathTex(spec[1], font_size=round(size * 1.45), color=hue)
@@ -306,6 +318,10 @@ class Slide(InteractiveScene):
                     break
         outside = 0
         for m in self.mobjects:
+            # A value that a step has moved is among them, and is no drawing: it stands at
+            # its own number, wherever that is (a point's place at 20 on a line of meters).
+            if isinstance(m, ValueTracker):
+                continue
             if not self.within(m, 7.12, 4.02):
                 outside += 1
         if overlapping > 0 or struck > 0 or outside > 0:
@@ -327,6 +343,32 @@ class Slide(InteractiveScene):
         start = self.group(a)
         end = self.group(b)
         points = self.ends(start, end)
+        if kind >= 5:
+            # Out of what it starts at, to one side: a push, a pull, something leaving.
+            side = (kind - 5) % 4
+            tail = start.get_bottom()
+            way = DOWN
+            if side == 1:
+                tail = start.get_top()
+                way = UP
+            if side == 2:
+                tail = start.get_left()
+                way = LEFT
+            if side == 3:
+                tail = start.get_right()
+                way = RIGHT
+            # As long as there is room for, short of the edge of the stage.
+            room = 3.7 + tail[1]
+            if side == 1:
+                room = 3.7 - tail[1]
+            if side == 2:
+                room = 6.6 + tail[0]
+            if side == 3:
+                room = 6.6 - tail[0]
+            reach = min(1.5, max(0.5, room))
+            if kind >= 9:
+                return Line(tail + way * 0.12, tail + way * reach, color=hue)
+            return Arrow(tail + way * 0.12, tail + way * reach, buff=0, color=hue, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=10)
         if kind == 4:
             # Between two words of one line: an arc over them, from top to top.
             bend = -PI / 2.2

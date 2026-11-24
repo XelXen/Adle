@@ -18,8 +18,10 @@ from dataclasses import dataclass
 from importlib import resources
 from typing import Any
 
+from adle_core.generation import examples
 from adle_core.generation.drafts import MAX_PROPOSED_CONCEPTS, SceneBrief
 from adle_core.generation.provider import ChatRequest
+from adle_core.lessons import axioms
 from adle_core.lessons.ir import MISCONCEPTION_KINDS, STRATEGIES
 
 MAX_PASSAGES = 6
@@ -191,10 +193,26 @@ is named by the element's id, a dot, and the part: in an element "coins", "coins
 - "coin": "face" ("H" or "T"). "die": "face" (1 to 6). "dot". "shape": "shape" (circle,
   square, rectangle or triangle), its "label" written inside.
 - "arrow": "from", "to" (elements or parts), optional "curved": true. "line": "from",
-  "to", optional "dashed": true. Either may have a "label".
+  "to", optional "dashed": true. Either may have a "label". An arrow may point out of one
+  thing instead of at another: "from" and "toward" ("right", "left", "above" or "below"),
+  for a push, a pull, or something leaving.
 - "brace": "over" (an element, a part, or a list of them), "side" (below, above, left or
   right), "label". "outline": "around" (the same): a box around them, with a "label".
 - "label": "on" (an element or a part), "text", "side": words beside something.
+- "timeline": "events", 2 to 6 of {"at": when, as it is written ("1969", "July 20"), "text":
+  a few words}, in the order they happened: in an element "years", "years.2" or
+  "years.1969" is one event.
+- "vessel": what an experiment is done in. "shape" ("beaker", "test tube" or "flask"),
+  "liquid" (its color, or "colorless"), "level" (0 empty to 1 full), and what is seen in
+  it as it begins:
+  "bubbles": true, "solid": a color, "heat": true. A step changes what is seen with "set":
+  {"set": "id", "to": {"liquid": "green", "bubbles": true, "solid": false, "level": 0.8,
+  "heat": true}}, any of them.
+- "molecule": "atoms", up to 12 symbols ("H", "O", "Na+"), and "bonds" ([[1, 2], [2, 3, 2]]:
+  the atoms joined, counted from 1, with 2 or 3 for a double or a triple bond): in an
+  element "water", "water.2" is its second atom.
+- "code": "lines", up to 10 lines of real code, indented as they are written: in an element
+  "loop", "loop.3" is its third line.
 - "param": "value", "min", "max", optional "slider": true: a number a step can change with
   "set", and every curve, point, area and number that uses its id follows it. With
   "slider": true the learner moves it at the end of the part. One at most.
@@ -211,83 +229,27 @@ happen, in order. Adle fits a count that is off. Actions:
 - {"hide": "id"}.
 - {"highlight": "id"}: point at it (an element or a part), until the next step.
 - {"color": "id", "to": "yellow"}: color it for good, to tie a thing to its symbol.
-- {"move": "id", "to": a place, or an element to move onto}.
+- {"move": "id", "to": a place, or an element to move onto}. An arrow moves to what it
+  joins next: {"move": "id", "to": {"from": "id", "to": "id"}}.
 - {"transform": "id", "into": "other id"}: one text, formula, sentence or shape becomes
   another, the parts they share staying put.
 - {"set": "id", "to": ...}: the param's new value (all that uses it follows), a point's x,
   a number, a coin's face, a die's face, the bars' new "values", a formula's new TeX (it is
-  rewritten, the parts it keeps staying put), a text's or a sentence's new words.
-
-An example, for a part on why the area of a rectangle is height times width. The case
-comes first and alone, then the count in its own numbers, out of the picture, then the
-rule:
-{"type": "explanation", "title": "Area counts squares",
- "beats": [{"say": "Here is a rectangle made of small squares. [Count one row]: four squares."},
-  {"say": "There are [three rows] like it, so there are [three times four], twelve squares."},
-  {"say": "[Every rectangle] works the same way: its area is its height times its width."}],
- "visual": {"elements": [
-   {"id": "g", "kind": "grid", "place": "left",
-    "rows": [["","","",""],["","","",""],["","","",""]]},
-   {"id": "w", "kind": "brace", "over": "g.row 1", "side": "above", "label": "4",
-    "color": "blue"},
-   {"id": "h", "kind": "brace", "over": "g.col 1", "side": "left", "label": "3",
-    "color": "green"},
-   {"id": "area", "kind": "math", "place": "right",
-    "tex": "{{\\color{green}{3}}} \\times {{\\color{blue}{4}}} = 12"},
-   {"id": "rule", "kind": "math", "place": "right",
-    "tex": "{{\\color{green}{h}}} \\times {{\\color{blue}{w}}} = A"}],
-  "steps": [[{"show": "g"}],
-   [{"color": "g.row 1", "to": "blue"}, {"show": "w"}],
-   [{"color": "g.col 1", "to": "green"}, {"show": "h"}],
-   [{"show": "area", "from": ["h", "w"]}],
-   [{"transform": "area", "into": "rule"}]],
-  "description": "3 rows of 4 squares, then $3 \\times 4 = 12$, then $h \\times w = A$."}}"""
+  rewritten, the parts it keeps staying put), a text's or a sentence's new words, what is
+  seen in a vessel, a grid's new "rows" or what one cell holds next, the "label" of an
+  arrow."""
 
 
-def visual_example() -> dict[str, Any]:
-    """The example part the format shows a model, as the model would write it."""
-    example: dict[str, Any] = json.loads(_VISUAL_FORMAT[_VISUAL_FORMAT.index('{"type"') :])
-    return example
+def visual_example(subject: str | None = None) -> dict[str, Any]:
+    """The example part the format shows the writer of a lesson of a subject, as a model
+    would write it: for no subject, the general one."""
+    part: dict[str, Any] = json.loads(
+        json.dumps(examples.EXAMPLES[axioms.subject(subject).example].part)
+    )
+    return part
 
 
-#: How to teach: what makes a lesson worth watching. Kept beside the format it fills.
-_TEACHING = """\
-How to teach this lesson (this is what makes it good):
-- Example first, theory after, always. The learner watches a case happen and works it out
-  with you; only then is the general rule said, as a summary of what they just saw.
-- So a part that teaches goes in this order. Its narration opens on the case itself
-  ("Toss a coin twice."), never on a definition ("A sample space is..."). Its visual
-  begins with the case alone on the stage: the objects, small numbers, a real sentence; no
-  formula and no definition yet. Its next steps act on that case as you speak (color,
-  move, highlight, count with "set", flip a coin, roll a die), so the idea is seen
-  happening. Only then comes the formula: first in the case's own numbers, brought out of
-  the picture with "from", each number in the color of what it counts; last, if the part
-  states a rule, "transform" those numbers into the rule's symbols.
-- A name or a definition comes after two or three instances of it: show the instances,
-  point at what they share, then name it.
-- The lesson moves the same way: its first part is a concrete case with no definition in
-  it; the general statement comes in a later part, built from the cases before it; then a
-  new case shows what changes and what stays the same.
-- The picture carries the idea. Every part that teaches has a visual that changes as you
-  speak, and most of its steps change what is already on the stage rather than add
-  something new.
-- Mathematics and science: show a quantity as a length, an area, a count, a slope or a
-  motion; let a "param" or a "set" show how changing one thing changes another; derive the
-  formula from the picture, one step at a time.
-- Language and writing: show real sentences ("words"), color and label the words that carry
-  the idea, turn one sentence into another to show a rule at work, and set a right use
-  beside a wrong one.
-- History, the life sciences, economics and the rest: a concrete case first (a person, a
-  place, a date, a number); then dates on a number_line, causes and effects or the stages
-  of a process as "nodes", comparisons as "bars" or a "table".
-- 3 to 6 steps in a visual, four to eight elements on the stage. Words on the stage are
-  short, labels rather than paragraphs: the narration says the rest.
-- Use the lesson's own numbers, names and examples in the visuals and in the questions.
-- Adle forgives a visual's small slips: what it cannot draw it leaves out, and it fits the
-  brackets to the steps. Spend your thought on the teaching, not on checking the scripts."""
-
-
-_LESSON_FORMAT = f"""\
+_LESSON_FORMAT_HEAD = f"""\
 The JSON object, its keys in this order:
 
 {{
@@ -320,10 +282,9 @@ Every segment has "type" and "title". The types, and what else each needs:
 A beat is {{"say": "..."}}: narration, read aloud, two or three sentences. Words only: no
 symbols, no formulas, no dollar signs, no backslashes. Say mathematics the way a person
 would ("w times x plus b", "the derivative of the loss"). Put square brackets around the
-words at which the picture should change (see "steps" below). A segment has 2 to 4 beats.
+words at which the picture should change (see "steps" below). A segment has 2 to 4 beats."""
 
-{_VISUAL_FORMAT}
-
+_LESSON_FORMAT_TAIL = f"""\
 A question has "form", "stem" (may contain $math$), "explanation" (why the right answer is
 right, worked out in full; may contain $math$), "hint" (a nudge that does not give the
 answer), "objective" (the number of the learning objective it checks), "difficulty" (1 easy,
@@ -352,7 +313,14 @@ Requirements for the whole lesson:
   different situations from the checkpoints. At least one has "transfer": true and at
   least one is not multiple choice.
 - Every question can be answered from this lesson alone and has one defensible answer.
-- Numbers in examples, visuals and questions are small and come out exactly."""
+- Where there are numbers, in examples, visuals and questions, they are small and come out
+  exactly."""
+
+
+def lesson_format(subject: str | None = None) -> str:
+    """The format of a lesson's answer, with the example part its subject is shown."""
+    example = examples.written(axioms.subject(subject).example)
+    return "\n\n".join([_LESSON_FORMAT_HEAD, _VISUAL_FORMAT, example, _LESSON_FORMAT_TAIL])
 
 
 #: What each way of teaching means, as an instruction to the writer.
@@ -379,17 +347,22 @@ def lesson_request(
     problems: Sequence[str] = (),
     approach: str | None = None,
     earlier: Sequence[str] = (),
+    subject: str | None = None,
 ) -> ChatRequest:
     """The request for one lesson draft.
 
     ``problems`` lists what was wrong with a first attempt. ``approach`` is the way of
     teaching to use, when Adle or the learner has chosen one; ``earlier`` names the ways
     earlier lessons on this concept used, so that this one is not the same lesson again.
+    ``subject`` is the course's (``lessons/axioms.py``): the lesson is formed by the rules
+    of every lesson and by what that subject needs besides (ADR-061).
     """
+    taught = axioms.subject(subject)
+    teacher = "the subject" if taught.key == axioms.GENERAL else taught.name.lower()
     system = (
         "You write short lessons for Adle, an app that teaches one concept at a time to one "
         "learner at a desk, as a slideshow: narration over pictures that change as it is "
-        "said, and a few questions. You are an expert teacher of the subject who explains by "
+        f"said, and a few questions. You are an expert teacher of {teacher} who explains by "
         "intuition and example first, and a careful writer.\n\n"
         f"{_WRITING_RULES}\n\n{_QUOTED_MATERIAL_RULE}"
     )
@@ -437,8 +410,8 @@ def lesson_request(
                 "use different examples, different numbers, and a different way in."
             )
         parts.append(" ".join(how))
-    parts.append(_TEACHING)
-    parts.append(_LESSON_FORMAT)
+    parts.append(axioms.teaching_brief(taught.key))
+    parts.append(lesson_format(taught.key))
     if problems:
         listed = "\n".join(f"- {problem}" for problem in problems[:MAX_PROBLEMS_IN_RETRY])
         parts.append(
@@ -549,10 +522,13 @@ def scene_request(
 
 # -- a curriculum -------------------------------------------------------------------
 
+_SUBJECTS_OFFERED = ", ".join(f'"{key}"' for key in axioms.SUBJECT_KEYS)
+
 _CURRICULUM_FORMAT = f"""\
 The JSON object:
 
 {{
+  "subject": "what kind of subject this course is",
   "concepts": [
     {{
       "title": "a short name for one idea",
@@ -574,7 +550,9 @@ Requirements:
   direct prerequisites only, and give one reason per entry in "reasons", in the same order.
   A concept that can be learned straight away has an empty "needs".
 - Do not repeat a concept the course already has.
-- Titles are plain names, not sentences: no numbering, no "Introduction to"."""
+- Titles are plain names, not sentences: no numbering, no "Introduction to".
+- "subject" is one of {_SUBJECTS_OFFERED}: the one whose teachers would teach this course.
+  It decides how the course's lessons are formed. "general" only if none fits."""
 
 
 def curriculum_request(

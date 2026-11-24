@@ -537,6 +537,7 @@ export function CurriculumPanel({
                 <ConceptDetail
                   key={selected.id}
                   concept={selected}
+                  subject={course.subject}
                   path={path}
                   hasMaterials={hasMaterials}
                   lessons={lessonsFor(selected)}

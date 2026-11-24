@@ -68,6 +68,18 @@ class Slide(InteractiveScene):
             return [other.get_left()[0] - 0.55 - mine.width / 2, other.get_center()[1], 0]
         return [other.get_right()[0] + 0.55 + mine.width / 2, other.get_center()[1], 0]
 
+    def stand_beside(self, key, anchor, ways):
+        # Beside what it was put beside: on the side asked for, or, where that would take it
+        # past the edge (under what already stands at the foot of the stage), on the next
+        # side there is to try.
+        mine = self.e[key]
+        for way in ways:
+            mine.move_to(self.beside([key], [anchor], way))
+            if self.within(mine, 6.2, 3.4):
+                return
+        mine.move_to(self.beside([key], [anchor], ways[0]))
+        self.keep(mine)
+
     def shown(self, spec, size, hue):
         if spec[0]:
             return MathTex(spec[1], font_size=round(size * 1.45), color=hue)
@@ -306,6 +318,10 @@ class Slide(InteractiveScene):
                     break
         outside = 0
         for m in self.mobjects:
+            # A value that a step has moved is among them, and is no drawing: it stands at
+            # its own number, wherever that is (a point's place at 20 on a line of meters).
+            if isinstance(m, ValueTracker):
+                continue
             if not self.within(m, 7.12, 4.02):
                 outside += 1
         if overlapping > 0 or struck > 0 or outside > 0:
@@ -347,11 +363,32 @@ class Slide(InteractiveScene):
             nodes.add(chip)
         links = VGroup()
         for edge in edges:
-            points = self.ends(self.e[keys[edge[1]]], self.e[keys[edge[2]]])
-            if directed:
-                link = Arrow(points[0], points[1], buff=0.08, color=self.muted, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=10)
+            a = self.e[keys[edge[1]]]
+            b = self.e[keys[edge[2]]]
+            if edge[3] == 0:
+                points = self.ends(a, b)
+                if directed:
+                    link = Arrow(points[0], points[1], buff=0.08, color=self.muted, max_tip_length_to_length_ratio=0.25, max_stroke_width_to_length_ratio=10)
+                else:
+                    link = Line(points[0], points[1], color=self.muted)
             else:
-                link = Line(points[0], points[1], color=self.muted)
+                # Past the nodes that stand between its ends: over a row, beside a column.
+                tail = a.get_top() + UP * 0.08
+                tip = b.get_top() + UP * 0.08
+                bend = -PI / 2.6
+                if b.get_center()[0] < a.get_center()[0]:
+                    bend = PI / 2.6
+                if edge[3] == 2:
+                    tail = a.get_right() + RIGHT * 0.08
+                    tip = b.get_right() + RIGHT * 0.08
+                    bend = -PI / 2.6
+                    if b.get_center()[1] > a.get_center()[1]:
+                        bend = PI / 2.6
+                if directed:
+                    link = CurvedArrow(tail, tip, color=self.muted, angle=bend)
+                else:
+                    link = ArcBetweenPoints(tail, tip, bend)
+                    link.set_color(self.muted)
             self.e[edge[0]] = link
             links.add(link)
         marks = VGroup()
@@ -371,7 +408,7 @@ class Slide(InteractiveScene):
         self.still_lines = []
         self.sides = {}
         self.amount = ValueTracker(0.0)
-        self.make_nodes('calls', ['calls.1', 'calls.2', 'calls.3', 'calls.4', 'calls.5'], [[False, 'fib(3)'], [False, 'fib(2)'], [False, 'fib(1)'], [False, 'fib(1)'], [False, 'fib(0)']], [False, False, False, False, False], [[0.0, 1.6], [-1.3, 0.0], [1.3, 0.0], [-1.3, -1.6], [1.3, -1.6]], [['calls.e1', 0, 1], ['calls.e2', 0, 2], ['calls.e3', 1, 3], ['calls.e4', 1, 4]], True, None, self.blue)
+        self.make_nodes('calls', ['calls.1', 'calls.2', 'calls.3', 'calls.4', 'calls.5'], [[False, 'fib(3)'], [False, 'fib(2)'], [False, 'fib(1)'], [False, 'fib(1)'], [False, 'fib(0)']], [False, False, False, False, False], [[0.0, 1.6], [-1.3, 0.0], [1.3, 0.0], [-1.3, -1.6], [1.3, -1.6]], [['calls.e1', 0, 1, 0], ['calls.e2', 0, 2, 0], ['calls.e3', 1, 3, 0], ['calls.e4', 1, 4, 0]], True, None, self.blue)
         self.put(['calls'], [0.0, 0.0, 12.4, 6.8], 1)
         self.tidy()
 

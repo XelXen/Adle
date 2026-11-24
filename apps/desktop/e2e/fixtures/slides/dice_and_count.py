@@ -68,6 +68,18 @@ class Slide(InteractiveScene):
             return [other.get_left()[0] - 0.55 - mine.width / 2, other.get_center()[1], 0]
         return [other.get_right()[0] + 0.55 + mine.width / 2, other.get_center()[1], 0]
 
+    def stand_beside(self, key, anchor, ways):
+        # Beside what it was put beside: on the side asked for, or, where that would take it
+        # past the edge (under what already stands at the foot of the stage), on the next
+        # side there is to try.
+        mine = self.e[key]
+        for way in ways:
+            mine.move_to(self.beside([key], [anchor], way))
+            if self.within(mine, 6.2, 3.4):
+                return
+        mine.move_to(self.beside([key], [anchor], ways[0]))
+        self.keep(mine)
+
     def shown(self, spec, size, hue):
         if spec[0]:
             return MathTex(spec[1], font_size=round(size * 1.45), color=hue)
@@ -306,6 +318,10 @@ class Slide(InteractiveScene):
                     break
         outside = 0
         for m in self.mobjects:
+            # A value that a step has moved is among them, and is no drawing: it stands at
+            # its own number, wherever that is (a point's place at 20 on a line of meters).
+            if isinstance(m, ValueTracker):
+                continue
             if not self.within(m, 7.12, 4.02):
                 outside += 1
         if overlapping > 0 or struck > 0 or outside > 0:
