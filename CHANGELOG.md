@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.8] - 2026-11-24
+
+The eighth alpha, about the voice. Mathematics is said as it is meant, "n factorial" and "and
+so on" included. Describe the Expressive voice in your own words, or start from a preset, and
+listen to any voice before you choose it. A voice you choose starts recording the lessons you
+opened last straight away. The Rich voice is gone.
+
 ### Changed
 
 - **Mathematics is said as it is meant.** "n!" is read "n factorial", "1, 2, ..., n" as
