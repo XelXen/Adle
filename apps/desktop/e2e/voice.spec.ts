@@ -52,6 +52,37 @@ function aVoice(folder: string): string {
   return models;
 }
 
+/** What each of the Expressive voice's two models is made of. */
+const QWEN_FILES = [
+  'config.json',
+  'model.safetensors',
+  'generation_config.json',
+  'merges.txt',
+  'preprocessor_config.json',
+  'speech_tokenizer/config.json',
+  'speech_tokenizer/configuration.json',
+  'speech_tokenizer/model.safetensors',
+  'speech_tokenizer/preprocessor_config.json',
+  'tokenizer_config.json',
+  'vocab.json',
+];
+
+/** The Expressive voice where an installation leaves it, its aligner too: every file empty. */
+function anExpressiveVoice(folder: string): string {
+  const models = path.join(folder, 'models');
+  const files = [
+    ...['Qwen3-TTS-12Hz-1.7B-VoiceDesign', 'Qwen3-TTS-12Hz-1.7B-Base'].flatMap((repo) =>
+      QWEN_FILES.map((file) => path.join(models, repo, file)),
+    ),
+    path.join(folder, 'aligner', 'hub', 'checkpoints', 'wav2vec2_fairseq_base_ls960_asr_ls960.pth'),
+  ];
+  for (const at of files) {
+    mkdirSync(path.dirname(at), { recursive: true });
+    writeFileSync(at, '');
+  }
+  return models;
+}
+
 /** A recognisable fake key. It only ever reaches the fake provider. */
 const KEY = 'sk-e2e-not-a-real-key-7Hq2mZx94Wd1';
 
@@ -357,6 +388,116 @@ test.describe('the natural voice', () => {
     ).toBeVisible();
     expect((await invoke<{ enabled: boolean }>(page, 'voice.status')).enabled).toBe(false);
     await expect(page.getByRole('button', { name: 'Use the Natural voice' })).toBeVisible();
+
+    expect(adle.problems).toEqual([]);
+    await adle.close();
+  });
+
+  test('the Expressive voice is put together from parts, heard, and saved; or written in the learner’s own words', async ({
+    profileDir,
+  }) => {
+    const folder = test.info().outputPath('voice');
+    const models = anExpressiveVoice(folder);
+    const adle = await launchApp(profileDir, {
+      onboarded: true,
+      env: {
+        ADLE_VOICE_QWEN_PYTHON: corePython,
+        ADLE_VOICE_ENGINE: standIn,
+        ADLE_VOICE_MODELS: models,
+        ADLE_VOICE_ALIGNER: path.join(folder, 'aligner'),
+      },
+    });
+    const { page } = adle;
+    await waitForCore(page);
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('tab', { name: 'Learning' }).click();
+
+    interface Voice {
+      design: string;
+      design_parts: Record<string, string>;
+    }
+    const own = (await invoke<Voice>(page, 'voice.status')).design;
+    const expressive = page
+      .getByRole('list', { name: 'Voices' })
+      .getByRole('listitem', { name: 'Expressive' });
+    await expect(expressive.getByText('In use').first()).toBeVisible();
+    const from = expressive.getByRole('combobox', { name: 'Start from' });
+    const parts = expressive.getByRole('group', { name: 'What the voice is made of' });
+    const words = expressive.getByRole('textbox', { name: 'In your own words' });
+    // Nothing chosen yet: Adle's own voice, every part of it left to the voice.
+    await expect(from).toHaveValue('Adle’s own');
+    await expect(words).toHaveValue(own);
+    await expect(parts.getByRole('combobox')).toHaveText([
+      /^Any/,
+      /^Any/,
+      /^Any/,
+      /^Any/,
+      /^Any/,
+      /^Any/,
+      /^Any/,
+      /^Any/,
+      /^Any/,
+    ]);
+    await expect(expressive.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    // Part by part: the description is written for the learner as they choose.
+    await parts.getByRole('combobox', { name: 'Speaker' }).selectOption({ label: 'Man' });
+    await expect(words).toHaveValue(
+      'A man with a clear voice, speaking natural English at an easy pace.',
+    );
+    await parts.getByRole('combobox', { name: 'Pace' }).selectOption({ label: 'Slow' });
+    await parts.getByRole('combobox', { name: 'Tone' }).selectOption({ label: 'Deep' });
+    await parts.getByRole('combobox', { name: 'Style' }).selectOption({
+      label: 'Documentary narrator',
+    });
+    const described =
+      'A man with a deep voice, speaking natural English at a slow pace, like a documentary narrator.';
+    await expect(words).toHaveValue(described);
+    await expect(from).toHaveValue('');
+
+    // Heard before it is kept: a sample, and nothing chosen by it.
+    await expressive.getByRole('button', { name: 'Listen to this voice' }).click();
+    await expect(expressive.getByRole('button', { name: 'Listen to this voice' })).toBeEnabled({
+      timeout: 30_000,
+    });
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect((await invoke<Voice>(page, 'voice.status')).design).toBe(own);
+
+    await expressive.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText('Voice saved')).toBeVisible();
+    const saved = await invoke<Voice>(page, 'voice.status');
+    expect(saved.design).toBe(described);
+    expect(saved.design_parts).toEqual({
+      speaker: 'man',
+      pace: 'slow',
+      tone: 'deep',
+      style: 'documentary',
+    });
+    await expect(expressive.getByRole('button', { name: 'Save' })).toBeDisabled();
+    await expectNoAccessibilityViolations(page);
+    await expressive.scrollIntoViewIfNeeded();
+    await screenshot(page, 'settings-voice-parts');
+
+    // A voice to start from sets every part at once, and the learner can go on from it.
+    await from.selectOption({ label: 'Bright and lively' });
+    await expect(parts.getByRole('combobox', { name: 'Speaker' })).toHaveValue('woman');
+    await expect(parts.getByRole('combobox', { name: 'Feeling' })).toHaveValue('lively');
+    await expect(words).toHaveValue(/^A lively young woman with a crisp, clear voice/);
+
+    // In the learner's own words, the most exact way: the parts are let go.
+    await words.fill('A soft, low voice with a smile in it.');
+    await expect(parts.getByRole('combobox', { name: 'Speaker' })).toHaveValue('');
+    await expect(from).toHaveValue('');
+    await expressive.getByRole('button', { name: 'Save' }).click();
+    await expect
+      .poll(async () => (await invoke<Voice>(page, 'voice.status')).design)
+      .toBe('A soft, low voice with a smile in it.');
+    expect((await invoke<Voice>(page, 'voice.status')).design_parts).toEqual({});
+
+    // And back to Adle's own.
+    await from.selectOption({ label: 'Adle’s own' });
+    await expressive.getByRole('button', { name: 'Save' }).click();
+    await expect.poll(async () => (await invoke<Voice>(page, 'voice.status')).design).toBe(own);
 
     expect(adle.problems).toEqual([]);
     await adle.close();

@@ -30,7 +30,7 @@ import shutil
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +45,7 @@ from adle_core.application.lessons import LessonService
 from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
 from adle_core.infrastructure.ids import is_id
 from adle_core.lessons.ir import is_plain_text
+from adle_core.voice import design as voice_design
 from adle_core.voice.catalog import (
     DEFAULT_DESIGN,
     MAX_DESIGN_CHARACTERS,
@@ -118,6 +119,9 @@ class VoiceStatus:
     borrowed: bool
     #: Who reads the lessons in the Expressive voice, as the learner described them (ADR-057).
     design: str = DEFAULT_DESIGN
+    #: The parts that description was put together from, while it still is what they
+    #: make (ADR-062): none for Adle's own voice, and for the learner's own words.
+    design_parts: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,14 +301,20 @@ class NarrationService:
             value = picked.get(each.id)
             known = {speaker.id for speaker in each.speakers}
             speakers[each.id] = value if value in known else each.default_speaker
-        design = chosen.get("design")
+        stored_design = chosen.get("design")
+        design = (
+            stored_design
+            if isinstance(stored_design, str) and stored_design.strip()
+            else DEFAULT_DESIGN
+        )
         return VoiceStatus(
             ready=ready,
             tier=tier,
             enabled=tier is not None and chosen.get("enabled", True) is not False,
             speakers=speakers,
             borrowed=self._paths.borrowed,
-            design=design if isinstance(design, str) and design.strip() else DEFAULT_DESIGN,
+            design=design,
+            design_parts=voice_design.parts_of(chosen.get("design_parts"), design),
         )
 
     def choose(
@@ -314,14 +324,26 @@ class NarrationService:
         tier: str | None = None,
         speaker: str | None = None,
         design: str | None = None,
+        parts: dict[str, str] | None = None,
     ) -> VoiceStatus:
         """Turn the natural voice on or off, choose a size of it, a voice of a size, or say
-        who reads in the Expressive voice (an empty description is Adle's own again). A
-        voice that changes is recorded at once in what the learner is likely to open next."""
+        who reads in the Expressive voice: in words (an empty description is Adle's own
+        again), or by its parts (ADR-062: none of them is Adle's own again), which the
+        description is then written from. A voice that changes is recorded at once in
+        what the learner is likely to open next."""
         before = self._identity()
         chosen = self._chosen()
-        if design is not None:
+        if parts is not None:
+            made_of = _parts(parts)
+            chosen.pop("design", None)
+            chosen.pop("design_parts", None)
+            if made_of:
+                chosen["design"] = voice_design.compose(made_of)
+                chosen["design_parts"] = made_of
+        elif design is not None:
             described = _described(design)
+            # The learner's own words: whatever parts it was once made of are let go.
+            chosen.pop("design_parts", None)
             if described:
                 chosen["design"] = described
             else:
@@ -859,8 +881,17 @@ class NarrationService:
 
     # -- a sample of a voice ---------------------------------------------------------------------
 
+    def describe(self, parts: dict[str, str]) -> str:
+        """The description a voice of these parts is made from (ADR-062)."""
+        return voice_design.compose(_parts(parts))
+
     def sample(
-        self, tier_id: str, *, speaker: str | None = None, design: str | None = None
+        self,
+        tier_id: str,
+        *,
+        speaker: str | None = None,
+        design: str | None = None,
+        parts: dict[str, str] | None = None,
     ) -> JobSnapshot:
         """A few words in a voice set up here, for the learner to hear before choosing it: a
         speaker of the Natural voice, or the Expressive voice of a description (ADR-057).
@@ -868,6 +899,8 @@ class NarrationService:
         tier = find_tier(tier_id)
         if tier is None or tier.id not in self.status().ready:
             raise NotFoundError("That voice is not set up here.")
+        if parts is not None:
+            design = voice_design.compose(_parts(parts))
         voice = self._sample_voice(tier, speaker, design)
         name = self._name(voice, SAMPLE_TEXT)
         running = self._jobs.find_active(KIND_VOICE_SAMPLE, name)
@@ -986,6 +1019,14 @@ class NarrationService:
     def ensure_not_recording(self, lesson_id: str) -> None:
         if self._jobs.find_active(KIND_NARRATION, lesson_id) is not None:
             raise ConflictError("The narration of this lesson is being recorded.")
+
+
+def _parts(parts: dict[str, str]) -> dict[str, str]:
+    """The parts of a voice a learner chose, each one that is offered."""
+    try:
+        return voice_design.checked(parts)
+    except voice_design.UnknownPartError as error:
+        raise ValidationFailedError("That is not one of the choices for a voice.") from error
 
 
 def _described(text: str) -> str:

@@ -1014,15 +1014,46 @@ export interface UnhelpfulReport {
 export interface VoiceChoice {
   design?: string | null;
   enabled?: boolean | null;
+  parts?: {
+    [k: string]: string | undefined;
+  } | null;
   speaker?: string | null;
   tier?: ('kokoro' | 'expressive') | null;
 }
 /**
- * A description of a voice to start from.
+ * The description a voice of some parts is made from.
+ *
+ */
+export interface VoiceDescription {
+  text: string;
+}
+export interface VoiceDescriptionRequest {
+  parts: {
+    [k: string]: string | undefined;
+  };
+}
+export interface VoiceDesignOption {
+  key: string;
+  name: string;
+}
+/**
+ * One thing about a voice a learner can choose: who speaks, how fast, and so on.
+ *
+ */
+export interface VoiceDesignPart {
+  key: string;
+  name: string;
+  options: VoiceDesignOption[];
+}
+/**
+ * A voice to start from: a choice of parts, and the description they make.
  *
  */
 export interface VoiceDesignPreset {
   name: string;
+  parts: {
+    [k: string]: string | undefined;
+  };
   text: string;
 }
 /**
@@ -1037,11 +1068,14 @@ export interface VoiceRecording {
 }
 /**
  * A few words in a voice set up here: a speaker of a size, or the Expressive voice of a
- * description (the one chosen when none is given).
+ * description or of parts (the one chosen when neither is given).
  *
  */
 export interface VoiceSampleRequest {
   design?: string | null;
+  parts?: {
+    [k: string]: string | undefined;
+  } | null;
   speaker?: string | null;
   tier: 'kokoro' | 'expressive';
 }
@@ -1056,6 +1090,10 @@ export interface VoiceSpeaker {
 export interface VoiceStatus {
   borrowed: boolean;
   design: string;
+  design_choices: VoiceDesignPart[];
+  design_parts: {
+    [k: string]: string | undefined;
+  };
   design_presets: VoiceDesignPreset[];
   enabled: boolean;
   gpu: string | null;

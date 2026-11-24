@@ -1100,7 +1100,11 @@ subject**, guessed from its name, named by the AI with its plan, or chosen by th
 an example part for each way a subject is taught; and **a timeline, a vessel for an
 experiment, a molecule and code** among what a slide can draw. Six real lessons in six
 subjects were written by hand and their slides run in the player; what they asked of a
-slide and did not get is drawn now. Evidence: `test_lesson_axioms.py`,
+slide and did not get is drawn now. And **the Expressive voice put together from
+parts** (ADR-062): who speaks, age, pitch, pace, tone, feeling, steadiness, accent
+and style, each chosen from a list, with voices to start from and the learner's own
+words kept as the most exact way (`voice/design.py`, `test_voice_design.py`, the
+journey in `e2e/voice`). Evidence for the rules: `test_lesson_axioms.py`,
 `test_slide_subjects.py`, `test_slide_real_lessons.py`, the renderer's
 `lesson-rules.test.ts`, the journey in `e2e/curriculum` that reads a course's rules and
 changes its subject, and 42 slide examples stepped through by `e2e/slide-player`.

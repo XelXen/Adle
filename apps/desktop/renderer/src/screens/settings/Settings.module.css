@@ -150,6 +150,18 @@
   max-width: 28rem;
 }
 
+/* The Expressive voice, put together from parts (ADR-062): its pickers in rows, as
+   many to a row as there is room for. */
+.voiceDesign {
+  max-width: 44rem;
+}
+
+.voiceParts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--ad-space-3);
+}
+
 /* A provider's name at the head of its card. */
 .providerName {
   margin: 0;

@@ -264,30 +264,8 @@ DEFAULT_DESIGN = (
     "A warm, clear, mid-pitched voice of a patient teacher, speaking natural American "
     "English at an easy pace."
 )
-#: Voices to start from, as the learner sees them, each a description the voice is made from.
-DESIGN_PRESETS: tuple[tuple[str, str], ...] = (
-    ("Warm teacher", DEFAULT_DESIGN),
-    (
-        "Calm and low",
-        "A calm, low, resonant voice, relaxed and reassuring, speaking slowly and clearly in "
-        "natural English.",
-    ),
-    (
-        "Bright and lively",
-        "A bright, youthful, energetic voice with a friendly smile in it, speaking clearly in "
-        "natural American English.",
-    ),
-    (
-        "British narrator",
-        "A clear, measured British English voice, mid-pitched and articulate, like a "
-        "documentary narrator.",
-    ),
-    (
-        "Gentle storyteller",
-        "A soft, gentle, expressive voice, unhurried, like someone reading a story to a "
-        "curious friend.",
-    ),
-)
+#: Voices to start from are choices of parts, and are kept with the parts
+#: (``voice/design.py``, ADR-062).
 #: The longest description of a voice a learner may write.
 MAX_DESIGN_CHARACTERS = 200
 #: What a voice is designed saying: long enough, and varied enough, for every line after

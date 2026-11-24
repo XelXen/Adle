@@ -8,9 +8,13 @@ import {
   downloadNote,
   speedNote,
   isRecommended,
+  presetOf,
   recordingNote,
+  sameParts,
   setupProgress,
   tierState,
+  voiceRequest,
+  withPart,
 } from './voice-model';
 
 function aTier(id: VoiceTier['id'], overrides: Partial<VoiceTier> = {}): VoiceTier {
@@ -58,6 +62,8 @@ function aStatus(overrides: Partial<VoiceStatus> = {}): VoiceStatus {
     borrowed: false,
     setting_up: null,
     design: 'A warm voice.',
+    design_parts: {},
+    design_choices: [],
     design_presets: [],
     recording: [],
     ...overrides,
@@ -174,5 +180,48 @@ describe('recordingNote', () => {
     expect(recordingNote([{ ...first, total: 0 }])).toBe(
       'Recording “Weights and bias” in this voice.',
     );
+  });
+});
+
+describe('a voice put together from parts (ADR-062)', () => {
+  const presets = [
+    { name: 'Adle’s own', text: 'A warm voice.', parts: {} },
+    { name: 'Calm narrator', text: 'A calm man.', parts: { speaker: 'man', feeling: 'calm' } },
+  ];
+
+  it('changes one part at a time, and leaves out a part chosen as nothing', () => {
+    expect(withPart({}, 'speaker', 'woman')).toEqual({ speaker: 'woman' });
+    expect(withPart({ speaker: 'woman', pace: 'slow' }, 'pace', 'fast')).toEqual({
+      speaker: 'woman',
+      pace: 'fast',
+    });
+    expect(withPart({ speaker: 'woman', pace: 'slow' }, 'speaker', '')).toEqual({ pace: 'slow' });
+    expect(withPart({ speaker: undefined, pace: '' }, 'tone', 'deep')).toEqual({ tone: 'deep' });
+  });
+
+  it('knows the same parts whatever order they were chosen in', () => {
+    expect(sameParts({ speaker: 'man', pace: 'slow' }, { pace: 'slow', speaker: 'man' })).toBe(
+      true,
+    );
+    expect(sameParts({ speaker: 'man' }, { speaker: 'man', pace: undefined })).toBe(true);
+    expect(sameParts({ speaker: 'man' }, { speaker: 'woman' })).toBe(false);
+    expect(sameParts({ speaker: 'man' }, {})).toBe(false);
+  });
+
+  it('is still the voice it started from only while its parts and its words both are', () => {
+    expect(presetOf(presets, {}, 'A warm voice.')).toBe('Adle’s own');
+    expect(presetOf(presets, { feeling: 'calm', speaker: 'man' }, ' A calm man. ')).toBe(
+      'Calm narrator',
+    );
+    // A part changed, or words of the learner's own.
+    expect(presetOf(presets, { feeling: 'calm' }, 'A calm speaker.')).toBe('');
+    expect(presetOf(presets, {}, 'A calm man.')).toBe('');
+  });
+
+  it('is saved and heard by its parts when it has any, or else in its words', () => {
+    expect(voiceRequest({ speaker: 'man', pace: undefined }, 'A man.')).toEqual({
+      parts: { speaker: 'man' },
+    });
+    expect(voiceRequest({}, '  A deep, slow voice. ')).toEqual({ design: 'A deep, slow voice.' });
   });
 });

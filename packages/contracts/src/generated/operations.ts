@@ -55,6 +55,8 @@ import type {
   SourceRefCreate,
   UnhelpfulReport,
   VoiceChoice,
+  VoiceDescription,
+  VoiceDescriptionRequest,
   VoiceSampleRequest,
   VoiceSetup,
   VoiceStatus,
@@ -254,6 +256,7 @@ export const OPERATIONS = {
   'sources.search': { method: 'GET', path: '/v1/courses/{course_id}/search', internal: false },
   'system.health': { method: 'GET', path: '/v1/health', internal: false },
   'voice.choose': { method: 'PUT', path: '/v1/voice', internal: false },
+  'voice.describe': { method: 'POST', path: '/v1/voice/design', internal: false },
   'voice.install': { method: 'POST', path: '/v1/voice/setup', internal: false },
   'voice.remove': { method: 'DELETE', path: '/v1/voice/{tier}', internal: false },
   'voice.sample': { method: 'POST', path: '/v1/voice/samples', internal: false },
@@ -665,6 +668,12 @@ export interface OperationTypes {
     query: undefined;
     body: VoiceChoice;
     result: VoiceStatus;
+  };
+  'voice.describe': {
+    path: undefined;
+    query: undefined;
+    body: VoiceDescriptionRequest;
+    result: VoiceDescription;
   };
   'voice.install': {
     path: undefined;

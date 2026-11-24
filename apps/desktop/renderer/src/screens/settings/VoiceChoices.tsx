@@ -1,5 +1,5 @@
 import { Download, Info, Play, Trash2 } from 'lucide-react';
-import { type ReactNode, useEffect, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 
 import type { Job, LearnerPreferences, VoiceStatus, VoiceTier } from '@adle/contracts';
 import {
@@ -30,8 +30,13 @@ import {
   speedNote,
   isRecommended,
   setupBytes,
+  presetOf,
+  sameParts,
   setupProgress,
   tierState,
+  type VoiceParts,
+  voiceRequest,
+  withPart,
 } from './voice-model';
 import { ComputerVoiceSettings } from './VoiceSettings';
 
@@ -42,6 +47,9 @@ interface Failure {
   tier: string;
   message: string;
 }
+
+/** The Expressive voice as it is saved: by its parts, or in the learner's own words. */
+type DesignChoice = { parts: Record<string, string> } | { design: string };
 
 /**
  * The voices that can read a lesson, from the lightest to the richest (ADR-042): the
@@ -205,11 +213,11 @@ export function VoiceChoices({
       'Couldn’t change the voice',
     );
 
-  const describe = (design: string): Promise<void> =>
+  const describe = (voice: DesignChoice): Promise<void> =>
     send(
       'design',
       async () => {
-        const next = await callCore('voice.choose', { body: { design } });
+        const next = await callCore('voice.choose', { body: voice });
         toast.show({ tone: 'success', title: 'Voice saved' });
         return next;
       },
@@ -239,7 +247,7 @@ export function VoiceChoices({
             onStop={(job) => void stop(job)}
             onRemove={() => setRemoving(tier)}
             onSpeaker={(speaker) => void chooseSpeaker(tier, speaker)}
-            onDesign={(design) => void describe(design)}
+            onDesign={(voice) => void describe(voice)}
             sampling={sample.making}
             onListen={(key, request) => void sample.listen(key, request)}
           />
@@ -352,7 +360,7 @@ function TierCard({
   onStop: (job: Job) => void;
   onRemove: () => void;
   onSpeaker: (speaker: string) => void;
-  onDesign: (design: string) => void;
+  onDesign: (voice: DesignChoice) => void;
   sampling: string | null;
   onListen: (key: string, request: SampleRequest) => void;
 }) {
@@ -536,8 +544,11 @@ function Speakers({
 }
 
 /**
- * Who reads the lessons in the Expressive voice, in the learner's words, with descriptions to
- * start from (ADR-057). Each lesson adds how it is delivered; this is the voice itself.
+ * Who reads the lessons in the Expressive voice (ADR-057, ADR-062): put together from parts
+ * (who speaks, how fast, the feeling of it, and so on), from a voice to start from, or
+ * written in the learner's own words, which is the most exact way. The description is the
+ * core's to write: choosing a part asks it what the parts make. Each lesson adds how it is
+ * delivered; this is the voice itself.
  */
 function Design({
   status,
@@ -549,52 +560,119 @@ function Design({
   status: VoiceStatus;
   saving: boolean;
   sampling: string | null;
-  onSave: (design: string) => void;
+  onSave: (voice: DesignChoice) => void;
   onListen: (key: string, request: SampleRequest) => void;
 }) {
-  const [draft, setDraft] = useState(status.design);
+  const toast = useToast();
+  const [parts, setParts] = useState<VoiceParts>(status.design_parts);
+  const [words, setWords] = useState(status.design);
+  // The latest thing asked of the core: an answer to an earlier one is not shown.
+  const asked = useRef(0);
   const presets = status.design_presets;
-  const preset = presets.find((item) => item.text === draft)?.name ?? '';
-  const changed = draft.trim() !== status.design;
+  const preset = presetOf(presets, parts, words);
+  const changed = words.trim() !== status.design || !sameParts(parts, status.design_parts);
   const key = 'expressive:design';
+
+  /** These parts, and the description the core writes from them. */
+  const choose = async (next: VoiceParts): Promise<void> => {
+    const turn = ++asked.current;
+    setParts(next);
+    try {
+      const described = await callCore('voice.describe', {
+        body: { parts: withPart(next, '', '') },
+      });
+      if (asked.current === turn) setWords(described.text);
+    } catch (error) {
+      if (asked.current !== turn) return;
+      setParts(parts);
+      toast.show({
+        tone: 'danger',
+        title: 'Couldn’t change the voice',
+        description: describeError(error),
+      });
+    }
+  };
+
   return (
-    <div className={styles.voiceField}>
-      <Stack gap={3}>
-        <Select
-          label="Start from"
-          value={preset}
-          options={[
-            ...(preset === '' ? [{ value: '', label: 'Your own words' }] : []),
-            ...presets.map((item) => ({ value: item.name, label: item.name })),
-          ]}
-          onValueChange={(name) => {
-            const chosen = presets.find((item) => item.name === name);
-            if (chosen) setDraft(chosen.text);
-          }}
-        />
+    <div className={styles.voiceDesign}>
+      <Stack gap={4}>
+        <Stack direction="row" gap={2} align="end" wrap>
+          <Select
+            className={styles.voiceField}
+            label="Start from"
+            value={preset}
+            options={[
+              ...(preset === ''
+                ? [
+                    {
+                      value: '',
+                      label: Object.keys(parts).length > 0 ? 'Your own choice' : 'Your own words',
+                    },
+                  ]
+                : []),
+              ...presets.map((item) => ({ value: item.name, label: item.name })),
+            ]}
+            onValueChange={(name) => {
+              const chosen = presets.find((item) => item.name === name);
+              if (!chosen) return;
+              asked.current += 1;
+              setParts(chosen.parts);
+              setWords(chosen.text);
+            }}
+          />
+          <InfoPopover label="About these choices" icon={<Info />} title="About these choices">
+            <p>
+              The voice is made from the description below. It follows most of it, an accent least
+              of all, so listen before you save.
+            </p>
+            <p>
+              What you leave as Any is the voice’s to decide, and can change when you change
+              something else.
+            </p>
+          </InfoPopover>
+        </Stack>
+        <div className={styles.voiceParts} role="group" aria-label="What the voice is made of">
+          {status.design_choices.map((part) => (
+            <Select
+              key={part.key}
+              label={part.name}
+              value={parts[part.key] ?? ''}
+              options={[
+                { value: '', label: 'Any' },
+                ...part.options.map((option) => ({ value: option.key, label: option.name })),
+              ]}
+              onValueChange={(choice) => void choose(withPart(parts, part.key, choice))}
+            />
+          ))}
+        </div>
         <TextArea
-          label="The voice"
+          label="In your own words"
           description="Who reads your lessons. Each lesson adds how it is delivered."
           rows={3}
           maxLength={200}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          value={words}
+          onChange={(event) => {
+            // Words of the learner's own: the parts are let go, and nothing overwrites them.
+            asked.current += 1;
+            setParts({});
+            setWords(event.target.value);
+          }}
         />
         <Stack direction="row" gap={3} align="center" wrap>
           <Button
             variant="tertiary"
             icon={<Play />}
             loading={sampling === key}
-            disabled={draft.trim() === '' || (sampling !== null && sampling !== key)}
-            onClick={() => onListen(key, { tier: 'expressive', design: draft.trim() })}
+            disabled={words.trim() === '' || (sampling !== null && sampling !== key)}
+            onClick={() => onListen(key, { tier: 'expressive', ...voiceRequest(parts, words) })}
             aria-label="Listen to this voice"
           >
             Listen
           </Button>
           <Button
-            disabled={!changed || draft.trim() === ''}
+            disabled={!changed || words.trim() === ''}
             loading={saving}
-            onClick={() => onSave(draft.trim())}
+            onClick={() => onSave(voiceRequest(parts, words))}
           >
             Save
           </Button>

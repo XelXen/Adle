@@ -15,6 +15,14 @@ const core = {
   sampled: [] as Record<string, unknown>[],
 };
 
+/** What the stand-in says a voice of some parts is: Adle's own for none of them. */
+function described(parts: Record<string, string>): string {
+  const chosen = Object.keys(parts)
+    .sort()
+    .map((name) => `${name} ${parts[name]}`);
+  return chosen.length > 0 ? `A voice of ${chosen.join(', ')}.` : 'A warm, clear voice.';
+}
+
 /** What was played, by where it was played from. */
 const played: string[] = [];
 
@@ -81,8 +89,17 @@ vi.mock('../../lib/core-client', () => ({
       }
       case 'voice.sample_clip':
         return Promise.resolve({ mime: 'audio/wav', data: 'UklGRg==' });
+      case 'voice.describe':
+        return Promise.resolve({ text: described(body.parts as Record<string, string>) });
       case 'voice.choose': {
-        if (typeof body.design === 'string') core.status.design = body.design;
+        if (typeof body.design === 'string') {
+          core.status.design = body.design;
+          core.status.design_parts = {};
+        }
+        if (typeof body.parts === 'object' && body.parts !== null) {
+          core.status.design_parts = { ...(body.parts as Record<string, string>) };
+          core.status.design = described(body.parts as Record<string, string>);
+        }
         if (typeof body.enabled === 'boolean') core.status.enabled = body.enabled;
         if (typeof body.tier === 'string') core.status.tier = body.tier as VoiceStatus['tier'];
         if (typeof body.speaker === 'string')
@@ -192,9 +209,32 @@ beforeEach(() => {
     borrowed: false,
     setting_up: null,
     design: 'A warm, clear voice.',
+    design_parts: {},
+    design_choices: [
+      {
+        key: 'speaker',
+        name: 'Speaker',
+        options: [
+          { key: 'woman', name: 'Woman' },
+          { key: 'man', name: 'Man' },
+        ],
+      },
+      {
+        key: 'pace',
+        name: 'Pace',
+        options: [
+          { key: 'slow', name: 'Slow' },
+          { key: 'fast', name: 'Fast' },
+        ],
+      },
+    ],
     design_presets: [
-      { name: 'Warm teacher', text: 'A warm, clear voice.' },
-      { name: 'Calm and low', text: 'A calm, low voice.' },
+      { name: 'Adle’s own', text: 'A warm, clear voice.', parts: {} },
+      {
+        name: 'Calm narrator',
+        text: 'A voice of pace slow, speaker man.',
+        parts: { speaker: 'man', pace: 'slow' },
+      },
     ],
     recording: [],
   };
@@ -365,27 +405,94 @@ describe('listening before choosing, and the voice in the learner’s words (ADR
     expect(within(card('Natural')).getByRole('button', { name: 'Listen to Heart' })).toBeEnabled();
   });
 
-  it('describes the Expressive voice in the learner’s words, from a preset or their own', async () => {
+  it('puts the Expressive voice together from parts, with the description the core writes', async () => {
     expressiveHere(true);
     show();
     await look();
     const expressive = card('Expressive');
-    const voice = within(expressive).getByRole('textbox', { name: 'The voice' });
-    expect(voice).toHaveValue('A warm, clear voice.');
+    const words = within(expressive).getByRole('textbox', { name: 'In your own words' });
+    const from = within(expressive).getByRole('combobox', { name: 'Start from' });
+    const parts = within(expressive).getByRole('group', { name: 'What the voice is made of' });
+    const speaker = within(parts).getByRole('combobox', { name: 'Speaker' });
+    const pace = within(parts).getByRole('combobox', { name: 'Pace' });
+    // Nothing chosen yet: Adle's own voice, every part left to it.
+    expect(from).toHaveValue('Adle’s own');
+    expect(words).toHaveValue('A warm, clear voice.');
+    expect(speaker).toHaveValue('');
+    expect(
+      within(speaker)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Any', 'Woman', 'Man']);
     const save = within(expressive).getByRole('button', { name: 'Save' });
     expect(save).toBeDisabled();
-    const presets = within(expressive).getByRole('combobox', { name: 'Start from' });
+
+    // A part chosen: the core says what the parts make, and it is no longer a preset.
     await act(async () => {
-      fireEvent.change(presets, { target: { value: 'Calm and low' } });
+      fireEvent.change(speaker, { target: { value: 'woman' } });
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(voice).toHaveValue('A calm, low voice.');
+    expect(core.asked).toContain('voice.describe');
+    expect(words).toHaveValue('A voice of speaker woman.');
+    expect(from).toHaveValue('');
+    expect(within(from).getByRole('option', { name: 'Your own choice' })).toBeInTheDocument();
     await act(async () => {
-      fireEvent.change(voice, { target: { value: 'A deep, slow voice.' } });
+      fireEvent.change(pace, { target: { value: 'fast' } });
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(presets).toHaveValue('');
-    // Heard before it is kept.
+    expect(words).toHaveValue('A voice of pace fast, speaker woman.');
+
+    // Heard before it is kept, and kept by its parts: the description is the core's to write.
+    await press('Listen to this voice');
+    expect(core.sampled).toEqual([
+      { tier: 'expressive', parts: { speaker: 'woman', pace: 'fast' } },
+    ]);
+    await act(async () => {
+      within(expressive).getByRole('button', { name: 'Save' }).click();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(core.status.design_parts).toEqual({ speaker: 'woman', pace: 'fast' });
+    expect(core.status.design).toBe('A voice of pace fast, speaker woman.');
+    expect(
+      screen.getAllByRole('status').some((item) => item.textContent?.includes('Voice saved')),
+    ).toBe(true);
+    expect(within(expressive).getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    // A voice to start from sets every part at once.
+    await act(async () => {
+      fireEvent.change(from, { target: { value: 'Calm narrator' } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(speaker).toHaveValue('man');
+    expect(pace).toHaveValue('slow');
+    expect(words).toHaveValue('A voice of pace slow, speaker man.');
+    // A part put back to "Any" is left to the voice.
+    await act(async () => {
+      fireEvent.change(pace, { target: { value: '' } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(words).toHaveValue('A voice of speaker man.');
+  });
+
+  it('takes the voice in the learner’s own words, which lets its parts go', async () => {
+    expressiveHere(true);
+    core.status.design_parts = { speaker: 'man', pace: 'slow' };
+    core.status.design = 'A voice of pace slow, speaker man.';
+    show();
+    await look();
+    const expressive = card('Expressive');
+    const words = within(expressive).getByRole('textbox', { name: 'In your own words' });
+    const from = within(expressive).getByRole('combobox', { name: 'Start from' });
+    const speaker = within(expressive).getByRole('combobox', { name: 'Speaker' });
+    expect(from).toHaveValue('Calm narrator');
+    expect(speaker).toHaveValue('man');
+    await act(async () => {
+      fireEvent.change(words, { target: { value: 'A deep, slow voice.' } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(speaker).toHaveValue('');
+    expect(from).toHaveValue('');
+    expect(within(from).getByRole('option', { name: 'Your own words' })).toBeInTheDocument();
     await press('Listen to this voice');
     expect(core.sampled).toEqual([{ tier: 'expressive', design: 'A deep, slow voice.' }]);
     await act(async () => {
@@ -393,9 +500,14 @@ describe('listening before choosing, and the voice in the learner’s words (ADR
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(core.status.design).toBe('A deep, slow voice.');
-    expect(
-      screen.getAllByRole('status').some((item) => item.textContent?.includes('Voice saved')),
-    ).toBe(true);
+    expect(core.status.design_parts).toEqual({});
+    // Nothing to say is nothing to save or to hear.
+    await act(async () => {
+      fireEvent.change(words, { target: { value: '   ' } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(within(expressive).getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(within(expressive).getByRole('button', { name: 'Listen to this voice' })).toBeDisabled();
   });
 
   it('says which lessons are being recorded in a voice just chosen, until they are', async () => {

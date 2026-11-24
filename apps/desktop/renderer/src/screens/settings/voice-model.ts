@@ -100,3 +100,46 @@ export function recordingNote(recording: VoiceStatus['recording']): string | nul
       : `, then ${rest.length} more ${rest.length === 1 ? 'lesson' : 'lessons'}`;
   return `Recording “${first.title}” in this voice${lines}${more}.`;
 }
+
+/** The parts a voice is put together from, by the part's key (ADR-062). */
+export type VoiceParts = Readonly<Record<string, string | undefined>>;
+
+/** A choice of parts with one of them changed; a part chosen as nothing is left out. */
+export function withPart(parts: VoiceParts, key: string, choice: string): Record<string, string> {
+  const next: Record<string, string> = {};
+  for (const [name, value] of Object.entries(parts)) {
+    if (name !== key && value) next[name] = value;
+  }
+  if (choice) next[key] = choice;
+  return next;
+}
+
+export function sameParts(one: VoiceParts, other: VoiceParts): boolean {
+  const names = Object.keys(one).filter((name) => one[name]);
+  const others = Object.keys(other).filter((name) => other[name]);
+  return names.length === others.length && names.every((name) => one[name] === other[name]);
+}
+
+/**
+ * The voice to start from that a draft still is: its parts and its words both. None once
+ * the learner has changed a part or written words of their own.
+ */
+export function presetOf(
+  presets: VoiceStatus['design_presets'],
+  parts: VoiceParts,
+  words: string,
+): string {
+  const found = presets.find(
+    (preset) => sameParts(preset.parts, parts) && preset.text === words.trim(),
+  );
+  return found?.name ?? '';
+}
+
+/** What a draft of the Expressive voice is saved or heard as: its parts, or else its words. */
+export function voiceRequest(
+  parts: VoiceParts,
+  words: string,
+): { parts: Record<string, string> } | { design: string } {
+  const chosen = withPart(parts, '', '');
+  return Object.keys(chosen).length > 0 ? { parts: chosen } : { design: words.trim() };
+}

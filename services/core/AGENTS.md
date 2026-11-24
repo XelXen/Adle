@@ -361,9 +361,18 @@ everything and decides nothing.
   part is stored: a picture that does not come changes what is shown, not what is said.
   **A voice the learner shapes** (ADR-057): two natural voices (`TIERS`); one no longer
   offered is in `RETIRED` and taken off a computer as the core starts (`_retire`). The
-  Expressive voice is the learner's description (`status().design`, presets in
-  `DESIGN_PRESETS`) plus the lesson's delivery (`Lesson.voice`), designed saying
-  `REFERENCE_TEXT`. A change of voice (`_identity`) records the lessons opened last at once
+  Expressive voice is the learner's description (`status().design`) plus the lesson's
+  delivery (`Lesson.voice`), designed saying `REFERENCE_TEXT`. **The description can be
+  put together from parts** (ADR-062, `voice/design.py`, pure): who speaks, age, pitch,
+  pace, tone, feeling, steadiness, accent, style, each a choice with a name for the
+  learner and a phrase for the voice; `compose` writes the one sentence they make (no
+  parts at all is `DEFAULT_DESIGN`), and nothing else writes it, because a recording is
+  named by its description. The parts are kept beside the description
+  (`design_parts`) and are only how it was made: `parts_of` lets them go once they no
+  longer make it (the learner wrote over it, or a version changed a phrase), and the
+  description goes on being read as it is. Voices to start from are choices of parts
+  (`PRESETS`). A new part or choice is an entry there; changing a phrase changes every
+  voice made with it, so add, do not reword. A change of voice (`_identity`) records the lessons opened last at once
   (`_record_recent`, `start(ahead=True)`); a recording follows the voice chosen line by line,
   and lessons recorded ahead step aside for what the learner opens or a sample
   (`_step_aside`). Samples are made in the voice lane and kept under `samples/<size>/`.

@@ -12,13 +12,13 @@ import base64
 from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, StrictBool, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
 
 from adle_core.api import schemas
 from adle_core.application.narration import KIND_NARRATION
 from adle_core.application.services import Services, get_services
+from adle_core.voice import design as voice_design
 from adle_core.voice.catalog import (
-    DESIGN_PRESETS,
     MAX_DESIGN_CHARACTERS,
     TIERS,
     Tier,
@@ -43,10 +43,47 @@ TierId = Literal["kokoro", "expressive"]
 Design = Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_DESIGN_CHARACTERS)]
 
 
+#: The parts of a voice a learner chose (ADR-062): a part's key, then the key of its
+#: choice. A part left out, or given as nothing, is left to the voice.
+DesignParts = Annotated[
+    dict[
+        Annotated[str, StringConstraints(max_length=20)],
+        Annotated[str, StringConstraints(max_length=20)],
+    ],
+    Field(max_length=12),
+]
+
+
 class VoiceDesignPreset(BaseModel):
-    """A description of a voice to start from."""
+    """A voice to start from: a choice of parts, and the description they make."""
 
     name: str
+    text: str
+    parts: dict[str, str]
+
+
+class VoiceDesignOption(BaseModel):
+    key: str
+    name: str
+
+
+class VoiceDesignPart(BaseModel):
+    """One thing about a voice a learner can choose: who speaks, how fast, and so on."""
+
+    key: str
+    name: str
+    options: list[VoiceDesignOption]
+
+
+class VoiceDescriptionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parts: DesignParts
+
+
+class VoiceDescription(BaseModel):
+    """The description a voice of some parts is made from."""
+
     text: str
 
 
@@ -108,7 +145,12 @@ class VoiceStatus(BaseModel):
     #: Who reads the lessons in the Expressive voice, as the learner described them, or
     #: Adle's own; each lesson adds how it is delivered (ADR-057).
     design: str
-    #: Descriptions to start from.
+    #: The parts that description was put together from (ADR-062): none for Adle's own
+    #: voice, and none for a description in the learner's own words.
+    design_parts: dict[str, str]
+    #: The parts a voice can be put together from, in the order they are shown.
+    design_choices: list[VoiceDesignPart]
+    #: Voices to start from.
     design_presets: list[VoiceDesignPreset]
     #: The lessons being recorded now: in a voice just chosen, those the learner opened last.
     recording: list[VoiceRecording]
@@ -127,16 +169,19 @@ class VoiceChoice(BaseModel):
     tier: TierId | None = None
     speaker: Annotated[str, StringConstraints(max_length=40)] | None = None
     design: Design | None = None
+    #: The Expressive voice by its parts: the core writes the description from them.
+    parts: DesignParts | None = None
 
 
 class VoiceSampleRequest(BaseModel):
     """A few words in a voice set up here: a speaker of a size, or the Expressive voice of a
-    description (the one chosen when none is given)."""
+    description or of parts (the one chosen when neither is given)."""
 
     model_config = ConfigDict(extra="forbid")
     tier: TierId
     speaker: Annotated[str, StringConstraints(max_length=40)] | None = None
     design: Design | None = None
+    parts: DesignParts | None = None
 
 
 class NarrationWord(BaseModel):
@@ -222,7 +267,25 @@ def _status(services: Services) -> VoiceStatus:
         borrowed=status.borrowed,
         setting_up=schemas.Job.model_validate(setup) if setup else None,
         design=status.design,
-        design_presets=[VoiceDesignPreset(name=name, text=text) for name, text in DESIGN_PRESETS],
+        design_parts=status.design_parts,
+        design_choices=[
+            VoiceDesignPart(
+                key=part.key,
+                name=part.name,
+                options=[
+                    VoiceDesignOption(key=option.key, name=option.name) for option in part.options
+                ],
+            )
+            for part in voice_design.PARTS
+        ],
+        design_presets=[
+            VoiceDesignPreset(
+                name=preset.name,
+                text=voice_design.compose(dict(preset.parts)),
+                parts=dict(preset.parts),
+            )
+            for preset in voice_design.PRESETS
+        ],
         recording=[
             VoiceRecording(
                 lesson_id=item.lesson_id, title=item.title, done=item.done, total=item.total
@@ -240,9 +303,20 @@ def voice_status(services: ServicesDep) -> VoiceStatus:
 @router.put("/voice", operation_id="voice.choose", response_model=VoiceStatus)
 def choose_voice(body: VoiceChoice, services: ServicesDep) -> VoiceStatus:
     services.narration.choose(
-        enabled=body.enabled, tier=body.tier, speaker=body.speaker, design=body.design
+        enabled=body.enabled,
+        tier=body.tier,
+        speaker=body.speaker,
+        design=body.design,
+        parts=body.parts,
     )
     return _status(services)
+
+
+@router.post("/voice/design", operation_id="voice.describe", response_model=VoiceDescription)
+def describe_voice(body: VoiceDescriptionRequest, services: ServicesDep) -> VoiceDescription:
+    """The description a voice of these parts is made from (ADR-062): written by the core,
+    so that the same parts are always the same voice. Nothing is changed."""
+    return VoiceDescription(text=services.narration.describe(body.parts))
 
 
 @router.post(
@@ -251,7 +325,9 @@ def choose_voice(body: VoiceChoice, services: ServicesDep) -> VoiceStatus:
 def sample_voice(body: VoiceSampleRequest, services: ServicesDep) -> schemas.Job:
     """A sample of a voice, made in the background, once (ADR-057): the job's result names it."""
     return schemas.Job.model_validate(
-        services.narration.sample(body.tier, speaker=body.speaker, design=body.design)
+        services.narration.sample(
+            body.tier, speaker=body.speaker, design=body.design, parts=body.parts
+        )
     )
 
 

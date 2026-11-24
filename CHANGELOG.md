@@ -19,6 +19,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **New pictures.** A lesson can draw a timeline; a beaker, test tube or flask in which
   something is seen to happen (a color, bubbles, a solid, heat); a molecule; and lines of
   code.
+- **An Expressive voice put together from parts.** In Settings, choose who speaks, their
+  age, pitch, pace, tone, feeling, delivery, accent and style, each from a list, and
+  listen before you save. Start from a ready-made voice and change what you like, or
+  write the voice in your own words, which is still the most exact way.
 
 ### Changed
 

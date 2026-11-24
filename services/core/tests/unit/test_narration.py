@@ -370,8 +370,130 @@ def test_the_expressive_voice_is_designed_from_what_the_lesson_says_of_its_narra
     assert client.put("/v1/voice", json={"design": "x" * 201}).status_code == 422
     assert client.put("/v1/voice", json={"design": "As on https://example.com"}).status_code == 422
     presets = client.get("/v1/voice").json()["design_presets"]
-    assert presets[0] == {"name": "Warm teacher", "text": DEFAULT_DESIGN}
+    assert presets[0] == {"name": "Adle’s own", "text": DEFAULT_DESIGN, "parts": {}}
     assert len(presets) >= 4
+
+
+def test_the_expressive_voice_is_put_together_from_parts_and_the_core_writes_it(
+    client: TestClient, voiced: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client.put("/v1/voice", json={"tier": "expressive"})
+    status = client.get("/v1/voice").json()
+    # Nothing chosen yet: Adle's own voice, made of no parts.
+    assert (status["design"], status["design_parts"]) == (DEFAULT_DESIGN, {})
+    offered = {
+        part["key"]: [option["key"] for option in part["options"]]
+        for part in status["design_choices"]
+    }
+    assert list(offered) == [
+        "speaker",
+        "age",
+        "pitch",
+        "pace",
+        "tone",
+        "feeling",
+        "steadiness",
+        "accent",
+        "style",
+    ]
+    assert offered["speaker"] == ["woman", "man"]
+    # Every voice to start from is a choice of parts that are offered, and what they make.
+    for preset in status["design_presets"]:
+        for part, choice in preset["parts"].items():
+            assert choice in offered[part], preset
+        said = client.post("/v1/voice/design", json={"parts": preset["parts"]}).json()
+        assert said == {"text": preset["text"]}
+
+    # Asking what parts make changes nothing.
+    parts = {"speaker": "man", "pace": "slow", "tone": "deep", "style": "documentary"}
+    described = client.post("/v1/voice/design", json={"parts": parts}).json()["text"]
+    assert described == (
+        "A man with a deep voice, speaking natural English at a slow pace, "
+        "like a documentary narrator."
+    )
+    assert client.get("/v1/voice").json()["design"] == DEFAULT_DESIGN
+
+    # Chosen by its parts: the description is the core's, and the parts are remembered.
+    chosen = client.put("/v1/voice", json={"parts": parts}).json()
+    assert (chosen["design"], chosen["design_parts"]) == (described, parts)
+    lesson = a_lesson(client)
+    asked: list[dict[str, Any]] = []
+    speak = VoiceEngine.speak
+
+    def heard(self: VoiceEngine, text: str, voice: dict[str, Any], *rest: Any, **named: Any) -> Any:
+        asked.append(dict(voice))
+        return speak(self, text, voice, *rest, **named)
+
+    monkeypatch.setattr(VoiceEngine, "speak", heard)
+    record(client, voiced, lesson["id"])
+    assert {entry["design"] for entry in asked} == {described}
+
+    # A part given as nothing is left to the voice, and the order given does not matter.
+    fewer = client.put(
+        "/v1/voice", json={"parts": {"style": "news", "speaker": "", "pace": "fast"}}
+    )
+    assert fewer.json()["design_parts"] == {"pace": "fast", "style": "news"}
+    # Written over in the learner's own words: its own words, and no parts.
+    own = client.put("/v1/voice", json={"design": "A deep, calm voice."}).json()
+    assert (own["design"], own["design_parts"]) == ("A deep, calm voice.", {})
+    # No parts at all is Adle's own voice again.
+    client.put("/v1/voice", json={"parts": parts})
+    back = client.put("/v1/voice", json={"parts": {}}).json()
+    assert (back["design"], back["design_parts"]) == (DEFAULT_DESIGN, {})
+
+    # A part or a choice that is not offered is refused, and nothing changes.
+    for wrong in (
+        {"speaker": "robot"},
+        {"species": "cat"},
+        {"speaker": "x" * 21},
+        {f"part{index}": "x" for index in range(13)},
+    ):
+        assert client.put("/v1/voice", json={"parts": wrong}).status_code == 422, wrong
+        assert client.post("/v1/voice/design", json={"parts": wrong}).status_code == 422, wrong
+    assert client.get("/v1/voice").json()["design"] == DEFAULT_DESIGN
+
+
+def test_a_voice_of_parts_can_be_heard_before_it_is_chosen(
+    client: TestClient, voiced: Services
+) -> None:
+    parts = {"speaker": "woman", "feeling": "lively"}
+    asked = client.post("/v1/voice/samples", json={"tier": "expressive", "parts": parts})
+    assert asked.status_code == 202, asked.text
+    made = voiced.jobs.wait(asked.json()["id"], timeout=60)
+    assert (made.kind, made.status) == ("voice_sample", "succeeded")
+    # The same voice written out is the same sample: a voice is its description.
+    described = client.post("/v1/voice/design", json={"parts": parts}).json()["text"]
+    again = client.post("/v1/voice/samples", json={"tier": "expressive", "design": described})
+    assert (
+        voiced.jobs.wait(again.json()["id"], timeout=60).result["sample"] == made.result["sample"]
+    )
+    # Hearing it chose nothing.
+    status = client.get("/v1/voice").json()
+    assert (status["design"], status["design_parts"]) == (DEFAULT_DESIGN, {})
+    refused = client.post(
+        "/v1/voice/samples", json={"tier": "expressive", "parts": {"speaker": "robot"}}
+    )
+    assert refused.status_code == 422
+
+
+def test_parts_kept_by_another_version_are_forgotten_and_the_voice_stays(
+    client: TestClient, voiced: Services, tmp_path: Path
+) -> None:
+    """A description is what a voice is; its parts are only how it was made. Parts this
+    version does not offer, or that no longer make the description kept with them, are
+    let go, and the description goes on being read as it is: nothing is recorded again."""
+    client.put("/v1/voice", json={"parts": {"speaker": "man"}})
+    preferences = tmp_path / "voice" / "preferences.json"
+    kept = json.loads(preferences.read_text("utf-8"))
+    described = kept["design"]
+    kept["design_parts"] = {"speaker": "robot"}
+    preferences.write_text(json.dumps(kept), "utf-8")
+    status = client.get("/v1/voice").json()
+    assert (status["design"], status["design_parts"]) == (described, {})
+    kept["design_parts"] = {"speaker": "woman"}
+    preferences.write_text(json.dumps(kept), "utf-8")
+    status = client.get("/v1/voice").json()
+    assert (status["design"], status["design_parts"]) == (described, {})
 
 
 def test_a_line_the_voice_cannot_say_fails_the_recording_and_is_said_plainly(
