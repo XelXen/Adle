@@ -2138,7 +2138,34 @@ _LIBRARY: dict[str, str] = {
             size = 1
         ux = dx / size * 1.8
         uy = dy / size * 1.8
-        return Line([middle[0] - ux, middle[1] - uy, 0], [middle[0] + ux, middle[1] + uy, 0], color=hue)
+        ends = self.clipped([middle[0] - ux, middle[1] - uy, 0], [middle[0] + ux, middle[1] + uy, 0], axes)
+        return Line(ends[0], ends[1], color=hue)
+
+    def clipped(self, p, q, m):
+        # The piece of the line from p to q over m's own area, so that a tangent never runs
+        # out among the axes' numbers (ADR-056); all of it if almost none is over it.
+        x0 = m.get_left()[0]
+        x1 = m.get_right()[0]
+        y0 = m.get_bottom()[1]
+        y1 = m.get_top()[1]
+        dx = q[0] - p[0]
+        dy = q[1] - p[1]
+        low = 0.0
+        high = 1.0
+        edges = [[-dx, p[0] - x0], [dx, x1 - p[0]], [-dy, p[1] - y0]]
+        for edge in edges + [[dy, y1 - p[1]]]:
+            if edge[0] == 0:
+                if edge[1] < 0:
+                    return [p, q]
+            else:
+                u = edge[1] / edge[0]
+                if edge[0] < 0:
+                    low = max(low, u)
+                else:
+                    high = min(high, u)
+        if high - low < 0.2:
+            return [p, q]
+        return [[p[0] + low * dx, p[1] + low * dy, 0], [p[0] + high * dx, p[1] + high * dy, 0]]
 
     def make_tangent(self, key, axes, index, point, a, b, hue):
         tracker = self.trackers[point]

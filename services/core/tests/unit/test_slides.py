@@ -678,6 +678,22 @@ def test_every_slide_tidies_its_labels_before_it_shows_them_and_checks_each_step
     assert source.count('self.audit()\n        self.post_message("step"') == slide.steps
 
 
+def test_a_line_through_a_word_counts_and_one_beside_it_does_not() -> None:
+    # The methods every slide carries look for lines through words as well (ADR-056):
+    # the lines that stay put are kept with the words that do, for a label to keep clear of,
+    # and a step ends saying how many words a line runs through.
+    assert "self.still_lines = lines" in LAYOUT_METHODS
+    assert (
+        "for line in self.still_lines:\n                if self.struck(m, line):" in LAYOUT_METHODS
+    )
+    assert '" under a line, "' in LAYOUT_METHODS
+    # Only the middle of a word: a line that grazes it, or runs beside it, does not count.
+    assert "+ 0.2 * w" in LAYOUT_METHODS
+    assert "+ 0.25 * h" in LAYOUT_METHODS
+    source = compile_slide(EXAMPLES["tangents_inline"]).source
+    assert "self.still_lines = []" in source
+
+
 def test_a_label_is_pinned_beside_what_it_names_unless_it_moves_with_it() -> None:
     source = compile_slide(EXAMPLES["tangent"]).source
     # The curve's name: pinned, so tidy may move it.

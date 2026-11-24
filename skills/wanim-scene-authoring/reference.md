@@ -168,13 +168,17 @@ Write ordinary manim Community v0.21 Python. Only the Wanim-specific parts are l
   and `e2e/fixtures/figures/` run in both themes by `e2e/slide-player.spec.ts` and
   `e2e/scene-player.spec.ts`, 2026-11-23: `isinstance(m, Text)`,
   `isinstance(m, SingleStringMathTex)` (true of a `MathTex`) and `isinstance(m, DecimalNumber)`
-  tell a word from a drawing; `m.submobjects` and `self.mobjects` (what is on the stage) can
+  tell a word from a drawing, and `isinstance(m, Line)` (an arrow and an axis's line among
+  them) and `isinstance(m, ParametricFunction)` (a plotted curve) a line; `get_anchors()`
+  gives a line's path, point by point, each indexed `[0]` and `[1]` (ADR-056); `m.submobjects` and `self.mobjects` (what is on the stage) can
   be walked; `a is b`; `for key in a_dict`, `key not in a_list` and `a_dict.get(key, default)`;
   `get_left()`, `get_right()`, `get_top()` and `get_bottom()` of a word or a group, by
   index; `next_to` called again moves a label to another side of a mobject or a point, also
   inside an `always_redraw` function, which may keep a choice in an attribute of the scene.
   A word's box is the box of what is drawn, so letters set side by side touch and do not
-  overlap.
+  overlap. A scene's own method may be replaced by setting an attribute of the same name
+  (`self.lines = []` made `self.lines(...)` fail with no message): give state names no
+  method has.
 
 ### Documented upstream, not yet exercised here
 

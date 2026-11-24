@@ -130,7 +130,8 @@ most, a file's name.
 - A change to messages between host and frame is a change to `packages/event-protocol`: update
   both validators, both sides, and the tests in one commit.
 - A slide or a figure Adle wrote says, as each step ends, whether any of its words lie over
-  others or anything lies past the edge of the screen (the scene event `layout`, ADR-055).
+  others or under a line, or anything lies past the edge of the screen (the scene event
+  `layout`, ADR-055, ADR-056).
   Nothing in the app acts on it; `slide-player.spec.ts` and the figures in
   `scene-player.spec.ts` fail on it.
 - A frame may send `MESSAGE_BUDGET_PER_SECOND` messages a second and no more; past that the
