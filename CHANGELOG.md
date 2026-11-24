@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.9] - 2026-11-24
+
+The ninth alpha, about your own notes. A PDF that is a scan or handwriting is kept instead
+of turned away, and **Read them** has the AI write its pages out as text, only when you press
+it. A page with a detailed drawing is no longer skipped.
+
 ### Added
 
 - **Scanned and handwritten notes can be read.** A PDF that is a scan, photographs of
