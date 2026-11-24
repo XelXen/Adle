@@ -1533,7 +1533,7 @@ class GenerationService:
             # once, so that the app runs them one after another, in order, without waiting
             # to be asked for each. (A lesson begun at its first part has had its figures
             # drawn already, each as its part came.)
-            offered = [self._offer_figure(figure) for figure in figures]
+            offered = self._offer_figures(figures)
             try:
                 for number, figure in enumerate(figures, start=1):
                     context.check_cancelled()
@@ -1718,15 +1718,36 @@ class GenerationService:
             return artifact, result
         return fallback
 
-    def _offer_figure(self, figure: FigureScene) -> tuple[SceneArtifact | None, str | None]:
-        """A figure as a scene the gate takes, and its trial in the app's player if the app
-        is there to run one: (None, None) for a figure the gate refuses."""
+    def _offer_figures(
+        self, figures: Sequence[FigureScene]
+    ) -> list[tuple[SceneArtifact | None, str | None]]:
+        """Each figure as a scene the gate takes, and their trials offered together: every
+        figure is looked at by the gate first, then all are offered in one step, so that the
+        app finds all of them in one look however long the gate took (ADR-045)."""
+        artifacts = [self._figure_artifact(figure) for figure in figures]
+        taken = [artifact for artifact in artifacts if artifact is not None]
+        if not taken or not self._trials.present():
+            return [(artifact, None) for artifact in artifacts]
+        trial_ids = iter(self._trials.offer_all(taken))
+        return [
+            (artifact, next(trial_ids) if artifact is not None else None) for artifact in artifacts
+        ]
+
+    def _figure_artifact(self, figure: FigureScene) -> SceneArtifact | None:
+        """A figure as a scene the gate takes; None for one it refuses."""
         try:
-            artifact = inspect_scene(figure.scene_id, figure.title, figure.source)
+            return inspect_scene(figure.scene_id, figure.title, figure.source)
         except (SceneRejectedError, ValidationError) as error:
             logger.info(
                 "generation.figure_unattached kind=%s error=%s", figure.kind, type(error).__name__
             )
+            return None
+
+    def _offer_figure(self, figure: FigureScene) -> tuple[SceneArtifact | None, str | None]:
+        """A figure as a scene the gate takes, and its trial in the app's player if the app
+        is there to run one: (None, None) for a figure the gate refuses."""
+        artifact = self._figure_artifact(figure)
+        if artifact is None:
             return None, None
         if not self._trials.present():
             return artifact, None

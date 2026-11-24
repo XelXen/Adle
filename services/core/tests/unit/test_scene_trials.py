@@ -319,6 +319,28 @@ def test_the_figures_of_a_lesson_taken_whole_are_offered_for_their_trials_all_at
     assert services.generation.trials.waiting() == []
 
 
+def test_the_figures_are_offered_together_however_long_the_gate_takes(
+    client: TestClient,
+    services: Services,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every figure is looked at by the gate before any is offered: a slow gate cannot split
+    them across the app's looks (seen on a slower machine than this one, 2026-11-23, once
+    each figure carried the methods that check its layout, ADR-055)."""
+    gate = generation_module.inspect_scene
+
+    def slow(*args: Any, **kwargs: Any) -> Any:
+        time.sleep(0.1)
+        return gate(*args, **kwargs)
+
+    monkeypatch.setattr(generation_module, "inspect_scene", slow)
+    provider.queue(with_figures(parts_first=True))
+    with App(services, [None, None, None]) as app:
+        write_a_lesson(client, services)
+    assert app.looks[0] == 3
+
+
 def test_a_figure_whose_trial_does_not_come_does_not_hold_up_the_rest_of_the_answer(
     client: TestClient,
     services: Services,

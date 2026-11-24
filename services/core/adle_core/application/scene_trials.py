@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, Protocol
 
 from adle_core.infrastructure.ids import new_id
 
@@ -79,6 +79,21 @@ class _Trial:
     verdict: TrialFailure | Literal["passed"] | None = None
 
 
+class TrialScene(Protocol):
+    """What a trial is made of: what the gate found in a scene (``SceneArtifact``)."""
+
+    @property
+    def scene_class(self) -> str: ...
+    @property
+    def source(self) -> str: ...
+    @property
+    def interactive(self) -> bool: ...
+    @property
+    def controls(self) -> Sequence[str]: ...
+    @property
+    def steps(self) -> int: ...
+
+
 class SceneTrials:
     """Trials offered by jobs and answered by the app. Thread-safe; nothing is stored."""
 
@@ -116,6 +131,27 @@ class SceneTrials:
                 OpenTrial(trial_id, scene_class, source, interactive, controls, steps)
             )
         return trial_id
+
+    def offer_all(self, scenes: Sequence[TrialScene]) -> list[str]:
+        """Several trials offered in one step, in order: the app sees all of them in its next
+        look or none, however long it took to make them ready (ADR-045)."""
+        offered = [
+            (
+                new_id("trial"),
+                scene.scene_class,
+                scene.source,
+                scene.interactive,
+                tuple(scene.controls),
+                scene.steps,
+            )
+            for scene in scenes
+        ]
+        with self._lock:
+            for trial_id, scene_class, source, interactive, controls, steps in offered:
+                self._trials[trial_id] = _Trial(
+                    OpenTrial(trial_id, scene_class, source, interactive, controls, steps)
+                )
+        return [trial_id for trial_id, *_ in offered]
 
     def withdraw(self, trial_id: str) -> None:
         """No longer wanted: the job that offered it has ended. Nothing if it is gone."""
