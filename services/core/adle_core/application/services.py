@@ -28,7 +28,7 @@ from adle_core.application.model_gateway import ModelGateway
 from adle_core.application.narration import NarrationService
 from adle_core.application.retrieval import FtsRetriever, Retriever
 from adle_core.application.sample_course import SampleCourseService
-from adle_core.application.sources import SourceService
+from adle_core.application.sources import PageDrawer, SourceService
 from adle_core.config import Settings
 from adle_core.generation.credentials import CredentialVault
 from adle_core.generation.provider import ChatClient
@@ -36,7 +36,7 @@ from adle_core.generation.quota import QuotaLimits
 from adle_core.infrastructure.asset_store import AssetStore
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.migrate import MigrationOutcome, migrate
-from adle_core.ingestion.extract import Extractor, extract_isolated
+from adle_core.ingestion.extract import Extractor, extract_isolated, render_isolated
 from adle_core.lessons.player import ItemMask
 from adle_core.voice.runtime import VoicePaths
 
@@ -101,6 +101,7 @@ def build_services(
     launch_token: LaunchToken,
     *,
     extract: Extractor = extract_isolated,
+    draw_page: PageDrawer = render_isolated,
     provider_transport: httpx.BaseTransport | None = None,
     quota_limits: QuotaLimits | None = None,
 ) -> Services:
@@ -170,7 +171,9 @@ def build_services(
         migration=migration,
         jobs=jobs,
         courses=courses,
-        sources=SourceService(database, source_files, jobs, extract=extract),
+        sources=SourceService(
+            database, source_files, jobs, extract=extract, gateway=gateway, draw_page=draw_page
+        ),
         retriever=retriever,
         curriculum=curriculum,
         learner=learner,

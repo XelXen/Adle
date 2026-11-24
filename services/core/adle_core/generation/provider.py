@@ -24,6 +24,7 @@ Rules that hold here:
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import json
 import logging
@@ -100,6 +101,9 @@ class ModelSpec:
     #: The same, for one kind of request only (``purpose``, value), where it was measured
     #: to help that kind and not the others. Takes the place of ``reasoning_effort``.
     reasoning_for: tuple[tuple[str, str], ...] = ()
+    #: The reference lists pictures as part of a message, and the real endpoint was seen
+    #: to read one: only such a model is sent a picture of a page (ADR-060).
+    images: bool = False
 
     def effort(self, purpose: str) -> str | None:
         """What is sent as ``reasoning_effort`` for this kind of request, if anything."""
@@ -132,7 +136,14 @@ NEMOTRON_ULTRA = ModelSpec(
     # the default.
     reasoning_for=(("lesson", "none"),),
 )
-NEMOTRON_SUPER = ModelSpec(id="nvidia/nemotron-3.5-super-vl-120b-a12b", name="Nemotron 3.5 Super")
+NEMOTRON_SUPER = ModelSpec(
+    id="nvidia/nemotron-3.5-super-vl-120b-a12b",
+    name="Nemotron 3.5 Super",
+    # Its reference takes a picture as a part of the message ("image_url", a data URL).
+    # On 2026-11-24 it read a typed page and a handwritten one word for word, the drawing
+    # described in a line, a PNG of 110 to 190 KB each, in 2 to 16 s (ADR-060).
+    images=True,
+)
 NVIDIA_MODELS = (
     NEMOTRON_ULTRA,
     NEMOTRON_SUPER,
@@ -175,6 +186,9 @@ NVIDIA_ORDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("curriculum", (_ULTRA, _SUPER, _KIMI, _MISTRAL)),
     ("lesson", (_ULTRA, _KIMI, _MISTRAL)),
     ("scene", (_KIMI, _ULTRA)),
+    # The one model whose reading of a picture was seen (ADR-060). Mistral Large 4's
+    # reference takes pictures too; it is not asked until it has been tried by hand.
+    ("read", (_SUPER,)),
 )
 
 #: Adle's own caution for a provider that publishes no daily limit for these models.
@@ -196,6 +210,8 @@ class TypicalSeconds:
     curriculum: int = 30
     ask: int = 15
     check: int = 8
+    #: One page read from its picture.
+    read: int = 10
 
     def of(self, purpose: str) -> int:
         found = getattr(self, purpose, None)
@@ -247,12 +263,23 @@ class ProviderConfig:
         return self.models[0].id
 
     def models_for(self, purpose: str) -> tuple[ModelSpec, ...]:
-        """The models to ask for a kind of request, in order: its own order, or all of them."""
+        """The models to ask for a kind of request, in order: its own order, or all of them.
+
+        Reading a picture asks only models that see pictures: none, at a provider without one.
+        """
+        found = self.models
         for listed, ids in self.orders:
             if listed == purpose:
                 by_id = {spec.id: spec for spec in self.models}
-                return tuple(by_id[model_id] for model_id in ids)
-        return self.models
+                found = tuple(by_id[model_id] for model_id in ids)
+                break
+        if purpose == "read":
+            return tuple(spec for spec in found if spec.images)
+        return found
+
+    def serves(self, purpose: str) -> bool:
+        """Whether this provider has a model for this kind of request at all."""
+        return bool(self.models_for(purpose))
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str]) -> ProviderConfig:
@@ -296,7 +323,7 @@ NVIDIA = ProviderConfig(
     # With each kind of request at the model that does it soonest (ADR-039), as measured
     # on 2026-11-21: a lesson's text in about two minutes, a picture in two to three, a
     # list of concepts in half a minute, an answer in ten seconds.
-    typical=TypicalSeconds(lesson=120, scene=150, curriculum=35, ask=10, check=10),
+    typical=TypicalSeconds(lesson=120, scene=150, curriculum=35, ask=10, check=10, read=8),
     # These models think before they answer, and the shared endpoints queue: a small
     # question took forty seconds to begin to be answered when this was written.
     read_timeout_seconds=180.0,
@@ -405,6 +432,20 @@ class ProviderKeyMissingError(ProviderError):
 
     def __init__(self) -> None:
         super().__init__("Add your AI provider key in Settings to use this.")
+
+
+class PicturesUnreadableError(ProviderError):
+    """No provider the learner chose has a model that reads pictures (ADR-060)."""
+
+    status_code = 409
+    code = "pictures_unreadable"
+
+    def __init__(self, names: tuple[str, ...] = ()) -> None:
+        who = " or ".join(names) if names else "Your AI provider"
+        super().__init__(
+            f"{who} can’t read pictures of pages. Add a key for NVIDIA NIM in Settings to "
+            "have them read."
+        )
 
 
 class ProviderKeyRejectedError(ProviderError):
@@ -565,6 +606,11 @@ _LOOK_UP_SECONDS = 0.2
 # -- one request -----------------------------------------------------------------
 
 
+#: What one picture of a page counts for, in tokens, before a provider has said: 2,285 for a
+#: page and its instruction, at 150 dots to the inch (2026-11-24, ADR-060).
+PICTURE_TOKENS = 2_400
+
+
 @dataclass(frozen=True, slots=True)
 class ChatRequest:
     #: What the request is for: recorded with the usage, never sent.
@@ -574,6 +620,9 @@ class ChatRequest:
     max_output_tokens: int
     #: Ask for a single JSON object.
     json_output: bool = False
+    #: Pictures sent with the user's words, each a PNG: a page to be read (ADR-060). Only
+    #: a model that sees pictures (``ModelSpec.images``) is sent any.
+    images: tuple[bytes, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -747,11 +796,29 @@ class ChatClient:
         api_key = self._vault.api_key(self.config.provider_id)
         if api_key is None:
             raise ProviderKeyMissingError
+        if request.images and not spec.images:
+            # The gateway asks only models that see pictures for one; this is a mistake.
+            raise ValueError("That model is not sent pictures.")
+        user: str | list[dict[str, Any]] = request.user
+        if request.images:
+            user = [
+                {"type": "text", "text": request.user},
+                *(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": "data:image/png;base64,"
+                            + base64.b64encode(picture).decode("ascii")
+                        },
+                    }
+                    for picture in request.images
+                ),
+            ]
         body: dict[str, Any] = {
             "model": spec.id,
             "messages": [
                 {"role": "system", "content": request.system},
-                {"role": "user", "content": request.user},
+                {"role": "user", "content": user},
             ],
             # No sampling parameters: every model is left at what its provider set. The
             # bound below also covers a model's thinking, hence the floor for those that think.

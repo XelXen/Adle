@@ -89,10 +89,12 @@ class ProviderChoice(BaseModel):
     #: By the learner's choice, a request could go here now.
     in_use: bool
     #: What it is asked first for when the learner lets Adle choose (ADR-039).
-    first_for: list[Literal["ask", "curriculum", "lesson", "scene", "check"]]
+    first_for: list[Literal["ask", "curriculum", "lesson", "scene", "check", "read"]]
     #: False when the limits Adle keeps to are its own caution and not the provider's.
     limits_published: bool
     usage: ProviderUsage
+    #: It has a model that reads pictures of pages (ADR-060).
+    reads_pictures: bool
 
 
 class ProviderRoute(BaseModel):
@@ -123,6 +125,10 @@ class ProviderRoutes(BaseModel):
     lesson: ProviderRoute
     #: A picture in a lesson (ADR-039).
     scene: ProviderRoute
+    #: A page of the learner's own that is a picture, read from it (ADR-060). With nobody
+    #: the learner chose able to read pictures, it names no provider and its sentence is
+    #: empty.
+    read: ProviderRoute
 
 
 class ProviderStatus(BaseModel):
@@ -158,6 +164,16 @@ def _usage(services: Services, config: ProviderConfig) -> ProviderUsage:
 
 
 def _route(services: Services, work: str, found: Plan) -> ProviderRoute:
+    if not found.provider_ids:
+        return ProviderRoute(
+            provider_ids=[],
+            names=[],
+            sentence="",
+            reason="",
+            model_name="",
+            wait_seconds=0,
+            wait_measured=False,
+        )
     wait = services.generation.expected_wait(work)
     first = next(
         item for item in services.gateway.providers if item.provider_id == found.provider_ids[0]
@@ -175,7 +191,7 @@ def _route(services: Services, work: str, found: Plan) -> ProviderRoute:
 
 def _status(services: Services) -> ProviderStatus:
     gateway = services.gateway
-    plans = {work: gateway.plan(work) for work in ("ask", "curriculum", "lesson", "scene")}
+    plans = {work: gateway.plan(work) for work in ("ask", "curriculum", "lesson", "scene", "read")}
     config = gateway.config
     selection = gateway.selection
     # A provider is in use if a request could go to it: it is in some plan, with a key.
@@ -200,6 +216,7 @@ def _status(services: Services) -> ProviderStatus:
                 first_for=sorted(item.first_for),
                 limits_published=item.limits_published,
                 usage=_usage(services, item),
+                reads_pictures=item.serves("read"),
             )
             for item in gateway.providers
         ],
@@ -208,6 +225,7 @@ def _status(services: Services) -> ProviderStatus:
             curriculum=_route(services, "curriculum", plans["curriculum"]),
             lesson=_route(services, "lesson", plans["lesson"]),
             scene=_route(services, "scene", plans["scene"]),
+            read=_route(services, "read", plans["read"]),
         ),
     )
 

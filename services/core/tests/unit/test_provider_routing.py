@@ -608,8 +608,11 @@ def test_the_interface_is_told_where_each_kind_of_request_would_go(client: TestC
     assert both["routes"]["lesson"]["wait_seconds"] > both["routes"]["ask"]["wait_seconds"]
     assert [(choice["in_use"], choice["first_for"]) for choice in both["providers"]] == [
         (True, ["scene"]),
-        (True, ["ask", "check", "curriculum", "lesson"]),
+        (True, ["ask", "check", "curriculum", "lesson", "read"]),
     ]
+    # Pages that are pictures go to NVIDIA alone: AIHubMix's model is not sent one (ADR-060).
+    assert both["routes"]["read"]["provider_ids"] == ["nvidia"]
+    assert [choice["reads_pictures"] for choice in both["providers"]] == [False, True]
     assert [choice["usage"]["provider_id"] for choice in both["providers"]] == [
         "aihubmix",
         "nvidia",

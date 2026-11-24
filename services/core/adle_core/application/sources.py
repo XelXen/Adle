@@ -7,35 +7,50 @@ says "comes from your notes" can be traced to the exact place.
 
 from __future__ import annotations
 
+import contextlib
 import re
+import threading
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from adle_core.application.courses import PROVISIONAL_TITLE, get_course_or_404, title_from_file
-from adle_core.application.jobs import JobContext, JobRunner, JobSnapshot
+from adle_core.application.jobs import JobCancelledError, JobContext, JobRunner, JobSnapshot
 from adle_core.errors import NotFoundError, ValidationFailedError
+from adle_core.generation.prompts import read_page_request
+from adle_core.generation.provider import RequestCancelledError
 from adle_core.infrastructure.asset_store import AssetStore, hash_file
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.ids import new_id
 from adle_core.infrastructure.orm import Source, SourceChunk, SourceSection
 from adle_core.ingestion.chunking import chunk_document
-from adle_core.ingestion.extract import Extractor, extract_isolated
+from adle_core.ingestion.extract import Extractor, extract_isolated, render_isolated
+from adle_core.ingestion.parsers import clean_text
 from adle_core.ingestion.types import (
     DEFAULT_LIMITS,
     ExtractedDocument,
+    ExtractedSection,
     IngestionError,
     Limits,
+    SectionKind,
+    picture_sentence,
     too_large,
 )
 
+if TYPE_CHECKING:
+    from adle_core.application.model_gateway import ModelGateway
+
 MAX_FILES_PER_IMPORT = 50
+#: The work of reading a file's pages that are pictures (ADR-060).
+KIND_READ_PICTURES = "read_pictures"
 MAX_SEARCH_RESULTS = 20
 _MAX_QUERY_TERMS = 12
 # Private-use characters cannot occur in stored text (clean_text removes them),
@@ -43,6 +58,17 @@ _MAX_QUERY_TERMS = 12
 _MARK_OPEN = chr(0xE000)
 _MARK_CLOSE = chr(0xE001)
 _WORD = re.compile(r"\w+", re.UNICODE)
+#: How far a page read from its picture is trusted (ADR-060): a model wrote it out, and a
+#: word can be misread, as "fuIcrum" was for "fulcrum" on 2026-11-24.
+READ_CONFIDENCE = 0.8
+#: The most of a page read from its picture that is kept. A dense page is about 4,000
+#: characters; a model that does not stop is not a page.
+MAX_READ_CHARACTERS = 20_000
+#: What a model writes for a page with nothing on it.
+_NO_TEXT = re.compile(r"^\[no text\]\W*$", re.IGNORECASE)
+
+#: Draws one page of a PDF as a PNG picture: the parser worker, or a stand-in in tests.
+PageDrawer = Callable[[Path, int], bytes]
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +85,8 @@ class SourceRecord:
     chunk_count: int
     page_count: int
     created_at: datetime
+    #: Pages that are pictures, not read yet (ADR-060).
+    picture_pages: list[int] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,6 +172,24 @@ def _split_highlights(marked: str) -> list[HighlightSegment]:
     return segments
 
 
+def _warnings(stored: Any, picture_pages: Any) -> list[str]:
+    """What the learner is told about a file: what was stored, and its pages still pictures."""
+    pages = list(picture_pages or [])
+    return [*list(stored), *([picture_sentence(pages)] if pages else [])]
+
+
+def _reading_result(source_id: str, read: list[int], writer: dict[str, str]) -> dict[str, Any]:
+    return {"source_id": source_id, "pages_read": list(read), "written_by": dict(writer)}
+
+
+def _waiting(said: Callable[[int, str], None], index: int, seconds: float) -> None:
+    said(index, f"Waiting about {max(1, round(seconds))} seconds to stay under the rate limit")
+
+
+def _busy(said: Callable[[int, str], None], index: int, provider: str) -> None:
+    said(index, f"Waiting for {provider} to finish another request")
+
+
 class SourceService:
     def __init__(
         self,
@@ -153,12 +199,18 @@ class SourceService:
         *,
         extract: Extractor = extract_isolated,
         limits: Limits = DEFAULT_LIMITS,
+        gateway: ModelGateway | None = None,
+        draw_page: PageDrawer = render_isolated,
     ) -> None:
         self._database = database
         self._files = files
         self._jobs = jobs
         self._extract = extract
         self._limits = limits
+        self._gateway = gateway
+        self._draw_page = draw_page
+        # Looking for a reading under way and starting one are one step.
+        self._starting = threading.Lock()
 
     # -- reading -----------------------------------------------------------
 
@@ -196,13 +248,14 @@ class SourceService:
                 display_name=source.display_name,
                 kind=source.kind,
                 status=source.status,
-                warnings=list(source.warnings),
+                warnings=_warnings(source.warnings, source.picture_pages),
                 size_bytes=source.size_bytes,
                 char_count=source.char_count,
                 section_count=section_count,
                 chunk_count=chunk_count,
                 page_count=page_count,
                 created_at=source.created_at,
+                picture_pages=list(source.picture_pages),
             )
             for source, section_count, page_count, chunk_count in session.execute(statement)
         ]
@@ -240,6 +293,12 @@ class SourceService:
             )
 
     def delete(self, source_id: str) -> None:
+        # Its pictures stop being read first: nothing more is sent for a file the learner
+        # is removing (ADR-060).
+        reading = self._jobs.find_active(KIND_READ_PICTURES, source_id)
+        if reading is not None:
+            with contextlib.suppress(NotFoundError):
+                self._jobs.cancel(reading.id)
         with self._database.session() as session:
             source = session.get(Source, source_id)
             if source is None:
@@ -342,7 +401,7 @@ class SourceService:
             file_name=name,
             outcome="imported",
             source_id=source_id,
-            warnings=list(document.warnings),
+            warnings=_warnings(document.warnings, document.picture_pages),
         )
 
     def add_authored_source(
@@ -382,8 +441,13 @@ class SourceService:
                     content_hash=content_hash,
                     stored_name=stored_name,
                     size_bytes=size_bytes,
-                    status="needs_attention" if document.warnings else "extracted",
+                    status=(
+                        "needs_attention"
+                        if document.warnings or document.picture_pages
+                        else "extracted"
+                    ),
                     warnings=list(document.warnings),
+                    picture_pages=list(document.picture_pages),
                     parser=document.parser,
                     parser_version=document.parser_version,
                     char_count=document.character_count,
@@ -420,6 +484,189 @@ class SourceService:
                         content_hash=chunk.content_hash,
                     )
                 )
+
+    # -- pictures of pages (ADR-060) ----------------------------------------
+
+    def start_reading(self, source_id: str) -> JobSnapshot:
+        """Read the pages of a file that are pictures, with a model that sees pictures.
+
+        At the learner's word, for this file alone (ADR-060). Each page is drawn from the
+        original in the parser worker, sent as a picture, and what the model writes out
+        becomes the page's text: in its place among the file's pages, and searchable and
+        quoted like any other as soon as it is stored. A page whose turn comes after the
+        file was removed, or after it was read, is left alone.
+        """
+        if self._gateway is None:
+            raise ValidationFailedError("Pictures of pages cannot be read here.")
+        with self._database.read() as session:
+            source = session.get(Source, source_id)
+            if source is None:
+                raise NotFoundError("That source no longer exists.")
+            pages = list(source.picture_pages)
+            course_id, name, stored_name = source.course_id, source.display_name, source.stored_name
+        if not pages:
+            raise ValidationFailedError("Every page of this file has been read already.")
+        original = self._files.path_for(stored_name) if stored_name else None
+        if original is None or not original.is_file():
+            raise ValidationFailedError(
+                "The file itself is no longer here, only its text. Import it again to read "
+                "its pictures."
+            )
+        # Refused before anything is drawn: nobody to ask, or no key to ask with.
+        self._gateway.ready_for("read")
+        gateway = self._gateway
+        with self._starting:
+            # Asked twice at once, one reading: the second is shown the first.
+            running = self._jobs.find_active(KIND_READ_PICTURES, source_id)
+            if running is not None:
+                return running
+            return self._jobs.submit(
+                KIND_READ_PICTURES,
+                self._reading(source_id, pages, original, name, gateway),
+                course_id=course_id,
+                subject_id=source_id,
+            )
+
+    def _reading(
+        self,
+        source_id: str,
+        pages: list[int],
+        original: Path,
+        name: str,
+        gateway: ModelGateway,
+    ) -> Callable[[JobContext], dict[str, Any]]:
+        """The work of reading a file's pictures, page by page."""
+
+        def work(context: JobContext) -> dict[str, Any]:
+            read: list[int] = []
+            writer: dict[str, str] = {}
+
+            def said(done: int, message: str) -> None:
+                context.report(done, len(pages), message)
+
+            for index, page in enumerate(pages):
+                context.check_cancelled(_reading_result(source_id, read, writer))
+                if not self._waiting_to_be_read(source_id, page):
+                    continue
+                said(index, f"Reading page {page}")
+                try:
+                    picture = self._draw_page(original, page)
+                except IngestionError:
+                    # This page cannot be drawn; the others can still be read.
+                    continue
+                try:
+                    result = gateway.complete(
+                        read_page_request(name, page, picture),
+                        cancelled=lambda: context.cancelled,
+                        on_wait=partial(_waiting, said, index),
+                        on_busy=partial(_busy, said, index),
+                    )
+                except RequestCancelledError as error:
+                    raise JobCancelledError(_reading_result(source_id, read, writer)) from error
+                self._store_read_page(source_id, page, result.text)
+                read.append(page)
+                writer = {"provider": result.provider_name, "model": result.model_name}
+            said(len(pages), "")
+            return _reading_result(source_id, read, writer)
+
+        return work
+
+    def _waiting_to_be_read(self, source_id: str, page: int) -> bool:
+        with self._database.read() as session:
+            source = session.get(Source, source_id)
+            return source is not None and page in source.picture_pages
+
+    def _store_read_page(self, source_id: str, page: int, written: str) -> None:
+        """A page read from its picture, kept as the page's text in its place in the file.
+
+        The file's sections and passages are numbered again so that the page comes where it
+        stands in the file; what was there keeps its rows, and every passage its id.
+        """
+        text = clean_text(written)[:MAX_READ_CHARACTERS]
+        if _NO_TEXT.match(text):
+            text = ""
+        section = ExtractedSection(
+            kind=SectionKind.PAGE, text=text, page_number=page, confidence=READ_CONFIDENCE
+        )
+        chunks = chunk_document((section,)) if text else []
+        with self._database.session() as session:
+            source = session.get(Source, source_id)
+            if source is None or page not in source.picture_pages:
+                return
+            source.picture_pages = [listed for listed in source.picture_pages if listed != page]
+            if not source.warnings and not source.picture_pages:
+                source.status = "extracted"
+            if not text:
+                return
+            source.char_count += len(text)
+            sections = list(
+                session.scalars(
+                    select(SourceSection)
+                    .where(SourceSection.source_id == source_id)
+                    .order_by(SourceSection.ordinal)
+                )
+            )
+            # Where the page goes: before the first section that begins after it.
+            place = next(
+                (
+                    position
+                    for position, existing in enumerate(sections)
+                    if existing.page_number is not None and existing.page_number > page
+                ),
+                len(sections),
+            )
+            stored = SourceSection(
+                id=new_id("sec"),
+                source_id=source_id,
+                ordinal=-1,
+                kind=section.kind.value,
+                title=None,
+                page_number=page,
+                level=None,
+                char_count=len(text),
+                confidence=READ_CONFIDENCE,
+            )
+            ordered = [*sections[:place], stored, *sections[place:]]
+            passages = list(
+                session.scalars(
+                    select(SourceChunk)
+                    .where(SourceChunk.source_id == source_id)
+                    .order_by(SourceChunk.ordinal)
+                )
+            )
+            # Numbered again in two steps: every number unique at every moment.
+            for offset, existing in enumerate(sections):
+                existing.ordinal = -(offset + 2)
+            for offset, passage in enumerate(passages):
+                passage.ordinal = -(offset + 2)
+            session.add(stored)
+            session.flush()
+            for ordinal, row in enumerate(ordered):
+                row.ordinal = ordinal
+            by_section: dict[str, list[SourceChunk]] = {}
+            for passage in passages:
+                by_section.setdefault(passage.section_id, []).append(passage)
+            ordinal = 0
+            for row in ordered:
+                if row is stored:
+                    for chunk in chunks:
+                        session.add(
+                            SourceChunk(
+                                source_id=source_id,
+                                section_id=stored.id,
+                                course_id=source.course_id,
+                                ordinal=ordinal,
+                                text=chunk.text,
+                                char_start=chunk.char_start,
+                                char_end=chunk.char_end,
+                                content_hash=chunk.content_hash,
+                            )
+                        )
+                        ordinal += 1
+                    continue
+                for passage in by_section.get(row.id, []):
+                    passage.ordinal = ordinal
+                    ordinal += 1
 
     # -- searching ---------------------------------------------------------
 

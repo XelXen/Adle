@@ -70,10 +70,28 @@ class ExtractedDocument:
     parser_version: str
     #: Learner-readable notes about anything that may have been lost.
     warnings: tuple[str, ...] = field(default_factory=tuple)
+    #: Pages that are pictures: no text to select (a scan, a photograph, handwriting), or a
+    #: drawing the reader could not take apart. A model that sees pictures can read them,
+    #: at the learner's word (ADR-060). 1-based, in order.
+    picture_pages: tuple[int, ...] = field(default_factory=tuple)
 
     @property
     def character_count(self) -> int:
         return sum(len(section.text) for section in self.sections)
+
+
+def picture_sentence(pages: tuple[int, ...] | list[int]) -> str:
+    """What the learner is told about the pages of a file that are pictures."""
+    if not pages:
+        return ""
+    if len(pages) == 1:
+        return f"Page {pages[0]} is a picture, with no text to select."
+    if len(pages) > 6:
+        return f"{len(pages)} pages are pictures, with no text to select."
+    listed = ", ".join(str(page) for page in pages[:-1])
+    return (
+        f"{len(pages)} pages are pictures, with no text to select (pages {listed} and {pages[-1]})."
+    )
 
 
 class IngestionError(AdleError):

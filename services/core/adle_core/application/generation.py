@@ -152,6 +152,8 @@ _REQUESTS_FOR = {
     "curriculum": ("curriculum",),
     "ask": ("ask",),
     "scene": ("scene",),
+    # One page of a learner's file, read from its picture (ADR-060).
+    "read": ("read",),
 }
 #: What a model is seen to be doing while its answer is on the way, in the learner's words.
 _STAGES = {"thinking": "thinking", "writing": "writing"}
@@ -981,7 +983,11 @@ class GenerationService:
         kind took on this computer, or what is usual for it before any have arrived.
         """
         purposes = _REQUESTS_FOR[work]
-        first = self._gateway.plan(purposes[0]).provider_ids[0]
+        planned = self._gateway.plan(purposes[0]).provider_ids
+        if not planned:
+            # Nobody it could go to (a picture, and no model that sees pictures).
+            return Wait(seconds=0, measured=False)
+        first = planned[0]
         found = [self._gateway.seconds_for(first, purpose) for purpose in purposes]
         seconds = sum(seconds for seconds, _ in found)
         if work == "lesson" and self._voice_wait is not None:

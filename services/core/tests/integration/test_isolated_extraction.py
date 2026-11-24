@@ -13,7 +13,12 @@ from pathlib import Path
 import httpx2 as httpx
 import pytest
 
-from adle_core.ingestion.extract import extract_isolated, interpreter_flags, worker_command
+from adle_core.ingestion.extract import (
+    extract_isolated,
+    interpreter_flags,
+    render_isolated,
+    worker_command,
+)
 from adle_core.ingestion.types import DEFAULT_LIMITS, DocumentKind, IngestionError
 
 DOCUMENTS = Path(__file__).resolve().parents[4] / "fixtures" / "sample-documents"
@@ -29,6 +34,19 @@ def test_a_document_is_parsed_in_a_child_process_and_returned_intact() -> None:
 
 
 @pytest.mark.slow
+def test_a_page_is_drawn_as_a_picture_in_a_child_process() -> None:
+    # A page to be read by a model that sees pictures (ADR-060): drawn by PDFium in the
+    # worker, from the learner's file, and handed back as a gray PNG of an A4 page at 150
+    # dots to the inch.
+    picture = render_isolated(DOCUMENTS / "scanned-notes.pdf", 2)
+    assert picture.startswith(bytes.fromhex("89504e470d0a1a0a"))
+    width, height = int.from_bytes(picture[16:20]), int.from_bytes(picture[20:24])
+    assert (width, height) == (1240, 1754) or abs(width - 1240) <= 4
+    with pytest.raises(IngestionError) as raised:
+        render_isolated(DOCUMENTS / "scanned-notes.pdf", 9)
+    assert raised.value.code == "malformed_document"
+
+
 def test_parser_errors_cross_the_process_boundary_with_their_code() -> None:
     with pytest.raises(IngestionError) as raised:
         extract_isolated(DOCUMENTS / "lecture-notes-encrypted.pdf", "locked.pdf")

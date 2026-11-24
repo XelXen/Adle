@@ -17,8 +17,8 @@ Installs JavaScript dependencies (`npm ci`), the pinned Electron binary, and the
 1. Pick the next item in `docs/engineering/PROJECT_STATE.md`.
 2. `npm run dev` to run the app while you work.
 3. Write the change **with its tests**.
-4. `npm run check` (fast gates). For anything a learner can see, or anything touching the main
-   process, the bridge, or the player, also `npm run e2e`, then open the app and try it.
+4. `node scripts/check.mjs --e2e`: the static checks, and the tests and journeys your change
+   can reach (ADR-059). For anything a learner can see, open the app and try it too.
 5. Update the docs the change affects.
 6. Commit.
 
@@ -63,7 +63,7 @@ To publish an alpha or a stable version:
 2. In `CHANGELOG.md`, give the version its own heading with the date, and under it a few
    lines that open the release: they become the top of the release's notes.
    `npm run release:notes` shows what will be published.
-3. `node scripts/check.mjs --e2e`, then commit exactly that, with the subject
+3. `node scripts/check.mjs --all --e2e`, then commit exactly that, with the subject
    `release: <version>` and nothing after it, and push it on its own: CI looks at the commit
    at the head of the push.
 4. CI checks everything for that commit, as for any push. If the subject names a version
@@ -117,7 +117,7 @@ row in `docs/engineering/DECISIONS.md`. Accepted ADRs are not edited; supersede 
 
 ## Before you ask for review
 
-- [ ] `npm run check` passes; `npm run e2e` passes if UI, main, bridge, or player changed.
+- [ ] `node scripts/check.mjs --e2e` passes (it runs what the change can reach).
 - [ ] New behaviour has tests; a fixed bug has a regression test.
 - [ ] Loading, empty, error, and disabled states exist where relevant.
 - [ ] Keyboard and screen-reader behaviour considered; axe still clean.

@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { expect, test } from './support/app';
 import { mountRawPlayer } from './support/player';
+import { themesFor } from './support/themes';
 import { desktopDir } from './support/app';
 
 /**
@@ -22,8 +23,8 @@ test('there are slides to run', () => {
   expect(Object.keys(plan).sort()).toEqual([...slides].sort());
 });
 
-for (const file of slides) {
-  for (const theme of ['dark', 'light'] as const) {
+for (const [index, file] of slides.entries()) {
+  for (const theme of themesFor(index)) {
     test(`${file} steps through every cue in the ${theme} theme`, async ({ adle }) => {
       test.setTimeout(120_000);
       const { steps, interactive } = plan[file]!;

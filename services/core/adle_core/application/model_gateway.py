@@ -36,11 +36,13 @@ from sqlalchemy import select
 
 from adle_core.errors import AdleError, NotFoundError
 from adle_core.generation.provider import (
+    PICTURE_TOKENS,
     ChatClient,
     ChatRequest,
     ChatResult,
     ModelSpec,
     NoModelAnsweredError,
+    PicturesUnreadableError,
     ProviderBadResponseError,
     ProviderConfig,
     ProviderError,
@@ -62,7 +64,7 @@ from adle_core.generation.quota import (
     summarise,
     tokens_for_characters,
 )
-from adle_core.generation.routing import AUTOMATIC, Plan, Standing, plan
+from adle_core.generation.routing import AUTOMATIC, PURPOSES, Plan, Standing, plan
 from adle_core.infrastructure.database import Database, utc_now
 from adle_core.infrastructure.orm import ModelUsage
 
@@ -285,6 +287,7 @@ class ModelGateway:
                     ),
                     spent=verdict.verdict is Verdict.EXHAUSTED,
                     resting=until is not None and until > now,
+                    serves=frozenset(purpose for purpose in PURPOSES if config.serves(purpose)),
                 )
             )
         return found
@@ -358,10 +361,12 @@ class ModelGateway:
             route = Plan((provider_id,), (name,), automatic=False)
         else:
             route = self.plan(request.purpose)
-        clients = [self._clients[name] for name in route.provider_ids]
-        if not any(client.has_key for client in clients):
-            raise ProviderKeyMissingError
-        prompt_tokens = estimate_tokens(request.system) + estimate_tokens(request.user)
+        clients = self._askable(route)
+        prompt_tokens = (
+            estimate_tokens(request.system)
+            + estimate_tokens(request.user)
+            + PICTURE_TOKENS * len(request.images)
+        )
         for position, client in enumerate(clients):
             config = client.config
             key_at_start = self._key_changes[config.provider_id]
@@ -406,7 +411,31 @@ class ModelGateway:
             )
         raise AssertionError("a plan always has a provider to ask")  # pragma: no cover
 
+    def ready_for(self, purpose: str) -> None:
+        """Raise what a request of this kind would be refused with now, before it is made:
+        nobody the learner chose can be asked it at all, or nobody has a key. For work that
+        prepares something first, such as drawing a page to be read (ADR-060)."""
+        self._askable(self.plan(purpose))
+
     # -- internals ---------------------------------------------------------
+
+    def _askable(self, route: Plan) -> list[ChatClient]:
+        """The clients of a plan, or what refuses it: nobody to ask, or no key to ask with."""
+        if not route.provider_ids:
+            # Nobody the learner chose can be asked this at all: a picture, to a provider
+            # with no model that sees pictures.
+            raise PicturesUnreadableError(
+                tuple(
+                    client.config.display_name
+                    for client in self._clients.values()
+                    if self._vault.selection in (client.config.provider_id, AUTOMATIC)
+                    and client.has_key
+                )
+            )
+        clients = [self._clients[name] for name in route.provider_ids]
+        if not any(client.has_key for client in clients):
+            raise ProviderKeyMissingError
+        return clients
 
     def _take_turn(
         self,

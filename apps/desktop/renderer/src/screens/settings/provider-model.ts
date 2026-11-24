@@ -136,11 +136,26 @@ const WORK_LABELS: Record<Work, string> = {
   curriculum: 'Suggested concepts',
   lesson: 'Lessons',
   scene: 'Pictures',
+  read: 'Pages that are pictures',
 };
 
-/** Where each kind of request would go at this moment, as the core says. */
-export function routeLines(status: Pick<ProviderStatus, 'routes'>): RouteLine[] {
-  return (['ask', 'curriculum', 'lesson', 'scene'] as const).map((work) => ({
+/**
+ * Where each kind of request would go at this moment, as the core says. Pages that are
+ * pictures are listed only where a provider that reads pictures has a key to (ADR-060):
+ * otherwise the core names one only to say whose key is missing.
+ */
+export function routeLines(
+  status: Pick<ProviderStatus, 'routes'> & {
+    providers: Pick<ProviderChoice, 'provider_id' | 'key_configured'>[];
+  },
+): RouteLine[] {
+  const keyed = new Set(
+    status.providers.filter((each) => each.key_configured).map((each) => each.provider_id),
+  );
+  const works = (['ask', 'curriculum', 'lesson', 'scene', 'read'] as const).filter(
+    (work) => work !== 'read' || status.routes.read.provider_ids.some((id) => keyed.has(id)),
+  );
+  return works.map((work) => ({
     work,
     label: WORK_LABELS[work],
     destination: status.routes[work].sentence,

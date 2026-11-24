@@ -244,6 +244,11 @@ export const OPERATIONS = {
     internal: true,
   },
   'sources.list': { method: 'GET', path: '/v1/courses/{course_id}/sources', internal: false },
+  'sources.read_pictures': {
+    method: 'POST',
+    path: '/v1/sources/{source_id}/read-pictures',
+    internal: false,
+  },
   'sources.search': { method: 'GET', path: '/v1/courses/{course_id}/search', internal: false },
   'system.health': { method: 'GET', path: '/v1/health', internal: false },
   'voice.choose': { method: 'PUT', path: '/v1/voice', internal: false },
@@ -628,6 +633,12 @@ export interface OperationTypes {
     query: undefined;
     body: undefined;
     result: SourceList;
+  };
+  'sources.read_pictures': {
+    path: { source_id: string };
+    query: undefined;
+    body: undefined;
+    result: Job;
   };
   'sources.search': {
     path: { course_id: string };

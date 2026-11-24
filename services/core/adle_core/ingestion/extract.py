@@ -16,6 +16,7 @@ hostile file cannot run code in the service by crafting its answer.
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import subprocess
@@ -26,7 +27,12 @@ from pathlib import Path
 from adle_core.ingestion.detect import detect_kind
 from adle_core.ingestion.parsers import parse_document
 from adle_core.ingestion.types import DEFAULT_LIMITS, ExtractedDocument, IngestionError, Limits
-from adle_core.ingestion.worker import CRASH_MESSAGE, document_from_json, request_for
+from adle_core.ingestion.worker import (
+    CRASH_MESSAGE,
+    document_from_json,
+    render_request_for,
+    request_for,
+)
 
 #: The signature of an extraction function. Tests can substitute an in-process one.
 Extractor = Callable[[Path, str, Limits], ExtractedDocument]
@@ -101,6 +107,50 @@ def extract_isolated(
             raise TypeError("malformed error")
     except IngestionError:
         raise
+    except (ValueError, TypeError, KeyError, AttributeError) as error:
+        raise IngestionError("malformed_document", CRASH_MESSAGE) from error
+    raise _refusal(code, message)
+
+
+#: The longest one page may take to draw.
+_RENDER_TIMEOUT_SECONDS = 60.0
+#: The most a picture of a page may weigh: far above any page at 150 dots to the inch.
+_MAX_PICTURE_BYTES = 16 * 1024 * 1024
+_PNG_SIGNATURE = bytes.fromhex("89504e470d0a1a0a")
+
+
+def render_isolated(path: Path, page: int) -> bytes:
+    """One page of a PDF drawn as a gray PNG, in a killable child process (ADR-060).
+
+    The child reads the learner's file with PDFium; what it hands back is checked to be a
+    PNG of a sensible size before anything else sees it.
+    """
+    request = json.dumps(render_request_for(path, page)).encode("utf-8")
+    process = subprocess.Popen(  # noqa: S603 - fixed command; the path travels as data on stdin
+        worker_command(),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    try:
+        reply, _ = process.communicate(request, timeout=_RENDER_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as error:
+        process.kill()
+        process.communicate()
+        raise IngestionError("parse_timeout", "Drawing that page took too long.") from error
+    if process.returncode != 0 or not reply or len(reply) > _MAX_REPLY_BYTES:
+        raise IngestionError("malformed_document", CRASH_MESSAGE)
+    try:
+        response = json.loads(reply)
+        if response.get("ok") is True:
+            picture = base64.b64decode(response["png"], validate=True)
+            if not picture.startswith(_PNG_SIGNATURE) or len(picture) > _MAX_PICTURE_BYTES:
+                raise ValueError("not a picture")
+            return picture
+        code, message = response["code"], response["message"]
+        if not isinstance(code, str) or not isinstance(message, str):
+            raise TypeError("malformed error")
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         raise IngestionError("malformed_document", CRASH_MESSAGE) from error
     raise _refusal(code, message)

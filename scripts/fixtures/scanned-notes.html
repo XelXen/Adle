@@ -1,0 +1,123 @@
+<!doctype html>
+<!--
+  The pages of scanned-notes.pdf, before they are photographed (scripts/fixtures/print-scans.cjs).
+  Every word here was written for Adle's tests. Page 1 is typed notes, page 2 handwritten notes
+  with a drawing; both become pictures with no text layer. Page 3 stays text.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Levers</title>
+    <style>
+      body {
+        margin: 0;
+        background: #fff;
+      }
+      .sheet {
+        box-sizing: border-box;
+        width: 794px;
+        height: 1123px;
+        padding: 72px 80px;
+        background: #fbfaf6;
+        color: #1d1d1d;
+        overflow: hidden;
+        position: relative;
+      }
+      .typed {
+        font:
+          17px/1.55 'Courier New',
+          monospace;
+      }
+      .typed h1 {
+        font-size: 24px;
+        margin: 0 0 18px;
+      }
+      .typed p {
+        margin: 0 0 14px;
+      }
+      .hand {
+        font:
+          27px/44px 'Ink Free',
+          'Segoe Print',
+          cursive;
+        color: #1f3a8a;
+        background-color: #fdfdf8;
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent 43px,
+          #b9c7e6 43px,
+          #b9c7e6 44px
+        );
+        background-position: 0 70px;
+        transform: rotate(-0.8deg);
+      }
+      .hand h1 {
+        font-size: 36px;
+        margin: 0 0 6px;
+        text-decoration: underline;
+      }
+      .hand p {
+        margin: 0;
+      }
+      .hand svg {
+        margin: 6px 0 0 40px;
+      }
+      .text {
+        font:
+          16px/1.5 Georgia,
+          serif;
+      }
+      .text h1 {
+        font-size: 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="sheet typed" id="typed">
+      <h1>Week 3: Simple machines</h1>
+      <p>
+        A lever is a rigid bar that turns about a fixed point, the fulcrum. A small effort far from
+        the fulcrum can move a large load close to it.
+      </p>
+      <p>
+        Mechanical advantage is the load divided by the effort. A lever with a mechanical advantage
+        of 4 lifts a 200 N load with an effort of 50 N.
+      </p>
+      <p>
+        Nothing is free: the effort moves four times as far as the load does. The work put in is the
+        work taken out, less what friction takes.
+      </p>
+      <p>
+        Exercise: a crowbar 1.5 m long rests on a stone 0.3 m from its tip. What effort at the far
+        end lifts a 600 N rock at the tip?
+      </p>
+    </section>
+    <section class="sheet hand" id="hand">
+      <h1>Levers - my notes</h1>
+      <p>1st class: fulcrum in the middle (see-saw)</p>
+      <p>2nd class: load in the middle (wheelbarrow)</p>
+      <p>3rd class: effort in the middle (tweezers)</p>
+      <p>MA = load / effort</p>
+      <p>if MA &gt; 1 the lever helps you</p>
+      <svg width="420" height="150" viewBox="0 0 420 150" aria-hidden="true">
+        <line x1="20" y1="90" x2="400" y2="70" stroke="#1f3a8a" stroke-width="4" />
+        <polygon points="210,82 180,140 240,140" fill="none" stroke="#1f3a8a" stroke-width="4" />
+        <rect x="30" y="40" width="50" height="44" fill="none" stroke="#1f3a8a" stroke-width="4" />
+        <line x1="380" y1="10" x2="380" y2="62" stroke="#1f3a8a" stroke-width="4" />
+        <polyline points="368,48 380,64 392,48" fill="none" stroke="#1f3a8a" stroke-width="4" />
+      </svg>
+      <p>
+        load &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fulcrum &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        effort
+      </p>
+    </section>
+    <section class="sheet text" id="text">
+      <h1>Week 3: what to bring</h1>
+      <p>
+        Bring a ruler, a pencil and the worksheet on levers. We will balance a ruler on a pencil and
+        find where a small coin balances a larger one.
+      </p>
+    </section>
+  </body>
+</html>

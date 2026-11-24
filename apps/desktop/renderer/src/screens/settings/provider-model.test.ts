@@ -163,7 +163,10 @@ describe('routeLines', () => {
         curriculum: route('AIHubMix'),
         lesson: route('NVIDIA NIM', 'This is long work.', 'Nemotron 3 Ultra'),
         scene: route('AIHubMix', 'Its model is made for code.', 'Coding Kimi K3 (free)'),
+        // Nobody chosen reads pictures (ADR-060): the line is left out.
+        read: route(''),
       },
+      providers: [],
     });
     expect(lines.map((line) => line.work)).toEqual(['ask', 'curriculum', 'lesson', 'scene']);
     expect(lines[3]).toMatchObject({ label: 'Pictures', model: 'Coding Kimi K3 (free)' });
@@ -176,6 +179,42 @@ describe('routeLines', () => {
       label: 'Lessons',
       reason: 'This is long work.',
     });
+  });
+
+  it('lists pages that are pictures where a provider chosen reads them', () => {
+    const lines = routeLines({
+      routes: {
+        ask: route('NVIDIA NIM'),
+        curriculum: route('NVIDIA NIM'),
+        lesson: route('NVIDIA NIM'),
+        scene: route('NVIDIA NIM'),
+        read: { ...route('NVIDIA NIM', '', 'Nemotron 3.5 Super'), provider_ids: ['nvidia'] },
+      },
+      providers: [{ provider_id: 'nvidia', key_configured: true }],
+    });
+    expect(lines.at(-1)).toMatchObject({
+      work: 'read',
+      label: 'Pages that are pictures',
+      destination: 'NVIDIA NIM',
+      model: 'Nemotron 3.5 Super',
+    });
+  });
+
+  it('leaves pages that are pictures out while the provider that reads them has no key', () => {
+    const lines = routeLines({
+      routes: {
+        ask: route('AIHubMix'),
+        curriculum: route('AIHubMix'),
+        lesson: route('AIHubMix'),
+        scene: route('AIHubMix'),
+        read: { ...route('NVIDIA NIM'), provider_ids: ['nvidia'] },
+      },
+      providers: [
+        { provider_id: 'aihubmix', key_configured: true },
+        { provider_id: 'nvidia', key_configured: false },
+      ],
+    });
+    expect(lines.map((line) => line.work)).not.toContain('read');
   });
 });
 

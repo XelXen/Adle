@@ -111,6 +111,16 @@ everything and decides nothing.
   (parsing, a model request) happens inside a `session()`.
 - **Untrusted input:** imported documents and model output are data. Validate model output with
   Pydantic and reject unknown fields; scene source must pass `scene_policy.check_scene_source`.
+- **A page with no text to select is kept as a picture** (ADR-060): `picture_pages` on
+  the document and the source, said to the learner by `picture_sentence`; a PDF of nothing
+  but pictures is imported. It is read only at the learner's word (`sources.read_pictures`,
+  `SourceService.start_reading`): drawn by PDFium in the parser worker (`ingestion/render.py`,
+  `render_isolated`), sent one page a request (`prompts.read_page_request`, purpose `read`)
+  only to a model whose `ModelSpec.images` is set, after it was seen to read a picture by
+  hand. A provider without one does not serve `read` (`ProviderConfig.serves`,
+  `routing.Standing.serves`): chosen alone, nothing is sent (`PicturesUnreadableError`).
+  What comes back is stored as the page in its place (`_store_read_page`, numbered again,
+  confidence 0.8); removing the file stops the reading.
 - **A PDF is cut into sections by its outline, else by its numbered headings, else by its
   pages** (ADR-046, `ingestion/parsers.py`). A course plan for materials without headings
   is asked with how each page begins (`CurriculumService.page_openings`). A change to how a

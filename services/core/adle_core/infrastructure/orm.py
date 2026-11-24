@@ -120,8 +120,13 @@ class Source(Base):
     stored_name: Mapped[str | None] = mapped_column(String(80))
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
-    #: Learner-readable extraction warnings, e.g. pages with no selectable text.
+    #: Learner-readable extraction warnings, e.g. text that may be garbled.
     warnings: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    #: Pages that are pictures, not read yet (ADR-060): 1-based, in order. A page leaves
+    #: the list once it has been read.
+    picture_pages: Mapped[list[int]] = mapped_column(
+        JSON, nullable=False, default=list, server_default="[]"
+    )
     parser: Mapped[str] = mapped_column(String(40), nullable=False)
     parser_version: Mapped[str] = mapped_column(String(40), nullable=False)
     char_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

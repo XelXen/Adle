@@ -339,6 +339,27 @@ the 40 to 49 s measured before; how much later in a lesson, with the voice warme
 is written, is not measured yet, and Adle's guess until a computer has timed it is 65 s.
 How the voice sounds was not judged: that is the owner's to say.
 
+## A page read from its picture (2026-11-24)
+
+A page with no text to select is drawn on this computer and read by a model that sees
+pictures, at the learner's word (ADR-060). By hand, the two picture pages of
+`fixtures/sample-documents/scanned-notes.pdf` (typed notes photographed; handwriting with a
+drawing), each drawn gray at 150 dots to the inch and sent to NVIDIA's Nemotron 3.5 Super:
+
+| | Picture | Took | Tokens in / out | Read |
+|---|---|---|---|---|
+| Drawing one page in the parser worker, its start included | 190 KB | 0.45 s | | |
+| Typed page, the first request | 110 KB | 15.6 s | 2,285 / 160 | word for word |
+| Handwritten page with a drawing | 183 KB | 2.3 s | 2,285 / 119 | word for word, the drawing in a line; "fulcrum" once as "fuIcrum" |
+
+A page is one request: a notebook of 21 pages is 21 of NVIDIA's 200 a day for Adle, and
+at 4 a minute takes about five minutes. AIHubMix's free model was not tried: the account
+answered that it can make ten requests until it is paid for.
+
+A detailed drawing on a PDF page goes past pypdf's budget of work (2,000,000 tokens):
+the page of a textbook chapter with a molecule drawn atom by atom was read on a second try
+with 10,000,000 in 13 s, and the chapter's 21 pages in 24 s.
+
 ## What was not measured
 
 - **Generating with AIHubMix's model.** That provider has not answered a request yet (see

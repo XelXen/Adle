@@ -88,7 +88,7 @@ jobs:
       - name: Install Python dependencies
         run: npm run core:sync
       - name: Contracts, format, lint, types, unit tests
-        run: node scripts/check.mjs
+        run: node scripts/check.mjs --all
       - name: Dependency audit (npm)
         run: npm audit --audit-level=high
       - name: Dependency audit (Python, everything in uv.lock)

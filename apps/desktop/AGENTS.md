@@ -340,6 +340,11 @@ most, a file's name.
   `lib/generation.ts` and the destination the core plans (`destination(status, work)`),
   never a hard-coded name. Do not write the sentence beside the button again, and do not
   add a control that sends without the note. A journey reads it with `openWhatIsSent`.
+- **A file's pages that are pictures are read at the learner's word** (ADR-060):
+  `ReadPictures` in each row of Materials, with `WhatIsSent` beside "Read them" and where
+  it goes from `routes.read`. When nobody chosen can read pictures, or has no key, there is
+  nothing to press and `noReader` says what would let them be read. A reading under way
+  is followed when the tab is opened again (`jobs.list_active`, kind `read_pictures`).
 - **A course from files is made with its files** (ADR-053): `NewCourseDialog` creates the
   course, then `importWithPicker`; nothing chosen, and the course is removed again. Its
   "Set it up for me" asks for the suggestions with `setup`; `readSetUp` reads what that

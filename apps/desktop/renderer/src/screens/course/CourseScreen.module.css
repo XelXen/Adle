@@ -124,6 +124,15 @@
   color: var(--ad-color-sun-text);
 }
 
+/* Pages that are pictures, read at the learner's word (ADR-060). */
+.pictureReading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  align-items: center;
+  margin-top: var(--ad-space-1);
+}
+
 /* ---- Search -------------------------------------------------------------- */
 .searchAdornment {
   display: inline-flex;

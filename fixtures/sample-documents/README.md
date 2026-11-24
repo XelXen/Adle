@@ -14,7 +14,8 @@ copied from a real course. Safe to commit and to redistribute with the project.
 | `legacy-encoding.txt` | Latin-1 bytes: import succeeds with a warning. |
 | `partly-scanned.pdf` | Pages 1 and 3 have text, page 2 is blank: import succeeds with a warning. |
 | `lecture-notes-encrypted.pdf` | Password-protected: rejected as `encrypted_document`. Password: `adle-fixture-password`. |
-| `scanned-handout.pdf` | No text layer at all: rejected as `scanned_document`. |
+| `scanned-handout.pdf` | No text layer at all: imported, both pages kept as pictures to be read (ADR-060). |
+| `scanned-notes.pdf` | Typed notes photographed, handwritten notes with a drawing (pictures, no text layer), and a page of text: the first two are read from their pictures at the learner's word (ADR-060). |
 | `damaged.pdf` | The first third of a real PDF: rejected as `malformed_document`. |
 | `not-really-a.pdf` | Plain text with a `.pdf` name: rejected as `unsupported_type`. |
 | `binary-named.txt` | Binary bytes with a `.txt` name: rejected as `unsupported_type`. |
@@ -35,6 +36,12 @@ npx electron scripts/fixtures/print-pdf.cjs scripts/fixtures/chapter-notes.html 
 
 ```bash
 uv run --directory services/core python ../../scripts/fixtures/build_documents.py
+```
+
+On Windows, whose "Ink Free" font draws the handwriting:
+
+```bash
+npx electron scripts/fixtures/print-scans.cjs scripts/fixtures/scanned-notes.html fixtures/sample-documents/scanned-notes.pdf
 ```
 
 Rebuilding changes the bytes of the PDF and Word files (timestamps, object ids). Tests assert on

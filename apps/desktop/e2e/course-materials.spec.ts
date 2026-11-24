@@ -14,8 +14,18 @@ import {
   expectNoAccessibilityViolations,
   importWithDialog,
   openCourseTab,
+  openWhatIsSent,
+  closeWhatIsSent,
+  saveProviderKey,
   screenshot,
 } from './support/courses';
+import { READ_PAGE, startFakeProvider } from './support/fake-provider';
+
+/** A recognizable fake key. It only ever reaches a server on this computer. */
+const NVIDIA_KEY = 'nvapi-e2e-not-a-real-key-Rd73pQx2Lm8v';
+const NVIDIA = 'NVIDIA NIM (custom endpoint 127.0.0.1)';
+const TYPED =
+  'Week 3: Simple machines\nA lever is a rigid bar that turns about a fixed point, the fulcrum.';
 
 const sourceList = (page: Page) => page.getByRole('list', { name: 'Materials in this course' });
 const sourceRow = (page: Page, name: string) =>
@@ -24,6 +34,72 @@ const sourceRow = (page: Page, name: string) =>
     .filter({ has: page.getByText(name, { exact: true }) });
 
 test.describe('course materials', () => {
+  test('scanned and handwritten pages are read by the AI at the learner’s word, and become text that is found', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(150_000);
+    const aihubmix = await startFakeProvider();
+    const nvidia = await startFakeProvider();
+    const adle = await launchApp(profileDir, {
+      onboarded: true,
+      theme: 'light',
+      env: {
+        ADLE_PROVIDER_ENDPOINTS: JSON.stringify({
+          aihubmix: aihubmix.baseUrl,
+          nvidia: nvidia.baseUrl,
+        }),
+      },
+    });
+    const { app, page } = adle;
+    try {
+      await waitForCore(page);
+      await page.getByRole('button', { name: 'Settings' }).click();
+      await saveProviderKey(page, NVIDIA, NVIDIA_KEY);
+      await page.getByRole('button', { name: 'Library', exact: true }).click();
+
+      await createCourse(page, 'Levers', { app, files: ['scanned-notes.pdf'] });
+      const notes = sourceRow(page, 'scanned-notes.pdf');
+      await expect(notes).toContainText(
+        '2 pages are pictures, with no text to select (pages 1 and 2).',
+        { timeout: 30_000 },
+      );
+      // What is sent, and where, is one press away from the button that sends it.
+      const sent = await openWhatIsSent(page, notes);
+      await expect(sent).toContainText(`Sends pictures of those 2 pages to ${NVIDIA}.`);
+      await closeWhatIsSent(page, notes);
+      // Nothing is sent until the learner says so.
+      expect(nvidia.requests).toHaveLength(0);
+
+      nvidia.queue(TYPED, READ_PAGE);
+      await notes.getByRole('button', { name: 'Read them' }).click();
+      await expect(notes).toContainText('Ready', { timeout: 60_000 });
+      await expect(notes).not.toContainText('pictures');
+      // One picture to a request, to the provider that reads pictures, and none elsewhere.
+      expect(nvidia.requests.map((request) => request.kind)).toEqual(['read', 'read']);
+      for (const request of nvidia.requests) {
+        expect(request.pictures).toHaveLength(1);
+        expect(request.pictures[0]).toMatch(/^data:image\/png;base64,/);
+      }
+      expect(aihubmix.requests).toHaveLength(0);
+
+      // What was read is found like any other page, at its place in the file.
+      await page.getByRole('searchbox', { name: 'Search your materials' }).fill('rigid bar');
+      const found = page
+        .getByRole('list', { name: /Results for/ })
+        .getByRole('listitem')
+        .first();
+      await expect(found).toContainText('scanned-notes.pdf');
+      await expect(found).toContainText('page 1');
+      await expectNoAccessibilityViolations(page);
+      await screenshot(page, 'course-materials-pictures-read');
+      expect(adle.problems).toEqual([]);
+    } finally {
+      await adle.close();
+      await aihubmix.close();
+      await nvidia.close();
+    }
+  });
+
   test('import a syllabus and notes, see what was extracted, and find passages by location', async ({
     adle,
   }) => {
@@ -47,14 +123,14 @@ test.describe('course materials', () => {
       'scanned-handout.pdf',
     ]);
 
-    // One summary says what happened to every file, including the one that failed and why.
+    // One summary says what happened to every file. A scan is kept, its pages to be read
+    // at the learner's word (ADR-060).
     const summary = page.getByRole('status').filter({ hasText: 'imported' });
-    await expect(summary).toContainText('2 files imported · 1 couldn’t be imported', {
-      timeout: 30_000,
-    });
-    await expect(summary).toContainText('scanned-handout.pdf');
-    await expect(summary).toContainText('no selectable text');
-    await expect(summary).toContainText('never uploads');
+    await expect(summary).toContainText('3 files imported', { timeout: 30_000 });
+    await expect(summary).toContainText(
+      'scanned-handout.pdf was imported, with a note: 2 pages are pictures, with no text to ' +
+        'select (pages 1 and 2).',
+    );
 
     await expect(sourceRow(page, 'neural-networks-syllabus.md')).toContainText('Ready');
     await expect(sourceRow(page, 'neural-networks-syllabus.md')).toContainText('Markdown');
@@ -62,8 +138,11 @@ test.describe('course materials', () => {
     // Low-confidence extraction is flagged, with the reason, not hidden.
     const partly = sourceRow(page, 'partly-scanned.pdf');
     await expect(partly).toContainText('Check extraction');
-    await expect(partly).toContainText('1 of 3 pages had no selectable text');
-    await expect(sourceRow(page, 'scanned-handout.pdf')).toHaveCount(0);
+    await expect(partly).toContainText('Page 2 is a picture, with no text to select.');
+    // No key: nothing to press, and what would let it be read is said.
+    await expect(partly).toContainText('To read it, add a key for NVIDIA NIM in Settings.');
+    await expect(partly.getByRole('button', { name: 'Read it' })).toHaveCount(0);
+    await expect(sourceRow(page, 'scanned-handout.pdf')).toContainText('Check extraction');
 
     // Search shows the source and the exact place each passage comes from.
     const search = page.getByRole('searchbox', { name: 'Search your materials' });

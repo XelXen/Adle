@@ -21,7 +21,7 @@ export default defineConfig({
             'apps/desktop/electron/**/*.test.ts',
             'packages/event-protocol/**/*.test.ts',
             'packages/contracts/**/*.test.ts',
-            'scripts/**/*.test.ts',
+            'scripts/**/*.test.{ts,mjs}',
           ],
         },
       },

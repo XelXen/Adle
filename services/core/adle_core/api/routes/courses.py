@@ -113,6 +113,17 @@ def delete_source(source_id: str, services: ServicesDep) -> Response:
     return Response(status_code=204)
 
 
+@router.post(
+    "/sources/{source_id}/read-pictures",
+    operation_id="sources.read_pictures",
+    response_model=schemas.Job,
+    status_code=202,
+)
+def read_pictures(source_id: str, services: ServicesDep) -> schemas.Job:
+    """Read the pages of a file that are pictures, at the learner's word (ADR-060)."""
+    return schemas.Job.model_validate(services.sources.start_reading(source_id))
+
+
 @router.get(
     "/courses/{course_id}/search",
     operation_id="sources.search",

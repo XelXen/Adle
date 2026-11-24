@@ -49,6 +49,29 @@ def sse(text: str, *, usage: dict[str, int] | None = None) -> httpx.Response:
 
 Answer = str | dict[str, Any] | httpx.Response | Exception | Callable[[dict[str, Any]], Any]
 
+#: What the fake reads off a picture of a page, unless told otherwise.
+READ_PAGE = "Levers - my notes\nMA = load / effort\n[A drawing of a lever on a fulcrum]"
+
+
+def text_of(content: Any) -> str:
+    """The words of a message: itself, or its text parts when it also carries pictures."""
+    if isinstance(content, str):
+        return content
+    return "\n".join(part["text"] for part in content if part.get("type") == "text")
+
+
+def pictures_of(body: dict[str, Any]) -> list[str]:
+    """The pictures a request carried, as their data URLs."""
+    found: list[str] = []
+    for message in body["messages"]:
+        if isinstance(message["content"], list):
+            found += [
+                part["image_url"]["url"]
+                for part in message["content"]
+                if part.get("type") == "image_url"
+            ]
+    return found
+
 
 class FakeProvider:
     def __init__(self) -> None:
@@ -75,6 +98,8 @@ class FakeProvider:
             return "ask"
         if "checking that a connection works" in system:
             return "check"
+        if "from a picture of it" in system:
+            return "read"
         return "lesson"
 
     def kinds(self) -> list[str]:
@@ -83,7 +108,7 @@ class FakeProvider:
     def prompt(self, index: int = -1) -> str:
         """Everything the model was shown in one request: system and user text."""
         messages = self.requests[index]["messages"]
-        return "\n".join(message["content"] for message in messages)
+        return "\n".join(text_of(message["content"]) for message in messages)
 
     def default(self, body: dict[str, Any]) -> Answer:
         kind = self.kind(body)
@@ -95,7 +120,9 @@ class FakeProvider:
             return ANSWER
         if kind == "check":
             return "ready"
-        user = body["messages"][1]["content"]
+        if kind == "read":
+            return READ_PAGE
+        user = text_of(body["messages"][1]["content"])
         return INTERACTIVE_SCENE if "Kind: interactive" in user else ANIMATION_SCENE
 
     def __call__(self, request: httpx.Request) -> httpx.Response:

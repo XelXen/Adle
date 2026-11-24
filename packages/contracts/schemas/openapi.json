@@ -1566,7 +1566,7 @@
           "display_name": { "title": "Display Name", "type": "string" },
           "first_for": {
             "items": {
-              "enum": ["ask", "curriculum", "lesson", "scene", "check"],
+              "enum": ["ask", "curriculum", "lesson", "scene", "check", "read"],
               "type": "string"
             },
             "title": "First For",
@@ -1581,6 +1581,7 @@
             "type": "array"
           },
           "provider_id": { "title": "Provider Id", "type": "string" },
+          "reads_pictures": { "title": "Reads Pictures", "type": "boolean" },
           "selected": { "title": "Selected", "type": "boolean" },
           "usage": { "$ref": "#/components/schemas/ProviderUsage" }
         },
@@ -1594,7 +1595,8 @@
           "in_use",
           "first_for",
           "limits_published",
-          "usage"
+          "usage",
+          "reads_pictures"
         ],
         "title": "ProviderChoice",
         "type": "object"
@@ -1663,9 +1665,10 @@
           "ask": { "$ref": "#/components/schemas/ProviderRoute" },
           "curriculum": { "$ref": "#/components/schemas/ProviderRoute" },
           "lesson": { "$ref": "#/components/schemas/ProviderRoute" },
+          "read": { "$ref": "#/components/schemas/ProviderRoute" },
           "scene": { "$ref": "#/components/schemas/ProviderRoute" }
         },
-        "required": ["ask", "curriculum", "lesson", "scene"],
+        "required": ["ask", "curriculum", "lesson", "scene", "read"],
         "title": "ProviderRoutes",
         "type": "object"
       },
@@ -2022,6 +2025,11 @@
             "type": "string"
           },
           "page_count": { "title": "Page Count", "type": "integer" },
+          "picture_pages": {
+            "items": { "type": "integer" },
+            "title": "Picture Pages",
+            "type": "array"
+          },
           "section_count": { "title": "Section Count", "type": "integer" },
           "size_bytes": { "title": "Size Bytes", "type": "integer" },
           "status": {
@@ -2043,7 +2051,8 @@
           "section_count",
           "chunk_count",
           "page_count",
-          "created_at"
+          "created_at",
+          "picture_pages"
         ],
         "title": "Source",
         "type": "object"
@@ -4714,6 +4723,40 @@
           }
         },
         "summary": "Get Source",
+        "tags": ["courses"]
+      }
+    },
+    "/v1/sources/{source_id}/read-pictures": {
+      "post": {
+        "description": "Read the pages of a file that are pictures, at the learner's word (ADR-060).",
+        "operationId": "sources.read_pictures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": { "title": "Source Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Read Pictures",
         "tags": ["courses"]
       }
     },

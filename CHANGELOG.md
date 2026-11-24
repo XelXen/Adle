@@ -5,6 +5,20 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Scanned and handwritten notes can be read.** A PDF that is a scan, photographs of
+  pages, or handwriting is no longer turned away. Its pages are kept as pictures, and
+  **Read them** in Materials has the AI write them out as text, which you can then search
+  and learn from. Nothing is sent until you press it, and what is sent is one press away.
+  Reading pictures needs a key for NVIDIA NIM.
+
+### Changed
+
+- **Checks run what a change can reach.** For contributors: `node scripts/check.mjs` runs
+  the tests and journeys that cover what you changed; `--all` runs everything, as GitHub
+  does for every push.
+
 ### Fixed
 
 - **A page with a detailed drawing is read.** A PDF page drawn in fine detail, such as a

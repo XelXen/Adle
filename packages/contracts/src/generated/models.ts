@@ -786,12 +786,13 @@ export interface ProviderCheck {
 export interface ProviderChoice {
   base_url: string;
   display_name: string;
-  first_for: ('ask' | 'curriculum' | 'lesson' | 'scene' | 'check')[];
+  first_for: ('ask' | 'curriculum' | 'lesson' | 'scene' | 'check' | 'read')[];
   in_use: boolean;
   key_configured: boolean;
   limits_published: boolean;
   models: ProviderModel[];
   provider_id: string;
+  reads_pictures: boolean;
   selected: boolean;
   usage: ProviderUsage;
 }
@@ -841,6 +842,7 @@ export interface ProviderRoutes {
   ask: ProviderRoute;
   curriculum: ProviderRoute;
   lesson: ProviderRoute;
+  read: ProviderRoute;
   scene: ProviderRoute;
 }
 export interface ProviderSelection {
@@ -909,6 +911,7 @@ export interface Source {
   id: string;
   kind: 'pdf' | 'docx' | 'markdown' | 'text' | 'authored';
   page_count: number;
+  picture_pages: number[];
   section_count: number;
   size_bytes: number;
   status: 'extracted' | 'needs_attention';

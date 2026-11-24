@@ -10,8 +10,9 @@ A result is never reported from reading code.
 
 | Command | Runs | Time |
 |---|---|---|
-| `npm run check` | Contract and allowlist drift, third-party licences, Prettier, ESLint, `tsc`, Vitest, ruff, mypy, pytest | ~2.5 min |
-| `node scripts/check.mjs --e2e` | All of the above, then builds and runs the Electron suite | ~14 min |
+| `npm run check` | Contract and allowlist drift, third-party licences, Prettier, ESLint, `tsc`, ruff, mypy whole; then the tests what is not on origin/main yet can reach: Vitest related to the files changed, pytest whose code changed (pytest-testmon) and the integration tests (ADR-059) | under a minute for a small change; the first run on a computer records every core test (~7 min) |
+| `node scripts/check.mjs --e2e` | The same, then builds and runs the journeys the change can reach (`node scripts/affected.mjs` says which) | depends on the change |
+| `node scripts/check.mjs --all --e2e` | Everything, whatever changed: what GitHub runs for every push, and what a release is checked with | ~25 min |
 | `npm test` | Vitest (TypeScript unit and component tests) | ~6 s |
 | `npm run core:test` | pytest (Python unit and integration tests) | ~95 s |
 | `npm run e2e` | Build, then Playwright against the real Electron app | ~11 min |
@@ -31,6 +32,24 @@ uv run --directory services/core pytest tests/unit/test_scene_policy.py -k hosti
 ```bash
 npm run e2e -- security.spec.ts
 ```
+
+### What a check runs (ADR-059)
+
+A check here runs what a change can reach. What changed is everything not on origin/main
+yet. The static checks always run whole. Vitest runs the tests related to the changed files
+by their imports (`--changed`). pytest runs, with `--testmon`, the tests whose code changed
+since they last ran, read from the code each test ran (its record, `.testmondata`, is not in
+git), and the integration tests whenever the core's code changed: they run the core as a
+program of its own, which the record cannot see. All core tests run when what changed is
+something the record cannot follow (package data, `pyproject.toml`, `uv.lock`, a conftest or
+a helper in `tests/support`). The journeys are those `scripts/affected.mjs` maps the files
+to; a path it does not know runs every journey, and words, decisions, tooling and unit tests
+run none. On GitHub (`CI`), and with `--all`, everything runs.
+
+Each slide, figure and scene example runs once, the two themes taking turns along each set
+(`e2e/support/themes.ts`); `ADLE_E2E_EVERY_THEME=1` runs every example in both. Figures and
+scenes run as rehearsals, which say what a learner's run says at many times the speed; the
+slides keep a learner's pace.
 
 ## Layers
 

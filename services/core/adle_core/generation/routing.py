@@ -24,9 +24,10 @@ from typing import Literal
 AUTOMATIC = "auto"
 
 #: What a request is for, as far as choosing a provider goes. ``ask`` is a question the
-#: learner puts to Adle in the middle of a lesson; ``check`` finds out whether a key works.
-Purpose = Literal["ask", "curriculum", "lesson", "scene", "check"]
-PURPOSES: tuple[Purpose, ...] = ("ask", "curriculum", "lesson", "scene", "check")
+#: learner puts to Adle in the middle of a lesson; ``check`` finds out whether a key works;
+#: ``read`` reads a picture of a page of the learner's own (ADR-060).
+Purpose = Literal["ask", "curriculum", "lesson", "scene", "check", "read"]
+PURPOSES: tuple[Purpose, ...] = ("ask", "curriculum", "lesson", "scene", "check", "read")
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +45,9 @@ class Standing:
     spent: bool = False
     #: It failed a moment ago and is being left alone for a while.
     resting: bool = False
+    #: What it can be asked at all: a provider with no model that sees pictures cannot be
+    #: asked to read one, by choice or otherwise.
+    serves: frozenset[str] = frozenset(PURPOSES)
 
     @property
     def ready(self) -> bool:
@@ -97,7 +101,7 @@ def _why_first(purpose: str, first: Standing, others: Sequence[Standing]) -> str
 
 def _order(purpose: str, standings: Sequence[Standing]) -> tuple[list[Standing], str]:
     """Usable providers, best first, for this purpose; and why the first is first."""
-    usable = [standing for standing in standings if standing.has_key]
+    usable = [standing for standing in standings if standing.has_key and purpose in standing.serves]
     if len(usable) < 2:
         return usable, ""
 
@@ -134,13 +138,17 @@ def plan(purpose: str, selection: str, standings: Sequence[Standing]) -> Plan:
     known = {standing.provider_id: standing for standing in standings}
     chosen = known.get(selection)
     if chosen is not None:
-        # One provider, by the learner's choice. Nothing moves a request away from it.
+        # One provider, by the learner's choice. Nothing moves a request away from it, and
+        # a request it cannot be asked at all goes nowhere: the plan is empty.
+        if purpose not in chosen.serves:
+            return Plan((), (), automatic=False)
         return Plan((chosen.provider_id,), (chosen.name,), automatic=False)
     ordered, reason = _order(purpose, standings)
     if not ordered:
-        # No key anywhere. The first provider is named so that the refusal can say whose
-        # key is missing; nothing is sent.
-        ordered = list(standings[:1])
+        # No key anywhere it could go. The first provider that could be asked is named so
+        # that the refusal can say whose key is missing; nothing is sent. None at all, and
+        # the plan is empty.
+        ordered = [standing for standing in standings if purpose in standing.serves][:1]
     return Plan(
         tuple(standing.provider_id for standing in ordered),
         tuple(standing.name for standing in ordered),

@@ -73,6 +73,7 @@ what is never reached, so this is at most what ships.
 | `pydantic` | 2.14.3 | MIT |
 | `pydantic_core` | 2.50.4 | MIT |
 | `pypdf` | 7.1.1 | BSD-3-Clause |
+| `pypdfium2` | 5.15.2 | BSD-3-Clause, Apache-2.0, dependency licenses |
 | `python-docx` | 1.2.0 | MIT License |
 | `SQLAlchemy` | 2.1.9 | MIT |
 | `starlette` | 1.10.0 | BSD-3-Clause |
@@ -102,12 +103,13 @@ None of this reaches a learner.
 | PSF-2.0 | 1 |
 | Python-2.0 | 1 |
 
-### Python development tools: 15 packages
+### Python development tools: 17 packages
 
 | Package | Version | Licence |
 |---|---|---|
 | `ast_serialize` | 0.13.1 | MIT |
 | `colorama` | 0.4.6 | BSD License |
+| `coverage` | 7.17.2 | Apache-2.0 |
 | `hypothesis` | 6.170.15 | MPL-2.0 |
 | `iniconfig` | 2.3.1 | MIT |
 | `librt` | 0.16.0 | MIT |
@@ -119,5 +121,6 @@ None of this reaches a learner.
 | `Pygments` | 2.21.0 | BSD-2-Clause |
 | `pytest` | 9.2.0 | MIT |
 | `pytest-asyncio` | 1.5.0 | Apache-2.0 |
+| `pytest-testmon` | 2.3.0 | MIT |
 | `ruff` | 0.17.5 | MIT |
 | `sortedcontainers` | 2.4.0 | Apache Software License |

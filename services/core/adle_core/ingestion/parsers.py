@@ -28,8 +28,9 @@ from adle_core.ingestion.types import (
 #: Bumped when what a parser makes of the same file changes. "2": Word documents keep
 #: their equations, the descriptions of their pictures, and their tables as tables (ADR-041).
 #: "4": a PDF page drawn with more than pypdf's budget of work is read again with a larger
-#: one, instead of being skipped.
-PARSER_REVISION = "4"
+#: one, instead of being skipped. "5": pages with no text, or none that can be read, are
+#: kept as pictures to be read (ADR-060), and a PDF of nothing but pictures is imported.
+PARSER_REVISION = "5"
 
 LINE_BREAK = chr(10)
 #: Unicode replacement character: what a decoder emits for bytes it cannot read.
@@ -75,7 +76,7 @@ class _HeadingPath:
 
 
 def _require_content(document: ExtractedDocument, limits: Limits) -> ExtractedDocument:
-    if document.character_count == 0:
+    if document.character_count == 0 and not document.picture_pages:
         raise IngestionError("empty_document", "No text could be found in the file.")
     if document.character_count > limits.max_characters:
         raise IngestionError(
@@ -481,19 +482,10 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
             garbled_pages.append(number)
         pages.append((number, text, max(0.2, 1.0 - 4 * garbled)))
 
-    if not pages and unreadable_pages and not empty_pages:
-        raise IngestionError(
-            "malformed_document",
-            "Adle could not read any page of this PDF. Save it as text or as a Word "
-            "document and import that instead.",
-        )
-    if not pages:
-        raise IngestionError(
-            "scanned_document",
-            "This PDF has no selectable text: it is probably a scan. Adle does not run text "
-            "recognition (OCR) and never uploads files to do so. Convert it with an OCR tool "
-            "first, or import the text in another format.",
-        )
+    # A page with no text to select, and a page whose drawing could not be taken apart,
+    # are both kept as pictures: drawn whole, a model that sees pictures can read them, at
+    # the learner's word (ADR-060). A PDF of nothing but pictures is imported to be read.
+    picture_pages = tuple(sorted(empty_pages + unreadable_pages))
 
     # Cut where the document's headings begin, so that what it covers can be read off
     # them: its own outline first, else the lines numbered as headings, else the pages.
@@ -508,17 +500,6 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
         ]
 
     warnings: list[str] = []
-    if empty_pages:
-        one = len(empty_pages) == 1
-        warnings.append(
-            f"{len(empty_pages)} of {_counted(page_count, 'page', 'pages')} had no selectable "
-            f"text ({_for_example(empty_pages)}). "
-            + (
-                "It may be an image or a scan and was skipped."
-                if one
-                else "They may be images or scans and were skipped."
-            )
-        )
     if garbled_pages:
         warnings.append(
             f"The text on {_counted(len(garbled_pages), 'page', 'pages')} "
@@ -529,12 +510,6 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
                 else "Check passages quoted from them."
             )
         )
-    if unreadable_pages:
-        warnings.append(
-            f"{_counted(len(unreadable_pages), 'page', 'pages')} "
-            f"({_for_example(unreadable_pages)}) could not be read and "
-            + ("was skipped." if len(unreadable_pages) == 1 else "were skipped.")
-        )
 
     return _require_content(
         ExtractedDocument(
@@ -543,6 +518,7 @@ def parse_pdf(path: Path, limits: Limits) -> ExtractedDocument:
             parser="pypdf",
             parser_version=f"{version('pypdf')}+{PARSER_REVISION}",
             warnings=tuple(warnings),
+            picture_pages=picture_pages,
         ),
         limits,
     )

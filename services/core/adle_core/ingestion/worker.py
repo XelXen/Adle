@@ -34,6 +34,7 @@ def document_to_json(document: ExtractedDocument) -> dict[str, Any]:
         "parser": document.parser,
         "parser_version": document.parser_version,
         "warnings": list(document.warnings),
+        "picture_pages": list(document.picture_pages),
         "sections": [
             {
                 "kind": section.kind.value,
@@ -93,17 +94,30 @@ def document_from_json(data: Any, limits: Limits) -> ExtractedDocument:
     parser, parser_version = data.get("parser"), data.get("parser_version")
     if not isinstance(parser, str) or not isinstance(parser_version, str):
         raise TypeError("malformed parser identity")
+    pictures = data.get("picture_pages", [])
+    if (
+        not isinstance(pictures, list)
+        or len(pictures) > limits.max_pages
+        or not all(
+            isinstance(page, int) and not isinstance(page, bool) and 1 <= page <= limits.max_pages
+            for page in pictures
+        )
+    ):
+        raise TypeError("malformed picture pages")
     return ExtractedDocument(
         kind=DocumentKind(str(data.get("kind"))),
         sections=tuple(sections),
         parser=parser[:40],
         parser_version=parser_version[:40],
         warnings=tuple(entry[:500] for entry in warnings[:20]),
+        picture_pages=tuple(sorted(set(pictures))),
     )
 
 
 def handle(request: Any) -> dict[str, Any]:
-    """Parse the document named by ``request`` and describe the outcome."""
+    """Parse the document named by ``request``, or draw one of its pages, and say how it went."""
+    if isinstance(request, dict) and "render_page" in request:
+        return _render(request)
     try:
         path = Path(request["path"])
         kind = DocumentKind(request["kind"])
@@ -131,6 +145,34 @@ def handle(request: Any) -> dict[str, Any]:
 
 def request_for(path: Path, kind: DocumentKind, limits: Limits) -> dict[str, Any]:
     return {"path": str(path), "kind": kind.value, "limits": asdict(limits)}
+
+
+def render_request_for(path: Path, page: int) -> dict[str, Any]:
+    return {"path": str(path), "render_page": page}
+
+
+def _render(request: dict[str, Any]) -> dict[str, Any]:
+    """Draw one page of a PDF as a picture (ADR-060)."""
+    import base64
+
+    from adle_core.ingestion.render import page_picture
+
+    path, page = request.get("path"), request.get("render_page")
+    if not isinstance(path, str) or not isinstance(page, int) or isinstance(page, bool):
+        return {"ok": False, "code": "malformed_document", "message": CRASH_MESSAGE}
+    try:
+        picture = page_picture(Path(path), page)
+    except IngestionError as error:
+        return {"ok": False, "code": error.code, "message": error.message}
+    except MemoryError:
+        return {"ok": False, "code": "file_too_large", "message": "The page is too large to draw."}
+    except Exception as error:
+        return {
+            "ok": False,
+            "code": "malformed_document",
+            "message": f"{CRASH_MESSAGE} ({type(error).__name__})",
+        }
+    return {"ok": True, "png": base64.b64encode(picture).decode("ascii")}
 
 
 def main() -> int:

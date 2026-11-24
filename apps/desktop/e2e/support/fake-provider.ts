@@ -22,7 +22,11 @@ import { exampleScene } from './player';
 const answers = path.join(repoRoot, 'fixtures', 'model-answers');
 const read = (name: string): string => readFileSync(path.join(answers, name), 'utf8');
 
-export type RequestKind = 'curriculum' | 'lesson' | 'scene' | 'ask' | 'check';
+export type RequestKind = 'curriculum' | 'lesson' | 'scene' | 'ask' | 'check' | 'read';
+
+/** What the fake reads off a picture of a page (ADR-060), unless told otherwise. */
+export const READ_PAGE =
+  'Levers - my notes\nMA = load / effort\n[A drawing of a lever on a fulcrum]';
 
 export interface RecordedRequest {
   kind: RequestKind;
@@ -30,7 +34,31 @@ export interface RecordedRequest {
   authorization: string | undefined;
   /** Everything the model was shown: the system and user text. */
   prompt: string;
+  /** The pictures it was sent, as data URLs (ADR-060). */
+  pictures: string[];
   body: Record<string, unknown>;
+}
+
+interface Part {
+  type: string;
+  text?: string;
+  image_url?: { url: string };
+}
+
+/** The words of a message: itself, or its text parts when it carries pictures too. */
+function textOf(content: string | Part[] | undefined): string {
+  if (typeof content === 'string') return content;
+  return (content ?? [])
+    .filter((part) => part.type === 'text')
+    .map((part) => part.text ?? '')
+    .join('\n');
+}
+
+function picturesOf(content: string | Part[] | undefined): string[] {
+  if (typeof content === 'string' || !content) return [];
+  return content
+    .filter((part) => part.type === 'image_url')
+    .map((part) => part.image_url?.url ?? '');
 }
 
 /**
@@ -79,6 +107,7 @@ function kindOf(system: string): RequestKind {
   // A question the learner asked in the middle of a lesson, and the check of a key.
   if (system.includes('partway through a lesson')) return 'ask';
   if (system.includes('checking that a connection works')) return 'check';
+  if (system.includes('from a picture of it')) return 'read';
   return 'lesson';
 }
 
@@ -87,6 +116,7 @@ function defaultAnswer(kind: RequestKind, user: string): string {
   if (kind === 'lesson') return read('lesson.json');
   if (kind === 'ask') return read('answer.json');
   if (kind === 'check') return 'ready';
+  if (kind === 'read') return READ_PAGE;
   return exampleScene(user.includes('Kind: interactive') ? 'neuron_weight.py' : 'weighted_sum.py');
 }
 
@@ -219,15 +249,16 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
         return;
       }
       const body = JSON.parse(await readBody(request)) as Record<string, unknown> & {
-        messages: { role: string; content: string }[];
+        messages: { role: string; content: string | Part[] }[];
       };
-      const system = body.messages[0]?.content ?? '';
-      const user = body.messages[1]?.content ?? '';
+      const system = textOf(body.messages[0]?.content);
+      const user = textOf(body.messages[1]?.content);
       const kind = kindOf(system);
       requests.push({
         kind,
         authorization: request.headers.authorization,
         prompt: `${system}\n${user}`,
+        pictures: picturesOf(body.messages[1]?.content),
         body,
       });
 

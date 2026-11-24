@@ -220,20 +220,32 @@ def test_a_bad_file_does_not_stop_the_rest_of_the_import(
     result = outcomes(job)
     assert result["study-notes.txt"]["outcome"] == "imported"
     assert result["partly-scanned.pdf"]["outcome"] == "imported"
-    assert "no selectable text" in result["partly-scanned.pdf"]["warnings"][0]
-    assert result["scanned-handout.pdf"]["error_code"] == "scanned_document"
+    assert result["partly-scanned.pdf"]["warnings"] == [
+        "Page 2 is a picture, with no text to select."
+    ]
+    # A PDF of nothing but pictures is kept, to be read at the learner's word (ADR-060).
+    assert result["scanned-handout.pdf"]["outcome"] == "imported"
     assert result["lecture-notes-encrypted.pdf"]["error_code"] == "encrypted_document"
     assert result["damaged.pdf"]["error_code"] == "malformed_document"
     assert result["does-not-exist.pdf"]["error_code"] == "file_unreadable"
-    for name in ("scanned-handout.pdf", "damaged.pdf"):
-        assert result[name]["outcome"] == "rejected"
-        assert result[name]["message"]
+    assert result["damaged.pdf"]["outcome"] == "rejected"
+    assert result["damaged.pdf"]["message"]
 
     sources = client.get(f"/v1/courses/{course['id']}/sources").json()["sources"]
     statuses = {source["display_name"]: source["status"] for source in sources}
-    assert statuses == {"study-notes.txt": "extracted", "partly-scanned.pdf": "needs_attention"}
+    assert statuses == {
+        "study-notes.txt": "extracted",
+        "partly-scanned.pdf": "needs_attention",
+        "scanned-handout.pdf": "needs_attention",
+    }
+    pictures = {source["display_name"]: source["picture_pages"] for source in sources}
+    assert pictures == {
+        "study-notes.txt": [],
+        "partly-scanned.pdf": [2],
+        "scanned-handout.pdf": [1, 2],
+    }
     # Nothing from a rejected file is left behind on disk.
-    assert len(list(services.settings.sources_dir.iterdir())) == 2
+    assert len(list(services.settings.sources_dir.iterdir())) == 3
 
 
 def test_import_requests_are_validated(client: TestClient) -> None:

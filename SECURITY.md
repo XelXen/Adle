@@ -201,7 +201,9 @@ A learner's file is untrusted input to parsers written by third parties. Details
 | Stored files stay inside the data directory | Copied under the generated source id; the display name is never used as a path | `test_courses_and_sources.py` |
 | Search input is never query syntax | Terms are extracted and quoted by code (`build_match_query`) | `test_courses_and_sources.py` |
 | Error messages do not quote documents | Only an error code and a fixed message cross the worker boundary. The service shows what a worker says only if the code is one a parser has, as one plain line of limited length (`_refusal` in `ingestion/extract.py`); anything else is treated as a worker that broke | `test_ingestion.py` |
-| Nothing is uploaded to import | Parsers are local; there is no OCR service; the session blocks all network requests | `e2e/security.spec.ts`; design |
+| Nothing is uploaded to import | Parsers are local; a page with no text to select is kept as a picture and nothing more is done with it; the session blocks all network requests | `e2e/security.spec.ts`; `e2e/course-materials.spec.ts` (nothing sent until "Read them"); design |
+| A page that is a picture leaves the computer only at the learner's word (ADR-060) | Nothing is sent until "Read them" is pressed on that file; what is sent and to whom is one press away. The page is drawn by PDFium in the parser worker, and what the worker hands back is checked to be a PNG of a sensible size (`render_isolated`). It is sent only to a model seen to read pictures (`ModelSpec.images`); a provider without one is never asked, even when chosen | `test_reading_pictures.py`; `test_isolated_extraction.py`; `e2e/course-materials.spec.ts` |
+| What a model reads off a picture is data | Kept as the page's text, cleaned, bounded (20,000 characters), trusted less (0.8), and quoted in a block like any document text when it is sent again | `test_reading_pictures.py`; `test_prompt_quoting.py` |
 
 Document content is data. Nothing in a file is executed, followed, or treated as an instruction.
 
@@ -212,6 +214,11 @@ Document content is data. Nothing in a file is executed, followed, or treated as
   it has no channel to the renderer or the provider key (the key is not in its memory, its
   arguments, or its environment).
 - A file within the limits can still be slow to parse; the time limit (120 s) bounds it.
+- PDFium, which draws a page to be read, is a large C++ library reading a file from
+  anywhere. It runs in the parser worker, with the same exposure as the parsers.
+- A picture of a page may hold more than the learner meant to share (a name on a notebook's
+  cover, a note in the margin). It is sent only at their word, a file at a time, and what
+  is sent is said first.
 
 ## The learner's data as a whole
 
@@ -351,7 +358,9 @@ request in any case. See ADR-013.
 - No telemetry, analytics, or crash upload. No external service other than the AI providers
   the learner gave a key to, and only when the learner asks for something they write; and,
   when the learner sets a natural voice up, its downloads from Hugging Face, the Python
-  Package Index, PyTorch and GitHub, which carry nothing of theirs (ADR-042).
+  Package Index, PyTorch and GitHub, which carry nothing of theirs (ADR-042). Pictures of a
+  file's pages go to a provider only when the learner presses "Read them" on that file
+  (ADR-060).
 - A notification of the operating system carries fixed words chosen in the main process by
   its kind (`electron/main/notices.ts`, ADR-026). The page cannot supply text for one, so no
   course title, lesson, or model output reaches the notification centre. None is shown while

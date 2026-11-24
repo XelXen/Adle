@@ -27,6 +27,7 @@ import { formatFileSize, pluralise } from '../../lib/format';
 import { isJobActive, useJob } from '../../lib/use-job';
 import { useResource } from '../../lib/use-resource';
 import styles from './CourseScreen.module.css';
+import { ReadPictures } from './ReadPictures';
 
 const KIND_LABEL: Record<Source['kind'], string> = {
   pdf: 'PDF',
@@ -269,6 +270,7 @@ export function SourcesPanel({
                       {warning}
                     </p>
                   ))}
+                  <ReadPictures source={source} onRead={sources.reload} />
                 </div>
                 <IconButton
                   label={`Remove ${source.display_name}`}

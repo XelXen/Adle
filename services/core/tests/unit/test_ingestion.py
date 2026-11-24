@@ -26,6 +26,7 @@ from adle_core.ingestion.types import (
     ExtractedSection,
     IngestionError,
     SectionKind,
+    picture_sentence,
 )
 from adle_core.ingestion.worker import document_from_json, request_for
 
@@ -129,14 +130,44 @@ def test_utf16_text_with_a_byte_order_mark_is_read(tmp_path: Path) -> None:
     assert extract_in_process(file, file.name).sections[0].text == "Größe und Übung"
 
 
-def test_partly_scanned_pdf_imports_what_it_can_and_says_what_it_skipped() -> None:
+def test_a_page_with_no_text_is_kept_as_a_picture_to_be_read() -> None:
+    # A scanned or handwritten page has no text to select: it is kept as a picture, which
+    # a model that sees pictures can read at the learner's word (ADR-060).
     document = extract_in_process(DOCUMENTS / "partly-scanned.pdf", "partly-scanned.pdf")
     assert [section.page_number for section in document.sections] == [1, 3]
-    assert len(document.warnings) == 1
-    assert document.warnings[0] == (
-        "1 of 3 pages had no selectable text (page 2). "
-        "It may be an image or a scan and was skipped."
+    assert document.picture_pages == (2,)
+    assert document.warnings == ()
+    assert picture_sentence(document.picture_pages) == (
+        "Page 2 is a picture, with no text to select."
     )
+
+
+def test_scanned_and_handwritten_pages_are_pictures_and_a_typed_one_is_text() -> None:
+    # Typed notes photographed, handwritten notes with a drawing, and a page of text
+    # (fixtures/sample-documents/README.md).
+    document = extract_in_process(DOCUMENTS / "scanned-notes.pdf", "scanned-notes.pdf")
+    assert document.picture_pages == (1, 2)
+    assert [section.page_number for section in document.sections] == [3]
+    assert "Bring a ruler" in document.sections[0].text
+
+
+def test_a_pdf_of_nothing_but_pictures_is_kept_to_be_read() -> None:
+    document = extract_in_process(DOCUMENTS / "scanned-handout.pdf", "scanned-handout.pdf")
+    assert document.sections == ()
+    assert document.picture_pages == (1, 2)
+
+
+@pytest.mark.parametrize(
+    ("pages", "said"),
+    [
+        ((4,), "Page 4 is a picture, with no text to select."),
+        ((1, 2), "2 pages are pictures, with no text to select (pages 1 and 2)."),
+        ((1, 3, 5), "3 pages are pictures, with no text to select (pages 1, 3 and 5)."),
+        (tuple(range(1, 22)), "21 pages are pictures, with no text to select."),
+    ],
+)
+def test_the_pages_that_are_pictures_are_said_plainly(pages: tuple[int, ...], said: str) -> None:
+    assert picture_sentence(pages) == said
 
 
 def test_a_page_drawn_past_the_readers_budget_is_read_with_a_larger_one() -> None:
@@ -165,11 +196,13 @@ def test_second_tries_stop_when_their_time_is_spent(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(parsers, "_LARGE_PAGES_SECONDS", 2.0)
     with apply_configuration(stream_parsing_work_maximum_count=50):
         document = extract_in_process(DOCUMENTS / "lecture-notes.pdf", "lecture-notes.pdf")
-    assert document.warnings == ("1 page (page 3) could not be read and was skipped.",)
+    # A page that cannot be taken apart can still be drawn: it is kept as a picture.
+    assert document.warnings == ()
+    assert document.picture_pages == (3,)
     assert 3 not in {section.page_number for section in document.sections}
 
 
-def test_a_pdf_no_page_of_which_can_be_read_is_not_called_a_scan(
+def test_a_pdf_no_page_of_which_can_be_taken_apart_is_kept_as_pictures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from pypdf import apply_configuration
@@ -177,13 +210,10 @@ def test_a_pdf_no_page_of_which_can_be_read_is_not_called_a_scan(
     from adle_core.ingestion import parsers
 
     monkeypatch.setattr(parsers, "_LARGE_PAGES_SECONDS", 0.0)
-    with (
-        apply_configuration(stream_parsing_work_maximum_count=50),
-        pytest.raises(IngestionError) as raised,
-    ):
-        extract_in_process(DOCUMENTS / "lecture-notes.pdf", "lecture-notes.pdf")
-    assert raised.value.code == "malformed_document"
-    assert "could not read any page" in raised.value.message
+    with apply_configuration(stream_parsing_work_maximum_count=50):
+        document = extract_in_process(DOCUMENTS / "lecture-notes.pdf", "lecture-notes.pdf")
+    assert document.sections == ()
+    assert document.picture_pages == (1, 2, 3)
 
 
 # -- rejections ------------------------------------------------------------
@@ -193,7 +223,6 @@ def test_a_pdf_no_page_of_which_can_be_read_is_not_called_a_scan(
     ("name", "code", "hint"),
     [
         ("lecture-notes-encrypted.pdf", "encrypted_document", "password-protected"),
-        ("scanned-handout.pdf", "scanned_document", "never uploads"),
         ("damaged.pdf", "malformed_document", "damaged"),
         ("not-really-a.pdf", "unsupported_type", "not a PDF"),
         ("binary-named.txt", "unsupported_type", "readable text"),

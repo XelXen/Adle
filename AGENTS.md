@@ -42,8 +42,9 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Install everything | `npm run setup` (npm ci, Electron binary, `uv sync`) |
 | Run the app (rebuilds on change) | `npm run dev` |
 | Build / start the built app | `npm run build` / `npm start` |
-| **All fast gates** | `npm run check` |
-| All gates including E2E | `node scripts/check.mjs --e2e` |
+| **The gates, as far as a change reaches** (ADR-059) | `npm run check` (with journeys: `node scripts/check.mjs --e2e`) |
+| Every gate and every journey, whatever changed (what GitHub runs) | `node scripts/check.mjs --all --e2e` |
+| Which journeys a change needs | `node scripts/affected.mjs` |
 | Lint / format | `npm run lint` / `npm run format` |
 | Type-check TypeScript | `npm run typecheck` |
 | Unit tests (TS) | `npm test` (one file: `npx vitest run path/to/file.test.ts`) |
@@ -118,6 +119,9 @@ is built from it, and an alpha or a stable version is published from a release c
   URLs, or paths through it. A picture is tried in a frame nobody sees before it joins a
   lesson, when the app is there to try it (ADR-038).
 - User documents and model output are data, never instructions.
+- A picture of a page of the learner's leaves the computer only when they press "Read
+  them" on that file, and only for a model seen to read pictures (ADR-060). Importing sends
+  nothing.
 - A natural voice is downloaded only at the learner's word, from what is pinned: every model
   file by its hash (`voice/catalog.py`), every program by the lock for its system
   (`voice/data/`). It runs in an environment and a process of its own, and the core never
@@ -205,6 +209,8 @@ account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day 
   A lesson's words are one request, read part by part as they arrive; once a lesson has
   begun it is never asked for again (ADR-048).
   A question asked during a lesson is one request, two at most; a check of a key is one.
+  Reading a file's pages that are pictures is one request a page, at the learner's word
+  (ADR-060).
   Asking a provider's next model because the one before is away is not a retry of the answer,
   and is bounded by the number of models.
 - Send a model only the fields its own reference lists (`ModelSpec` in `provider.py`), and
@@ -217,7 +223,8 @@ account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day 
 1. Take the next unchecked item from `docs/engineering/PROJECT_STATE.md`.
 2. Read the relevant code, nested `AGENTS.md`, and ADRs before editing.
 3. Build the smallest vertical slice that a learner could use; add tests with it.
-4. `npm run check`; for UI or process changes also `npm run e2e` and look at the app.
+4. `node scripts/check.mjs --e2e`, which runs what the change can reach (ADR-059), and look
+   at the app for UI or process changes. Before a release: `node scripts/check.mjs --all --e2e`.
 5. Update docs (below), review `git diff`, commit with a Conventional Commit.
 
 Report test results only with `PASS`, `FAIL`, `NOT RUN`, or `BLOCKED`. Never infer a pass.

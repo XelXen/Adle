@@ -10,6 +10,7 @@ import type { ElectronApplication } from '@playwright/test';
 
 import { desktopDir, expect, launchApp, repoRoot, test } from './support/app';
 import { exampleScene, fixtureScene, mountRawPlayer, worldToPage } from './support/player';
+import { themesFor } from './support/themes';
 
 /** The colour the window really shows at a point of the page, read by the main process. */
 async function shownAt(
@@ -529,8 +530,8 @@ for (const set of sceneSets) {
       expect(examples.length).toBeGreaterThanOrEqual(set.atLeast);
     });
 
-    for (const file of examples) {
-      for (const theme of ['light', 'dark'] as const) {
+    for (const [index, file] of examples.entries()) {
+      for (const theme of themesFor(index)) {
         test(`${file} runs to completion in the ${theme} theme`, async ({ adle }) => {
           // The longest scene plays for about thirty seconds. A computer busy with other
           // checks has been seen to take four times as long as usual, so the wait is ample.
@@ -540,7 +541,13 @@ for (const set of sceneSets) {
             `${set.prefix}${theme}${file.replace(/[^a-z0-9]/g, '').slice(0, 12)}`,
           );
           await player.waitFor(`m.type === 'ready'`);
-          await player.load(readFileSync(path.join(set.directory, file), 'utf8'), { theme });
+          // Run through as a rehearsal: the same code and the same messages as a learner's
+          // run (tested above), at many times the speed. How a picture keeps pace with
+          // words is the slides' journey, run at a learner's pace.
+          await player.load(readFileSync(path.join(set.directory, file), 'utf8'), {
+            theme,
+            rehearsal: true,
+          });
 
           const settled = await player.waitFor(
             `m.type === 'error' || m.type === 'finished' || (m.type === 'state' && m.state.interactive)`,

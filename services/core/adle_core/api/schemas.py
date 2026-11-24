@@ -120,6 +120,9 @@ class Source(_Output):
     #: Number of pages with extracted text, for paged documents; otherwise 0.
     page_count: int
     created_at: datetime
+    #: Pages that are pictures, not read yet (ADR-060): they can be read with
+    #: ``sources.read_pictures``, which sends each to the AI provider as a picture.
+    picture_pages: list[int]
 
 
 class SourceList(_Output):

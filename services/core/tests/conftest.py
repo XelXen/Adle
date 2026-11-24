@@ -15,6 +15,7 @@ from adle_core.application.services import Services, build_services
 from adle_core.config import Settings
 from adle_core.generation.quota import QuotaLimits
 from adle_core.ingestion.extract import extract_in_process
+from adle_core.ingestion.render import page_picture
 from tests.support.model import FakeProvider
 
 TEST_TOKEN = "test-launch-token-0123456789abcdef0123456789"
@@ -43,6 +44,7 @@ def services(settings: Settings, provider: FakeProvider) -> Iterator[Services]:
         settings,
         LaunchToken(TEST_TOKEN),
         extract=extract_in_process,
+        draw_page=page_picture,
         provider_transport=httpx.MockTransport(provider),
         # The daily allowance is the real one. The per-minute limit is lifted so that a
         # test which makes five requests does not sit waiting for a minute to pass.
