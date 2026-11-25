@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.10] - 2026-11-25
+
+The tenth alpha. Lessons now follow the way each subject is taught, and a whole course can
+be watched: the new **Film** tab makes a narrated film of all of it while you do something
+else. A course and your settings can be saved as files to share or to move to another
+computer, and the Expressive voice is put together from parts.
+
 ### Added
 
 - **Lessons formed the way each subject is taught.** Every lesson still begins with
