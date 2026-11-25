@@ -360,6 +360,46 @@ A detailed drawing on a PDF page goes past pypdf's budget of work (2,000,000 tok
 the page of a textbook chapter with a molecule drawn atom by atom was read on a second try
 with 10,000,000 in 13 s, and the chapter's 21 pages in 24 s.
 
+## A film of a course (2026-11-25)
+
+A film is written a chapter at a time by Kimi K3.1 Pro through NVIDIA, each chapter run by
+ManimGX 0.1.1 on this computer, its lines read by the Kokoro voice (ADR-065). By hand, a
+course of two concepts in history, through Adle's own services, with a film maker's home
+never used before:
+
+| | Took |
+|---|---|
+| Readying the engine's home (a small scene, ended at 20 s) | 22 s, with the opening |
+| Chapter 1, its first file (108 s thinking, 174 s writing) | 320 s; refused before it ran: two lines with more bracketed spans than animations (now mended instead) |
+| Chapter 1, sent back three times | 287, 422 and 272 s; the first two ran, with 11 and then 2 faults of layout (12 s each in the engine); the third was refused, and the one with 2 was kept |
+| Chapter 2, its first file | 376 s; ran with 5 faults (8 s) |
+| Chapter 2, sent back once | 234 s; ran with none (6 s) |
+| Recording chapter 2's lines (chapter 1's were recorded while chapter 2 was written) | 54 s |
+| The whole film looked at once more | 16 s |
+| The video, 1920 by 1080 at 30 frames a second | 30 s, for 7 min 4 s of film; 20.7 MB |
+| **Altogether** | **34.5 minutes, 6 requests** |
+
+Each chapter came to about three and a half minutes (207.9 and 205.2 s), as the guide
+asks. The video's sound has no quiet stretch of four seconds anywhere (ffmpeg's
+`silencedetect` at -45 dB), so a chapter's voice is not lost when the chapters are put
+together. Most of what the engine found was words in a box whose size the model had
+guessed, and arrows across words; the guide now says how to avoid both.
+
+The engine itself is quick once its home is ready, and never ends the first time in a home
+that has never been used (Windows 11, an RTX 4080 Laptop GPU):
+
+| A run of `inspect` | Took |
+|---|---|
+| The first in a new home | did not end in 600 s (ended by hand) |
+| After that first run was ended, after 5, 20 or 60 s | 1.8 to 2.1 s |
+| The same chapter again in the same home | 5.1 s |
+| Adle's small scene in a new home, ended at 20 s; then a real chapter | 20.0 s; 4.6 s |
+| Adle's small scene in a home already ready | 0.9 s |
+
+A first chapter written earlier the same day, before these changes, took 593 s (310 s of it
+thinking). A course of a dozen concepts is therefore two to four hours, nearly all of it
+the model's, and at most 48 requests.
+
 ## What was not measured
 
 - **Generating with AIHubMix's model.** That provider has not answered a request yet (see
@@ -375,6 +415,9 @@ with 10,000,000 in 13 s, and the chapter's 21 pages in 24 s.
 - **A natural voice anywhere else.** Linux and macOS set a voice up only on GitHub's
   machines' terms (the environment is made there by every package check; nothing is
   downloaded). A card with less memory, or a slower connection, was not tried.
+- **A film anywhere else, or a long one.** The film maker was set up and run on this
+  computer alone; on Linux and macOS its locks are checked by GitHub's machines and
+  nothing more. No film of more than two chapters was made with a real model.
 - **Other machines and other operating systems.** One laptop, one system, for every timing
   in this document except the first starts on GitHub's machines above.
 

@@ -1,7 +1,7 @@
 """A stand-in for the model provider that never leaves the process.
 
 ``FakeProvider`` is an httpx transport handler. By default it answers each kind
-of request (curriculum, lesson, scene, ask, check) with a good canned answer; a test can
+of request (curriculum, lesson, scene, ask, check, read, film) with a good canned answer; a test can
 queue specific answers, failures, or malformed output ahead of the defaults.
 Everything that was asked is recorded so tests can assert on what was sent.
 """
@@ -30,6 +30,8 @@ CURRICULUM: dict[str, Any] = json.loads((ANSWERS / "curriculum.json").read_text(
 LESSON: dict[str, Any] = json.loads((ANSWERS / "lesson.json").read_text("utf-8"))
 #: An answer to something the learner asked in the middle of a lesson.
 ANSWER: dict[str, Any] = json.loads((ANSWERS / "answer.json").read_text("utf-8"))
+#: A chapter of a film (ADR-065): passes the rules, and runs clean in the real engine.
+FILM_CHAPTER = (ANSWERS / "film-chapter.py").read_text("utf-8")
 
 
 def sse(text: str, *, usage: dict[str, int] | None = None) -> httpx.Response:
@@ -100,6 +102,8 @@ class FakeProvider:
             return "check"
         if "from a picture of it" in system:
             return "read"
+        if "one chapter of a narrated teaching film" in system:
+            return "film"
         return "lesson"
 
     def kinds(self) -> list[str]:
@@ -122,6 +126,8 @@ class FakeProvider:
             return "ready"
         if kind == "read":
             return READ_PAGE
+        if kind == "film":
+            return FILM_CHAPTER
         user = text_of(body["messages"][1]["content"])
         return INTERACTIVE_SCENE if "Kind: interactive" in user else ANIMATION_SCENE
 

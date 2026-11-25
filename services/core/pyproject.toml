@@ -38,6 +38,8 @@ extend-exclude = [
   "adle_core/sample_course/scenes",
   # Generated from the scene-authoring skill; reformatting its code blocks would make it drift.
   "adle_core/generation/data",
+  # A film chapter as an example for its writer: a ManimGX scene, never imported (ADR-065).
+  "adle_core/film/data",
 ]
 
 [tool.ruff.lint]
@@ -77,7 +79,7 @@ ignore = [
 python_version = "3.12"
 strict = true
 files = ["adle_core"]
-exclude = ["adle_core/sample_course/scenes/"]
+exclude = ["adle_core/sample_course/scenes/", "adle_core/film/data/"]
 plugins = ["pydantic.mypy"]
 warn_unreachable = true
 

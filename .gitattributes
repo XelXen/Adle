@@ -10,3 +10,4 @@
 *.pdf binary
 *.docx binary
 *.onnx binary
+*.mp4 binary

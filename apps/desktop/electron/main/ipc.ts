@@ -31,6 +31,7 @@ import {
 import { callCore } from './core/client';
 import type { CoreProcess } from './core/process';
 import { registerCourseFileHandlers } from './course-files';
+import { registerFilmFileHandlers } from './film-files';
 import { registerDataHandlers } from './data';
 import {
   MAX_IMPORT_FILES,
@@ -315,6 +316,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   registerDataHandlers({ core, dataDir: deps.dataDir }, handle);
   registerCourseFileHandlers({ core, dataDir: deps.dataDir }, handle);
   registerSettingsFileHandlers({ core, keyStore, uiState, dataDir: deps.dataDir }, handle);
+  registerFilmFileHandlers({ core, dataDir: deps.dataDir }, handle);
 
   handle(
     IPC.providerClearApiKey,

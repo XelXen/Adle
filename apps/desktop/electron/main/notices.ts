@@ -35,6 +35,10 @@ const NOTICES: Record<NoticeKind, Notice> = {
     title: 'Your break is over',
     body: 'Ready when you are.',
   },
+  film_ready: {
+    title: 'Your film is ready',
+    body: 'Open Adle to watch it.',
+  },
 };
 
 /** A kind of notification, if it is one Adle has words for. Anything else is refused. */

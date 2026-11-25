@@ -30,6 +30,7 @@ export const IPC = {
   settingsSaveFile: 'adle:settings:save-file',
   settingsChooseFile: 'adle:settings:choose-file',
   settingsBringIn: 'adle:settings:bring-in',
+  filmsSaveFile: 'adle:films:save-file',
   dataSaveCopy: 'adle:data:save-copy',
   dataRestoreCopy: 'adle:data:restore-copy',
   dataEraseAll: 'adle:data:erase-all',
@@ -72,6 +73,7 @@ export const NOTICE_KINDS = [
   'answer_ready',
   'writing_stopped',
   'break_over',
+  'film_ready',
 ] as const;
 export type NoticeKind = (typeof NOTICE_KINDS)[number];
 
@@ -193,6 +195,14 @@ export interface CourseFileFound {
   title: string;
   kind: CourseFileKind;
   counts: CourseFileCounts;
+}
+
+/** A film was written where the learner chose (ADR-065). */
+export interface SavedFilmFile {
+  /** The name of the video, for saying what was saved. Never a path. */
+  fileName: string;
+  /** Its subtitles were saved beside it, under the same name. */
+  withCaptions: boolean;
 }
 
 /** A new course made of what a file held. */
@@ -368,6 +378,14 @@ export interface AdleBridge {
       parts: SettingsFileParts,
       options: { password: string | null; setUpVoice: boolean },
     ): Promise<CoreResult<SettingsBroughtIn>>;
+  };
+  /**
+   * A film of a whole course (ADR-065). The page says which film; where it is saved is
+   * asked in a window of the operating system.
+   */
+  films: {
+    /** Save a film, with its subtitles beside it. Resolves with `null` if they backed out. */
+    saveFile(filmId: string): Promise<CoreResult<SavedFilmFile | null>>;
   };
   /**
    * The learner's own data as a whole. Each of these asks the learner in a window of the

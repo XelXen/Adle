@@ -83,7 +83,8 @@ def lesson_rules() -> schemas.LessonRules:
 @router.delete("/courses/{course_id}", operation_id="courses.delete", status_code=204)
 def delete_course(course_id: str, services: ServicesDep) -> Response:
     # Whatever is being written or read for it stops first: nothing more is asked of a
-    # provider for a course the learner is removing.
+    # provider for a course the learner is removing. Its film stops too (ADR-065).
+    services.films.stop_for_course(course_id)
     services.generation.stop_for_course(course_id)
     services.courses.delete(course_id)
     # Its lessons' recorded narration goes with them (ADR-042).

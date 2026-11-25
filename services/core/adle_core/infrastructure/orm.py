@@ -47,6 +47,9 @@ LEARNER_EVENT_KINDS = (
 )
 MASTERY_STATES = ("not_assessed", "building", "needs_evidence", "demonstrated")
 LESSON_ORIGINS = ("sample", "generated")
+#: A film is being made, was left before it was made (stopped, failed, or Adle closed), or
+#: can be watched (ADR-065).
+FILM_STATUSES = ("making", "unfinished", "ready")
 MODEL_USAGE_OUTCOMES = (
     "pending",
     "ok",
@@ -630,3 +633,41 @@ class Job(Base):
     error: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
+
+
+class Film(Base):
+    """A film of a whole course (ADR-065): one a course, a chapter for each concept.
+
+    What is being made and what was made of it are here; the video and its subtitles are
+    files under ``films/<id>/``, and the work on them under ``film-work/<id>/``.
+    """
+
+    __tablename__ = "films"
+    __table_args__ = (_one_of("status", FILM_STATUSES),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="making")
+    #: The course's title when the film was begun.
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Its chapters, in order: ``[{"concept_id", "title", "state", "by", "problems",
+    #: "lines"}]``; ``state`` is ``waiting``, ``written`` (by a model, checked) or
+    #: ``in_words`` (by Adle, when a model's would not run).
+    chapters: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    #: The voice it is read in, when it is read in one: its size and how it is asked for.
+    voice: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    #: Once made: how long it is, how large its video is, and when each chapter begins.
+    seconds: Mapped[float | None] = mapped_column(Float)
+    size: Mapped[int | None] = mapped_column(Integer)
+    marks: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    #: Sentences for the learner about how it was made.
+    notes: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    #: Which provider and model wrote its chapters (see ``GenerationService._written_by``).
+    written_by: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    #: Why it is unfinished, in the learner's words.
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime)

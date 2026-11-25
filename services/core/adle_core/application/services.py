@@ -21,6 +21,7 @@ from adle_core.application.assessment import AssessmentService
 from adle_core.application.course_sharing import CourseFileService
 from adle_core.application.courses import CourseService
 from adle_core.application.curriculum import CurriculumService
+from adle_core.application.films import FilmService
 from adle_core.application.generation import GenerationService
 from adle_core.application.jobs import JobRunner
 from adle_core.application.learner import LearnerService
@@ -33,6 +34,7 @@ from adle_core.application.sample_course import SampleCourseService
 from adle_core.application.settings_file import SettingsFileService
 from adle_core.application.sources import PageDrawer, SourceService
 from adle_core.config import Settings
+from adle_core.film.runtime import FilmPaths
 from adle_core.generation.credentials import CredentialVault
 from adle_core.generation.provider import ChatClient
 from adle_core.generation.quota import QuotaLimits
@@ -75,6 +77,8 @@ class Services:
     course_files: CourseFileService
     #: The core's part of a settings file (ADR-064).
     settings_file: SettingsFileService
+    #: A film of a whole course, and what makes it (ADR-065).
+    films: FilmService
 
     def close(self) -> None:
         """Stop background work and release the database. Safe to call more than once."""
@@ -190,6 +194,19 @@ def build_services(
     )
     # A file written for the learner and never collected is not kept.
     course_files.clear_handed_over()
+    films = FilmService(
+        database,
+        jobs,
+        gateway,
+        curriculum,
+        generation,
+        narration,
+        FilmPaths.under(settings.data_dir),
+        handover_dir=settings.handover_dir,
+    )
+    # A film being made when Adle closed is unfinished now, and one whose video is gone
+    # is no longer offered.
+    films.settle()
     return Services(
         settings=settings,
         launch_token=launch_token,
@@ -214,6 +231,7 @@ def build_services(
         narration=narration,
         course_files=course_files,
         settings_file=SettingsFileService(learner, narration),
+        films=films,
     )
 
 

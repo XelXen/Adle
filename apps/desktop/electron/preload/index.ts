@@ -79,6 +79,10 @@ const bridge: AdleBridge = {
       options: { password: string | null; setUpVoice: boolean },
     ) => ipcRenderer.invoke(IPC.settingsBringIn, token, parts, options),
   },
+  films: {
+    // Which film; where it goes is asked by the main process.
+    saveFile: (filmId: string) => ipcRenderer.invoke(IPC.filmsSaveFile, filmId),
+  },
   data: {
     // No arguments: the main process asks the learner where, which, and whether.
     saveCopy: () => ipcRenderer.invoke(IPC.dataSaveCopy),

@@ -1,0 +1,4 @@
+chapter_03.py:6: in construct
+    law = m.MathTex(r"a = \frac{F}{m}", tex_to_color_map={"a": m.YELLOW, "F": m.RED})
+  (raised in manimgx/mobjects\text.py:1177, in _one_formula)
+TypstError: error: unknown command: \fr

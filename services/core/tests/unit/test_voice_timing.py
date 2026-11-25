@@ -8,6 +8,7 @@ With the stand-in engine (tests/support/fake_voice_engine.py), which takes
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -96,11 +97,14 @@ def test_a_voice_is_timed_where_it_is_set_up(
     assert kokoro is not None
     timed = VoiceInstaller(paths).verify(kokoro)
     assert timed is not None
-    # As much as a lesson's first part, from an engine started cold.
-    assert timed["start"] >= 0.2 * len(SETUP_LINES)
+    # As much as a lesson's first part, from an engine started cold. A time is read with
+    # the monotonic clock, which on Windows ticks every 15.6 ms: one span read with it can
+    # come out short by up to a tick, so a tick is allowed for.
+    tick = time.get_clock_info("monotonic").resolution
+    assert timed["start"] >= 0.2 * len(SETUP_LINES) - tick
     # The last line: its words take 0.3 s each to say, and 0.2 s more to make.
     words = len(SETUP_LINES[-1].replace(",", "").split())
-    assert timed["rate"] > 0.2 / (0.3 * words)
+    assert timed["rate"] > (0.2 - tick) / (0.3 * words)
     assert not list(paths.root.glob("probe*"))
 
 

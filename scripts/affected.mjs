@@ -24,6 +24,7 @@ const SLIDE = 'slide-player.spec.ts';
 /** What the AI writes, and who is asked: a lesson, a plan, a question, a key. */
 const AI = [
   'generation.spec.ts',
+  'film.spec.ts',
   'providers.spec.ts',
   'provider-key.spec.ts',
   'ask.spec.ts',
@@ -46,7 +47,8 @@ const NO_JOURNEY = [
   /^\.github\//,
   /^\.gitignore$/,
   /^scripts\//,
-  /^services\/core\/tests\//,
+  // The core's tests, but for the stand-ins a journey runs in the place of an engine.
+  /^services\/core\/tests\/(?!support\/(fake_voice_engine\.py|fake_film_engine\.py|film\.mp4)$)/,
   /\.test\.(ts|tsx|mjs)$/,
 ];
 
@@ -56,6 +58,19 @@ const RULES = [
   [/^apps\/desktop\/e2e\/fixtures\/slides\//, [SLIDE]],
   [/^apps\/desktop\/e2e\/fixtures\/figures\//, [SCENE]],
   [/^skills\/wanim-scene-authoring\/examples\//, [SCENE]],
+  // The stand-ins a journey runs in the place of an engine (ADR-042, ADR-065).
+  [/^services\/core\/tests\/support\/fake_voice_engine\.py$/, ['voice.spec.ts']],
+  [/^services\/core\/tests\/support\/(fake_film_engine\.py|film\.mp4)$/, ['film.spec.ts']],
+  // A film of a whole course (ADR-065).
+  [
+    new RegExp(`^${CORE}(film/|application/films\\.py$|api/routes/films\\.py$)`),
+    ['film.spec.ts', 'security.spec.ts'],
+  ],
+  [/^fixtures\/model-answers\/film-chapter\.py$/, ['film.spec.ts']],
+  [
+    /^apps\/desktop\/(electron\/main\/film-file|renderer\/src\/(lib\/films|app\/FilmWatch|screens\/course\/Film))/,
+    ['film.spec.ts', 'security.spec.ts'],
+  ],
   [new RegExp(`^${CORE}generation/layout\\.py$`), [SLIDE, SCENE]],
   [new RegExp(`^${CORE}generation/slides\\.py$`), [SLIDE, 'generation.spec.ts']],
   [new RegExp(`^${CORE}generation/figures\\.py$`), [SCENE, 'generation.spec.ts']],

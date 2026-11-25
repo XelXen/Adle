@@ -29,7 +29,7 @@ import re
 import shutil
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -85,6 +85,14 @@ KIND_VOICE_SETUP = "voice_setup"
 KIND_VOICE_WARMUP = "voice_warmup"
 #: A short sample of a voice, for the learner to hear before choosing it (ADR-057).
 KIND_VOICE_SAMPLE = "voice_sample"
+#: Lines of a film of a whole course, a chapter's at a time (ADR-065).
+KIND_FILM_NARRATION = "film_narration"
+#: How a film is delivered in the Expressive voice: the learner says who reads it, as they
+#: do for lessons, and a film adds only this (ADR-057, ADR-065).
+FILM_DELIVERY = "As the narrator of a film that teaches: clear, warm and unhurried."
+#: A line the voice could not say more often than this in a row, and the engine is taken
+#: to be broken: the rest of the film is quiet rather than waited for.
+_FILM_FAILURES_IN_A_ROW = 3
 #: How many of the lessons the learner opened last, and has not finished, are recorded in a
 #: new voice as soon as it is chosen, the latest first (ADR-057).
 RECORD_AHEAD_LESSONS = 2
@@ -1036,6 +1044,124 @@ class NarrationService:
     def ensure_not_recording(self, lesson_id: str) -> None:
         if self._jobs.find_active(KIND_NARRATION, lesson_id) is not None:
             raise ConflictError("The narration of this lesson is being recorded.")
+
+    # -- a film (ADR-065) --------------------------------------------------------------------
+
+    def film_voice(self) -> dict[str, Any] | None:
+        """The voice a film begun now is read in: the natural voice that reads lessons, as
+        it is chosen now; none where no natural voice reads them."""
+        status = self.status()
+        tier = find_tier(status.tier or "")
+        if not status.enabled or tier is None:
+            return None
+        if tier.id == "expressive":
+            return {"tier": tier.id, "design": status.design}
+        return {"tier": tier.id, "speaker": status.speakers[tier.id]}
+
+    def film_voice_ready(self, voice: dict[str, Any]) -> bool:
+        """Whether a film's voice can still be recorded here."""
+        tier = find_tier(str(voice.get("tier", "")))
+        return tier is not None and tier.id in self.status().ready
+
+    def voice_name(self, voice: dict[str, Any]) -> str:
+        """A film's voice as a learner would name it."""
+        tier = find_tier(str(voice.get("tier", "")))
+        if tier is None:
+            return "the natural voice"
+        speaker = next((item for item in tier.speakers if item.id == voice.get("speaker")), None)
+        return f"{tier.name} ({speaker.name})" if speaker is not None else tier.name
+
+    @staticmethod
+    def _film_asked(voice: dict[str, Any], folder: Path) -> tuple[Tier, dict[str, Any]]:
+        """How the engine is asked for a film's voice."""
+        tier = find_tier(str(voice.get("tier", "")))
+        if tier is None:
+            raise VoiceUnavailableError()
+        if tier.id == "expressive":
+            design = f"{voice.get('design') or DEFAULT_DESIGN} Its delivery here: {FILM_DELIVERY}"
+            return tier, NarrationService._designed(design, folder)
+        return tier, {"tier": tier.id, "speaker": str(voice.get("speaker") or tier.default_speaker)}
+
+    def record_film(
+        self, film_id: str, folder: Path, voice: dict[str, Any], lines: Sequence[str]
+    ) -> JobSnapshot:
+        """Record lines of a film in its voice, into the film's own folder, in the voice
+        lane: behind what is being recorded already, and never two at once."""
+        if not self.film_voice_ready(voice):
+            raise VoiceUnavailableError()
+        tier, asked = self._film_asked(voice, folder)
+        said = list(dict.fromkeys(line for line in lines if line))
+        return self._jobs.submit(
+            KIND_FILM_NARRATION,
+            lambda context: self._record_film(tier, asked, folder, said, context),
+            subject_id=film_id,
+            lane=LANE_VOICE,
+        )
+
+    def _record_film(
+        self,
+        tier: Tier,
+        voice: dict[str, Any],
+        folder: Path,
+        lines: list[str],
+        context: JobContext,
+    ) -> dict[str, Any]:
+        folder.mkdir(parents=True, exist_ok=True)
+        engine = self._engines.take(tier.family)
+        recorded = failed = in_a_row = 0
+        try:
+            for done, text in enumerate(lines):
+                context.check_cancelled()
+                name = self._name(voice, text)
+                clip, timing = folder / f"{name}.clip", folder / f"{name}.json"
+                if clip.is_file() and timing.is_file():
+                    continue
+                context.report(done, len(lines), "Recording the voice")
+                try:
+                    spoken = engine.speak(text, voice, clip, cancelled=lambda: context.cancelled)
+                except VoiceEngineError:
+                    if context.cancelled:
+                        raise JobCancelledError(None) from None
+                    # A line that cannot be said is quiet in the film; the others are not.
+                    failed += 1
+                    in_a_row += 1
+                    if in_a_row >= _FILM_FAILURES_IN_A_ROW:
+                        break
+                    continue
+                in_a_row = 0
+                timing.write_text(
+                    json.dumps({"seconds": spoken.seconds, "words": spoken.words, "tier": tier.id}),
+                    encoding="utf-8",
+                )
+                recorded += 1
+        except OSError:
+            # The film was removed while it was recorded, its folder with it.
+            if context.cancelled or not folder.is_dir():
+                raise JobCancelledError(None) from None
+            raise
+        finally:
+            self._engines.give_back()
+        context.report(len(lines), len(lines), "Done")
+        return {"kind": "film_narration", "recorded": recorded, "failed": failed}
+
+    def film_line(
+        self, folder: Path, voice: dict[str, Any], text: str
+    ) -> tuple[str, float, list[dict[str, float | int]]] | None:
+        """A line of a film as it was recorded: its clip's name in ``folder``, how long it
+        is, and where each word is; or nothing, for a line not recorded."""
+        try:
+            _, asked = self._film_asked(voice, folder)
+        except VoiceUnavailableError:
+            return None
+        name = self._name(asked, text)
+        try:
+            timing = json.loads((folder / f"{name}.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if not (folder / f"{name}.clip").is_file() or not isinstance(timing, dict):
+            return None
+        words = [word for word in timing.get("words", []) if isinstance(word, dict)]
+        return f"{name}.clip", float(timing.get("seconds", 0)), words
 
 
 def _parts(parts: dict[str, str]) -> dict[str, str]:

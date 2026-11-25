@@ -4,12 +4,14 @@ Long work (importing documents, generating lessons) must not block a request
 or the interface. A job is a row in the database plus a function run on a
 worker thread:
 
-* there are three lanes, each with one worker. Long work (an import, a lesson, a
+* there are four lanes, each with one worker. Long work (an import, a lesson, a
   list of concepts) runs in the main lane one job at a time, so heavy work is
   naturally bounded. Short things the learner is sitting and waiting for (a
   question asked in the middle of a lesson, a check that a key works) run in
   the quick lane, so that they never wait behind a lesson that takes minutes;
-  recording a lesson's narration runs in a lane of its own;
+  recording a lesson's narration runs in a lane of its own; and so does a film of
+  a whole course, which takes an hour or more, so that lessons go on being
+  written while it is made (ADR-065);
 * progress and outcome are persisted, so the interface can poll for them;
 * cancellation is cooperative: the work checks ``context.cancelled``;
 * a job that was still pending when the app closed is marked as interrupted
@@ -45,7 +47,10 @@ LANE_QUICK = "quick"
 #: Recording a lesson's narration on this computer's graphics card (ADR-042). It neither
 #: waits behind a lesson being written nor holds one up.
 LANE_VOICE = "voice"
-LANES = (LANE_MAIN, LANE_QUICK, LANE_VOICE)
+#: A film of a whole course, and setting up what makes it (ADR-065): hours of work that
+#: hold nothing else up.
+LANE_FILM = "film"
+LANES = (LANE_MAIN, LANE_QUICK, LANE_VOICE, LANE_FILM)
 
 
 @dataclass(frozen=True, slots=True)

@@ -81,6 +81,13 @@ describe('providerCharacter', () => {
       limits_published: false,
     });
     expect(writer).toBe('With “Automatic”, writes lessons, suggested concepts and answers.');
+    // Asked first for films too, it says so.
+    expect(
+      providerCharacter({
+        first_for: ['ask', 'check', 'curriculum', 'lesson', 'film'],
+        limits_published: false,
+      }),
+    ).toBe('With “Automatic”, writes lessons, films, suggested concepts and answers.');
     // A provider asked first for everything has nothing to tell it apart.
     expect(
       providerCharacter({
@@ -163,12 +170,20 @@ describe('routeLines', () => {
         curriculum: route('AIHubMix'),
         lesson: route('NVIDIA NIM', 'This is long work.', 'Nemotron 3 Ultra'),
         scene: route('AIHubMix', 'Its model is made for code.', 'Coding Kimi K3 (free)'),
+        film: route('NVIDIA NIM', '', 'Kimi K3.1 Pro'),
         // Nobody chosen reads pictures (ADR-060): the line is left out.
         read: route(''),
       },
       providers: [],
     });
-    expect(lines.map((line) => line.work)).toEqual(['ask', 'curriculum', 'lesson', 'scene']);
+    expect(lines.map((line) => line.work)).toEqual([
+      'ask',
+      'curriculum',
+      'lesson',
+      'scene',
+      'film',
+    ]);
+    expect(lines[4]).toMatchObject({ label: 'Films', model: 'Kimi K3.1 Pro' });
     expect(lines[3]).toMatchObject({ label: 'Pictures', model: 'Coding Kimi K3 (free)' });
     expect(lines[0]).toMatchObject({
       label: 'Questions',
@@ -188,6 +203,7 @@ describe('routeLines', () => {
         curriculum: route('NVIDIA NIM'),
         lesson: route('NVIDIA NIM'),
         scene: route('NVIDIA NIM'),
+        film: route('NVIDIA NIM'),
         read: { ...route('NVIDIA NIM', '', 'Nemotron 3.5 Super'), provider_ids: ['nvidia'] },
       },
       providers: [{ provider_id: 'nvidia', key_configured: true }],
@@ -207,6 +223,7 @@ describe('routeLines', () => {
         curriculum: route('AIHubMix'),
         lesson: route('AIHubMix'),
         scene: route('AIHubMix'),
+        film: route('AIHubMix'),
         read: { ...route('NVIDIA NIM'), provider_ids: ['nvidia'] },
       },
       providers: [

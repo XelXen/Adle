@@ -124,6 +124,29 @@ most, a file's name.
   computer would be here and what setting it up downloads (`setUpNote`); afterwards it
   lists what is different, and the page begins again when the learner presses Done.
 
+## A film of a course
+
+- A course's **Film** tab (`FilmPanel`, ADR-065) shows where its film stands, as the core
+  says it (`films.get`, `films.maker_status`; `filmStage` in `lib/films.ts`): the film
+  maker to set up (what it downloads, and from where, said first: it is downloaded only
+  when the learner presses it), what stands in the way, the film to make (what is sent,
+  and the most requests it may cost, one press away with `WhatIsSent`), the film being
+  made chapter by chapter, one left unfinished to continue, and one made.
+- **A film is played from what the core holds**: `fetchFilm` asks for its video a part at
+  a time (`films.video_part`) and makes a `blob:` of it; its words come as cues
+  (`films.captions`) and become WebVTT in the page, as plain text (`vttOf`). The page names
+  a film by its id and nothing else, and never names a place.
+- **Saving a film** is `window.adle.films.saveFile(filmId)`, checked in
+  `film-file-rules.ts` (pure, unit tested): the core writes it into its own folder
+  (`films.save_file`, internal), the main process asks where in a save dialog and moves
+  it there, its subtitles beside it unless a file of that name is there already.
+- A film takes an hour or more, so it is watched app-wide by `FilmWatch` (the rail's
+  "Making a film", a toast and the notification `film_ready` when it is ready, a toast and
+  `writing_stopped` when it could not be finished), not by `WritingProvider`. A screen that
+  starts a film calls its `refresh()`.
+- A journey uses a stand-in film engine and the stand-in provider (`e2e/film.spec.ts`),
+  never a real download.
+
 ## When the app itself fails
 
 - What to do about a crashed or hung page, an uncaught error, or a core that died is decided

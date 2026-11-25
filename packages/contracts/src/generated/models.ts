@@ -290,6 +290,69 @@ export interface CourseFileToBringIn {
   holds: CourseFileHolds;
   path: string;
 }
+export interface CourseFilm {
+  film: Film | null;
+  plan: FilmPlanOut;
+}
+export interface Film {
+  chapters: FilmChapter[];
+  created_at: string | null;
+  finished_at: string | null;
+  id: string;
+  making: Job | null;
+  notes: string[];
+  reason: string | null;
+  seconds: number | null;
+  size: number | null;
+  status: 'making' | 'unfinished' | 'ready';
+  title: string;
+  voice: string | null;
+  written_by: {
+    [k: string]: unknown | undefined;
+  };
+}
+export interface FilmChapter {
+  problems: number;
+  start: number | null;
+  state: 'waiting' | 'written' | 'in_words';
+  title: string;
+}
+export interface Job {
+  course_id: string | null;
+  created_at?: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  id: string;
+  kind: string;
+  progress_detail?: JobProgressDetail | null;
+  progress_done: number;
+  progress_message: string;
+  progress_total: number;
+  result: unknown;
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+  subject_id: string | null;
+}
+/**
+ * What long work is doing just now, for a learner who is waiting for it.
+ *
+ * Nothing here is the answer itself: a stage, and the titles of what has been written.
+ *
+ */
+export interface JobProgressDetail {
+  outline?: string[];
+  stage?: ('waiting' | 'thinking' | 'writing' | 'drawing' | 'voicing') | null;
+  title?: string | null;
+}
+/**
+ * What a film of the course would be, before it is begun or continued.
+ *
+ */
+export interface FilmPlanOut {
+  blocked: string | null;
+  chapters: string[];
+  requests_at_most: number;
+  voice: string | null;
+}
 export interface CourseList {
   courses: Course[];
 }
@@ -357,6 +420,38 @@ export interface SceneRef {
   fallback_text: string;
   scene_id: string;
 }
+export interface FilmCaptions {
+  cues: FilmCue[];
+}
+export interface FilmCue {
+  end: number;
+  start: number;
+  text: string;
+}
+/**
+ * Whether the film maker is on this computer, and what setting it up takes.
+ *
+ */
+export interface FilmMakerStatus {
+  borrowed: boolean;
+  download_bytes: number;
+  fits: boolean;
+  installed_bytes: number;
+  ready: boolean;
+  setting_up: Job | null;
+  sources: string[];
+}
+/**
+ * A part of a film's video, for the page to put together and play.
+ *
+ */
+export interface FilmVideoPart {
+  data: string;
+  mime: 'video/mp4';
+  part: number;
+  parts: number;
+  size: number;
+}
 export interface Health {
   api_version: string;
   status: string;
@@ -392,32 +487,6 @@ export interface InteractionSegment {
   scene: SceneRef;
   title: string;
   type: 'interaction';
-}
-export interface Job {
-  course_id: string | null;
-  created_at?: string | null;
-  error_code: string | null;
-  error_message: string | null;
-  id: string;
-  kind: string;
-  progress_detail?: JobProgressDetail | null;
-  progress_done: number;
-  progress_message: string;
-  progress_total: number;
-  result: unknown;
-  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-  subject_id: string | null;
-}
-/**
- * What long work is doing just now, for a learner who is waiting for it.
- *
- * Nothing here is the answer itself: a stage, and the titles of what has been written.
- *
- */
-export interface JobProgressDetail {
-  outline?: string[];
-  stage?: ('waiting' | 'thinking' | 'writing' | 'drawing' | 'voicing') | null;
-  title?: string | null;
 }
 export interface JobList {
   jobs: Job[];
@@ -916,7 +985,7 @@ export interface ProviderCheck {
 export interface ProviderChoice {
   base_url: string;
   display_name: string;
-  first_for: ('ask' | 'curriculum' | 'lesson' | 'scene' | 'check' | 'read')[];
+  first_for: ('ask' | 'curriculum' | 'lesson' | 'scene' | 'check' | 'read' | 'film')[];
   in_use: boolean;
   key_configured: boolean;
   limits_published: boolean;
@@ -971,6 +1040,7 @@ export interface ProviderRoute {
 export interface ProviderRoutes {
   ask: ProviderRoute;
   curriculum: ProviderRoute;
+  film: ProviderRoute;
   lesson: ProviderRoute;
   read: ProviderRoute;
   scene: ProviderRoute;
@@ -997,6 +1067,15 @@ export interface SavedCourseFile {
   counts: CourseFileCounts;
   lessons_left_out: number;
   name: string;
+  suggested_name: string;
+}
+/**
+ * A film written for the desktop shell to move where the learner chose.
+ *
+ */
+export interface SavedFilmFile {
+  captions_name: string | null;
+  file_name: string;
   suggested_name: string;
 }
 /**

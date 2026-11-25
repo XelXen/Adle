@@ -186,6 +186,10 @@ NVIDIA_ORDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("curriculum", (_ULTRA, _SUPER, _KIMI, _MISTRAL)),
     ("lesson", (_ULTRA, _KIMI, _MISTRAL)),
     ("scene", (_KIMI, _ULTRA)),
+    # A chapter of a film is a scene file of three or four minutes (ADR-065). Kimi wrote one
+    # by hand on 2026-11-24 that ran, its layout clean but for a table, after two rounds of
+    # being told what the engine found (491 s, then 159 and 230 s).
+    ("film", (_KIMI, _ULTRA, _MISTRAL)),
     # The one model whose reading of a picture was seen (ADR-060). Mistral Large 4's
     # reference takes pictures too; it is not asked until it has been tried by hand.
     ("read", (_SUPER,)),
@@ -212,6 +216,8 @@ class TypicalSeconds:
     check: int = 8
     #: One page read from its picture.
     read: int = 10
+    #: One chapter of a film, written once (ADR-065).
+    film: int = 300
 
     def of(self, purpose: str) -> int:
         found = getattr(self, purpose, None)
@@ -244,6 +250,10 @@ class ProviderConfig:
     read_timeout_seconds: float = 120.0
     #: The longest one request may take in all.
     total_timeout_seconds: float = 420.0
+    #: The same, for one kind of request only (``purpose``, seconds): a chapter of a film
+    #: is a long file a model thinks over for minutes, and nobody is waiting for it
+    #: (ADR-065). A silence longer than ``read_timeout_seconds`` still ends it.
+    total_timeout_for: tuple[tuple[str, float], ...] = (("film", 1800.0),)
 
     def __post_init__(self) -> None:
         if not self.models:
@@ -261,6 +271,10 @@ class ProviderConfig:
     def model(self) -> str:
         """The model used unless it is unavailable."""
         return self.models[0].id
+
+    def total_seconds(self, purpose: str) -> float:
+        """The longest one request of this kind may take in all."""
+        return dict(self.total_timeout_for).get(purpose, self.total_timeout_seconds)
 
     def models_for(self, purpose: str) -> tuple[ModelSpec, ...]:
         """The models to ask for a kind of request, in order: its own order, or all of them.
@@ -323,7 +337,9 @@ NVIDIA = ProviderConfig(
     # With each kind of request at the model that does it soonest (ADR-039), as measured
     # on 2026-11-21: a lesson's text in about two minutes, a picture in two to three, a
     # list of concepts in half a minute, an answer in ten seconds.
-    typical=TypicalSeconds(lesson=120, scene=150, curriculum=35, ask=10, check=10, read=8),
+    typical=TypicalSeconds(
+        lesson=120, scene=150, curriculum=35, ask=10, check=10, read=8, film=420
+    ),
     # These models think before they answer, and the shared endpoints queue: a small
     # question took forty seconds to begin to be answered when this was written.
     read_timeout_seconds=180.0,
@@ -833,7 +849,7 @@ class ChatClient:
         if request.json_output and spec.json_mode:
             body["response_format"] = {"type": "json_object"}
 
-        deadline = self._monotonic() + self.config.total_timeout_seconds
+        deadline = self._monotonic() + self.config.total_seconds(request.purpose)
         try:
             with self._client.stream(
                 "POST",

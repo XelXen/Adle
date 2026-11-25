@@ -196,6 +196,39 @@ results is then treated exactly as a scene a model wrote: every layer below appl
 - Web storage is available inside a player origin for the life of that frame. Origins are
   single-use and all storage is cleared at startup.
 
+### A chapter of a film (ADR-065)
+
+A film of a whole course is the one place where code a model wrote runs **outside the
+player's frame**: each chapter is a ManimGX file, run by the film engine, a program of its
+own on a Python of its own, on the learner's computer and as the learner. Nothing in it is
+sandboxed by the operating system. What stands between a chapter and the computer:
+
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| Nothing of a chapter runs before the policy has passed it | `film/policy.py` (`check_chapter_source`) parses the file and looks at every node: only `manimgx as m`, `numpy as np` and `math`; one scene; only the names and members of the pinned engine that are listed (`film/data/names.json`, written from the engine by `scripts/dev/film_names.py`), with files, pictures from files, sound, the voice, the typesetter's own code, the engine's settings, the film being made and three dimensions left out; no underscore names or attributes; a few of Python's own names, none that looks inside an object or runs text, and none of the others may be bound either; no `while`, `try`, `with`, `global`, decorators or `**`; no text holding an address, a path, or a typesetter's command that reads a file. What Adle mends in a file (an engine name used bare, `np` or `math` not imported, brackets beyond a line's animations) it mends before the check, and the mended file is checked whole | `test_film_policy.py`: 72 hostile files, each refused (another import, `__import__`, `open` bound and used, a class's machinery, `getattr`, `vars`, `eval`, numpy reading or writing a file, pictures and drawings from files, sound, the engine's voices, a voice of the file's own, the engine's settings, the typesetter's preamble directly and in a mapping, `**`, font and code files, a format string, paths and addresses in text, TeX's `\input` and Typst's `#read`, the film and its clock, a window, a camera, a 3-D scene, and every refused statement), and nothing of a refused file run |
+| A chapter runs only inside Adle's own files | The engine is given `take_NN.py` or `film.py`, never the chapter: they import `adle_voice.py` first, which takes the network away from the process (`socket.connect`, `create_connection`, `getaddrinfo`) and gives every scene Adle's voice (the engine's own default voice is a service on the internet) | `test_film_script.py`; the films made by hand (ADR-065) |
+| The engine has nothing of this computer's | `bare_environment`: no setting for Python, no profile, its home, temporary files and caches a folder of the film maker's own (kept between runs: a first run in an empty home never ends, so it is readied by a small scene ended after twenty seconds), and a proxy that leads nowhere; started with `-I -B`; its output read up to a bound and never logged | `test_film_install.py` |
+| A chapter that never ends is ended | Five minutes for a chapter alone, more for a long film by its length; the learner's Stop ends it at once | `test_film_install.py` (a scene that hangs, ended in time and when stopped) |
+| What the engine says of a chapter goes only to the model that wrote it | `report.findings`, by the chapter's own lines, at most fourteen sentences of 300 characters; the core logs only counts | `test_film_report.py` |
+| The number of requests is bounded, and said first | One a chapter, and `MAX_MENDS` (three) more at most; the bound is beside "Make the film", one press away | `test_films.py`; `e2e/film.spec.ts` |
+| The film maker is downloaded only at the learner's word, and only what is pinned | `FilmInstaller`: the Python by its size and SHA-256 (`film/catalog.py`), unpacked with `tarfile`'s `data` filter; ManimGX and what it needs by the lock for this system with `--require-hashes --no-deps --only-binary=:all:`; the engine draws a circle here before it is called set up; only its own folder is ever removed | `test_film_install.py` (a changed or longer Python refused, an archive that reaches out of its folder refused, a failed install leaves nothing) |
+| The page plays a film and names no place | The video is fetched from the core a part at a time into a `blob:`; its words become WebVTT as plain text; saving is `films.saveFile(filmId)`, the place asked in the system's own window | `film-file-rules.test.ts`; `films.test.ts`; `e2e/security.spec.ts`; `e2e/film.spec.ts` |
+
+**Residual risks, accepted**
+
+- **The policy is a list, not a sandbox.** A way out of the engine it does not know of is a
+  way out, as the learner. The list is short on purpose and every name on it was read; text
+  put together while the file runs is not seen by the policy, and the engine gives text to
+  its typesetter only escaped (tried by hand: `#read(...)` and `\input` in a chapter's text
+  are set as text or refused).
+- **The network is taken away inside the engine's process, not by the system.** A library
+  of the engine that opened a connection without Python's `socket` could reach the network.
+- **The engine's programs are trusted as their publishers built them**: ManimGX, its Rust
+  core and its fonts, numpy, Pillow and the rest, from the Python Package Index, and the
+  Python from python-build-standalone, each by its hash.
+- **A chapter can show what is wrong**, as any picture a model drew can. A film is the
+  model's work and says so.
+
 ## Imported documents
 
 A learner's file is untrusted input to parsers written by third parties. Details and reasoning:
@@ -403,7 +436,9 @@ request in any case. See ADR-013.
 - No telemetry, analytics, or crash upload. No external service other than the AI providers
   the learner gave a key to, and only when the learner asks for something they write; and,
   when the learner sets a natural voice up, its downloads from Hugging Face, the Python
-  Package Index, PyTorch and GitHub, which carry nothing of theirs (ADR-042). Pictures of a
+  Package Index, PyTorch and GitHub, which carry nothing of theirs (ADR-042); and, when the
+  learner sets the film maker up, its downloads from GitHub and the Python Package Index,
+  which carry nothing of theirs either (ADR-065). Pictures of a
   file's pages go to a provider only when the learner presses "Read them" on that file
   (ADR-060).
 - A notification of the operating system carries fixed words chosen in the main process by

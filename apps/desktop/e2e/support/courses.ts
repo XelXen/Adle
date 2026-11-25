@@ -119,7 +119,7 @@ export async function saveProviderKey(
 /** Open one of a course's tabs. A course with concepts opens on "Learn". */
 export async function openCourseTab(
   page: Page,
-  name: 'Learn' | 'Curriculum' | 'Materials',
+  name: 'Learn' | 'Curriculum' | 'Materials' | 'Film',
 ): Promise<void> {
   const tab = page.getByRole('tab', { name, exact: true });
   await tab.click();

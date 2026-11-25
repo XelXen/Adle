@@ -56,6 +56,28 @@ describe('the journeys a change needs (ADR-059)', () => {
     ]);
   });
 
+  it('runs the film’s journey for a change to the film, its stand-ins, or its chapter', () => {
+    expect(
+      journeysFor([
+        'services/core/adle_core/film/policy.py',
+        'services/core/adle_core/application/films.py',
+        'apps/desktop/renderer/src/screens/course/FilmPanel.tsx',
+        'apps/desktop/electron/main/film-files.ts',
+      ]),
+    ).toEqual(['film.spec.ts', 'security.spec.ts']);
+    expect(
+      journeysFor([
+        'services/core/tests/support/fake_film_engine.py',
+        'fixtures/model-answers/film-chapter.py',
+      ]),
+    ).toEqual(['film.spec.ts']);
+    // The voice's stand-in runs in its journey; the core's own fake provider does not.
+    expect(journeysFor(['services/core/tests/support/fake_voice_engine.py'])).toEqual([
+      'voice.spec.ts',
+    ]);
+    expect(journeysFor(['services/core/tests/support/model.py'])).toEqual([]);
+  });
+
   it('runs a journey that was changed, and nothing else for it', () => {
     expect(journeysFor(['apps/desktop/e2e/voice.spec.ts'])).toEqual(['voice.spec.ts']);
   });

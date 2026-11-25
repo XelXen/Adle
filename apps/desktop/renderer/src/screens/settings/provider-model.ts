@@ -60,7 +60,8 @@ export function providerCharacter(
     return `With “Automatic”, draws the pictures: its model is made for code.${allowance}`;
   }
   if (!first.has('scene') && first.has('lesson')) {
-    return `With “Automatic”, writes lessons, suggested concepts and answers.${allowance}`;
+    const films = first.has('film') ? ' films,' : '';
+    return `With “Automatic”, writes lessons,${films} suggested concepts and answers.${allowance}`;
   }
   return allowance.trim();
 }
@@ -136,6 +137,7 @@ const WORK_LABELS: Record<Work, string> = {
   curriculum: 'Suggested concepts',
   lesson: 'Lessons',
   scene: 'Pictures',
+  film: 'Films',
   read: 'Pages that are pictures',
 };
 
@@ -152,7 +154,7 @@ export function routeLines(
   const keyed = new Set(
     status.providers.filter((each) => each.key_configured).map((each) => each.provider_id),
   );
-  const works = (['ask', 'curriculum', 'lesson', 'scene', 'read'] as const).filter(
+  const works = (['ask', 'curriculum', 'lesson', 'scene', 'film', 'read'] as const).filter(
     (work) => work !== 'read' || status.routes.read.provider_ids.some((id) => keyed.has(id)),
   );
   return works.map((work) => ({

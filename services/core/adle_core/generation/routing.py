@@ -25,9 +25,18 @@ AUTOMATIC = "auto"
 
 #: What a request is for, as far as choosing a provider goes. ``ask`` is a question the
 #: learner puts to Adle in the middle of a lesson; ``check`` finds out whether a key works;
-#: ``read`` reads a picture of a page of the learner's own (ADR-060).
-Purpose = Literal["ask", "curriculum", "lesson", "scene", "check", "read"]
-PURPOSES: tuple[Purpose, ...] = ("ask", "curriculum", "lesson", "scene", "check", "read")
+#: ``read`` reads a picture of a page of the learner's own (ADR-060); ``film`` writes a
+#: chapter of a film of a whole course (ADR-065).
+Purpose = Literal["ask", "curriculum", "lesson", "scene", "check", "read", "film"]
+PURPOSES: tuple[Purpose, ...] = (
+    "ask",
+    "curriculum",
+    "lesson",
+    "scene",
+    "check",
+    "read",
+    "film",
+)
 
 
 @dataclass(frozen=True, slots=True)

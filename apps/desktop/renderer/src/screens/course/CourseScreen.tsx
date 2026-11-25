@@ -1,4 +1,12 @@
-import { ArrowLeft, Download, FileText, GraduationCap, ListTree, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Clapperboard,
+  Download,
+  FileText,
+  GraduationCap,
+  ListTree,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -21,6 +29,7 @@ import { taughtAs, useLessonRules } from '../../lib/lesson-rules';
 import { useResource } from '../../lib/use-resource';
 import styles from './CourseScreen.module.css';
 import { CurriculumPanel } from './CurriculumPanel';
+import { FilmPanel } from './FilmPanel';
 import { LearnPanel } from './LearnPanel';
 import { LessonRulesDialog } from './LessonRulesDialog';
 import { SaveCourseDialog } from './SaveCourseDialog';
@@ -30,6 +39,7 @@ const TABS: readonly TabItem<CourseTab>[] = [
   { value: 'learn', label: 'Learn', icon: <GraduationCap /> },
   { value: 'curriculum', label: 'Curriculum', icon: <ListTree /> },
   { value: 'sources', label: 'Materials', icon: <FileText /> },
+  { value: 'film', label: 'Film', icon: <Clapperboard /> },
 ];
 
 /** One course: what to do next in it, what it teaches, and the materials it draws on. */
@@ -153,6 +163,8 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
             <LearnPanel course={data} />
           ) : current === 'curriculum' ? (
             <CurriculumPanel course={data} onCourseChanged={course.reload} />
+          ) : current === 'film' ? (
+            <FilmPanel course={data} />
           ) : (
             <SourcesPanel courseId={courseId} onCourseChanged={course.reload} />
           )

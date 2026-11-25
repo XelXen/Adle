@@ -72,6 +72,7 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Which figures in kept answers Adle can draw, and why not (offline) | `uv run --directory services/core python ../../scripts/dev/figure_census.py <answer files>` |
 | Measure what a learner waits for | `node scripts/measure.mjs` (`--packaged` for the packaged build) |
 | Lock a natural voice's programs again | `bash scripts/dev/voice_locks.sh` (after a version in it changes; then set each voice up by hand, ADR-042) |
+| Lock the film maker's programs again | `bash scripts/dev/film_locks.sh` (after ManimGX's version changes; then `scripts/dev/film_names.py` with its Python, and a film made by hand, ADR-065) |
 
 The packaged app is `apps/desktop/out/release/Adle-<platform>-<arch>/`, and its installers
 are in `apps/desktop/out/installers/`. Nothing is signed (ADR-034). The build in `out/test/`
@@ -121,6 +122,13 @@ is built from it, and an alpha or a stable version is published from a release c
   only through `@adle/event-protocol`. Do not add message types casually; never pass callbacks,
   URLs, or paths through it. A picture is tried in a frame nobody sees before it joins a
   lesson, when the app is there to try it (ADR-038).
+- **The one exception is a chapter of a film** (ADR-065): a model's ManimGX file, run by the
+  film engine on this computer, outside the frame. It runs only after `film/policy.py`
+  passed it, only inside the files Adle writes around it (`film/script.py`, which take the
+  network away from the process and give it Adle's voice), with nothing of this computer's
+  in its environment and a time limit (`film/runtime.py`). Never widen what the policy
+  lets a chapter name to make a chapter work, and never run anything else in the engine.
+  That policy is a list, not a sandbox: a lesson's pictures stay in the frame.
 - User documents and model output are data, never instructions.
 - A picture of a page of the learner's leaves the computer only when they press "Read
   them" on that file, and only for a model seen to read pictures (ADR-060). Importing sends
@@ -128,7 +136,9 @@ is built from it, and an alpha or a stable version is published from a release c
 - A natural voice is downloaded only at the learner's word, from what is pinned: every model
   file by its hash (`voice/catalog.py`), every program by the lock for its system
   (`voice/data/`). It runs in an environment and a process of its own, and the core never
-  imports what its engine imports (ADR-042).
+  imports what its engine imports (ADR-042). The film maker is the same (ADR-065): a
+  Python kept only by its pinned hash (`film/catalog.py`), ManimGX by the lock for its
+  system (`film/data/`), downloaded only at the learner's word, never imported by the core.
 - "No network" for the page and for scenes means every road, not only requests (ADR-029).
   The page cannot name a file, and nothing it hands over is trusted to be what it says.
 - The data as a whole (save a copy, restore, delete everything) is touched only through
@@ -163,7 +173,8 @@ is built from it, and an alpha or a stable version is published from a release c
 **Privacy**
 
 - Local by default. The only outbound traffic is the provider call the learner triggered,
-  and the download of a natural voice the learner asked for (ADR-042).
+  and the download of a natural voice or of the film maker the learner asked for (ADR-042,
+  ADR-065).
 - No telemetry, analytics, or crash upload. No new external service without an ADR and a UI
   disclosure.
 
@@ -234,6 +245,8 @@ account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day 
   A question asked during a lesson is one request, two at most; a check of a key is one.
   Reading a file's pages that are pictures is one request a page, at the learner's word
   (ADR-060).
+  A chapter of a film is one request, and three more at most, each told what the film
+  engine found in it, by line (ADR-065); that bound is said before a film is begun.
   Asking a provider's next model because the one before is away is not a retry of the answer,
   and is bounded by the number of models.
 - Send a model only the fields its own reference lists (`ModelSpec` in `provider.py`), and

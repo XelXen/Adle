@@ -19,9 +19,13 @@ import type {
   CourseFileRequest,
   CourseFileSummary,
   CourseFileToBringIn,
+  CourseFilm,
   CourseList,
   CourseUpdate,
   Curriculum,
+  FilmCaptions,
+  FilmMakerStatus,
+  FilmVideoPart,
   Health,
   ImportRequest,
   Job,
@@ -53,6 +57,7 @@ import type {
   ProviderStatus,
   ProviderUsage,
   SavedCourseFile,
+  SavedFilmFile,
   SceneTrialList,
   SceneTrialReport,
   SearchResults,
@@ -144,6 +149,16 @@ export const OPERATIONS = {
     internal: false,
   },
   'data.save_copy': { method: 'POST', path: '/v1/data/copy', internal: true },
+  'films.captions': { method: 'GET', path: '/v1/films/{film_id}/captions', internal: false },
+  'films.get': { method: 'GET', path: '/v1/courses/{course_id}/film', internal: false },
+  'films.make': { method: 'POST', path: '/v1/courses/{course_id}/film', internal: false },
+  'films.maker_status': { method: 'GET', path: '/v1/film-maker', internal: false },
+  'films.making': { method: 'GET', path: '/v1/films/making', internal: false },
+  'films.remove': { method: 'DELETE', path: '/v1/courses/{course_id}/film', internal: false },
+  'films.remove_maker': { method: 'DELETE', path: '/v1/film-maker', internal: false },
+  'films.save_file': { method: 'POST', path: '/v1/films/{film_id}/file', internal: true },
+  'films.set_up_maker': { method: 'POST', path: '/v1/film-maker/setup', internal: false },
+  'films.video_part': { method: 'GET', path: '/v1/films/{film_id}/video/{part}', internal: false },
   'generation.accept_proposal': {
     method: 'POST',
     path: '/v1/jobs/{job_id}/accept',
@@ -416,6 +431,66 @@ export interface OperationTypes {
     query: undefined;
     body: CopyDestination;
     result: null;
+  };
+  'films.captions': {
+    path: { film_id: string };
+    query: undefined;
+    body: undefined;
+    result: FilmCaptions;
+  };
+  'films.get': {
+    path: { course_id: string };
+    query: undefined;
+    body: undefined;
+    result: CourseFilm;
+  };
+  'films.make': {
+    path: { course_id: string };
+    query: undefined;
+    body: undefined;
+    result: Job;
+  };
+  'films.maker_status': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: FilmMakerStatus;
+  };
+  'films.making': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: JobList;
+  };
+  'films.remove': {
+    path: { course_id: string };
+    query: undefined;
+    body: undefined;
+    result: null;
+  };
+  'films.remove_maker': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: FilmMakerStatus;
+  };
+  'films.save_file': {
+    path: { film_id: string };
+    query: undefined;
+    body: undefined;
+    result: SavedFilmFile;
+  };
+  'films.set_up_maker': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: Job;
+  };
+  'films.video_part': {
+    path: { film_id: string; part: number };
+    query: undefined;
+    body: undefined;
+    result: FilmVideoPart;
   };
   'generation.accept_proposal': {
     path: { job_id: string };

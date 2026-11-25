@@ -15,6 +15,7 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from importlib import resources
 from typing import Any
 
@@ -835,4 +836,108 @@ def read_page_request(display_name: str, page_number: int, picture: bytes) -> Ch
         max_output_tokens=READ_OUTPUT_TOKENS,
         json_output=False,
         images=(picture,),
+    )
+
+
+# -- a chapter of a film (ADR-065) ----------------------------------------------------------
+
+#: The most one chapter of a film may be answered with: a file of three or four minutes, and
+#: what a model thinks before it writes.
+FILM_CHAPTER_OUTPUT_TOKENS = 16_000
+#: The most excerpts of the learner's materials a chapter is written from.
+MAX_FILM_PASSAGES = 6
+
+
+@lru_cache(maxsize=1)
+def _film_guide_parts() -> tuple[str, str]:
+    data = resources.files("adle_core.film.data")
+    return (
+        data.joinpath("guide.md").read_text(encoding="utf-8"),
+        data.joinpath("example_chapter.py").read_text(encoding="utf-8").strip(),
+    )
+
+
+def film_guide(subject: str | None) -> str:
+    """How a chapter of a film is written: the engine's rules, how the course's subject is
+    taught (ADR-061), and one chapter as an example of the form."""
+    text, example = _film_guide_parts()
+    return text.replace("{TEACHING}", axioms.teaching_brief(subject)).replace("{EXAMPLE}", example)
+
+
+@dataclass(frozen=True, slots=True)
+class FilmChapterBrief:
+    """What one chapter of a film is written from."""
+
+    course_title: str
+    subject: str | None
+    #: Every chapter's title, in the film's order.
+    chapters: Sequence[str]
+    #: Which of them this one is.
+    index: int
+    concept: ConceptBrief
+    passages: Sequence[Passage] = ()
+
+
+def film_chapter_request(
+    brief: FilmChapterBrief, *, previous: str | None = None, problems: Sequence[str] = ()
+) -> ChatRequest:
+    """The request for one chapter of a film: one complete file.
+
+    ``previous`` is the file as it was written before and ``problems`` what the rules or
+    the engine found wrong with it, when it is sent back to be mended (ADR-065). Everything
+    of the course, the learner's materials and the model's own file is quoted as data.
+    """
+    listed = "\n".join(
+        f"{number + 1}. {_clip(title, 120)}"
+        + ("   <- this chapter" if number == brief.index else "")
+        for number, title in enumerate(brief.chapters)
+    )
+    concept = brief.concept
+    objectives = "\n".join(f"- {_clip(item, 300)}" for item in concept.objectives) or "- (none)"
+    parts = [
+        "The film is the whole course " + _block("course", _clip(brief.course_title, 200)),
+        "Its chapters, in order:\n" + _block("chapters", listed),
+        f"Write chapter {brief.index + 1} of {len(brief.chapters)}: "
+        + _block("chapter", _clip(concept.title, 200)),
+        "What it is about:\n" + _block("summary", _clip(concept.summary or concept.title, 1500)),
+        "What someone who has watched it can do. Teach each of these, with an example of its "
+        "own, in this order:\n" + _block("objectives", objectives),
+    ]
+    if concept.prerequisites:
+        before = "\n".join(f"- {_clip(item, 120)}" for item in concept.prerequisites)
+        parts.append(
+            "It builds on these chapters, which the viewer has just watched:\n"
+            + _block("before", before)
+        )
+    if brief.passages:
+        blocks = "\n".join(
+            _excerpt(passage, MAX_PASSAGE_CHARACTERS)
+            for passage in brief.passages[:MAX_FILM_PASSAGES]
+        )
+        parts.append(
+            "Passages from the learner's own materials about it. Teach what they say, in their "
+            "terms and notation:\n" + blocks
+        )
+    else:
+        parts.append(
+            "The learner has not imported materials about it: teach it from well-established "
+            "knowledge."
+        )
+    if previous is not None:
+        wrong = "\n".join(f"- {_clip(item, 300)}" for item in problems[:MAX_PROBLEMS_IN_RETRY])
+        parts.append(
+            "You wrote this file for the chapter, and it was checked: by Adle's rules, and by "
+            "running it in the engine, which looks at every moment of it. Here it is, and what "
+            "was wrong. Write the whole file again with these put right, and everything else as "
+            "it was.\n"
+            + _quoted_file(previous)
+            + "\nWhat was wrong:\n"
+            + _block("error", wrong or "- It did not run.")
+        )
+    return ChatRequest(
+        purpose="film",
+        system=film_guide(brief.subject) + "\n\n" + _QUOTED_MATERIAL_RULE,
+        user="\n\n".join(parts),
+        max_output_tokens=FILM_CHAPTER_OUTPUT_TOKENS,
+        json_output=False,
     )

@@ -541,6 +541,15 @@
         "title": "CourseFileToBringIn",
         "type": "object"
       },
+      "CourseFilm": {
+        "properties": {
+          "film": { "anyOf": [{ "$ref": "#/components/schemas/Film" }, { "type": "null" }] },
+          "plan": { "$ref": "#/components/schemas/FilmPlanOut" }
+        },
+        "required": ["plan", "film"],
+        "title": "CourseFilm",
+        "type": "object"
+      },
       "CourseList": {
         "properties": {
           "courses": {
@@ -672,6 +681,139 @@
         },
         "required": ["id", "title", "estimated_seconds", "narration", "type"],
         "title": "ExplanationSegment",
+        "type": "object"
+      },
+      "Film": {
+        "properties": {
+          "chapters": {
+            "items": { "$ref": "#/components/schemas/FilmChapter" },
+            "title": "Chapters",
+            "type": "array"
+          },
+          "created_at": {
+            "anyOf": [{ "format": "date-time", "type": "string" }, { "type": "null" }],
+            "title": "Created At"
+          },
+          "finished_at": {
+            "anyOf": [{ "format": "date-time", "type": "string" }, { "type": "null" }],
+            "title": "Finished At"
+          },
+          "id": { "title": "Id", "type": "string" },
+          "making": { "anyOf": [{ "$ref": "#/components/schemas/Job" }, { "type": "null" }] },
+          "notes": { "items": { "type": "string" }, "title": "Notes", "type": "array" },
+          "reason": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Reason" },
+          "seconds": { "anyOf": [{ "type": "number" }, { "type": "null" }], "title": "Seconds" },
+          "size": { "anyOf": [{ "type": "integer" }, { "type": "null" }], "title": "Size" },
+          "status": {
+            "enum": ["making", "unfinished", "ready"],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": { "title": "Title", "type": "string" },
+          "voice": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Voice" },
+          "written_by": { "additionalProperties": true, "title": "Written By", "type": "object" }
+        },
+        "required": [
+          "id",
+          "status",
+          "title",
+          "chapters",
+          "voice",
+          "seconds",
+          "size",
+          "notes",
+          "written_by",
+          "reason",
+          "created_at",
+          "finished_at",
+          "making"
+        ],
+        "title": "Film",
+        "type": "object"
+      },
+      "FilmCaptions": {
+        "properties": {
+          "cues": {
+            "items": { "$ref": "#/components/schemas/FilmCue" },
+            "title": "Cues",
+            "type": "array"
+          }
+        },
+        "required": ["cues"],
+        "title": "FilmCaptions",
+        "type": "object"
+      },
+      "FilmChapter": {
+        "properties": {
+          "problems": { "title": "Problems", "type": "integer" },
+          "start": { "anyOf": [{ "type": "number" }, { "type": "null" }], "title": "Start" },
+          "state": {
+            "enum": ["waiting", "written", "in_words"],
+            "title": "State",
+            "type": "string"
+          },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": ["title", "state", "problems", "start"],
+        "title": "FilmChapter",
+        "type": "object"
+      },
+      "FilmCue": {
+        "properties": {
+          "end": { "title": "End", "type": "number" },
+          "start": { "title": "Start", "type": "number" },
+          "text": { "title": "Text", "type": "string" }
+        },
+        "required": ["start", "end", "text"],
+        "title": "FilmCue",
+        "type": "object"
+      },
+      "FilmMakerStatus": {
+        "description": "Whether the film maker is on this computer, and what setting it up takes.",
+        "properties": {
+          "borrowed": { "title": "Borrowed", "type": "boolean" },
+          "download_bytes": { "title": "Download Bytes", "type": "integer" },
+          "fits": { "title": "Fits", "type": "boolean" },
+          "installed_bytes": { "title": "Installed Bytes", "type": "integer" },
+          "ready": { "title": "Ready", "type": "boolean" },
+          "setting_up": { "anyOf": [{ "$ref": "#/components/schemas/Job" }, { "type": "null" }] },
+          "sources": { "items": { "type": "string" }, "title": "Sources", "type": "array" }
+        },
+        "required": [
+          "ready",
+          "fits",
+          "borrowed",
+          "setting_up",
+          "download_bytes",
+          "installed_bytes",
+          "sources"
+        ],
+        "title": "FilmMakerStatus",
+        "type": "object"
+      },
+      "FilmPlanOut": {
+        "description": "What a film of the course would be, before it is begun or continued.",
+        "properties": {
+          "blocked": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Blocked" },
+          "chapters": { "items": { "type": "string" }, "title": "Chapters", "type": "array" },
+          "requests_at_most": { "title": "Requests At Most", "type": "integer" },
+          "voice": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Voice" }
+        },
+        "required": ["chapters", "requests_at_most", "voice", "blocked"],
+        "title": "FilmPlanOut",
+        "type": "object"
+      },
+      "FilmVideoPart": {
+        "description": "A part of a film's video, for the page to put together and play.",
+        "properties": {
+          "data": { "title": "Data", "type": "string" },
+          "mime": { "const": "video/mp4", "title": "Mime", "type": "string" },
+          "part": { "title": "Part", "type": "integer" },
+          "parts": { "title": "Parts", "type": "integer" },
+          "size": { "title": "Size", "type": "integer" }
+        },
+        "required": ["part", "parts", "size", "mime", "data"],
+        "title": "FilmVideoPart",
         "type": "object"
       },
       "Health": {
@@ -1742,7 +1884,7 @@
           "display_name": { "title": "Display Name", "type": "string" },
           "first_for": {
             "items": {
-              "enum": ["ask", "curriculum", "lesson", "scene", "check", "read"],
+              "enum": ["ask", "curriculum", "lesson", "scene", "check", "read", "film"],
               "type": "string"
             },
             "title": "First For",
@@ -1840,11 +1982,12 @@
         "properties": {
           "ask": { "$ref": "#/components/schemas/ProviderRoute" },
           "curriculum": { "$ref": "#/components/schemas/ProviderRoute" },
+          "film": { "$ref": "#/components/schemas/ProviderRoute" },
           "lesson": { "$ref": "#/components/schemas/ProviderRoute" },
           "read": { "$ref": "#/components/schemas/ProviderRoute" },
           "scene": { "$ref": "#/components/schemas/ProviderRoute" }
         },
-        "required": ["ask", "curriculum", "lesson", "scene", "read"],
+        "required": ["ask", "curriculum", "lesson", "scene", "read", "film"],
         "title": "ProviderRoutes",
         "type": "object"
       },
@@ -1953,6 +2096,20 @@
         },
         "required": ["name", "suggested_name", "counts", "lessons_left_out"],
         "title": "SavedCourseFile",
+        "type": "object"
+      },
+      "SavedFilmFile": {
+        "description": "A film written for the desktop shell to move where the learner chose.",
+        "properties": {
+          "captions_name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Captions Name"
+          },
+          "file_name": { "title": "File Name", "type": "string" },
+          "suggested_name": { "title": "Suggested Name", "type": "string" }
+        },
+        "required": ["file_name", "captions_name", "suggested_name"],
+        "title": "SavedFilmFile",
         "type": "object"
       },
       "SceneArtifact": {
@@ -3869,6 +4026,101 @@
         "x-adle-internal": true
       }
     },
+    "/v1/courses/{course_id}/film": {
+      "delete": {
+        "operationId": "films.remove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Successful Response" },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Remove Film",
+        "tags": ["films"]
+      },
+      "get": {
+        "operationId": "films.get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CourseFilm" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Course Film",
+        "tags": ["films"]
+      },
+      "post": {
+        "description": "Begin the course's film, or continue it where it was left.",
+        "operationId": "films.make",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Make Film",
+        "tags": ["films"]
+      }
+    },
     "/v1/courses/{course_id}/jobs": {
       "get": {
         "description": "Work still in progress for a course, so a screen can pick it up again after navigating.",
@@ -4205,6 +4457,225 @@
         "summary": "Save A Copy",
         "tags": ["data"],
         "x-adle-internal": true
+      }
+    },
+    "/v1/film-maker": {
+      "delete": {
+        "operationId": "films.remove_maker",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/FilmMakerStatus" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Remove Film Maker",
+        "tags": ["films"]
+      },
+      "get": {
+        "operationId": "films.maker_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/FilmMakerStatus" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Film Maker Status",
+        "tags": ["films"]
+      }
+    },
+    "/v1/film-maker/setup": {
+      "post": {
+        "description": "Set the film maker up: it is downloaded, at the learner's word (ADR-065).",
+        "operationId": "films.set_up_maker",
+        "responses": {
+          "202": {
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Job" } } },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Set Up Film Maker",
+        "tags": ["films"]
+      }
+    },
+    "/v1/films/making": {
+      "get": {
+        "description": "Films being made, and the film maker being set up, in any course: for the app to\nsay so wherever the learner is, and that a film is ready when it is.",
+        "operationId": "films.making",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/JobList" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Films Being Made",
+        "tags": ["films"]
+      }
+    },
+    "/v1/films/{film_id}/captions": {
+      "get": {
+        "operationId": "films.captions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "film_id",
+            "required": true,
+            "schema": { "title": "Film Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/FilmCaptions" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Film Captions",
+        "tags": ["films"]
+      }
+    },
+    "/v1/films/{film_id}/file": {
+      "post": {
+        "description": "Write a film, and its subtitles, where the desktop shell collects them.",
+        "operationId": "films.save_file",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "film_id",
+            "required": true,
+            "schema": { "title": "Film Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SavedFilmFile" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Save Film File",
+        "tags": ["films"],
+        "x-adle-internal": true
+      }
+    },
+    "/v1/films/{film_id}/video/{part}": {
+      "get": {
+        "operationId": "films.video_part",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "film_id",
+            "required": true,
+            "schema": { "title": "Film Id", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "part",
+            "required": true,
+            "schema": { "title": "Part", "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/FilmVideoPart" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Film Video Part",
+        "tags": ["films"]
       }
     },
     "/v1/health": {

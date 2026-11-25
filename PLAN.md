@@ -1114,7 +1114,16 @@ and brought in from one** (ADR-064): appearance, learning, voice, the provider c
 and the keys, locked with a password; a voice that is not on the other computer set
 up at the learner's word, replaced by the nearest that runs there, or left to the
 computer's own (`settings-file.test.ts`, `test_settings_file.py`, the journeys in
-`e2e/settings-file` and `e2e/security`). Evidence for the rules:
+`e2e/settings-file` and `e2e/security`). And **a film of a whole course** (ADR-065): a
+chapter for each concept, each a ManimGX file the AI writes, checked by a policy of its
+own and then by the engine at every moment, sent back three times at most with what was
+found, read in the natural voice, put together and made into a video; the film maker
+downloaded only at the learner's word (`test_film_policy.py`, `test_film_report.py`,
+`test_film_script.py`, `test_film_install.py`, `test_films.py`, `films.test.ts`,
+`film-file-rules.test.ts`, the journeys in `e2e/film` and `e2e/security`, and two films
+made by hand through NVIDIA, the real engine and the Kokoro voice, the second whole: two
+chapters, seven minutes of 1080p film with sound throughout, in 34.5 minutes and six
+requests). Evidence for the rules:
 `test_lesson_axioms.py`,
 `test_slide_subjects.py`, `test_slide_real_lessons.py`, the renderer's
 `lesson-rules.test.ts`, the journey in `e2e/curriculum` that reads a course's rules and
@@ -1128,6 +1137,11 @@ changes its subject, and 42 slide examples stepped through by `e2e/slide-player`
   chooses it or no recording will come (ADR-051).
 - **One branch, and a release is a commit** (ADR-043), where ADR-034 had `dev`, `main`
   and a tag.
+- **A film's chapters run outside the player's frame** (ADR-065): code a model wrote, run
+  by the film engine on the learner's computer behind a policy, a process with no network
+  and nothing of the computer's, and a time limit, and sent back up to three times with
+  what the engine found. Section 9 had every model's scene in the frame, asked for again
+  once at most; a lesson's pictures still are.
 - **Most pictures are not written by a model** (ADR-045). Section 9 has every scene written
   by the model as one file; a figure is data the model gives and a scene the core writes
   from a template. A model still writes a scene for what no figure can show.

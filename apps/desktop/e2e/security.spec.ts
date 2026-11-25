@@ -107,6 +107,7 @@ test.describe('renderer boundary', () => {
         core: ['invoke', 'onStatus', 'restart', 'status'],
         courses: ['bringIn', 'chooseFile', 'saveFile'],
         data: ['eraseAll', 'restoreCopy', 'saveCopy', 'showSafetyCopies'],
+        films: ['saveFile'],
         provider: ['clearApiKey', 'keyState', 'select', 'setApiKey'],
         settings: ['bringIn', 'chooseFile', 'saveFile'],
         sources: ['importDropped', 'importWithPicker'],
@@ -464,6 +465,54 @@ test.describe('settings as a file', () => {
       () => (globalThis as Record<string, unknown>).adleAskedKinds as string[],
     );
     expect(asked).toEqual(['save', 'open']);
+    expect(existsSync(target)).toBe(false);
+  });
+});
+
+test.describe('a film as a file', () => {
+  test('the page says which film and never where it goes, and the core’s route is not its own', async ({
+    adle,
+    profileDir,
+  }) => {
+    const { app, page } = adle;
+    await waitForCore(page);
+    const target = path.join(profileDir, 'chosen-by-the-page.mp4');
+    await app.evaluate(({ dialog }) => {
+      const asked: string[] = [];
+      (globalThis as Record<string, unknown>).adleAskedKinds = asked;
+      dialog.showSaveDialog = () => {
+        asked.push('save');
+        return Promise.resolve({ canceled: true, filePath: '' });
+      };
+    });
+    const results = await page.evaluate(async (where) => {
+      type Loose = Record<string, (...args: unknown[]) => Promise<unknown>>;
+      const films = window.adle!.films as unknown as Loose;
+      const invoke = window.adle!.core.invoke as unknown as (
+        operation: string,
+        params?: unknown,
+      ) => Promise<unknown>;
+      const film = `flm_${'0'.repeat(20)}`;
+      return {
+        // A place, named every way the page can think of.
+        pathAsFilm: await films.saveFile!(where),
+        withPath: await films.saveFile!({ id: film, path: where }),
+        // A film that does not exist: nothing is written, and nothing is asked.
+        noSuchFilm: await films.saveFile!(film, where, { filePath: where }),
+        // And the core's own route for it is the main process's alone.
+        save: await invoke('films.save_file', { path: { film_id: film } }),
+      };
+    }, target);
+
+    const refused = { ok: false, error: { code: 'invalid_request' } };
+    expect(results.pathAsFilm).toMatchObject(refused);
+    expect(results.withPath).toMatchObject(refused);
+    expect(results.save).toMatchObject(refused);
+    expect(results.noSuchFilm).toMatchObject({ ok: false, error: { code: 'not_found' } });
+    const asked = await app.evaluate(
+      () => (globalThis as Record<string, unknown>).adleAskedKinds as string[],
+    );
+    expect(asked).toEqual([]);
     expect(existsSync(target)).toBe(false);
   });
 });

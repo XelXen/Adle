@@ -127,10 +127,13 @@ KIND_CURRICULUM = "curriculum_proposal"
 KIND_LESSON = "lesson_generation"
 KIND_ASK = "lesson_ask"
 KIND_CHECK = "provider_check"
-#: Long work: what the learner may leave to itself and come back to.
+#: A film of a whole course (ADR-065), made by ``application/films.py``.
+KIND_FILM = "film_making"
+#: Long work: what the learner may leave to itself and come back to. A film is followed by
+#: a watch of its own (``films.making``): it takes hours, and nothing waits on it.
 LONG_JOB_KINDS: tuple[str, ...] = (KIND_CURRICULUM, KIND_LESSON)
 #: Every kind of job that asks a model for something.
-MODEL_JOB_KINDS: tuple[str, ...] = (*LONG_JOB_KINDS, KIND_ASK, KIND_CHECK)
+MODEL_JOB_KINDS: tuple[str, ...] = (*LONG_JOB_KINDS, KIND_ASK, KIND_CHECK, KIND_FILM)
 
 #: Why a provider's next model, or the next provider, is being asked, in the learner's words.
 _PASSED_OVER = {
@@ -155,6 +158,8 @@ _REQUESTS_FOR = {
     "scene": ("scene",),
     # One page of a learner's file, read from its picture (ADR-060).
     "read": ("read",),
+    # One chapter of a film, written once (ADR-065).
+    "film": ("film",),
 }
 #: What a model is seen to be doing while its answer is on the way, in the learner's words.
 _STAGES = {"thinking": "thinking", "writing": "writing"}
@@ -947,6 +952,11 @@ class GenerationService:
                     "then change the provider."
                 )
             self._gateway.select(selection)
+
+    def written_by(self, results: Sequence[ChatResult]) -> dict[str, Any]:
+        """Who wrote something made elsewhere (a film, ADR-065), for its record: as for
+        anything written here."""
+        return self._written_by(results)
 
     def _written_by(self, results: Sequence[ChatResult]) -> dict[str, Any]:
         """Who wrote something, for its record: each provider and model that answered.

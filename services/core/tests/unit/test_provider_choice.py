@@ -12,6 +12,7 @@ import json
 import logging
 import threading
 import time
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -581,6 +582,27 @@ def test_the_time_limit_runs_while_the_model_is_only_thinking() -> None:
     # Given up on at the second line, long before any answer: the next model's turn.
     assert raised.value.trouble == "silent"
     assert "took too long to answer" in str(raised.value)
+
+
+def test_a_chapter_of_a_film_is_given_longer_and_nothing_else_is() -> None:
+    """A chapter of a film is a long file nobody is waiting for (ADR-065): it may take
+    half an hour, where any other request is given up on after fifteen minutes."""
+    assert NVIDIA.total_seconds("film") == 1800.0
+    assert NVIDIA.total_seconds("lesson") == NVIDIA.total_timeout_seconds == 900.0
+    film = replace(REQUEST, purpose="film")
+    moments = iter([0.0, 1.0, NVIDIA.total_timeout_seconds + 1.0, 1801.0])
+    vault = CredentialVault()
+    vault.set_api_key(NVIDIA_KEY, "nvidia")
+    client = ChatClient(
+        NVIDIA,
+        vault,
+        transport=httpx.MockTransport(lambda request: waiting_response()),
+        monotonic=lambda: next(moments),
+    )
+    with pytest.raises(ProviderModelUnavailableError):
+        client.complete(film)
+    # Past the fifteen minutes of any other request it was still waited for.
+    assert next(moments, None) is None
 
 
 # -- the next model, when one is away -----------------------------------------------------

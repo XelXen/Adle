@@ -1,4 +1,4 @@
-import { BookOpen, Coffee, Library, PenLine, Settings } from 'lucide-react';
+import { BookOpen, Clapperboard, Coffee, Library, PenLine, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import {
@@ -12,6 +12,7 @@ import {
 
 import { useApp } from './app/AppContext';
 import { BreakProvider, useBreak } from './app/BreakContext';
+import { FilmWatchProvider, useFilmWatch } from './app/FilmWatch';
 import { type Route, useRouter } from './app/router';
 import { SceneTrials } from './app/SceneTrials';
 import { useWriting, WritingProvider } from './app/WritingContext';
@@ -20,6 +21,7 @@ import { clockText } from './lib/breaks';
 import { callCore } from './lib/core-client';
 import { courseRoute, RAIL_COURSES } from './lib/courses';
 import { useResource } from './lib/use-resource';
+import { KIND_FILM } from './lib/films';
 import { isDrawingPictures, KIND_LESSON } from './lib/generation';
 import { BreakScreen } from './screens/break/BreakScreen';
 import { CourseScreen } from './screens/course/CourseScreen';
@@ -66,8 +68,10 @@ function RailActivity() {
   const { route, navigate } = useRouter();
   const rest = useBreak();
   const { jobs } = useWriting();
+  const films = useFilmWatch();
   const [first] = jobs;
-  if (!rest.times && !first) return null;
+  const [film] = films.jobs;
+  if (!rest.times && !first && !film) return null;
   return (
     <NavSection label="Now" keepWhenNarrow>
       {first ? (
@@ -90,6 +94,17 @@ function RailActivity() {
               courseId: first.course_id,
               tab: first.kind === KIND_LESSON ? 'learn' : 'curriculum',
             });
+          }}
+        />
+      ) : null}
+      {film ? (
+        <NavItem
+          label={film.kind === KIND_FILM ? 'Making a film' : 'Setting up the film maker'}
+          icon={<Clapperboard />}
+          disabled={!film.course_id}
+          onClick={() => {
+            if (!film.course_id) return;
+            navigate({ name: 'course', courseId: film.course_id, tab: 'film' });
           }}
         />
       ) : null}
@@ -143,7 +158,9 @@ function RailCourses() {
 function Activity({ children }: { children: ReactNode }) {
   return (
     <WritingProvider>
-      <BreakProvider>{children}</BreakProvider>
+      <FilmWatchProvider>
+        <BreakProvider>{children}</BreakProvider>
+      </FilmWatchProvider>
       <SceneTrials />
     </WritingProvider>
   );

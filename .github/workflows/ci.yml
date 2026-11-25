@@ -112,6 +112,14 @@ jobs:
               --ignore-vuln PYSEC-2026-2289 --ignore-vuln PYSEC-2026-2290 \
               --ignore-vuln PYSEC-2026-3929 --ignore-vuln PYSEC-2026-4174
           done
+      - name: Dependency audit (Python, the programs the film maker is set up with)
+        # Downloaded at the learner's word and never shipped (ADR-065). None is set aside:
+        # a new advisory fails this step.
+        run: |
+          for lock in services/core/adle_core/film/data/manimgx-*.txt; do
+            echo "$lock"
+            uv tool run pip-audit -r "$lock" --disable-pip --no-deps
+          done
 
   e2e:
     name: End-to-end (${{ matrix.os }})

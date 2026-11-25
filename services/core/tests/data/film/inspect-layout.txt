@@ -1,0 +1,11 @@
+take_02.py: Take, 10.08 s, 5 plays
+storyboard: Take.storyboard.png
+  #0   0.00– 1.77s  chapter_02.py:7  say 'Here is a title.' with Write(Text 'Words over words')
+  #1   1.77– 4.46s  chapter_02.py:9  say 'And here is a label on it.' with FadeIn(Text 'This label sits on the title')
+  #2   4.46– 7.54s  chapter_02.py:14  say 'And a table too wide for th…' with FadeIn(Table)
+  #3   7.54– 9.08s  chapter_02.py:16  say 'And a small sign.' with FadeIn(MathTex '=')
+  #4   9.08–10.08s  chapter_02.py:17  FadeOut(Group)
+layout: 3 problems
+  [1] t=4.46152–9.0769s (chapter_02.py:9)  title (Text 'Words over words') and over (Text 'This label sits on the title'): texts overlap
+  [2] t=7.53844–9.0769s (chapter_02.py:14)  table (Table): 3.30 past the left edge, 7.30 past the right edge
+  [3] t=9.0769s (chapter_02.py:16)  sign (MathTex '='): text is 7 px tall at 1080p

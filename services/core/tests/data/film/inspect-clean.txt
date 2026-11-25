@@ -1,0 +1,20 @@
+take_02.py: Take, 62.13 s, 17 plays
+storyboard: Take.storyboard.png, Take.storyboard-2.png
+  #0   0.00– 4.69s  chapter_02.py:14  say 'How much floor does a rug c…' with Write(Text 'The area of a rectangle')
+  #1   4.69– 8.92s  chapter_02.py:22  say 'Here is a rug, four squares…' with LaggedStart(8× Create) with AnimationGroup(FadeIn(Text '4 wide'), FadeIn(Text '2 tall'))
+  #2   8.92–13.28s  chapter_02.py:30  say 'Count the squares one by on…' with LaggedStart(8× FadeIn)
+  #3  13.28–18.28s  chapter_02.py:34  say 'Each square is one square u…'
+  #4  18.28–22.51s  chapter_02.py:38  say 'Two rows of four make four …' with Write(MathTex '4 + 4 = 8')
+  #5  22.51–27.13s  chapter_02.py:39  say 'Adding the same number agai…' with ReplacementTransform(MathTex '4 + 4 = 8')
+  #6  27.13–31.82s  chapter_02.py:46  say 'So the area of any rectangl…' with Write(MathTex '\\text{area} = \\text{width} …')
+  #7  31.82–32.82s  chapter_02.py:47  Circumscribe(ShowPassingFlash(SurroundingRectangle))
+  #8  32.82–33.82s  chapter_02.py:48  FadeOut(Group)
+  #9  33.82–38.05s  chapter_02.py:51  say 'Now try it on a rug three w…' with Write(Text 'A second rug')
+  #10 38.05–41.13s  chapter_02.py:56  say 'Three rows of three squares…' with Create(Group)
+  #11 41.13–44.97s  chapter_02.py:58  say 'Width times height is three…' with Write(MathTex '3 \\times 3 = 9')
+  #12 44.97–48.82s  chapter_02.py:59  say 'Counting the squares one by…' with Indicate(Group)
+  #13 48.82–53.43s  chapter_02.py:60  say 'A square is a rectangle who…'
+  #14 53.43–56.51s  chapter_02.py:61  say 'So its area is its side tim…'
+  #15 56.51–61.13s  chapter_02.py:62  say 'Whatever the shape of the r…'
+  #16 61.13–62.13s  chapter_02.py:63  FadeOut(Group)
+layout: no problems in 17 samples

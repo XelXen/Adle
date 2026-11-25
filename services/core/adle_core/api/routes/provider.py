@@ -10,7 +10,6 @@ also keeps. They are excluded from the renderer's operation allowlist
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,7 +18,7 @@ from adle_core.api import schemas
 from adle_core.application.services import Services, get_services
 from adle_core.errors import NotFoundError
 from adle_core.generation.provider import ProviderConfig
-from adle_core.generation.routing import Plan
+from adle_core.generation.routing import Plan, Purpose
 
 router = APIRouter(prefix="/provider", tags=["provider"])
 
@@ -89,7 +88,7 @@ class ProviderChoice(BaseModel):
     #: By the learner's choice, a request could go here now.
     in_use: bool
     #: What it is asked first for when the learner lets Adle choose (ADR-039).
-    first_for: list[Literal["ask", "curriculum", "lesson", "scene", "check", "read"]]
+    first_for: list[Purpose]
     #: False when the limits Adle keeps to are its own caution and not the provider's.
     limits_published: bool
     usage: ProviderUsage
@@ -129,6 +128,8 @@ class ProviderRoutes(BaseModel):
     #: the learner chose able to read pictures, it names no provider and its sentence is
     #: empty.
     read: ProviderRoute
+    #: A chapter of a film of a whole course (ADR-065).
+    film: ProviderRoute
 
 
 class ProviderStatus(BaseModel):
@@ -191,7 +192,10 @@ def _route(services: Services, work: str, found: Plan) -> ProviderRoute:
 
 def _status(services: Services) -> ProviderStatus:
     gateway = services.gateway
-    plans = {work: gateway.plan(work) for work in ("ask", "curriculum", "lesson", "scene", "read")}
+    plans = {
+        work: gateway.plan(work)
+        for work in ("ask", "curriculum", "lesson", "scene", "read", "film")
+    }
     config = gateway.config
     selection = gateway.selection
     # A provider is in use if a request could go to it: it is in some plan, with a key.
@@ -226,6 +230,7 @@ def _status(services: Services) -> ProviderStatus:
             lesson=_route(services, "lesson", plans["lesson"]),
             scene=_route(services, "scene", plans["scene"]),
             read=_route(services, "read", plans["read"]),
+            film=_route(services, "film", plans["film"]),
         ),
     )
 

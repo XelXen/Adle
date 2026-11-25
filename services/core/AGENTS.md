@@ -27,7 +27,7 @@ adle_core/
   errors.py       AdleError and friends (no framework imports; usable everywhere)
   api/            FastAPI app factory, auth, error contract, schemas, routes (no domain logic)
   application/    service container; courses (and a course as a file: course_file,
-                  course_sharing), sources, jobs (three lanes), curriculum,
+                  course_sharing), sources, jobs (four lanes), curriculum,
                   learner, retrieval, lessons, asks (questions put to Adle during a lesson),
                   generation and the model gateway, saving and restoring a copy of the data
   curriculum/     PURE rules: concept graph (loops, order, layers), outline from headings
@@ -49,6 +49,11 @@ adle_core/
                   (runtime), setting it up (install), the locks of its programs (data/),
                   and engine.py, which runs in the voice's own environment and is never
                   imported by the core
+  film/           a film of a whole course (ADR-065): the film maker pinned (catalog),
+                  where it lives and running it (runtime), setting it up (install), what a
+                  chapter may be (policy), what the engine says of a scene (report), the
+                  files Adle writes around a chapter (script), and data/ (the writer's
+                  guide and example, the engine's names, the locks of its programs)
   orchestration/ audio/   empty: the computer's voice is the browser's (ADR-013), and jobs
                   are run by application/jobs.py
   tools/          developer entry points (contract export)
@@ -163,6 +168,7 @@ everything and decides nothing.
   has, as one plain line (`_refusal`): a new reason for refusing a file is a new entry in
   `_REFUSALS`. The voice's children (`venv`, pip, the engine) keep the same rules; they run
   on another Python, with `-I`, and with none of this computer's settings for pip or Python.
+  So does the film engine, with nothing of this computer's at all (`bare_environment`).
 - **The service ships as a wheel inside a private Python** (ADR-019), started with `-I`.
   So: anything read at run time is package data inside `adle_core/` and is found with
   `importlib.resources`, never by a path relative to the repository; nothing may depend on
@@ -246,18 +252,52 @@ everything and decides nothing.
   by the routes that delete). Nothing more is asked of a provider for what the learner has
   thrown away. A test of this must not wait longer than a stand-in for a slow answer
   takes to let go by itself, or it passes without the stopping.
-- **Jobs run in three lanes** (`application/jobs.py`). Long work (an import, a lesson, a
+- **Jobs run in four lanes** (`application/jobs.py`). Long work (an import, a lesson, a
   list of concepts) runs one at a time in the main lane. What the learner waits for (an ask,
   a check of a key) runs in the quick lane, so it never queues behind a lesson. A natural
-  voice's work (setting one up, recording a lesson) runs in the voice lane, one at a time,
-  so that a recording never runs while its programs are being replaced. One request is in
-  flight at each provider, whichever lane asks.
+  voice's work (setting one up, recording a lesson, a film's lines) runs in the voice lane,
+  one at a time, so that a recording never runs while its programs are being replaced. A
+  film, and setting up what makes it, run in the film lane: an hour of it holds nothing
+  else up. One request is in flight at each provider, whichever lane asks.
 - **A natural voice is set up only by `VoiceInstaller`, at the learner's word** (ADR-042).
   A model file is kept only if its size and hash are the catalogue's; a program only from
   the lock for this system, by its hash. A new file is a new pinned entry; a new version of
   a program is `scripts/dev/voice_locks.sh`, then each voice set up by hand. Only the
   voice's own folders are ever removed (`VoicePaths.environment`), never a Python a
   developer pointed Adle at (`borrowed`).
+- **A film of a whole course** (ADR-065, `application/films.py`) is a chapter for each
+  concept in learning order, each one complete ManimGX file a model writes
+  (`prompts.film_chapter_request`, purpose `film`). **A chapter is code a model wrote,
+  run outside the player's frame**, so: nothing of it runs before `film.policy`
+  (`check_chapter_source`) passed it; it runs only as a module imported by Adle's own
+  files (`film.script`: `take_source`, `film_source`, and `voice_source`, which takes
+  the network away from the process and gives every scene Adle's voice instead of the
+  engine's, an internet service); and only through `FilmEngine` (`film.runtime`), with
+  `bare_environment`, in the film's folder, for a bounded time. The engine's home is
+  kept between runs (`FilmPaths.home`, inside the film maker's folder): in a home never
+  used, the engine's first run never ends, and every run after it, once it is ended, takes
+  seconds. So `FilmEngine.prime` runs a small scene and ends it after `PRIME_SECONDS`
+  before the setup's trial and before each film, and a chapter that runs out of time is
+  looked at once more before it is blamed (`_looked_at`). The policy's names are
+  the pinned engine's (`film/data/names.json`, from `scripts/dev/film_names.py`): never
+  add a name to make a chapter work without reading what it reaches. An engine name used
+  bare (`WHITE` for `m.WHITE`), or `np` or `math` not imported, is mended, not sent back
+  (`policy.with_engine_names`), and so is a line with more bracketed spans than
+  animations (`policy.with_spans_fitted`: the spans after the last animation lose their
+  brackets, and what is said stays the same); the file is then checked as any other. A
+  line with fewer spans than animations is sent back, never guessed. A chapter is asked
+  for once and sent back `script.MAX_MENDS` times at most, told the policy's or the
+  engine's findings (`report.findings`, by the chapter's own line); the version that ran
+  with the least wrong is kept, and one that never ran is told in words
+  (`script.plain_chapter`, which quotes the course's words only through
+  `policy.text_problem`). What the engine said is told to the model and logged by count
+  only. A film's lines are recorded by `NarrationService.record_film` into the film's
+  folder; `script.engine_words` gives the engine a time for every run of the line. The
+  film maker is set up only by `FilmInstaller`, at the learner's word, from the pinned
+  Python and the lock for this system, and removing it takes only its own folder. A film
+  stopped, failed, or left when the core stopped is `unfinished` (`settle`), and
+  continuing begins at the first chapter not kept. Removing a film or its course stops it
+  (`stop_for_course`, called before the course is deleted).
 - **Looking for work that is under way and starting it are one step**
   (`GenerationService._starting`). Two requests arriving together must not both find
   nothing and both begin, and the provider must not be chosen under a job that has just

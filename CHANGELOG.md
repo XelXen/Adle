@@ -35,6 +35,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
   age, pitch, pace, tone, feeling, delivery, accent and style, each from a list, and
   listen before you save. Start from a ready-made voice and change what you like, or
   write the voice in your own words, which is still the most exact way.
+- **A film of the whole course.** A course's new **Film** tab makes a narrated film that
+  teaches all of it, a chapter for each concept in the order you learn them. The AI
+  writes each chapter as an animation, and the film maker checks every moment of it and
+  has it fixed before the film is put together. It takes an hour or more, so you don’t
+  need to wait: Adle tells you when it’s ready. Watch it with its chapters and subtitles,
+  read in your natural voice, or save it as a video. The film maker is downloaded the
+  first time, only when you ask for it.
 
 ### Changed
 

@@ -1,0 +1,122 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-6);
+  min-width: 0;
+}
+
+.lead {
+  margin: 0;
+  max-width: var(--ad-layout-reading-max);
+}
+
+.note {
+  margin: 0;
+  max-width: var(--ad-layout-reading-max);
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-3);
+}
+
+/* ---- Chapters, in order ------------------------------------------------------ */
+.chapters {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--ad-border-width) solid var(--ad-color-border);
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-surface);
+}
+
+.chapter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ad-space-2) var(--ad-space-4);
+  padding: var(--ad-space-3) var(--ad-space-4);
+  border-top: var(--ad-border-width) solid var(--ad-color-border);
+}
+
+.chapter:first-child {
+  border-top: none;
+}
+
+.chapterTitle {
+  font: var(--ad-text-body-strong);
+}
+
+.chapterState {
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.current .chapterState {
+  color: var(--ad-color-primary-text);
+}
+
+/* ---- The film, on a screen of its own ---------------------------------------- */
+.screen {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--ad-radius-card);
+  background: var(--ad-color-stage);
+  color: var(--ad-color-stage-ink);
+  box-shadow: var(--ad-shadow-2);
+}
+
+.video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--ad-color-stage);
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--ad-space-3);
+  aspect-ratio: 16 / 9;
+  padding: var(--ad-space-6);
+  color: var(--ad-color-stage-muted);
+}
+
+.marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.time {
+  font: var(--ad-text-mono);
+  color: var(--ad-color-muted);
+}
+
+.facts {
+  margin: 0;
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-1);
+  margin: 0;
+  padding-left: var(--ad-space-5);
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}

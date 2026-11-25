@@ -44,7 +44,7 @@ const BOTH = `${AIHUBMIX}, then ${NVIDIA} if needed`;
 const ULTRA = 'nvidia/nemotron-3-ultra-550b-a55b';
 const SUPER = 'nvidia/nemotron-3.5-super-vl-120b-a12b';
 /** "Current routing" in Settings: each kind of request, where it goes and which model writes it. */
-const KINDS = ['Questions', 'Suggested concepts', 'Lessons', 'Pictures'];
+const KINDS = ['Questions', 'Suggested concepts', 'Lessons', 'Pictures', 'Films'];
 
 interface Servers {
   aihubmix: FakeProvider;
@@ -160,6 +160,7 @@ test.describe('the AI providers', () => {
       `${NVIDIA}Nemotron 3.5 Super`,
       `${NVIDIA}Nemotron 3 Ultra`,
       `${NVIDIA}Nemotron 3 Ultra`,
+      `${NVIDIA}Kimi K3.1 Pro`,
       `${NVIDIA}Kimi K3.1 Pro`,
       `${NVIDIA}Nemotron 3.5 Super`,
     ]);
@@ -317,12 +318,18 @@ test.describe('the AI providers', () => {
     await expect(lines.nth(3)).toContainText(
       `${AIHUBMIX} draws the pictures: its model is made for code.`,
     );
-    await expect(lines.nth(4)).toHaveText(`${NVIDIA}Nemotron 3.5 Super`);
+    // A film is written as lessons are: by NVIDIA, with AIHubMix's model kept for the pictures.
+    await expect(lines.nth(4)).toContainText(writes);
+    await expect(lines.nth(4)).toContainText('Kimi K3.1 Pro');
+    await expect(lines.nth(4)).toContainText(
+      `${NVIDIA} writes this, and ${AIHUBMIX} is kept for the pictures.`,
+    );
+    await expect(lines.nth(5)).toHaveText(`${NVIDIA}Nemotron 3.5 Super`);
     await expect(providerCard(page, AIHUBMIX)).toContainText(
       'With “Automatic”, draws the pictures: its model is made for code. A small daily allowance.',
     );
     await expect(providerCard(page, NVIDIA)).toContainText(
-      'With “Automatic”, writes lessons, suggested concepts and answers.',
+      'With “Automatic”, writes lessons, films, suggested concepts and answers.',
     );
     // Already on automatic, so there is nothing to suggest.
     await expect(page.getByText('You have keys for both providers')).toHaveCount(0);

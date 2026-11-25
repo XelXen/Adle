@@ -1,0 +1,7 @@
+out.mp4  10.56 s, 640x360 at 30 fps, 0.0 MB (rendered in 0.5 s)
+storyboard: out.storyboard.png
+subtitles: out.srt
+layout: 0 problems, 3 notes (likely meant)
+  note: t=3.07692–3.57692s (chapter_01.py:11)  dot (Dot): outside the frame (not visible)
+  note: t=3.07692–3.57692s (chapter_01.py:11)  badge (Text 'LEFT OVER'): outside the frame (not visible)
+  note: t=4.17692s (film.py:35)  left[2] (Text 'LEFT OVER'): outside the frame (not visible)

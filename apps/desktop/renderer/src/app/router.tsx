@@ -13,7 +13,7 @@ import type { Hypothesis } from '@adle/contracts';
 export const SETTINGS_TABS = ['ai', 'learning', 'appearance', 'privacy', 'about'] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
-export const COURSE_TABS = ['learn', 'curriculum', 'sources'] as const;
+export const COURSE_TABS = ['learn', 'curriculum', 'sources', 'film'] as const;
 export type CourseTab = (typeof COURSE_TABS)[number];
 
 /** A kind of mistake a set of questions can be about. */
