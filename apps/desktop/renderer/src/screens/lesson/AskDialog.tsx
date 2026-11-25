@@ -1,8 +1,15 @@
-import { ArrowRight, Hand, Settings, Square } from 'lucide-react';
+import { ArrowRight, Hand, Image, RotateCcw, Settings, Square } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import type { Ask, Job } from '@adle/contracts';
-import { Button, Callout, Dialog, ProgressBar, TextArea } from '@adle/design-system';
+import {
+  Button,
+  Callout,
+  Dialog,
+  ProgressBar,
+  SegmentedControl,
+  TextArea,
+} from '@adle/design-system';
 
 import { useRouter } from '../../app/router';
 import { MathText } from '../../components/MathText';
@@ -13,6 +20,7 @@ import {
   MAX_QUESTION_CHARACTERS,
   questionProblem,
   suggestedQuestions,
+  suggestedRedraws,
 } from '../../lib/asks';
 import { callCore } from '../../lib/core-client';
 import { type JobFailure, jobProgress } from '../../lib/generation';
@@ -40,7 +48,13 @@ export interface AskDialogProps {
   stopProblem: string | null;
   /** The answer that has just arrived, once it has. */
   answer: Ask | null;
-  onAsk: (question: string) => void;
+  /** The part's picture can be drawn again as the learner asks (ADR-067). */
+  canRedraw: boolean;
+  /** A picture is being put into the lesson, or taken out. */
+  changingPicture: boolean;
+  onAsk: (question: string, redraw: boolean) => void;
+  /** Put the picture an answer drew into its part of the lesson. */
+  onUsePicture: (ask: Ask) => void;
   onStop: () => void;
   /** Put the last answer or failure away, to ask something else. */
   onAnother: () => void;
@@ -68,7 +82,10 @@ export function AskDialog({
   refused,
   stopProblem,
   answer,
+  canRedraw,
+  changingPicture,
   onAsk,
+  onUsePicture,
   onStop,
   onAnother,
   onClose,
@@ -77,6 +94,9 @@ export function AskDialog({
   const provider = useResource('provider-status', () => callCore('provider.status'));
   const [draft, setDraft] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
+  /** What the learner wants: words, or this part's picture drawn again. */
+  const [wanted, setWanted] = useState<'words' | 'picture'>('words');
+  const redraw = canRedraw && wanted === 'picture';
   const field = useRef<HTMLTextAreaElement>(null);
 
   const status = provider.resource.status === 'ready' ? provider.resource.data : undefined;
@@ -96,7 +116,7 @@ export function AskDialog({
     event.preventDefault();
     const found = questionProblem(draft);
     setProblem(found);
-    if (!found) onAsk(draft.trim());
+    if (!found) onAsk(draft.trim(), redraw);
   };
 
   let title: string;
@@ -105,7 +125,10 @@ export function AskDialog({
 
   if (view === 'waiting') {
     const progress = job ? jobProgress(job, 'Queued') : { value: undefined, message: 'Sending' };
-    title = 'Answering your question';
+    title =
+      redraw || progress.message.startsWith('Drawing the picture')
+        ? 'Drawing the picture again'
+        : 'Answering your question';
     actions = (
       <>
         <Button icon={<Square />} disabled={!job} onClick={onStop}>
@@ -131,6 +154,7 @@ export function AskDialog({
     );
   } else if (view === 'answer' && answer) {
     title = 'Answer';
+    const offered = answer.picture?.state === 'offered';
     actions = (
       <>
         <Button
@@ -143,9 +167,20 @@ export function AskDialog({
         >
           Ask another
         </Button>
-        <Button variant="primary" icon={<ArrowRight />} onClick={onClose}>
-          Back to lesson
-        </Button>
+        {offered ? (
+          <Button
+            variant="primary"
+            icon={<Image />}
+            loading={changingPicture}
+            onClick={() => onUsePicture(answer)}
+          >
+            Use this picture
+          </Button>
+        ) : (
+          <Button variant="primary" icon={<ArrowRight />} onClick={onClose}>
+            Back to lesson
+          </Button>
+        )}
       </>
     );
     body = <AskNote ask={answer} />;
@@ -170,12 +205,14 @@ export function AskDialog({
       </p>
     );
   } else {
-    const suggestions = suggestedQuestions(kind, unanswered);
-    const wait = usualWait(status, 'ask');
+    const suggestions = redraw ? suggestedRedraws() : suggestedQuestions(kind, unanswered);
+    // A picture is drawn by the model that writes lessons' pictures (ADR-067).
+    const work = redraw ? 'lesson' : 'ask';
+    const wait = usualWait(status, work);
     title = 'Ask about this part';
     actions = (
       <>
-        <WhatIsSent what={askDisclosure()} to={destination(status, 'ask')} wait={wait} />
+        <WhatIsSent what={askDisclosure(redraw)} to={destination(status, work)} wait={wait} />
         <Button onClick={onClose}>Cancel</Button>
         <Button type="submit" form="ask-form" variant="primary" icon={<Hand />}>
           Ask
@@ -193,6 +230,20 @@ export function AskDialog({
             {failure.message}
           </Callout>
         ) : null}
+        {canRedraw ? (
+          <SegmentedControl
+            label="What you want"
+            value={wanted}
+            options={[
+              { value: 'words', label: 'Ask a question' },
+              { value: 'picture', label: 'Change the picture' },
+            ]}
+            onValueChange={(value) => {
+              setWanted(value);
+              setProblem(null);
+            }}
+          />
+        ) : null}
         {unanswered ? (
           <Callout tone="info" title="You haven’t answered this question yet">
             You’ll get help thinking it through, not the answer. Like a hint, asking makes a correct
@@ -201,7 +252,7 @@ export function AskDialog({
         ) : null}
         <TextArea
           ref={field}
-          label="Your question"
+          label={redraw ? 'What should the picture show?' : 'Your question'}
           data-autofocus
           rows={3}
           maxLength={MAX_QUESTION_CHARACTERS}
@@ -211,7 +262,11 @@ export function AskDialog({
             setProblem(null);
           }}
           error={problem}
-          placeholder="What would you like explained?"
+          placeholder={
+            redraw
+              ? 'For example: draw the bonds between the molecules.'
+              : 'What would you like explained?'
+          }
         />
         <div>
           <p className={styles.askHint} id="ask-suggestions">
@@ -224,7 +279,7 @@ export function AskDialog({
                   size="small"
                   onClick={() => {
                     setProblem(null);
-                    onAsk(suggestion);
+                    onAsk(suggestion, redraw);
                   }}
                 >
                   {suggestion}
@@ -255,8 +310,22 @@ export function AskDialog({
   );
 }
 
-/** One question and its answer, as a note: the learner's words, then the answer to read. */
-export function AskNote({ ask }: { ask: Ask }) {
+export interface AskNoteProps {
+  ask: Ask;
+  /** Put the picture the answer drew into the lesson; with no way to, nothing is offered. */
+  onUsePicture?: () => void;
+  /** Give the part its own picture back. */
+  onPutBack?: () => void;
+  /** A picture is being put in or taken out. */
+  changing?: boolean;
+}
+
+/**
+ * One question and its answer, as a note: the learner's words, then the answer to read,
+ * and the part's picture drawn again when that is what they asked for (ADR-067).
+ */
+export function AskNote({ ask, onUsePicture, onPutBack, changing = false }: AskNoteProps) {
+  const picture = ask.picture ?? null;
   return (
     <div className={styles.askNote}>
       {/* The learner's own words are shown exactly as typed: never as mathematics or markup. */}
@@ -275,6 +344,25 @@ export function AskNote({ ask }: { ask: Ask }) {
             .map((citation) => `${citation.source_name}, ${citation.locator}`)
             .join('; ')}
         </p>
+      ) : null}
+      {picture ? (
+        <div className={styles.askPicture}>
+          <p className={styles.askMeta}>
+            {picture.state === 'in_use'
+              ? 'This part shows the picture drawn for this answer.'
+              : 'This answer drew a new picture for this part.'}
+          </p>
+          {picture.state === 'in_use' && onPutBack ? (
+            <Button size="small" icon={<RotateCcw />} loading={changing} onClick={onPutBack}>
+              Put the original back
+            </Button>
+          ) : null}
+          {picture.state === 'offered' && onUsePicture ? (
+            <Button size="small" icon={<Image />} loading={changing} onClick={onUsePicture}>
+              Use this picture
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       <p className={styles.askMeta}>
         Answered by {answeredBy(ask)}. AI can make mistakes.

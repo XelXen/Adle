@@ -257,6 +257,23 @@ export class LessonController {
     this.update({ parts: this.parts.length, more });
   }
 
+  /**
+   * A part whose picture the learner chose to have drawn again, or gave back its own
+   * (ADR-067): the same part with the same words, its picture and where its steps fall
+   * changed. The one way a part already here changes, and only at the learner's own press.
+   * A learner in that part starts it again from its beginning, with the picture it has now.
+   */
+  replace(segment: LessonSegment): void {
+    const index = this.parts.findIndex((part) => part.id === segment.id);
+    if (index < 0) return;
+    this.parts = this.parts.map((part, at) => (at === index ? segment : part));
+    if (this.state.segmentIndex === index) {
+      this.enter(index, false);
+      return;
+    }
+    this.update({});
+  }
+
   /** Stop everything. The controller must not be used afterwards. */
   dispose(): void {
     this.cancelNarration();

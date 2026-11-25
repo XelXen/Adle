@@ -230,6 +230,11 @@ export const OPERATIONS = {
   'lessons.get': { method: 'GET', path: '/v1/lessons/{lesson_id}', internal: false },
   'lessons.list': { method: 'GET', path: '/v1/courses/{course_id}/lessons', internal: false },
   'lessons.list_asks': { method: 'GET', path: '/v1/lessons/{lesson_id}/asks', internal: false },
+  'lessons.put_back_picture': {
+    method: 'DELETE',
+    path: '/v1/lessons/{lesson_id}/asks/{ask_id}/picture',
+    internal: false,
+  },
   'lessons.report_unhelpful': {
     method: 'POST',
     path: '/v1/lessons/{lesson_id}/unhelpful',
@@ -239,6 +244,11 @@ export const OPERATIONS = {
   'lessons.save_progress': {
     method: 'PUT',
     path: '/v1/lessons/{lesson_id}/progress',
+    internal: false,
+  },
+  'lessons.use_ask_picture': {
+    method: 'POST',
+    path: '/v1/lessons/{lesson_id}/asks/{ask_id}/picture',
     internal: false,
   },
   'lessons.withdraw_unhelpful': {
@@ -641,6 +651,12 @@ export interface OperationTypes {
     body: undefined;
     result: AskList;
   };
+  'lessons.put_back_picture': {
+    path: { lesson_id: string; ask_id: string };
+    query: undefined;
+    body: undefined;
+    result: LessonForPlayer;
+  };
   'lessons.report_unhelpful': {
     path: { lesson_id: string };
     query: undefined;
@@ -658,6 +674,12 @@ export interface OperationTypes {
     query: undefined;
     body: LessonProgressUpdate;
     result: LessonProgress;
+  };
+  'lessons.use_ask_picture': {
+    path: { lesson_id: string; ask_id: string };
+    query: undefined;
+    body: undefined;
+    result: LessonForPlayer;
   };
   'lessons.withdraw_unhelpful': {
     path: { lesson_id: string; segment_id: string };

@@ -385,3 +385,5 @@ class Slide(InteractiveScene):
         self.play(FadeIn(self.e['note'], shift=UP * 0.15), run_time=1.02)
         self.audit()
         self.post_message("step", 3)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJhY3RpdmUiLCJraW5kIjoid29yZHMiLCJ0ZXh0IjoiVGhlIGNhdCBjaGFzZWQgdGhlIG1vdXNlIiwicGxhY2UiOiJ0b3AifSx7ImlkIjoicGFzc2l2ZSIsImtpbmQiOiJ3b3JkcyIsInRleHQiOiJUaGUgbW91c2Ugd2FzIGNoYXNlZCBieSB0aGUgY2F0IiwicGxhY2UiOiJ0b3AifSx7ImlkIjoibm90ZSIsImtpbmQiOiJib3giLCJ0ZXh0IjoiVGhlIG9iamVjdCBtb3ZlcyB0byB0aGUgZnJvbnQuIiwicGxhY2UiOiJib3R0b20iLCJjb2xvciI6InZpb2xldCJ9XSwic3RlcHMiOltbeyJzaG93IjoiYWN0aXZlIn1dLFt7ImhpZ2hsaWdodCI6WyJhY3RpdmUubW91c2UiLCJhY3RpdmUuY2F0Il19XSxbeyJ0cmFuc2Zvcm0iOiJhY3RpdmUiLCJpbnRvIjoicGFzc2l2ZSJ9XSxbeyJzaG93Ijoibm90ZSJ9XV19

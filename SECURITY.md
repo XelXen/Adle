@@ -367,6 +367,8 @@ of a lesson, when they press "Ask" (ADR-024).
 | An answer cannot carry a link, markup, or a path, and cannot invent a source | Read strictly into one to four paragraphs of display text; a source is a number the prompt offered, or it is dropped | `test_asks.py` |
 | The learner's own words are shown as text | Rendered as plain text, never as mathematics or markup | `e2e/ask.spec.ts` |
 | A question costs a bounded number of requests | One, a second only if the first answer was unusable; one question per lesson at a time; 30 kept per lesson | `test_asks.py` |
+| A picture drawn again is said first, and joins the lesson only at the learner's press (ADR-067) | With "Change the picture", the dialog names the part's picture among what is sent and where (where a lesson goes). The answer's slide is drawn by Adle from templates like any slide, its words only as quoted literals; it is kept with the note and goes into the lesson only by "Use this picture", the whole lesson through `parse_bundle`, the part's words unchanged; "Put the original back" and removing the note restore the part's own. A note brought in from a course file carries words only | `test_asks_redraw.py`; `asks.test.ts`; `e2e/ask.spec.ts` |
+| A slide's script in its scene cannot run or speak | The script is kept as the scene's last line, a comment holding base64 (no model words in the scene but as quoted literals), at most 10,000 characters, never with a link; the player never reads it, and Adle reads it only as a model's data to be drawn again | `test_slides.py` (a script's hostile text is nowhere in the scene); `test_asks_redraw.py` |
 
 ## The model provider and its output
 

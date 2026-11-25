@@ -64,7 +64,7 @@ import {
   SpeechNarrator,
   type Voice,
 } from '../../lesson/speech';
-import { answeredAskId, asksAbout, KIND_ASK } from '../../lib/asks';
+import { answeredAskId, asksAbout, canRedraw, KIND_ASK } from '../../lib/asks';
 import { USUAL_BREAK_MINUTES } from '../../lib/breaks';
 import { getBridge } from '../../lib/bridge';
 import { callCore, CoreRequestError, describeError } from '../../lib/core-client';
@@ -378,9 +378,13 @@ function LessonPlayer({
     void getBridge().app.notify('answer_ready');
     if (askingAbout === null) {
       const index = parts.findIndex((item) => item.id === about);
+      const drew =
+        typeof finished.result === 'object' &&
+        finished.result !== null &&
+        (finished.result as { picture?: unknown }).picture === true;
       toast.show({
         tone: 'success',
-        title: 'Your answer is ready',
+        title: drew ? 'Your new picture is ready' : 'Your answer is ready',
         description: index >= 0 ? `See part ${index + 1} of this lesson.` : undefined,
       });
     }
@@ -502,7 +506,7 @@ function LessonPlayer({
     setAskRefusal(null);
     setAskingAbout(state.segmentIndex);
   };
-  const ask = async (question: string): Promise<void> => {
+  const ask = async (question: string, redraw: boolean): Promise<void> => {
     const about = parts[askingAbout ?? state.segmentIndex];
     if (!about) return;
     setAskStarting(true);
@@ -513,7 +517,7 @@ function LessonPlayer({
       setAskStarted(
         await callCore('lessons.ask', {
           path: { lesson_id: lessonId },
-          body: { segment_id: about.id, question },
+          body: { segment_id: about.id, question, redraw },
         }),
       );
     } catch (error) {
@@ -528,6 +532,41 @@ function LessonPlayer({
     callCore('jobs.cancel', { path: { job_id: askJob.id } }).catch((error: unknown) => {
       setStopProblem(describeError(error));
     });
+  };
+  /** A picture is being put into the lesson, or taken out of it (ADR-067). */
+  const [changingPicture, setChangingPicture] = useState(false);
+  /**
+   * Put the picture an answer drew into its part, or give the part its own back, at the
+   * learner's press (ADR-067). The lesson comes back as it is now: its pictures, and the
+   * part with its picture changed and its words as they were. A learner in that part
+   * starts it again.
+   */
+  const changePicture = async (changed: Ask, use: boolean): Promise<void> => {
+    setChangingPicture(true);
+    try {
+      const where = { path: { lesson_id: lessonId, ask_id: changed.id } };
+      const latest = use
+        ? await callCore('lessons.use_ask_picture', where)
+        : await callCore('lessons.put_back_picture', where);
+      pictures.adopt(latest);
+      const changedPart = latest.lesson.segments.find((item) => item.id === changed.segment_id);
+      if (changedPart) controller.replace(changedPart);
+      asks.reload();
+      if (use) setAskingAbout(null);
+    } catch (error) {
+      toast.show({
+        tone: 'danger',
+        title: use ? 'Couldn’t use the picture' : 'Couldn’t put the picture back',
+        description: describeError(error),
+      });
+    } finally {
+      setChangingPicture(false);
+    }
+  };
+  /** The part's picture is still being drawn (ADR-031): it is changed once it has arrived. */
+  const pictureComing = (item: LessonSegment): boolean => {
+    const reference = 'scene' in item ? item.scene : null;
+    return Boolean(reference && pictures.pending.has(reference.scene_id));
   };
   const removeAsk = (removed: Ask): void => {
     callCore('lessons.delete_ask', { path: { lesson_id: lessonId, ask_id: removed.id } }).then(
@@ -729,7 +768,12 @@ function LessonPlayer({
                 <ul className={styles.askedList}>
                   {aboutThisPart.map((item) => (
                     <li key={item.id} className={styles.askedItem}>
-                      <AskNote ask={item} />
+                      <AskNote
+                        ask={item}
+                        changing={changingPicture}
+                        onUsePicture={() => void changePicture(item, true)}
+                        onPutBack={() => void changePicture(item, false)}
+                      />
                       <IconButton
                         label="Remove question"
                         icon={<Trash2 />}
@@ -880,7 +924,10 @@ function LessonPlayer({
           refused={askRefusal !== null}
           stopProblem={stopProblem}
           answer={freshAnswer}
-          onAsk={(question) => void ask(question)}
+          canRedraw={canRedraw(askedPart.type) && !pictureComing(askedPart)}
+          changingPicture={changingPicture}
+          onAsk={(question, redraw) => void ask(question, redraw)}
+          onUsePicture={(chosen) => void changePicture(chosen, true)}
           onStop={stopAsk}
           onAnother={() => {
             setAskStarted(null);

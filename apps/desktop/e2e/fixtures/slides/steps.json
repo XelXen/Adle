@@ -79,6 +79,10 @@
     "interactive": false,
     "steps": 3
   },
+  "hydrogen_bond.py": {
+    "interactive": false,
+    "steps": 2
+  },
   "linked_list.py": {
     "interactive": false,
     "steps": 4

@@ -402,3 +402,5 @@ class Slide(InteractiveScene):
         self.play(self.e['counts.2'].animate.scale(1 / 1.12), run_time=0.25)
         self.audit()
         self.post_message("step", 2)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJjb3VudHMiLCJraW5kIjoiYmFycyIsInBsYWNlIjoiY2VudGVyIiwibGFiZWwiOiJyb2xscyBvZiBhIGRpZSIsImxhYmVscyI6WyIxIiwiMiIsIjMiLCI0IiwiNSIsIjYiXSwidmFsdWVzIjpbMSwxLDEsMSwxLDFdfV0sInN0ZXBzIjpbW3sic2hvdyI6ImNvdW50cyJ9XSxbeyJzZXQiOiJjb3VudHMiLCJ0byI6WzgsMTIsOSwxMSwxMCwxMF19XSxbeyJoaWdobGlnaHQiOiJjb3VudHMuMiJ9XV19

@@ -7,9 +7,11 @@ import {
   answeredBy,
   askDisclosure,
   asksAbout,
+  canRedraw,
   MAX_QUESTION_CHARACTERS,
   questionProblem,
   suggestedQuestions,
+  suggestedRedraws,
 } from './asks';
 
 const ask = (changes: Partial<Ask>): Ask => ({
@@ -128,5 +130,28 @@ describe('asksAbout', () => {
     ];
     expect(asksAbout(all, 'seg_1').map((item) => item.id)).toEqual(['a', 'c']);
     expect(asksAbout(all, 'seg_9')).toEqual([]);
+  });
+});
+
+describe('a part’s picture drawn again (ADR-067)', () => {
+  it('is offered only for a part that teaches with a picture', () => {
+    for (const kind of ['explanation', 'visualization', 'worked_example', 'summary']) {
+      expect(canRedraw(kind)).toBe(true);
+    }
+    for (const kind of ['checkpoint', 'reflection', 'interaction']) {
+      expect(canRedraw(kind)).toBe(false);
+    }
+  });
+
+  it('says that the picture is sent too, and offers requests no longer than a question', () => {
+    const said = askDisclosure(true);
+    for (const part of ['what you asked for', 'this part of the lesson with its picture']) {
+      expect(said).toContain(part);
+    }
+    // A request for a picture is answered without the learner's materials.
+    expect(said).not.toContain('your materials');
+    for (const request of suggestedRedraws()) {
+      expect(questionProblem(request)).toBeNull();
+    }
   });
 });

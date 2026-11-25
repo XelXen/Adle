@@ -422,3 +422,5 @@ class Slide(InteractiveScene):
         self.play(self.tint(self.e['calls.2'][0], self.sun, 0.45), run_time=0.7)
         self.audit()
         self.post_message("step", 1)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJjYWxscyIsImtpbmQiOiJub2RlcyIsImxheW91dCI6InRyZWUiLCJwbGFjZSI6ImNlbnRlciIsIm5vZGVzIjpbImZpYigzKSIsImZpYigyKSIsImZpYigxKSIsImZpYigxKSIsImZpYigwKSJdLCJlZGdlcyI6W1sxLDJdLFsxLDNdLFsyLDRdLFsyLDVdXX1dLCJzdGVwcyI6W1t7InNob3ciOiJjYWxscyJ9XSxbeyJjb2xvciI6ImNhbGxzLjIiLCJ0byI6InllbGxvdyJ9XV19

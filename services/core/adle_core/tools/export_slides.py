@@ -491,6 +491,16 @@ EXAMPLES: dict[str, dict[str, Any]] = {
             [{"highlight": "inside"}, {"color": "inside", "to": "yellow"}],
         ],
     },
+    # A picture drawn again as a learner asked (ADR-067): a hydrogen bond, a dashed line from
+    # an atom of one molecule to an atom of the next.
+    "hydrogen_bond": {
+        "elements": [
+            {"id": "upper", "kind": "molecule", "atoms": ["O", "H", "H"], "bonds": [[1, 2], [1, 3]], "place": "top", "label": "water"},
+            {"id": "lower", "kind": "molecule", "atoms": ["O", "H", "H"], "bonds": [[1, 2], [1, 3]], "place": "bottom", "label": "water"},
+            {"id": "bond", "kind": "line", "from": "upper.2", "to": "lower.1", "dashed": True, "color": "teal", "label": "hydrogen bond"},
+        ],
+        "steps": [[{"show": ["upper", "lower"]}], [{"show": "bond"}]],
+    },
     # Characters written small, a liquid with no color, and something put under what
     # stands at the foot of the stage: it goes above it instead.
     "small_marks": {

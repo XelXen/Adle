@@ -79,6 +79,9 @@
           "id": { "title": "Id", "type": "string" },
           "lesson_id": { "title": "Lesson Id", "type": "string" },
           "paragraphs": { "items": { "type": "string" }, "title": "Paragraphs", "type": "array" },
+          "picture": {
+            "anyOf": [{ "$ref": "#/components/schemas/AskPicture" }, { "type": "null" }]
+          },
           "question": { "title": "Question", "type": "string" },
           "segment_id": { "title": "Segment Id", "type": "string" },
           "written_by": { "$ref": "#/components/schemas/WrittenBy" }
@@ -118,11 +121,22 @@
         "title": "AskList",
         "type": "object"
       },
+      "AskPicture": {
+        "description": "The part's picture, drawn again because the learner asked (ADR-067).",
+        "properties": {
+          "description": { "title": "Description", "type": "string" },
+          "state": { "enum": ["offered", "in_use"], "title": "State", "type": "string" }
+        },
+        "required": ["state", "description"],
+        "title": "AskPicture",
+        "type": "object"
+      },
       "AskRequest": {
         "additionalProperties": false,
         "description": "Something the learner wants to ask about one part of a lesson.",
         "properties": {
           "question": { "maxLength": 500, "minLength": 3, "title": "Question", "type": "string" },
+          "redraw": { "default": false, "title": "Redraw", "type": "boolean" },
           "segment_id": {
             "pattern": "^seg_[a-z0-9_]{1,40}$",
             "title": "Segment Id",
@@ -5147,6 +5161,88 @@
           }
         },
         "summary": "Delete Ask",
+        "tags": ["lessons"]
+      }
+    },
+    "/v1/lessons/{lesson_id}/asks/{ask_id}/picture": {
+      "delete": {
+        "description": "Give the part its own picture back, in place of the one an answer drew. The lesson\nas it is now, to be played.",
+        "operationId": "lessons.put_back_picture",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "ask_id",
+            "required": true,
+            "schema": { "title": "Ask Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LessonForPlayer" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Put Back Picture",
+        "tags": ["lessons"]
+      },
+      "post": {
+        "description": "Put the picture an answer drew into its part of the lesson, in place of the part's\nown (ADR-067). The lesson as it is now, to be played.",
+        "operationId": "lessons.use_ask_picture",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": { "title": "Lesson Id", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "ask_id",
+            "required": true,
+            "schema": { "title": "Ask Id", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LessonForPlayer" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Use Ask Picture",
         "tags": ["lessons"]
       }
     },

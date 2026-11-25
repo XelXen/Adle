@@ -6,7 +6,8 @@
  * What these journeys are about: what is sent is said first and nothing is sent before
  * the learner asks; the answer is kept beside the part it was about; a question the
  * lesson is asking is never answered for the learner, and asking about it counts as help;
- * and the learner never has to wait in front of it.
+ * the learner never has to wait in front of it; and a part's picture can be drawn again
+ * as the learner asks, to be used, and put back, at their press (ADR-067).
  */
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -30,6 +31,8 @@ const PROVIDER = 'Custom endpoint (127.0.0.1)';
 const LESSON = 'Weights and bias: how a neuron adds things up';
 const QUESTION = 'Why does a bigger weight count for more?';
 const ANSWER_STARTS = 'A weight says how much one input counts.';
+/** What the learner wants the part's picture to show (ADR-067). */
+const WANT = 'Draw the hydrogen bonds between the water molecules.';
 
 const continueButton = (page: Page) => page.getByRole('button', { name: 'Continue', exact: true });
 const askButton = (page: Page) => page.getByRole('button', { name: 'Ask a question' });
@@ -73,6 +76,21 @@ async function inTheLesson(
 async function close({ adle, provider }: Session): Promise<void> {
   await adle.close();
   await provider.close();
+}
+
+/** The picture of a part of the lesson, as the lesson is stored: its scene's id. */
+function pictureOf(profileDir: string, part: number): string | null {
+  const database = new DatabaseSync(path.join(profileDir, 'data', 'adle.db'), { readOnly: true });
+  try {
+    const row = database.prepare('SELECT document FROM lessons WHERE title = ?').get(LESSON) as
+      { document: string } | undefined;
+    const document = JSON.parse(row?.document ?? '{}') as {
+      segments?: { scene?: { scene_id: string } | null }[];
+    };
+    return document.segments?.[part]?.scene?.scene_id ?? null;
+  } finally {
+    database.close();
+  }
 }
 
 /** Whether each answer the learner gave was recorded as an aided one, oldest first. */
@@ -382,5 +400,78 @@ test.describe('asking a question during a lesson', () => {
 
     expect(adle.problems).toEqual([]);
     await close(session);
+  });
+
+  test('a part’s picture is drawn again as the learner asks, used at their press, and put back', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(180_000);
+    const session = await inTheLesson(profileDir);
+    const { adle, page, provider } = session;
+    try {
+      // The first part explains in words, with no picture: the learner wants one.
+      expect(pictureOf(profileDir, 0)).toBeNull();
+
+      // ---- What to draw, in the learner's words, and what that sends, said first ----
+      await askButton(page).click();
+      const dialog = askDialog(page);
+      await dialog.getByRole('radio', { name: 'Change the picture' }).click();
+      const note = await openWhatIsSent(page, dialog);
+      await expect(note).toContainText(
+        'Sends what you asked for, this part of the lesson with its picture, the lesson title, ' +
+          `the course name, and this concept to ${PROVIDER}.`,
+      );
+      await closeWhatIsSent(page, dialog);
+      expect(provider.requests).toHaveLength(0);
+      await dialog.getByRole('textbox', { name: 'What should the picture show?' }).fill(WANT);
+      await expectNoAccessibilityViolations(page);
+      await dialog.getByRole('button', { name: 'Ask', exact: true }).click();
+
+      // ---- The answer comes with the picture, which is not in the lesson yet ----
+      const answer = answerDialog(page);
+      await expect(answer).toContainText('the hydrogen bond', { timeout: 30_000 });
+      await expect(answer).toContainText('This answer drew a new picture for this part.');
+      expect(provider.requests.map((request) => request.kind)).toEqual(['redraw']);
+      const sent = provider.requests[0]!.prompt;
+      expect(sent).toContain(`<learner_material kind="question">\n${WANT}\n`);
+      expect(sent).toContain('Not every input counts the same');
+      expect(sent).toContain('"elements"');
+      expect(sent).toContain('It has no picture now.');
+      expect(pictureOf(profileDir, 0)).toBeNull();
+      await expectNoAccessibilityViolations(page);
+      await screenshot(page, 'ask-redraw-answer');
+
+      // ---- Used: the part starts again with it, and says what it shows ----
+      await answer.getByRole('button', { name: 'Use this picture' }).click();
+      await expect(answer).toBeHidden();
+      await expect.poll(() => pictureOf(profileDir, 0)).toMatch(/^scn_ask_/);
+      await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Describe this picture' }).click();
+      await expect(page.getByText('Two water molecules, one above the other.')).toBeVisible();
+      const notes = kept(page);
+      await expect(notes).toContainText('This part shows the picture drawn for this answer.');
+      await expectNoAccessibilityViolations(page);
+      await screenshot(page, 'ask-redraw-in-use');
+      // Played, it draws the molecules, then the bond as the words reach it.
+      await page.getByRole('button', { name: 'Start', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+      await page
+        .getByRole('heading', { name: 'Not every input counts the same', level: 2 })
+        .scrollIntoViewIfNeeded();
+      // Only for the picture kept for review: a few seconds of it drawn.
+      await page.waitForTimeout(4000);
+      await page.getByRole('button', { name: 'Pause' }).click();
+      await screenshot(page, 'ask-redraw-played');
+
+      // ---- Put back: the part as it was, in words alone ----
+      await notes.getByRole('button', { name: 'Put the original back' }).click();
+      await expect.poll(() => pictureOf(profileDir, 0)).toBeNull();
+      await expect(page.getByText('Two water molecules, one above the other.')).toHaveCount(0);
+      await expect(notes.getByRole('button', { name: 'Use this picture' })).toBeVisible();
+      expect(provider.requests).toHaveLength(1);
+      expect(adle.problems).toEqual([]);
+    } finally {
+      await close(session);
+    }
   });
 });

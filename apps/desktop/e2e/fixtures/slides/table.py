@@ -378,3 +378,5 @@ class Slide(InteractiveScene):
         self.play(self.tint(self.e['law.2.2'], self.sun, 0), run_time=0.7)
         self.audit()
         self.post_message("step", 2)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJsYXciLCJraW5kIjoidGFibGUiLCJwbGFjZSI6ImxlZnQiLCJoZWFkZXIiOlsiJHgkIiwiJFAoWCA9IHgpJCJdLCJyb3dzIjpbWyIwIiwiXFxmcmFjezF9ezR9Il0sWyIxIiwiXFxmcmFjezF9ezJ9Il0sWyIyIiwiXFxmcmFjezF9ezR9Il1dfSx7ImlkIjoiZmxpcHMiLCJraW5kIjoidGV4dCIsInRleHQiOiJIZWFkcyBpbiB0d28gZmxpcHMgb2YgYSBjb2luIiwicGxhY2UiOiJyaWdodCJ9XSwic3RlcHMiOltbeyJzaG93IjpbImxhdyIsImZsaXBzIl19XSxbeyJoaWdobGlnaHQiOiJsYXcucm93IDIifV0sW3siY29sb3IiOiJsYXcuMi4yIiwidG8iOiJ5ZWxsb3cifV1dfQ==

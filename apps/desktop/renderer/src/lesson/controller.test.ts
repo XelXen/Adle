@@ -599,3 +599,37 @@ describe('a lesson still being written (ADR-048)', () => {
     expect(controller.getState().finished).toBe(true);
   });
 });
+
+describe('a part whose picture the learner changed (ADR-067)', () => {
+  it('takes the part with its new picture, and starts it again where the learner is', () => {
+    const { controller, narrator, changes } = setup(1, 2);
+    controller.play();
+    expect(controller.getState().status).toBe('playing');
+    const part = LESSON.segments[1]!;
+    const redrawn: LessonSegment = { ...part, title: part.title };
+
+    controller.replace(redrawn);
+
+    expect(controller.segments[1]).toBe(redrawn);
+    // Begun again from its start, waiting for the learner.
+    expect(controller.getState()).toMatchObject({
+      segmentIndex: 1,
+      status: 'ready',
+      beatIndex: -1,
+    });
+    expect(narrator.log).toContain('cancel');
+    expect(changes).toHaveBeenCalled();
+  });
+
+  it('changes a part the learner is not in without moving them, and ignores a part it lacks', () => {
+    const { controller } = setup(0, 2);
+    const part = LESSON.segments[2]!;
+    const redrawn: LessonSegment = { ...part };
+    controller.replace(redrawn);
+    expect(controller.segments[2]).toBe(redrawn);
+    expect(controller.getState().segmentIndex).toBe(0);
+    const before = controller.segments;
+    controller.replace({ ...part, id: 'seg_unknown' });
+    expect(controller.segments).toEqual(before);
+  });
+});

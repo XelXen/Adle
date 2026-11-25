@@ -32,6 +32,9 @@ LESSON: dict[str, Any] = json.loads((ANSWERS / "lesson.json").read_text("utf-8")
 ANSWER: dict[str, Any] = json.loads((ANSWERS / "answer.json").read_text("utf-8"))
 #: A chapter of a film (ADR-065): passes the rules, and runs clean in the real engine.
 FILM_CHAPTER = (ANSWERS / "film-chapter.py").read_text("utf-8")
+#: A part's picture drawn again as the learner asked (ADR-067): the hydrogen bond between
+#: two water molecules, as a slide.
+REDRAW: dict[str, Any] = json.loads((ANSWERS / "redraw.json").read_text("utf-8"))
 
 
 def sse(text: str, *, usage: dict[str, int] | None = None) -> httpx.Response:
@@ -96,6 +99,9 @@ class FakeProvider:
             return "curriculum"
         if "Wanim scene file" in system:
             return "scene"
+        # Before "partway through a lesson", which a redraw's instructions say too (ADR-067).
+        if "You draw pictures for Adle" in system:
+            return "redraw"
         if "partway through a lesson" in system:
             return "ask"
         if "checking that a connection works" in system:
@@ -132,6 +138,8 @@ class FakeProvider:
             return FILM_CHAPTER
         if kind == "storyboard":
             return "NOTHING"
+        if kind == "redraw":
+            return REDRAW
         user = text_of(body["messages"][1]["content"])
         return INTERACTIVE_SCENE if "Kind: interactive" in user else ANIMATION_SCENE
 

@@ -295,7 +295,13 @@ most, a file's name.
   reading a lesson is a new `Narrator`. A break's clock is the app's (`app/BreakContext.tsx`)
   and is never part of a lesson.
 - A question the learner asks about a part (`AskDialog`, `lib/asks.ts`) is a job like any
-  other. The lesson holds the job, so the dialog can be closed while it is answered, and
+  other. In a part that teaches with a picture (`canRedraw`), the learner can ask for the
+  picture to be drawn again instead ("Change the picture", ADR-067); what comes back is
+  offered in the answer and the note ("Use this picture"), and only that press puts it
+  in the lesson: `lessons.use_ask_picture` returns the lesson, which the screen takes
+  (`useLessonUpdates().adopt`) and the controller swaps into the part
+  (`LessonController.replace`, the one way a part already there changes; a learner in it
+  starts it again). "Put the original back" is `lessons.put_back_picture`. The lesson holds the job, so the dialog can be closed while it is answered, and
   opened again to watch it or stop it; a lesson that is opened again picks up a question
   still on its way. A failure is said where the learner is: in the dialog if it is open, as
   a toast if not. Show the learner's own words as plain text and the answer with `MathText`.

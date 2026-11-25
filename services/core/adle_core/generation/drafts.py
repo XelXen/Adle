@@ -1432,3 +1432,85 @@ def compile_answer(text: str, passages: Sequence[PassageRef] = ()) -> CompiledAn
         paragraphs=list(answer.paragraphs),
         citations=list(cited.values())[:MAX_ANSWER_CITATIONS],
     )
+
+
+@dataclass(frozen=True, slots=True)
+class CompiledRedraw:
+    """A part's picture drawn again at the learner's word (ADR-067), ready to be kept."""
+
+    #: What the picture now shows that it did not: display text, may contain $math$.
+    paragraphs: list[str]
+    #: The whole scene file, as Adle wrote it from the slide.
+    source: str
+    #: What it shows, in words: the part's picture for anyone who cannot see it.
+    described: str
+    #: How many steps it takes.
+    steps: int
+    #: For each line of the part's words, where its steps begin: the words themselves do
+    #: not change.
+    cues: list[list[int]]
+
+
+def compile_redraw(text: str, narration: Sequence[Mapping[str, Any]]) -> CompiledRedraw:
+    """Read a model's answer to "draw this part's picture again": its sentence or two, and
+    a slide, which Adle draws (ADR-049) and paces to where the part's words are (``_paced``).
+    ``narration`` is the part's lines as the lesson has them, each its ``text`` and
+    ``cues``. Raises ``DraftError`` with what was wrong, for the one retry."""
+    try:
+        whole = extract_json_object(text)
+    except DraftError as error:
+        raise DraftError(
+            ['The answer must be one JSON object with "paragraphs" and "visual".']
+        ) from error
+    visual = whole.get("visual")
+    if not isinstance(visual, dict):
+        raise DraftError(['"visual" is missing: the part\'s picture, as one slide.'])
+    said = whole.get("paragraphs")
+    cleaned = [
+        paragraph
+        for paragraph in (
+            tidy(item) for item in (said if isinstance(said, list) else []) if isinstance(item, str)
+        )
+        if paragraph
+    ] or ["The picture is drawn again as you asked."]
+    try:
+        answer = _Answer.model_validate({"paragraphs": cleaned[:2]})
+    except ValidationError as error:
+        raise DraftError(_problems(error)) from error
+    lines = [
+        {"text": str(beat.get("text", "")), "cues": list(beat.get("cues") or [])}
+        for beat in narration
+    ]
+    try:
+        first = compile_slide(visual)
+    except SlideError as error:
+        raise DraftError(
+            ["The picture could not be drawn: " + "; ".join(error.problems[:4])]
+        ) from error
+    if first.interactive:
+        raise DraftError(["A picture drawn again has nothing to move: leave out the slider."])
+    paced = _paced(lines, first.steps)
+    drawn = first
+    try:
+        fitted = compile_slide(visual, _step_seconds(paced, first.steps))
+    except SlideError:
+        fitted = None
+    if fitted is not None and fitted.steps == first.steps:
+        drawn = fitted
+    described = ""
+    for candidate in (visual.get("description"), drawn.described):
+        try:
+            described = _LONG_DISPLAY.validate_python(tidy(str(candidate or "")))
+        except ValidationError:
+            continue
+        if described:
+            break
+    if not described:
+        described = "A picture of this part."
+    return CompiledRedraw(
+        paragraphs=list(answer.paragraphs),
+        source=drawn.source,
+        described=described,
+        steps=drawn.steps,
+        cues=[list(beat.get("cues") or []) for beat in paced],
+    )

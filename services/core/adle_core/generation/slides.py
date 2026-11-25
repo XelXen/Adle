@@ -15,7 +15,9 @@ cued``), which holds after each phase until the host says ``next``. Each phase e
 slider ends on a live page where the learner moves it.
 
 Nothing of the model's text reaches the scene but as a quoted literal, and a formula only
-as Python written again by the figures module (ADR-045). An element that cannot be drawn,
+as Python written again by the figures module (ADR-045). The script itself is kept at the
+scene's end, encoded, in a comment no player reads, so that the part's picture can be drawn
+again from it at the learner's word (ADR-067). An element that cannot be drawn,
 and an action that names nothing on the stage, are left out and said: a picture is not
 lost for one of its parts. The scene written passes the scene policy, here and again where
 every scene does.
@@ -23,6 +25,8 @@ every scene does.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import itertools
 import json
 import math
@@ -59,6 +63,17 @@ from adle_core.generation.speech import has_marks, small_as_tex
 #: The most elements a slide draws, and the most steps it takes (a live page besides).
 MAX_ELEMENTS = 18
 MAX_STEPS = 9
+
+#: How a slide's scene keeps the script it was drawn from: one comment, its last line, the
+#: script's JSON in base64, so that the script goes wherever the scene goes and a part's
+#: picture can be drawn again from it at the learner's word (ADR-067), and none of a model's
+#: words is in a scene as anything but a quoted literal. The player never reads it; Adle
+#: reads it only as a model's data, drawn again through all of this module.
+SCRIPT_MARK = "# adle-slide-script: "
+#: The most of a script that is kept, as JSON. A script is 1 to 5 KB as it is written.
+MAX_SCRIPT_CHARACTERS = 10_000
+#: The most a scene may be, as the lesson's format allows (``lessons.ir``).
+_MAX_SOURCE = 40_000
 
 #: Colors a script may name, and the hue of the stage each stands for.
 COLORS: dict[str, str] = {
@@ -4889,6 +4904,9 @@ def compile_slide(raw: object, seconds: Sequence[float] | None = None) -> Compil
         + "\n".join(steps)
         + ("\n" + live if live else "")
     )
+    kept = _script_comment(raw)
+    if kept and len(source) + len(kept) <= _MAX_SOURCE:
+        source += kept
     report = check_scene_source(source)
     if not report.ok:
         problems = [violation.message for violation in report.violations[:3]]
@@ -4900,3 +4918,33 @@ def compile_slide(raw: object, seconds: Sequence[float] | None = None) -> Compil
         described=_describe(compiler),
         left_out=compiler.left_out,
     )
+
+
+def _script_comment(raw: dict[str, Any]) -> str:
+    """The script, as the comment that ends its scene; nothing for one too long to keep, or
+    one that names a link anywhere (no part of a scene does)."""
+    kept = {key: raw[key] for key in ("elements", "steps", "description") if key in raw}
+    try:
+        text = json.dumps(kept, ensure_ascii=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return ""
+    if len(text) > MAX_SCRIPT_CHARACTERS or names_a_link(text):
+        return ""
+    return "\n" + SCRIPT_MARK + base64.b64encode(text.encode("ascii")).decode("ascii") + "\n"
+
+
+def slide_script(source: str) -> dict[str, Any] | None:
+    """The script a slide's scene was drawn from, when it keeps one (ADR-067): a model's
+    data, to be drawn again only through ``compile_slide``. None for any other scene."""
+    for line in reversed(source.rstrip("\n").split("\n")[-2:]):
+        if not line.startswith(SCRIPT_MARK):
+            continue
+        encoded = line[len(SCRIPT_MARK) :].strip()
+        if len(encoded) > MAX_SCRIPT_CHARACTERS * 4 // 3 + 4:
+            return None
+        try:
+            value = json.loads(base64.b64decode(encoded, validate=True).decode("ascii"))
+        except (ValueError, binascii.Error, UnicodeDecodeError):
+            return None
+        return value if isinstance(value, dict) else None
+    return None

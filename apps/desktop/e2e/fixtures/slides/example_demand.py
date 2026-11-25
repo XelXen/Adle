@@ -411,3 +411,5 @@ class Slide(InteractiveScene):
         self.play(FadeIn(self.e['law'], shift=UP * 0.15), run_time=1.02)
         self.audit()
         self.post_message("step", 3)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJzb2xkIiwia2luZCI6ImJhcnMiLCJwbGFjZSI6ImNlbnRlciIsImNvbG9yIjoiYmx1ZSIsImxhYmVsIjoiY3VwcyBzb2xkIiwibGFiZWxzIjpbIjEgZG9sbGFyIiwiMiBkb2xsYXJzIiwiMyBkb2xsYXJzIl0sInZhbHVlcyI6WzQwLDIwLDEwXX0seyJpZCI6ImxhdyIsImtpbmQiOiJib3giLCJwbGFjZSI6ImJvdHRvbSIsImNvbG9yIjoidmlvbGV0IiwidGV4dCI6IldoZW4gdGhlIHByaWNlIHJpc2VzIGFuZCBub3RoaW5nIGVsc2UgY2hhbmdlcywgcGVvcGxlIGJ1eSBsZXNzLiJ9XSwic3RlcHMiOltbeyJzaG93Ijoic29sZC4xIn1dLFt7InNob3ciOiJzb2xkLjIifV0sW3sic2hvdyI6InNvbGQuMyJ9XSxbeyJzaG93IjoibGF3In1dXSwiZGVzY3JpcHRpb24iOiJCYXJzIG9mIGN1cHMgc29sZDogNDAgYXQgMSBkb2xsYXIsIDIwIGF0IDIgZG9sbGFycywgMTAgYXQgMyBkb2xsYXJzLiBUaGVuIHRoZSBsYXcgb2YgZGVtYW5kLiJ9

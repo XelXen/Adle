@@ -389,3 +389,5 @@ class Slide(InteractiveScene):
         self.play(LaggedStart(Write(self.e['note']), FadeIn(self.e['py/frame']), FadeIn(self.e['py.1'], shift=UP * 0.15), FadeIn(self.e['py.2'], shift=UP * 0.15), lag_ratio=0.3), run_time=1.68)
         self.audit()
         self.post_message("step", 3)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJjIiwia2luZCI6ImNvZGUiLCJsYWJlbCI6IkphdmFTY3JpcHQiLCJwbGFjZSI6ImxlZnQiLCJsaW5lcyI6WyJmdW5jdGlvbiB0b3RhbChpdGVtcykgeyIsIiAgbGV0IHN1bSA9IDA7IiwiICBmb3IgKGNvbnN0IGl0ZW0gb2YgaXRlbXMpIHsiLCIgICAgc3VtICs9IGl0ZW0ucHJpY2UgKiBpdGVtLmNvdW50OyIsIiAgfSIsIiAgcmV0dXJuIHN1bTsiLCJ9Il19LHsiaWQiOiJub3RlIiwia2luZCI6InRleHQiLCJ0ZXh0IjoiT25lIHBhc3Mgb3ZlciB0aGUgbGlzdC4iLCJwbGFjZSI6InJpZ2h0In0seyJpZCI6InB5Iiwia2luZCI6ImNvZGUiLCJwbGFjZSI6ImJvdHRvbSByaWdodCIsImNvZGUiOiJpZiB4IDwgMTAgYW5kIG5hbWUgIT0gJ2FkYSc6XG5cdHByaW50KGZcInt4Oj40fSAlIDMgPSB7eCAlIDN9XCIpIn1dLCJzdGVwcyI6W1t7InNob3ciOiJjLjEifV0sW3sic2hvdyI6WyJjLjIiLCJjLjMiXX1dLFt7InNob3ciOiJjIn0seyJoaWdobGlnaHQiOiJjLjQifV0sW3siY29sb3IiOiJjLmxpbmUgNiIsInRvIjoiZ3JlZW4ifSx7InNob3ciOlsibm90ZSIsInB5Il19XV19

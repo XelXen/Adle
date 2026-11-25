@@ -41,16 +41,40 @@ export function suggestedQuestions(kind: string, unanswered: boolean): string[] 
 }
 
 /**
- * Everything a question sends, as a list to put between "Sends" and "to <provider>".
- *
- * A promise made before anything is sent. Keep it in step with `ask_request` in the core
- * (`generation/prompts.py`): if the request gains something, it is named here first.
+ * The kinds of part whose picture can be drawn again at the learner's word (ADR-067): the
+ * core's list (`lessons.DRAWN_AGAIN`). A question, a reflection and something to try have
+ * none to change.
  */
-export function askDisclosure(): string {
-  return (
-    'your question, this part of the lesson, the lesson outline, the course name, this ' +
-    'concept, and any related passages from your materials'
-  );
+const DRAWN_AGAIN = new Set(['explanation', 'visualization', 'worked_example', 'summary']);
+
+/** Whether the learner can ask for this kind of part's picture to be drawn again. */
+export function canRedraw(kind: string): boolean {
+  return DRAWN_AGAIN.has(kind);
+}
+
+/** Ready-made requests for a picture drawn again. The learner's own words say it best. */
+export function suggestedRedraws(): string[] {
+  return [
+    'Draw what the words describe that the picture leaves out.',
+    'Label each thing in the picture.',
+    'Show it one step at a time.',
+  ];
+}
+
+/**
+ * Everything a question sends, as a list to put between "Sends" and "to <provider>"; asking
+ * for the picture to be drawn again sends the picture too (ADR-067).
+ *
+ * A promise made before anything is sent. Keep it in step with `ask_request` and
+ * `redraw_request` in the core (`generation/prompts.py`): if a request gains something, it
+ * is named here first.
+ */
+export function askDisclosure(redraw = false): string {
+  return redraw
+    ? 'what you asked for, this part of the lesson with its picture, the lesson title, the ' +
+        'course name, and this concept'
+    : 'your question, this part of the lesson, the lesson outline, the course name, this ' +
+        'concept, and any related passages from your materials';
 }
 
 /** What is wrong with a question as typed, or null if it can be asked. */

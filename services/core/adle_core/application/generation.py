@@ -30,7 +30,7 @@ import logging
 import re
 import threading
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -61,7 +61,7 @@ from adle_core.application.jobs import (
     JobSnapshot,
 )
 from adle_core.application.learner import LearnerService
-from adle_core.application.lessons import LessonService
+from adle_core.application.lessons import DRAWN_AGAIN, LessonService
 from adle_core.application.model_gateway import ModelGateway, QuotaExhaustedError
 from adle_core.application.retrieval import Passage as StoredPassage
 from adle_core.application.retrieval import Retriever
@@ -83,6 +83,7 @@ from adle_core.generation.drafts import (
     compile_curriculum,
     compile_lesson,
     compile_practice,
+    compile_redraw,
     extract_json_object,
     extract_python_file,
     mend_backslashes,
@@ -95,6 +96,7 @@ from adle_core.generation.provider import (
     ProviderKeyMissingError,
     RequestCancelledError,
 )
+from adle_core.generation.slides import slide_script
 from adle_core.generation.stream import PartStream
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.ids import new_id
@@ -705,6 +707,26 @@ def next_strategy(used: Sequence[str], subject: str | None = None) -> str | None
     if not used:
         return None
     return next((name for name in axioms.ways_for(subject) if name not in used), None)
+
+
+def _marked_steps(narration: Sequence[Mapping[str, Any]]) -> list[str]:
+    """A part's words with where each step of its picture plays marked "⟨2⟩", "⟨3⟩" and on:
+    the first plays as the part begins (ADR-049, ADR-067)."""
+    marked: list[str] = []
+    step = 1
+    for beat in narration:
+        text = str(beat.get("text", ""))
+        pieces: list[str] = []
+        last = 0
+        for cue in sorted(int(item) for item in beat.get("cues") or []):
+            if not 0 <= cue <= len(text) or cue < last:
+                continue
+            step += 1
+            pieces += [text[last:cue], f"⟨{step}⟩"]
+            last = cue
+        pieces.append(text[last:])
+        marked.append("".join(pieces))
+    return marked
 
 
 def subject_of(course: Course, *more: str | None) -> str:
@@ -1876,8 +1898,11 @@ class GenerationService:
 
     # -- a question the learner asks in the middle of a lesson -------------------
 
-    def ask(self, lesson_id: str, segment_id: str, question: str) -> JobSnapshot:
-        """Start a job that answers something the learner asked about one part of a lesson."""
+    def ask(
+        self, lesson_id: str, segment_id: str, question: str, *, redraw: bool = False
+    ) -> JobSnapshot:
+        """Start a job that answers something the learner asked about one part of a lesson;
+        with ``redraw``, one that draws the part's picture again as they asked (ADR-067)."""
         words = " ".join(question.split())
         if not MIN_QUESTION_CHARACTERS <= len(words) <= MAX_QUESTION_CHARACTERS:
             raise ValidationFailedError(
@@ -1885,8 +1910,18 @@ class GenerationService:
                 "characters long."
             )
         lesson = self._lessons.get_lesson(lesson_id)
-        if not any(segment.id == segment_id for segment in lesson.segments):
+        segment = next((item for item in lesson.segments if item.id == segment_id), None)
+        if segment is None:
             raise NotFoundError("That is not a part of this lesson.")
+        if redraw:
+            if segment.type not in DRAWN_AGAIN:
+                raise ConflictError("This part has no picture to change.")
+            scene = getattr(segment, "scene", None)
+            waiting = self._lessons.get(lesson_id).pending_scene_ids
+            if isinstance(scene, SceneRef) and scene.scene_id in waiting:
+                raise ConflictError(
+                    "This part's picture is still being drawn. Change it once it has arrived."
+                )
         if self._asks.count(lesson_id) >= MAX_ASKS_PER_LESSON:
             raise ConflictError(
                 f"This lesson already has {MAX_ASKS_PER_LESSON} saved questions. Remove one "
@@ -1898,9 +1933,10 @@ class GenerationService:
                 raise ConflictError(
                     "Your last question is still being answered. Wait for it, or stop it first."
                 )
+            answer = self._redraw if redraw else self._answer
             return self._jobs.submit(
                 KIND_ASK,
-                lambda context: self._answer(lesson_id, segment_id, words, context),
+                lambda context: answer(lesson_id, segment_id, words, context),
                 course_id=lesson.course_id,
                 subject_id=lesson_id,
                 lane=LANE_QUICK,
@@ -2011,6 +2047,103 @@ class GenerationService:
         raise GenerationFailedError(
             "The answer wasn’t usable, twice. Nothing was saved. Try asking again, perhaps in "
             "other words."
+        )
+
+    def _redraw(
+        self, lesson_id: str, segment_id: str, question: str, context: JobContext
+    ) -> dict[str, Any]:
+        """A part's picture drawn again as the learner asked (ADR-067): one request, a
+        second only if the first could not be drawn, told why. Kept with the answer; it joins
+        the lesson only when the learner uses it (``AskService.use_picture``)."""
+        found = self._lessons.get(lesson_id)
+        lesson = found.lesson
+        index = next(
+            (place for place, segment in enumerate(lesson.segments) if segment.id == segment_id),
+            None,
+        )
+        if index is None:
+            raise NotFoundError("That is not a part of this lesson.")
+        segment = lesson.segments[index]
+        reference = getattr(segment, "scene", None)
+        artifact = (
+            next((item for item in found.scenes if item.id == reference.scene_id), None)
+            if isinstance(reference, SceneRef)
+            else None
+        )
+        narration = [{"text": beat.text, "cues": list(beat.cues)} for beat in segment.narration]
+        part = prompts.PictureBrief(
+            number=index + 1,
+            title=segment.title,
+            kind=segment.type,
+            said=_marked_steps(narration),
+            steps=artifact.steps if artifact is not None and artifact.steps > 1 else 0,
+            shown=[beat.show for beat in segment.narration if beat.show],
+            script=slide_script(artifact.source) if artifact is not None else None,
+            picture=reference.fallback_text if isinstance(reference, SceneRef) else "",
+        )
+        with self._database.read() as session:
+            course = get_course_or_404(session, lesson.course_id)
+            course_title = course.title
+            concept_row = get_concept_or_404(session, lesson.concept_ids[0])
+            subject = subject_of(course, concept_row.title)
+            concept = prompts.ConceptBrief(
+                title=concept_row.title,
+                summary=concept_row.summary or "",
+                objectives=[],
+                prerequisites=[],
+            )
+        problems: list[str] = []
+        for attempt in (1, 2):
+            context.check_cancelled()
+            doing = (
+                "Drawing the picture again"
+                if attempt == 1
+                else "The first picture couldn’t be drawn. Asking once more"
+            )
+            context.report(0, 0, doing)
+            request = prompts.redraw_request(
+                course_title=course_title,
+                subject=subject,
+                concept=concept,
+                lesson_title=lesson.title,
+                part=part,
+                question=question,
+                problems=problems,
+            )
+            result = self._ask(request, context, attempt - 1, 2, doing)
+            try:
+                drawn = compile_redraw(result.text, narration)
+            except DraftError as error:
+                logger.info("generation.redraw_unusable attempt=%s", attempt)
+                problems = error.problems
+                continue
+            written_by = self._written_by([result])
+            kept = self._asks.store(
+                lesson_id=lesson_id,
+                segment_id=segment_id,
+                question=question,
+                paragraphs=drawn.paragraphs,
+                citations=[],
+                written_by=written_by,
+                picture={
+                    "source": drawn.source,
+                    "described": drawn.described,
+                    "steps": drawn.steps,
+                    "cues": drawn.cues,
+                },
+            )
+            context.report(2, 2, "Done")
+            return {
+                "kind": KIND_ASK,
+                "ask_id": kept.id,
+                "lesson_id": lesson_id,
+                "segment_id": segment_id,
+                "written_by": written_by,
+                "picture": True,
+            }
+        raise GenerationFailedError(
+            "The picture couldn’t be drawn as asked, twice. Nothing was saved. Try asking "
+            "again, perhaps in other words."
         )
 
     # -- finding out whether a key works -----------------------------------------

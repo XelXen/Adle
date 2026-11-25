@@ -379,3 +379,5 @@ class Slide(InteractiveScene):
         self.roll('die', [[-1, 1], [1, 1], [0, 0], [-1, -1], [1, -1]], self.blue)
         self.audit()
         self.post_message("step", 1)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJkaWUiLCJraW5kIjoiZGllIiwiZmFjZSI6MywicGxhY2UiOiJsZWZ0IiwibGFiZWwiOiJvbmUgcm9sbCJ9LHsiaWQiOiJvZGRzIiwia2luZCI6Im1hdGgiLCJwbGFjZSI6InJpZ2h0IiwidGV4IjoiUChcXHRleHR7b2RkfSkgPSBcXGZyYWN7M317Nn0ifV0sInN0ZXBzIjpbW3sic2hvdyI6WyJkaWUiLCJvZGRzIl19XSxbeyJzZXQiOiJkaWUiLCJ0byI6NX1dXX0=

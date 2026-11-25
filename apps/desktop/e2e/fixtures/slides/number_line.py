@@ -409,3 +409,5 @@ class Slide(InteractiveScene):
         self.play(self.trackers['X'].animate.set_value(7.0), run_time=1.6, rate_func=smooth)
         self.audit()
         self.post_message("step", 2)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJsaW5lIiwia2luZCI6Im51bWJlcl9saW5lIiwieCI6WzAsMTBdLCJsYWJlbCI6IngiLCJwbGFjZSI6ImNlbnRlciJ9LHsiaWQiOiJYIiwia2luZCI6InBvaW50Iiwib24iOiJsaW5lIiwieCI6MiwibGFiZWwiOiJYIiwiY29sb3IiOiJjb3JhbCJ9LHsiaWQiOiJ3aGVyZSIsImtpbmQiOiJ0ZXh0IiwidGV4dCI6IlggbGFuZHMgc29tZXdoZXJlIGJldHdlZW4gMCBhbmQgMTAuIiwicGxhY2UiOiJ0b3AifV0sInN0ZXBzIjpbW3sic2hvdyI6WyJsaW5lIiwid2hlcmUiXX1dLFt7InNob3ciOiJYIn1dLFt7InNldCI6IlgiLCJ0byI6N31dXX0=

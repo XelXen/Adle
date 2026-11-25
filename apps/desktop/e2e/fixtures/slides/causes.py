@@ -430,3 +430,5 @@ class Slide(InteractiveScene):
         self.play(self.e['why.e1'].animate.scale(1 / 1.12), run_time=0.25)
         self.audit()
         self.post_message("step", 2)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJ3aHkiLCJraW5kIjoibm9kZXMiLCJsYXlvdXQiOiJyb3ciLCJwbGFjZSI6InRvcCIsImNvbG9yIjoiZ3JlZW4iLCJub2RlcyI6WyJkZWJ0IiwiaHVuZ2VyIiwiYW5nZXIiLCJyZXZvbHQiXSwiZWRnZXMiOltbImRlYnQiLCJyZXZvbHQiXSxbImh1bmdlciIsInJldm9sdCJdLFsiYW5nZXIiLCJyZXZvbHQiXV19LHsiaWQiOiJzdGVwcyIsImtpbmQiOiJub2RlcyIsImxheW91dCI6ImNvbHVtbiIsInBsYWNlIjoiYm90dG9tIiwiZGlyZWN0ZWQiOmZhbHNlLCJub2RlcyI6WyJmaXJzdCIsInNlY29uZCIsInRoaXJkIl0sImVkZ2VzIjpbWzEsM10sWzEsMl1dfV0sInN0ZXBzIjpbW3sic2hvdyI6IndoeSJ9XSxbeyJzaG93Ijoic3RlcHMifV0sW3siaGlnaGxpZ2h0Ijoid2h5LmRlYnQtPnJldm9sdCJ9XV19

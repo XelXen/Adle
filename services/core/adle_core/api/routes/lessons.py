@@ -46,6 +46,10 @@ def list_lessons(course_id: str, services: ServicesDep) -> schemas.LessonList:
     response_model=schemas.LessonForPlayer,
 )
 def get_lesson(lesson_id: str, services: ServicesDep) -> schemas.LessonForPlayer:
+    return _for_player(services, lesson_id)
+
+
+def _for_player(services: Services, lesson_id: str) -> schemas.LessonForPlayer:
     loaded = services.lessons.get(lesson_id)
     return schemas.LessonForPlayer(
         lesson=player_view(loaded.lesson, services.item_mask),
@@ -115,7 +119,7 @@ def ask_about_lesson(
     ``lessons.list_asks``.
     """
     return schemas.Job.model_validate(
-        services.generation.ask(lesson_id, body.segment_id, body.question)
+        services.generation.ask(lesson_id, body.segment_id, body.question, redraw=body.redraw)
     )
 
 
@@ -130,6 +134,30 @@ def list_asks(lesson_id: str, services: ServicesDep) -> schemas.AskList:
         asks=[schemas.Ask.model_validate(ask) for ask in services.asks.list_for_lesson(lesson_id)],
         limit=MAX_ASKS_PER_LESSON,
     )
+
+
+@router.post(
+    "/lessons/{lesson_id}/asks/{ask_id}/picture",
+    operation_id="lessons.use_ask_picture",
+    response_model=schemas.LessonForPlayer,
+)
+def use_ask_picture(lesson_id: str, ask_id: str, services: ServicesDep) -> schemas.LessonForPlayer:
+    """Put the picture an answer drew into its part of the lesson, in place of the part's
+    own (ADR-067). The lesson as it is now, to be played."""
+    services.asks.use_picture(lesson_id, ask_id)
+    return _for_player(services, lesson_id)
+
+
+@router.delete(
+    "/lessons/{lesson_id}/asks/{ask_id}/picture",
+    operation_id="lessons.put_back_picture",
+    response_model=schemas.LessonForPlayer,
+)
+def put_back_picture(lesson_id: str, ask_id: str, services: ServicesDep) -> schemas.LessonForPlayer:
+    """Give the part its own picture back, in place of the one an answer drew. The lesson
+    as it is now, to be played."""
+    services.asks.put_back(lesson_id, ask_id)
+    return _for_player(services, lesson_id)
 
 
 @router.delete(

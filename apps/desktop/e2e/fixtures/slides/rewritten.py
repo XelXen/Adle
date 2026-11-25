@@ -383,3 +383,5 @@ class Slide(InteractiveScene):
         self.play(TransformMatchingTex(self.e['first'].copy(), self.e['next']), run_time=1.4)
         self.audit()
         self.post_message("step", 3)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJhY3RpdmUiLCJraW5kIjoid29yZHMiLCJwbGFjZSI6InRvcCIsInRleHQiOiJUaGUgZG9nIGNoYXNlZCB0aGUgYmFsbC4iLCJjb2xvciI6ImJsdWUifSx7ImlkIjoicGFzc2l2ZSIsImtpbmQiOiJ3b3JkcyIsInBsYWNlIjp7ImJlbG93IjoiYWN0aXZlIn0sInRleHQiOiJUaGUgYmFsbCB3YXMgY2hhc2VkIGJ5IHRoZSBkb2cuIiwiY29sb3IiOiJncmVlbiJ9LHsiaWQiOiJmaXJzdCIsImtpbmQiOiJtYXRoIiwicGxhY2UiOiJib3R0b20iLCJ0ZXgiOiIyeCArIDMgPSA3In0seyJpZCI6Im5leHQiLCJraW5kIjoibWF0aCIsInBsYWNlIjp7ImJlbG93IjoiZmlyc3QifSwidGV4IjoiMnggPSA0In1dLCJzdGVwcyI6W1t7InNob3ciOiJhY3RpdmUifV0sW3sic2hvdyI6InBhc3NpdmUifV0sW3sic2hvdyI6ImZpcnN0In1dLFt7InNob3ciOiJuZXh0In1dXX0=

@@ -473,7 +473,13 @@ class CourseFileService:
                     lesson_id=row.lesson_id,
                     segment_id=row.segment_id,
                     question=row.question,
-                    answer=dict(row.answer or {}),
+                    # A note's words; a picture it drew is in the lesson, if it is in use there
+                    # (ADR-067), and a note brought in carries words only.
+                    answer={
+                        key: value
+                        for key, value in (row.answer or {}).items()
+                        if key in ("paragraphs", "citations")
+                    },
                     written_by=dict(row.written_by or {}),
                     created_at=row.created_at,
                 )

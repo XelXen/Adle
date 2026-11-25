@@ -58,7 +58,8 @@ understanding with short questions, and adapts the next step to what you have ac
   sent and where before anything is, you can cancel, and nothing is added without you.
 - **Ask a question during a lesson:** about the part in front of you, in your own words or
   with one press. The answer is kept beside that part. On a question the lesson is asking,
-  you get help thinking it through, not the answer.
+  you get help thinking it through, not the answer. If a picture leaves something out,
+  ask for it to be drawn again, and use the new one if you like it.
 - **While a lesson is written** (a few minutes) Adle says about how long it takes, offers a
   break, and tells you when it is ready, with a notification if you are doing something else.
 - **Read aloud:** lessons are read by a voice installed on your computer, with nothing sent

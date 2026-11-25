@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { LessonForPlayer } from '@adle/contracts';
 
@@ -22,6 +22,11 @@ export interface LessonUpdates {
   segments: readonly Segment[];
   /** More parts are being written. */
   writing: boolean;
+  /**
+   * Take the lesson as the core has it now, after the learner changed a part's picture
+   * (ADR-067): its pictures, and its parts with that one's new picture in it.
+   */
+  adopt: (latest: LessonForPlayer) => void;
 }
 
 /**
@@ -77,5 +82,12 @@ export function useLessonUpdates(
     };
   }, [lessonId, waiting]);
 
-  return { scenes, pending, segments, writing };
+  const adopt = useCallback((latest: LessonForPlayer): void => {
+    setScenes(latest.scenes);
+    setPending(new Set(latest.pending_scene_ids ?? []));
+    setSegments(latest.lesson.segments);
+    setWriting(latest.writing ?? false);
+  }, []);
+
+  return { scenes, pending, segments, writing, adopt };
 }

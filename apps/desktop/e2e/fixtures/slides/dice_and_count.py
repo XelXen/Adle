@@ -388,3 +388,5 @@ class Slide(InteractiveScene):
         self.play(ChangeDecimalToValue(self.e['sixes/value'], 1.0), run_time=1.2)
         self.audit()
         self.post_message("step", 2)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJkaWUiLCJraW5kIjoiZGllIiwiZmFjZSI6MSwicGxhY2UiOiJsZWZ0IiwibGFiZWwiOiJyb2xsIn0seyJpZCI6InNpeGVzIiwia2luZCI6Im51bWJlciIsInZhbHVlIjowLCJkZWNpbWFscyI6MCwibGFiZWwiOiJzaXhlcyIsInBsYWNlIjoicmlnaHQifV0sInN0ZXBzIjpbW3sic2hvdyI6WyJkaWUiLCJzaXhlcyJdfV0sW3sic2V0IjoiZGllIiwidG8iOjR9XSxbeyJzZXQiOiJkaWUiLCJ0byI6Nn0seyJzZXQiOiJzaXhlcyIsInRvIjoxfV1dfQ==

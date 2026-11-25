@@ -7,6 +7,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Change a lesson's picture by asking.** If a picture leaves out something it should
+  show (say, the hydrogen bonds between water molecules), press **Ask a question**,
+  choose **Change the picture**, and say what it should show. Adle draws that part's
+  picture again and shows you the answer; **Use this picture** puts it in the lesson, and
+  **Put the original back** undoes it. The part's words stay as they were.
+
 - **A film's pictures are checked.** When the AI you use can read pictures (NVIDIA NIM),
   every chapter of a film is also looked at the way you would see it: a picture of the
   screen at the end of each animation. An arrow that points at nothing, a label away from

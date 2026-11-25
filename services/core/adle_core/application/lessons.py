@@ -9,6 +9,7 @@ scenes are put through the static policy again before they are handed out.
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -532,3 +533,92 @@ class LessonService:
     def delete(self, lesson_id: str) -> None:
         with self._database.session() as session:
             session.delete(_get_or_404(session, lesson_id))
+
+
+# -- a part's picture drawn again at the learner's word (ADR-067) -------------------
+
+#: Parts whose picture can be drawn again at the learner's word (ADR-067): those that
+#: teach with a picture. An interaction's must be something to operate, and a checkpoint
+#: or a reflection has none.
+DRAWN_AGAIN = frozenset({"explanation", "visualization", "worked_example", "summary"})
+
+
+def replace_picture(
+    session: Session,
+    row: StoredLesson,
+    segment_id: str,
+    scene: Mapping[str, Any] | None,
+    narration: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Give one part of a stored lesson another picture, or none, with where its steps
+    fall in the part's words (ADR-067). The words do not change; only each line's ``cues``
+    and ``advance_scene`` are taken from ``narration``, one for each line. ``scene`` is
+    ``{"id", "purpose", "source", "fallback_text"}``. Returns what the part had, in the
+    same shape, to put back. The whole lesson goes through the gate again."""
+    document: dict[str, Any] = json.loads(json.dumps(row.document))
+    segment = next((item for item in document["segments"] if item.get("id") == segment_id), None)
+    if segment is None:
+        raise NotFoundError("That is not a part of this lesson.")
+    if segment.get("type") not in DRAWN_AGAIN:
+        raise ConflictError("This part's picture can't be changed.")
+    beats = segment.get("narration") or []
+    if len(narration) != len(beats):
+        raise ConflictError("This part has changed since the picture was drawn.")
+    reference = segment.get("scene")
+    pending = list(row.pending_scenes or [])
+    if isinstance(reference, dict) and reference.get("scene_id") in pending:
+        raise ConflictError(
+            "This part's picture is still being drawn. Change it once it has arrived."
+        )
+    stored = {item.scene_id: item for item in row.scenes}
+    had: dict[str, Any] = {
+        "scene": None,
+        "narration": [
+            {"cues": list(beat.get("cues") or []), "advance_scene": bool(beat.get("advance_scene"))}
+            for beat in beats
+        ],
+    }
+    if isinstance(reference, dict):
+        kept = stored.get(str(reference.get("scene_id")))
+        if kept is not None:
+            had["scene"] = {
+                "id": kept.scene_id,
+                "purpose": kept.document["purpose"],
+                "source": kept.document["source"],
+                "fallback_text": reference.get("fallback_text", ""),
+            }
+    for beat, given in zip(beats, narration, strict=True):
+        beat["cues"] = list(given.get("cues") or [])
+        beat["advance_scene"] = bool(given.get("advance_scene"))
+    if scene is None:
+        segment.pop("scene", None)
+    else:
+        segment["scene"] = {"scene_id": scene["id"], "fallback_text": scene["fallback_text"]}
+    gone = had["scene"]["id"] if had["scene"] is not None else None
+    scenes = [
+        {
+            "id": item.scene_id,
+            "purpose": item.document["purpose"],
+            "source": item.document["source"],
+        }
+        for item in row.scenes
+        if item.scene_id != gone
+    ]
+    if scene is not None:
+        scenes.append({"id": scene["id"], "purpose": scene["purpose"], "source": scene["source"]})
+    bundle = parse_bundle({"lesson": document, "scenes": scenes, "pending_scene_ids": pending})
+    row.document = bundle.lesson.model_dump(mode="json")
+    if gone is not None:
+        row.scenes.remove(stored[gone])
+    if scene is not None:
+        added = next(item for item in bundle.scenes if item.id == scene["id"])
+        row.scenes.append(
+            StoredScene(
+                scene_id=added.id,
+                position=max((item.position for item in row.scenes), default=-1) + 1,
+                content_hash=added.content_hash,
+                document=added.model_dump(mode="json"),
+            )
+        )
+    session.flush()
+    return had

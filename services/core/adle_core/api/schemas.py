@@ -478,6 +478,9 @@ class AskRequest(_Input):
 
     segment_id: Annotated[str, StringConstraints(pattern=r"^seg_[a-z0-9_]{1,40}$")]
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+    #: Draw the part's picture again as the question says, rather than answer it in words
+    #: (ADR-067).
+    redraw: bool = False
 
 
 class Author(_Output):
@@ -501,6 +504,15 @@ class AskCitation(_Output):
     locator: str
 
 
+class AskPicture(_Output):
+    """The part's picture, drawn again because the learner asked (ADR-067)."""
+
+    #: Offered beside the answer, or in use in the lesson in place of the part's own.
+    state: Literal["offered", "in_use"]
+    #: What it shows, in words.
+    description: str
+
+
 class Ask(_Output):
     """A question the learner asked about a part of a lesson, and the answer."""
 
@@ -514,6 +526,8 @@ class Ask(_Output):
     citations: list[AskCitation]
     written_by: WrittenBy
     created_at: datetime
+    #: The part's picture drawn again, when the learner asked for that.
+    picture: AskPicture | None = None
 
 
 class AskList(_Output):

@@ -321,7 +321,16 @@ everything and decides nothing.
   ever read by anything else: an answer to a checkpoint given after an ask about that part
   is an aided answer. Removing one takes its words and leaves the row (`REMOVED`), so that
   it still counts; a skip counts too, because it shows the explanation. Never send an answer key in `prompts.ask_request`: see
-  `_part_brief` for what a part may show a model.
+  `_part_brief` for what a part may show a model. **An ask can have its part's picture
+  drawn again** (ADR-067, `redraw=True`): only for a part in `lessons.DRAWN_AGAIN` whose
+  picture is not still coming; one request, two at most, purpose `lesson`
+  (`prompts.redraw_request`, with the part's words marked where its steps play,
+  `_marked_steps`); the answer read by `drafts.compile_redraw` (a slide, drawn and paced to
+  the words, never one with a slider) and kept in the note's answer (`picture`). It joins
+  the lesson only through `AskService.use_picture`, which swaps the part's scene and cues
+  with `lessons.replace_picture` (the whole lesson through `parse_bundle`) and keeps what
+  the part had; `put_back`, and removing the note, give it back. A note in a course file
+  carries words only.
 - **A provider's models are tried in order** (ADR-021), and only `ModelGateway` decides
   which. The next is asked when the one before is away (`ProviderModelUnavailableError`:
   gone, failing, or silent) or will not take its request (400, 422). Not for a refused key,
@@ -352,7 +361,11 @@ everything and decides nothing.
   out and said (by count in the log, never its words). A model's text reaches the scene only
   as a quoted literal and a curve's formula only through `_python_expression`, as for a
   figure. The narration's [brackets] become `Beat.cues` in `drafts` (`_marked`, `_cued`,
-  `_paced`); a scene's `steps` are counted by the policy, never read from input. A new kind
+  `_paced`); a scene's `steps` are counted by the policy, never read from input. A slide's
+  scene ends with the script it was drawn from (`SCRIPT_MARK`, its JSON in base64, read
+  back with `slide_script`, ADR-067), so that a part's picture can be drawn again from what
+  it is: never read it for anything but a model's data, drawn again through
+  `compile_slide`. A new kind
   of element or verb is a template, an example in `tools/export_slides.py`, and
   `npm run slides` (the player steps through every example). The examples a lesson's
   writer is shown (`generation/examples.py`) are among them: change one and run

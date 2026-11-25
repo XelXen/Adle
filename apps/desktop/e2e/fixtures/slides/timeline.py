@@ -388,3 +388,5 @@ class Slide(InteractiveScene):
         self.play(self.tint(self.e['press.2'][0], self.sun, 0), self.tint(self.e['press.2'][1], self.sun, 0), run_time=0.7)
         self.audit()
         self.post_message("step", 3)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJwcmVzcyIsImtpbmQiOiJ0aW1lbGluZSIsImxhYmVsIjoiVGhlIHByaW50aW5nIHByZXNzIiwicGxhY2UiOiJjZW50ZXIiLCJldmVudHMiOlt7ImF0IjoiYy4gMTQ0MCIsInRleHQiOiJHdXRlbmJlcmcgYnVpbGRzIGEgcHJlc3Mgd2l0aCBtb3ZhYmxlIHR5cGUifSx7ImF0IjoiMTQ1NSIsInRleHQiOiJUaGUgR3V0ZW5iZXJnIEJpYmxlIGlzIHByaW50ZWQifSx7ImF0IjoiMTQ3MHMiLCJ0ZXh0IjoiUHJlc3NlcyBpbiBJdGFseSwgRnJhbmNlIGFuZCBFbmdsYW5kIn0seyJhdCI6IjE1MDAiLCJ0ZXh0IjoiTWlsbGlvbnMgb2YgYm9va3MgaW4gcHJpbnQifSx7ImF0IjoiMTUxNyIsInRleHQiOiJMdXRoZXIncyB0aGVzZXMgc3ByZWFkIGluIHByaW50In0seyJhdCI6IjE2MDAiLCJ0ZXh0IjoiTmV3c3BhcGVycyBiZWdpbiJ9XX1dLCJzdGVwcyI6W1t7InNob3ciOiJwcmVzcy4xIn1dLFt7InNob3ciOlsicHJlc3MuMiIsInByZXNzLjMiXX1dLFt7InNob3ciOiJwcmVzcyJ9XSxbeyJoaWdobGlnaHQiOiJwcmVzcy41In0seyJjb2xvciI6InByZXNzLjE0NTUiLCJ0byI6InllbGxvdyJ9XV19

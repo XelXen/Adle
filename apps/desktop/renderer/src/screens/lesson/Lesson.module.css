@@ -757,6 +757,14 @@
   color: var(--ad-color-muted);
 }
 
+/* A picture an answer drew for its part (ADR-067): what it is, and the one thing to do. */
+.askPicture {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ad-space-2) var(--ad-space-3);
+}
+
 /* The questions kept beside a part of the lesson, folded away until asked for. */
 .asked {
   display: flex;

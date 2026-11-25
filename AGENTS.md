@@ -191,7 +191,10 @@ is built from it, and an alpha or a stable version is published from a release c
   someone in the middle of a part. Once begun, a lesson is never written again. Removing
   a lesson or a course stops the work for it.
 - A question asked during a lesson is a note beside one part, not a chat (ADR-024). It never
-  gets the answer to a question the lesson is asking.
+  gets the answer to a question the lesson is asking. It can ask for that part's picture
+  to be drawn again (ADR-067): the picture comes with the note and joins the lesson only
+  at the learner's press, the part's words unchanged, and its own picture comes back when
+  they put it back or remove the note.
 - Every animation has a text equivalent; every scene control has a keyboard-operable mirror.
 - No placeholder buttons, fake data paths, or "coming soon" in anything marked done.
 - Words are in American English (ADR-044), short, plain, and about the learner's task

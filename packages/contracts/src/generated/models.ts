@@ -48,6 +48,7 @@ export interface Ask {
   id: string;
   lesson_id: string;
   paragraphs: string[];
+  picture?: AskPicture | null;
   question: string;
   segment_id: string;
   written_by: WrittenBy;
@@ -55,6 +56,14 @@ export interface Ask {
 export interface AskCitation {
   locator: string;
   source_name: string;
+}
+/**
+ * The part's picture, drawn again because the learner asked (ADR-067).
+ *
+ */
+export interface AskPicture {
+  description: string;
+  state: 'offered' | 'in_use';
 }
 /**
  * Who wrote something a model wrote.
@@ -80,6 +89,7 @@ export interface AskList {
  */
 export interface AskRequest {
   question: string;
+  redraw?: boolean;
   segment_id: string;
 }
 /**

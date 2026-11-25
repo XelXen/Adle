@@ -23,7 +23,7 @@ const answers = path.join(repoRoot, 'fixtures', 'model-answers');
 const read = (name: string): string => readFileSync(path.join(answers, name), 'utf8');
 
 export type RequestKind =
-  'curriculum' | 'lesson' | 'scene' | 'ask' | 'check' | 'read' | 'film' | 'storyboard';
+  'curriculum' | 'lesson' | 'scene' | 'ask' | 'check' | 'read' | 'film' | 'storyboard' | 'redraw';
 
 /** What the fake reads off a picture of a page (ADR-060), unless told otherwise. */
 export const READ_PAGE =
@@ -105,6 +105,9 @@ export interface FakeProvider {
 function kindOf(system: string): RequestKind {
   if (system.includes('design the curriculum')) return 'curriculum';
   if (system.includes('Wanim scene file')) return 'scene';
+  // A part's picture drawn again as the learner asked (ADR-067). Before an ask: its
+  // instructions say "partway through a lesson" too.
+  if (system.includes('You draw pictures for Adle')) return 'redraw';
   // A question the learner asked in the middle of a lesson, and the check of a key.
   if (system.includes('partway through a lesson')) return 'ask';
   if (system.includes('checking that a connection works')) return 'check';
@@ -124,6 +127,7 @@ function defaultAnswer(kind: RequestKind, user: string): string {
   if (kind === 'read') return READ_PAGE;
   if (kind === 'film') return read('film-chapter.py');
   if (kind === 'storyboard') return 'NOTHING';
+  if (kind === 'redraw') return read('redraw.json');
   return exampleScene(user.includes('Kind: interactive') ? 'neuron_weight.py' : 'weighted_sum.py');
 }
 

@@ -385,3 +385,5 @@ class Slide(InteractiveScene):
         self.play(LaggedStart(GrowArrow(self.e['w']), FadeIn(self.e['w/name']), lag_ratio=0.3), run_time=1.14)
         self.audit()
         self.post_message("step", 2)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJwbGFuZSIsImtpbmQiOiJheGVzIiwieCI6Wy0xLDVdLCJ5IjpbLTEsNF0sInBsYWNlIjoiY2VudGVyIn0seyJpZCI6InUiLCJraW5kIjoidmVjdG9yIiwib24iOiJwbGFuZSIsInRvIjpbMywxXSwibGFiZWwiOiJ1IiwiY29sb3IiOiJibHVlIn0seyJpZCI6InYiLCJraW5kIjoidmVjdG9yIiwib24iOiJwbGFuZSIsImZyb20iOlszLDFdLCJ0byI6WzQsM10sImxhYmVsIjoidiIsImNvbG9yIjoiZ3JlZW4ifSx7ImlkIjoidyIsImtpbmQiOiJ2ZWN0b3IiLCJvbiI6InBsYW5lIiwidG8iOls0LDNdLCJsYWJlbCI6InUgKyB2IiwiY29sb3IiOiJ5ZWxsb3cifV0sInN0ZXBzIjpbW3sic2hvdyI6WyJwbGFuZSIsInUiXX1dLFt7InNob3ciOiJ2In1dLFt7InNob3ciOiJ3In1dXX0=

@@ -405,3 +405,5 @@ class Slide(InteractiveScene):
         self.play(self.tint(self.e['outside.b1'], self.sun, 0), self.tint(self.e['outside.1'][0], self.sun, 0.45), self.tint(self.e['outside.2'][0], self.sun, 0.45), run_time=0.7)
         self.audit()
         self.post_message("step", 2)
+
+# adle-slide-script: eyJlbGVtZW50cyI6W3siaWQiOiJ3YWxsIiwia2luZCI6InNoYXBlIiwic2hhcGUiOiJyZWN0YW5nbGUiLCJsYWJlbCI6Im1lbWJyYW5lIiwiY29sb3IiOiJvcmFuZ2UiLCJwbGFjZSI6ImNlbnRlciJ9LHsiaWQiOiJvdXRzaWRlIiwia2luZCI6Im1vbGVjdWxlIiwiYXRvbXMiOlsiTyIsIk8iXSwiYm9uZHMiOltbMSwyLDJdXSwicGxhY2UiOiJ0b3AifSx7ImlkIjoiaW5zaWRlIiwia2luZCI6Im1vbGVjdWxlIiwiYXRvbXMiOlsiTyIsIk8iXSwiYm9uZHMiOltbMSwyLDJdXSwicGxhY2UiOiJib3R0b20ifV0sInN0ZXBzIjpbW3sic2hvdyI6WyJ3YWxsIiwib3V0c2lkZSJdfV0sW3sibW92ZSI6Im91dHNpZGUiLCJ0byI6Imluc2lkZSJ9XSxbeyJoaWdobGlnaHQiOiJpbnNpZGUifSx7ImNvbG9yIjoiaW5zaWRlIiwidG8iOiJ5ZWxsb3cifV1dfQ==

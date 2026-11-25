@@ -1,0 +1,76 @@
+{
+  "paragraphs": [
+    "The picture now shows the hydrogen bond: a dashed line from a hydrogen of one water molecule to the oxygen of the next."
+  ],
+  "visual": {
+    "elements": [
+      {
+        "id": "upper",
+        "kind": "molecule",
+        "atoms": [
+          "O",
+          "H",
+          "H"
+        ],
+        "bonds": [
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            3
+          ]
+        ],
+        "place": "top",
+        "label": "water"
+      },
+      {
+        "id": "lower",
+        "kind": "molecule",
+        "atoms": [
+          "O",
+          "H",
+          "H"
+        ],
+        "bonds": [
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            3
+          ]
+        ],
+        "place": "bottom",
+        "label": "water"
+      },
+      {
+        "id": "bond",
+        "kind": "line",
+        "from": "upper.2",
+        "to": "lower.1",
+        "dashed": true,
+        "color": "teal",
+        "label": "hydrogen bond"
+      }
+    ],
+    "steps": [
+      [
+        {
+          "show": [
+            "upper",
+            "lower"
+          ]
+        }
+      ],
+      [
+        {
+          "show": "bond"
+        }
+      ]
+    ],
+    "description": "Two water molecules, one above the other. A dashed teal line joins a hydrogen atom of the upper molecule to the oxygen atom of the lower one: a hydrogen bond."
+  }
+}
