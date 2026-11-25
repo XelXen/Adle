@@ -256,7 +256,7 @@ class FilmEngine:
             # Ended: what it set up is kept, which is what it was for.
             pass
         finally:
-            shutil.rmtree(folder, ignore_errors=True)
+            _removed(folder)
 
     def render(
         self,
@@ -316,6 +316,17 @@ class FilmEngine:
         except OSError as error:
             raise FilmEngineError() from error
         return code, _read(out_path), _read(err_path)
+
+
+def _removed(folder: Path) -> None:
+    """A folder of the engine's taken away. On Windows a file that a process just ended had
+    open, or one being scanned as it is made, can refuse to go for a moment: it is tried
+    again, for a few seconds at most."""
+    for _ in range(25):
+        shutil.rmtree(folder, ignore_errors=True)
+        if not folder.exists():
+            return
+        time.sleep(0.2)
 
 
 def _end(process: subprocess.Popen[bytes]) -> None:
