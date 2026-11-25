@@ -369,6 +369,16 @@
         "title": "CopyDestination",
         "type": "object"
       },
+      "CoreSettings": {
+        "description": "What the core keeps of the learner's settings, as a file holds it.",
+        "properties": {
+          "learning": { "additionalProperties": true, "title": "Learning", "type": "object" },
+          "voice": { "additionalProperties": true, "title": "Voice", "type": "object" }
+        },
+        "required": ["learning", "voice"],
+        "title": "CoreSettings",
+        "type": "object"
+      },
       "Course": {
         "properties": {
           "brought_in": { "default": false, "title": "Brought In", "type": "boolean" },
@@ -2188,6 +2198,74 @@
         "title": "SessionSummary",
         "type": "object"
       },
+      "SettingsBroughtIn": {
+        "properties": {
+          "notes": { "items": { "type": "string" }, "title": "Notes", "type": "array" },
+          "setting_up": { "anyOf": [{ "$ref": "#/components/schemas/Job" }, { "type": "null" }] }
+        },
+        "required": ["notes", "setting_up"],
+        "title": "SettingsBroughtIn",
+        "type": "object"
+      },
+      "SettingsLookedAt": {
+        "properties": {
+          "voice": { "anyOf": [{ "$ref": "#/components/schemas/VoicePlan" }, { "type": "null" }] }
+        },
+        "required": ["voice"],
+        "title": "SettingsLookedAt",
+        "type": "object"
+      },
+      "SettingsToBringIn": {
+        "additionalProperties": false,
+        "properties": {
+          "learning": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "maxProperties": 24,
+                "propertyNames": { "maxLength": 60 },
+                "type": "object"
+              },
+              { "type": "null" }
+            ],
+            "title": "Learning"
+          },
+          "set_up_voice": { "default": false, "title": "Set Up Voice", "type": "boolean" },
+          "voice": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "maxProperties": 24,
+                "propertyNames": { "maxLength": 60 },
+                "type": "object"
+              },
+              { "type": "null" }
+            ],
+            "title": "Voice"
+          }
+        },
+        "title": "SettingsToBringIn",
+        "type": "object"
+      },
+      "SettingsToLookAt": {
+        "additionalProperties": false,
+        "properties": {
+          "voice": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "maxProperties": 24,
+                "propertyNames": { "maxLength": 60 },
+                "type": "object"
+              },
+              { "type": "null" }
+            ],
+            "title": "Voice"
+          }
+        },
+        "title": "SettingsToLookAt",
+        "type": "object"
+      },
       "Source": {
         "properties": {
           "char_count": { "title": "Char Count", "type": "integer" },
@@ -2552,6 +2630,23 @@
         },
         "required": ["name", "text", "parts"],
         "title": "VoiceDesignPreset",
+        "type": "object"
+      },
+      "VoicePlan": {
+        "description": "What bringing a file's voice in would do on this computer.",
+        "properties": {
+          "download_bytes": { "title": "Download Bytes", "type": "integer" },
+          "name": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Name" },
+          "note": { "title": "Note", "type": "string" },
+          "set_up": { "title": "Set Up", "type": "boolean" },
+          "sources": { "items": { "type": "string" }, "title": "Sources", "type": "array" },
+          "tier": {
+            "anyOf": [{ "enum": ["kokoro", "expressive"], "type": "string" }, { "type": "null" }],
+            "title": "Tier"
+          }
+        },
+        "required": ["tier", "name", "set_up", "download_bytes", "sources", "note"],
+        "title": "VoicePlan",
         "type": "object"
       },
       "VoiceRecording": {
@@ -5107,6 +5202,101 @@
         },
         "summary": "Report Scene Trial",
         "tags": ["generation"]
+      }
+    },
+    "/v1/settings-file": {
+      "get": {
+        "operationId": "settings.save_file",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CoreSettings" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Settings For A File",
+        "tags": ["settings"],
+        "x-adle-internal": true
+      },
+      "post": {
+        "operationId": "settings.bring_in_file",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SettingsToBringIn" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SettingsBroughtIn" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Bring In Settings",
+        "tags": ["settings"],
+        "x-adle-internal": true
+      }
+    },
+    "/v1/settings-file/look": {
+      "post": {
+        "description": "What a file's voice would be on this computer. Nothing is changed.",
+        "operationId": "settings.look_at_file",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SettingsToLookAt" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SettingsLookedAt" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Look At Settings",
+        "tags": ["settings"],
+        "x-adle-internal": true
       }
     },
     "/v1/sources/{source_id}": {

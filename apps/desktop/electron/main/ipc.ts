@@ -48,6 +48,7 @@ import {
   validateApiKey,
 } from './secrets';
 import { openExternalLink } from './security';
+import { registerSettingsFileHandlers } from './settings-files';
 import { parseUiStatePatch, type UiStateStore } from './ui-state';
 
 /** Upper bound on a serialised request body coming from the renderer. */
@@ -313,6 +314,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   registerImportHandlers(core, handle);
   registerDataHandlers({ core, dataDir: deps.dataDir }, handle);
   registerCourseFileHandlers({ core, dataDir: deps.dataDir }, handle);
+  registerSettingsFileHandlers({ core, keyStore, uiState, dataDir: deps.dataDir }, handle);
 
   handle(
     IPC.providerClearApiKey,

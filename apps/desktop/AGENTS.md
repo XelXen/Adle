@@ -100,6 +100,30 @@ most, a file's name.
   ("Advanced"). A course that came in a file says "Imported" (`originLabel`).
 - A journey replaces both dialogs with `app.evaluate` (`e2e/course-files.spec.ts`).
 
+## Settings as a file
+
+- `window.adle.settings.*` (ADR-064): `saveFile(parts, password)`, `chooseFile()`,
+  `bringIn(token, parts, { password, setUpVoice })`. Checked in `settings-file.ts`
+  (pure, unit tested): exactly the five parts, a password of a sensible length or
+  none, and nothing that could carry a path.
+- **The main process puts the file together and takes it apart**, because it alone
+  reads the keys. Keys are written only locked (`lockKeys`: scrypt, then
+  AES-256-GCM) and only when a password was given; a wrong password is found before
+  anything is applied. A key is never returned to the page: `chooseFile` says whose
+  keys a file has. A key brought in is saved with `keyStore.save(id, address)` for
+  the address the core gives for that provider now, then handed to the core as any
+  key is. Do not add a way to save keys without a password, and do not read an
+  address out of a file.
+- The costs a file names for unlocking are bounded (`parseLocked`): a file cannot ask
+  this computer for more work than a password needs.
+- The provider chosen in a file is applied only if the core offers it here, through
+  the same `provider.select` the learner's click goes through; otherwise nothing
+  changes and that is said.
+- In the page: `SaveSettingsDialog` and `ImportSettingsDialog` (Settings → Privacy &
+  data). The import says, before anything changes, what a voice that is not on this
+  computer would be here and what setting it up downloads (`setUpNote`); afterwards it
+  lists what is different, and the page begins again when the learner presses Done.
+
 ## When the app itself fails
 
 - What to do about a crashed or hung page, an uncaught error, or a core that died is decided

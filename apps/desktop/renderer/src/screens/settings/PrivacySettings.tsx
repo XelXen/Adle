@@ -1,18 +1,21 @@
-import { Download, FolderOpen, History, Library, Trash2 } from 'lucide-react';
+import { Download, FolderOpen, History, Library, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-import { Button, Callout, Card, Section, Stack } from '@adle/design-system';
+import { Button, Callout, Card, Section, Stack, useToast } from '@adle/design-system';
 
 import { useApp } from '../../app/AppContext';
 import { useRouter } from '../../app/router';
-import { type CoreResult, getBridge } from '../../lib/bridge';
+import { type CoreResult, getBridge, type SettingsFileFound } from '../../lib/bridge';
+import { callCore, describeError } from '../../lib/core-client';
 import {
   type DataAction,
   type DataOutcome,
   describeOutcome,
   readOutcome,
 } from '../../lib/data-actions';
+import { useResource } from '../../lib/use-resource';
 import styles from './Settings.module.css';
+import { ImportSettingsDialog, SaveSettingsDialog } from './SettingsFileDialogs';
 
 /**
  * Save a copy of everything, restore from a copy, delete everything.
@@ -202,6 +205,95 @@ function YourData() {
   );
 }
 
+/**
+ * Settings saved to a file, and brought in from one (ADR-064): to set up another
+ * computer as this one is. The keys go in locked with a password, and never come to
+ * this page; where a file goes and which is read is asked by the system's own window.
+ */
+function YourSettings() {
+  const { coreStatus } = useApp();
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const [found, setFound] = useState<SettingsFileFound | null>(null);
+  // The providers' names, for saying whose keys a file has.
+  const provider = useResource(`provider-status:${coreStatus.state}`, () =>
+    callCore('provider.status'),
+  );
+  const nameOf = (providerId: string): string =>
+    (provider.resource.status === 'ready'
+      ? provider.resource.data.providers.find((each) => each.provider_id === providerId)
+          ?.display_name
+      : undefined) ?? providerId;
+
+  const chooseFile = async (): Promise<void> => {
+    setChoosing(true);
+    try {
+      const result = await getBridge().settings.chooseFile();
+      if (!result.ok) {
+        toast.show({
+          tone: 'danger',
+          title: 'Couldn’t open that file',
+          description: result.error.message,
+        });
+      } else if (result.data) {
+        setFound(result.data);
+      }
+    } catch (error) {
+      toast.show({
+        tone: 'danger',
+        title: 'Couldn’t open that file',
+        description: describeError(error),
+      });
+    } finally {
+      setChoosing(false);
+    }
+  };
+
+  return (
+    <Section title="Your settings">
+      <Card>
+        <div className={styles.dataRow}>
+          <div className={styles.dataText}>
+            <h3 className={styles.rowTitle}>Save or import settings</h3>
+            <p className={styles.muted}>
+              One file with how Adle is set up here, to use on another computer. Your API keys can
+              go in it, locked with a password.
+            </p>
+          </div>
+          <div className={styles.dataActions}>
+            <Button
+              icon={<Download />}
+              disabled={coreStatus.state !== 'ready'}
+              onClick={() => setSaving(true)}
+            >
+              Save settings
+            </Button>
+            <Button
+              icon={<Upload />}
+              loading={choosing}
+              disabled={coreStatus.state !== 'ready'}
+              onClick={() => void chooseFile()}
+            >
+              Import settings
+            </Button>
+          </div>
+        </div>
+      </Card>
+      {saving ? <SaveSettingsDialog onClose={() => setSaving(false)} /> : null}
+      {found ? (
+        <ImportSettingsDialog
+          found={found}
+          nameOf={nameOf}
+          onClose={() => setFound(null)}
+          // Everything on screen was read before the settings changed: begin again.
+          onDone={() => window.location.reload()}
+        />
+      ) : null}
+    </Section>
+  );
+}
+
 /** Where data lives, what leaves the device, and the controls over all of it. */
 export function PrivacySettings() {
   return (
@@ -263,6 +355,7 @@ export function PrivacySettings() {
         </Card>
       </Section>
 
+      <YourSettings />
       <YourData />
     </Stack>
   );

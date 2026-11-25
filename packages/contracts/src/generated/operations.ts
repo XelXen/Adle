@@ -12,6 +12,7 @@ import type {
   ConceptOrder,
   ConceptUpdate,
   CopyDestination,
+  CoreSettings,
   Course,
   CourseCreate,
   CourseFilePath,
@@ -56,6 +57,10 @@ import type {
   SceneTrialReport,
   SearchResults,
   SelfRating,
+  SettingsBroughtIn,
+  SettingsLookedAt,
+  SettingsToBringIn,
+  SettingsToLookAt,
   SourceDetail,
   SourceList,
   SourceRefCreate,
@@ -249,6 +254,9 @@ export const OPERATIONS = {
   'provider.usage': { method: 'GET', path: '/v1/provider/usage', internal: false },
   'scenes.report_trial': { method: 'POST', path: '/v1/scene-trials/{trial_id}', internal: false },
   'scenes.trials': { method: 'GET', path: '/v1/scene-trials', internal: false },
+  'settings.bring_in_file': { method: 'POST', path: '/v1/settings-file', internal: true },
+  'settings.look_at_file': { method: 'POST', path: '/v1/settings-file/look', internal: true },
+  'settings.save_file': { method: 'GET', path: '/v1/settings-file', internal: true },
   'sources.delete': { method: 'DELETE', path: '/v1/sources/{source_id}', internal: false },
   'sources.get': { method: 'GET', path: '/v1/sources/{source_id}', internal: false },
   'sources.import_paths': {
@@ -647,6 +655,24 @@ export interface OperationTypes {
     query: undefined;
     body: undefined;
     result: SceneTrialList;
+  };
+  'settings.bring_in_file': {
+    path: undefined;
+    query: undefined;
+    body: SettingsToBringIn;
+    result: SettingsBroughtIn;
+  };
+  'settings.look_at_file': {
+    path: undefined;
+    query: undefined;
+    body: SettingsToLookAt;
+    result: SettingsLookedAt;
+  };
+  'settings.save_file': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: CoreSettings;
   };
   'sources.delete': {
     path: { source_id: string };

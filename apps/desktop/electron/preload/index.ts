@@ -16,6 +16,7 @@ import {
   type ExternalLinkId,
   IPC,
   type NoticeKind,
+  type SettingsFileParts,
   type UiState,
 } from '../shared/ipc';
 import { droppedPaths } from './dropped';
@@ -66,6 +67,17 @@ const bridge: AdleBridge = {
     chooseFile: () => ipcRenderer.invoke(IPC.coursesChooseFile),
     bringIn: (token: string, holds: CourseFileHolds) =>
       ipcRenderer.invoke(IPC.coursesBringIn, token, holds),
+  },
+  settings: {
+    // Which parts, and a password for the keys; where is asked by the main process.
+    saveFile: (parts: SettingsFileParts, password: string | null) =>
+      ipcRenderer.invoke(IPC.settingsSaveFile, parts, password),
+    chooseFile: () => ipcRenderer.invoke(IPC.settingsChooseFile),
+    bringIn: (
+      token: string,
+      parts: SettingsFileParts,
+      options: { password: string | null; setUpVoice: boolean },
+    ) => ipcRenderer.invoke(IPC.settingsBringIn, token, parts, options),
   },
   data: {
     // No arguments: the main process asks the learner where, which, and whether.

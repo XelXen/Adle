@@ -18,6 +18,7 @@ from adle_core.api.routes import (
     learning,
     lessons,
     provider,
+    settings_file,
     system,
     voice,
 )
@@ -65,6 +66,7 @@ def create_app(services: Services) -> FastAPI:
         learning,
         data,
         voice,
+        settings_file,
     ):
         app.include_router(module.router, prefix=API_PREFIX)
     return app

@@ -25,6 +25,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
   the course to another computer. In the library, **Import course** shows what a file
   holds and makes a new course of it. What is saved or imported can be changed under
   **Advanced**.
+- **Save your settings to a file, and import them.** In Settings → Privacy & data,
+  **Save settings** writes one file with how Adle is set up: appearance, learning,
+  voice, AI provider, and your API keys, which are locked with a password you choose.
+  **Import settings** on another computer sets it up the same way. If a voice isn’t on
+  that computer, Adle offers to set it up, or uses the nearest one that runs there, and
+  says what it did.
 - **An Expressive voice put together from parts.** In Settings, choose who speaks, their
   age, pitch, pace, tone, feeling, delivery, accent and style, each from a list, and
   listen before you save. Start from a ready-made voice and change what you like, or

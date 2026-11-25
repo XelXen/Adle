@@ -30,6 +30,7 @@ from adle_core.application.model_gateway import ModelGateway
 from adle_core.application.narration import NarrationService
 from adle_core.application.retrieval import FtsRetriever, Retriever
 from adle_core.application.sample_course import SampleCourseService
+from adle_core.application.settings_file import SettingsFileService
 from adle_core.application.sources import PageDrawer, SourceService
 from adle_core.config import Settings
 from adle_core.generation.credentials import CredentialVault
@@ -72,6 +73,8 @@ class Services:
     narration: NarrationService
     #: A course saved as a file, and brought in from one (ADR-063).
     course_files: CourseFileService
+    #: The core's part of a settings file (ADR-064).
+    settings_file: SettingsFileService
 
     def close(self) -> None:
         """Stop background work and release the database. Safe to call more than once."""
@@ -210,6 +213,7 @@ def build_services(
         generation=generation,
         narration=narration,
         course_files=course_files,
+        settings_file=SettingsFileService(learner, narration),
     )
 
 

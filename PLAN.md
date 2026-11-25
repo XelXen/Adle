@@ -1109,7 +1109,12 @@ journey in `e2e/voice`). And **a course saved as a file and brought in from one*
 course; bringing one in always makes a new course, by the roads everything else
 goes in by, and what a learner knows is worked out from their answers
 (`test_course_file.py`, `test_course_sharing.py`, `course-file-rules.test.ts`, the
-journeys in `e2e/course-files` and `e2e/security`). Evidence for the rules:
+journeys in `e2e/course-files` and `e2e/security`). And **settings saved as a file
+and brought in from one** (ADR-064): appearance, learning, voice, the provider chosen,
+and the keys, locked with a password; a voice that is not on the other computer set
+up at the learner's word, replaced by the nearest that runs there, or left to the
+computer's own (`settings-file.test.ts`, `test_settings_file.py`, the journeys in
+`e2e/settings-file` and `e2e/security`). Evidence for the rules:
 `test_lesson_axioms.py`,
 `test_slide_subjects.py`, `test_slide_real_lessons.py`, the renderer's
 `lesson-rules.test.ts`, the journey in `e2e/curriculum` that reads a course's rules and

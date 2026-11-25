@@ -105,6 +105,12 @@ what it is good at. Reasoning: `docs/decisions/ADR-021-a-choice-of-providers.md`
    database, a file, or a log; a redaction filter on every log handler covers every key held,
    not only the one in use.
 
+6. Written into a **settings file** only when the learner saves one with their keys in it
+   (ADR-064), and then only locked: encrypted with AES-256-GCM under a key made from a
+   password they typed (scrypt, N = 32768, r = 8, p = 1, a new salt for each file). The
+   main process does this; the page types the password and is told whose keys are
+   there. A file names a key's provider and never an address.
+
 The renderer only ever receives `{ stored, hint }` for each provider, where `hint` is the last
 four characters.
 
@@ -120,6 +126,11 @@ four characters.
 | Checking a key sends nothing of the learner's, and goes to that provider alone | `provider.check` is one fixed request of a few words to the provider named; it has no stand-in | `test_provider_routing.py` (the whole prompt is asserted); `e2e/providers.spec.ts` |
 | The choice is not changed under work that is under way | The core refuses while any job that asks a model is waiting or running | `test_provider_choice.py`; `e2e/providers.spec.ts` |
 | A provider's other model is still the same provider | A stand-in is asked at the same address with the same key; the models and their order are shown before anything is sent, and a stand-in is said while it happens and afterwards | `test_provider_choice.py`; `e2e/providers.spec.ts` |
+| A key is never in a settings file in the clear | `lockKeys` in the main process; without a password the keys are left out | `settings-file.test.ts` (no key, part of one, or its base64 in the text; a changed file does not open); `e2e/settings-file.spec.ts` (the file on disk is searched); `e2e/security.spec.ts` (no password, no file) |
+| A settings file cannot send a key anywhere | A key in a file is named by its provider; it is stored for the address the core gives for that provider here, and one for a provider not offered here is not kept | `settings-file.test.ts` (an address in a file is not read); `e2e/settings-file.spec.ts` |
+| A settings file cannot change where requests go unasked | The provider it names is applied through `provider.select` only if it is offered here; otherwise the choice here stays | `settings-files.ts`; `e2e/settings-file.spec.ts` |
+| A settings file cannot make this computer download unasked | A voice that is not here is set up only when the learner left that ticked, having been shown what is downloaded | `test_settings_file.py`; `e2e/settings-file.spec.ts` (unticked: nothing is set up) |
+| A settings file cannot ask for unbounded work | The costs it names for unlocking are bounded, and a file larger than 256 KB is not read | `settings-file.test.ts` |
 | A model's thinking is not kept | Counted for the token estimate; never stored, shown, or logged | `test_provider_choice.py` |
 
 A developer can move a known provider to another address before launch

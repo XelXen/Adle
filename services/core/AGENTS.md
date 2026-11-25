@@ -112,6 +112,15 @@ everything and decides nothing.
   `Settings.handover_dir`**, under a generated name it returns; the desktop shell
   moves it. Its three routes are internal, and the two that read take a path the
   learner chose in a dialog, like `sources.import_paths`.
+- **The core's part of a settings file** (ADR-064, `application/settings_file.py`): the
+  learner's preferences and the voice, saved as plain values and brought in one
+  setting at a time, each only if it is a value it may have (`from_stored`). The file
+  itself, and everything about keys, is the desktop shell's: these routes are internal,
+  take no path, and never see a key. `plan` says what a file's voice would be on this
+  computer (the one named, the nearest lighter one that fits, or none) and changes
+  nothing; `bring_in` sets a voice up only when told the learner said so
+  (`set_up_voice`), and says in `notes` whatever could not be had as the file has it.
+  A new setting the core keeps is a value in `save` and a line in `bring_in`.
 - **A copy of the data is one self-contained file.** Make one with `backup_database` and
   nothing else: it includes the write-ahead log and leaves the copy in SQLite's single-file
   mode, so that looking at it creates nothing beside it.

@@ -368,6 +368,23 @@ class NarrationService:
             self._record_recent()
         return self.status()
 
+    def choose_speaker(self, tier_id: str, speaker: str) -> None:
+        """The speaker of one size of voice, without making that size the one in use: a
+        settings file names a speaker for each (ADR-064)."""
+        tier = find_tier(tier_id)
+        if tier is None or speaker not in {item.id for item in tier.speakers}:
+            raise NotFoundError("There is no such voice.")
+        before = self._identity()
+        chosen = self._chosen()
+        stored = chosen.get("speakers")
+        speakers = dict(stored) if isinstance(stored, dict) else {}
+        speakers[tier.id] = speaker
+        chosen["speakers"] = speakers
+        self._paths.root.mkdir(parents=True, exist_ok=True)
+        self._preferences.write_text(json.dumps(chosen), encoding="utf-8")
+        if self._identity() != before:
+            self._record_recent()
+
     def _identity(self) -> tuple[Any, ...]:
         """What makes the voice lessons are read in sound as it does: a change to any of it
         is a new voice."""

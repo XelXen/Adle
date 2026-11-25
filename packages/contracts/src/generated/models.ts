@@ -203,6 +203,18 @@ export interface ConceptUpdate {
 export interface CopyDestination {
   path: string;
 }
+/**
+ * What the core keeps of the learner's settings, as a file holds it.
+ *
+ */
+export interface CoreSettings {
+  learning: {
+    [k: string]: unknown | undefined;
+  };
+  voice: {
+    [k: string]: unknown | undefined;
+  };
+}
 export interface Course {
   brought_in?: boolean;
   concept_count: number;
@@ -1025,6 +1037,39 @@ export interface SearchResults {
 }
 export interface SelfRating {
   level: 'new' | 'some' | 'confident';
+}
+export interface SettingsBroughtIn {
+  notes: string[];
+  setting_up: Job | null;
+}
+export interface SettingsLookedAt {
+  voice: VoicePlan | null;
+}
+/**
+ * What bringing a file's voice in would do on this computer.
+ *
+ */
+export interface VoicePlan {
+  download_bytes: number;
+  name: string | null;
+  note: string;
+  set_up: boolean;
+  sources: string[];
+  tier: ('kokoro' | 'expressive') | null;
+}
+export interface SettingsToBringIn {
+  learning?: {
+    [k: string]: unknown | undefined;
+  } | null;
+  set_up_voice?: boolean;
+  voice?: {
+    [k: string]: unknown | undefined;
+  } | null;
+}
+export interface SettingsToLookAt {
+  voice?: {
+    [k: string]: unknown | undefined;
+  } | null;
 }
 export interface Source {
   char_count: number;

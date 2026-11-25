@@ -32,6 +32,11 @@ export type {
   ProviderKeyState,
   ProviderKeyStates,
   SavedCourseFile,
+  SavedSettingsFile,
+  SettingsBroughtIn,
+  SettingsFileFound,
+  SettingsFileParts,
+  SettingsVoicePlan,
   ThemePreference,
   UiState,
 } from '../../../electron/shared/ipc';

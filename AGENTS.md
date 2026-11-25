@@ -99,7 +99,10 @@ is built from it, and an alpha or a stable version is published from a release c
 - The renderer reaches the core only via `callCore(operationId)`. New endpoints need an
   `operation_id` and `npm run contracts`. Main-only routes are marked `x-adle-internal`.
 - A provider key lives in OS secure storage and core memory. It must never appear in the
-  renderer, argv, the environment, a log, the database, or a fixture.
+  renderer, argv, the environment, a log, the database, or a fixture. It leaves the
+  computer one way only: in a settings file the learner saves, locked with a password
+  they chose, written and read by the main process (ADR-064). Never in the clear, never
+  through the page, and named by its provider, never by an address.
 - There are two providers. The learner chooses one, or "automatic": every provider they have
   given a key to, each for what it is good at (ADR-021, ADR-023, ADR-039). Within a provider
   each kind of request has its own order of models, measured, not guessed. Nothing else changes that
@@ -131,6 +134,11 @@ is built from it, and an alpha or a stable version is published from a release c
 - The data as a whole (save a copy, restore, delete everything) is touched only through
   `window.adle.data`, whose functions take no arguments: the path or the confirmation comes
   from a dialog the main process opens. Restoring happens only while the core starts (ADR-016).
+- Settings leave as a file and come in from one only through `window.adle.settings`
+  (ADR-064), with the same rule about places as a course below. What cannot be had on
+  the computer they arrive at is said: a voice is set up only if the learner agreed to
+  the download, else the nearest one that runs there is used, else the computer's own;
+  and a provider that is not offered there changes nothing.
 - A course leaves as a file and comes in from one only through `window.adle.courses`
   (ADR-063): the page says which course and what the file holds, never where. The
   place it is saved, and the file one is brought in from, are chosen in a window of

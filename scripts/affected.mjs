@@ -74,6 +74,15 @@ const RULES = [
   ],
   // How a lesson is formed, and a course's subject (ADR-061).
   [new RegExp(`^${CORE}lessons/axioms\\.py$`), ['generation.spec.ts', 'curriculum.spec.ts']],
+  // Settings saved as a file and brought in from one (ADR-064).
+  [
+    new RegExp(`^${CORE}(application/settings_file\\.py|api/routes/settings_file\\.py)$`),
+    ['settings-file.spec.ts', 'security.spec.ts', 'voice.spec.ts'],
+  ],
+  [
+    /^apps\/desktop\/(electron\/main\/settings-file|renderer\/src\/lib\/settings-file)/,
+    ['settings-file.spec.ts', 'security.spec.ts', 'provider-key.spec.ts'],
+  ],
   // A course saved as a file and brought in from one (ADR-063).
   [
     new RegExp(
@@ -117,6 +126,7 @@ const RULES = [
       'first-run.spec.ts',
       'appearance-a11y.spec.ts',
       'data.spec.ts',
+      'settings-file.spec.ts',
     ],
   ],
   [

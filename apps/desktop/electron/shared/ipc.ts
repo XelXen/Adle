@@ -27,6 +27,9 @@ export const IPC = {
   coursesSaveFile: 'adle:courses:save-file',
   coursesChooseFile: 'adle:courses:choose-file',
   coursesBringIn: 'adle:courses:bring-in',
+  settingsSaveFile: 'adle:settings:save-file',
+  settingsChooseFile: 'adle:settings:choose-file',
+  settingsBringIn: 'adle:settings:bring-in',
   dataSaveCopy: 'adle:data:save-copy',
   dataRestoreCopy: 'adle:data:restore-copy',
   dataEraseAll: 'adle:data:erase-all',
@@ -205,6 +208,67 @@ export interface BroughtInCourse {
   notes: number;
 }
 
+/**
+ * The parts of a settings file (ADR-064): what is saved, and what is brought in.
+ */
+export interface SettingsFileParts {
+  /** The theme, and whether the computer may say that something is ready. */
+  appearance: boolean;
+  /** How the learner likes to learn: pace, how much explanation, reading aloud. */
+  learning: boolean;
+  /** Which voice reads the lessons, and who speaks in it. */
+  voice: boolean;
+  /** Which AI provider is used, or that Adle chooses. */
+  provider: boolean;
+  /** The providers' keys, locked with a password. */
+  keys: boolean;
+}
+
+/** Settings were written to a file where the learner chose. */
+export interface SavedSettingsFile {
+  /** The name of the file. Never a path. */
+  fileName: string;
+  /** The parts it has. */
+  parts: SettingsFileParts;
+  /** How many keys are in it, locked. */
+  keys: number;
+}
+
+/** What the voice a file names would be on this computer. */
+export interface SettingsVoicePlan {
+  /** The voice lessons would be read in; null for the computer's own. */
+  name: string | null;
+  /** It is not on this computer yet: setting it up downloads it. */
+  setUp: boolean;
+  downloadBytes: number;
+  /** Where a setup downloads from, as a person would name each place. */
+  sources: string[];
+  /** Why it is not the voice the file names, when it is not. */
+  note: string;
+}
+
+/**
+ * A settings file the learner chose, and what is in it. The page knows the file by
+ * `token` and by its name; it is never given a key, only told whose keys are there.
+ */
+export interface SettingsFileFound {
+  token: string;
+  fileName: string;
+  parts: SettingsFileParts;
+  /** The providers offered here that the file has a key for, by their names. */
+  keysFor: string[];
+  voice: SettingsVoicePlan | null;
+}
+
+/** What was brought in from a settings file, and what could not be had as it was. */
+export interface SettingsBroughtIn {
+  parts: SettingsFileParts;
+  keys: number;
+  /** Each a sentence for the learner. */
+  notes: string[];
+  settingUpVoice: boolean;
+}
+
 /** External destinations the UI may open in the system browser. Nothing else can be opened. */
 export const EXTERNAL_LINKS = {
   aihubmixKeys: 'https://aihubmix.com/token',
@@ -284,6 +348,26 @@ export interface AdleBridge {
     chooseFile(): Promise<CoreResult<CourseFileFound | null>>;
     /** Make a new course of the file last chosen: as much of it as `holds` says. */
     bringIn(token: string, holds: CourseFileHolds): Promise<CoreResult<BroughtInCourse>>;
+  };
+  /**
+   * Settings as a file (ADR-064). The page says which parts, and a password for the
+   * keys; where a file is saved and which is opened is asked in a window of the
+   * operating system. A key never reaches the page: it is told only whose are there.
+   */
+  settings: {
+    /** Save settings to a file. `password` locks the keys, when they are saved. */
+    saveFile(
+      parts: SettingsFileParts,
+      password: string | null,
+    ): Promise<CoreResult<SavedSettingsFile | null>>;
+    /** Have the learner choose a settings file, and say what it holds. */
+    chooseFile(): Promise<CoreResult<SettingsFileFound | null>>;
+    /** Bring in the parts chosen of the file last chosen. */
+    bringIn(
+      token: string,
+      parts: SettingsFileParts,
+      options: { password: string | null; setUpVoice: boolean },
+    ): Promise<CoreResult<SettingsBroughtIn>>;
   };
   /**
    * The learner's own data as a whole. Each of these asks the learner in a window of the

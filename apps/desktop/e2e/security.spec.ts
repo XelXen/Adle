@@ -108,6 +108,7 @@ test.describe('renderer boundary', () => {
         courses: ['bringIn', 'chooseFile', 'saveFile'],
         data: ['eraseAll', 'restoreCopy', 'saveCopy', 'showSafetyCopies'],
         provider: ['clearApiKey', 'keyState', 'select', 'setApiKey'],
+        settings: ['bringIn', 'chooseFile', 'saveFile'],
         sources: ['importDropped', 'importWithPicker'],
       },
     });
@@ -383,6 +384,87 @@ test.describe('renderer boundary', () => {
     // Nothing the core wrote for a save that was backed out of is left behind.
     const handover = path.join(profileDir, 'data', 'handover');
     expect(existsSync(handover) ? readdirSync(handover) : []).toEqual([]);
+  });
+});
+
+test.describe('settings as a file', () => {
+  test('the page cannot say where settings are saved or read from, and the keys need a password', async ({
+    adle,
+    profileDir,
+  }) => {
+    const { app, page } = adle;
+    await waitForCore(page);
+    const target = path.join(profileDir, 'chosen-by-the-page.json');
+    // The learner backs out of every question the operating system asks.
+    await app.evaluate(({ dialog }) => {
+      const asked: string[] = [];
+      (globalThis as Record<string, unknown>).adleAskedKinds = asked;
+      dialog.showSaveDialog = () => {
+        asked.push('save');
+        return Promise.resolve({ canceled: true, filePath: '' });
+      };
+      dialog.showOpenDialog = () => {
+        asked.push('open');
+        return Promise.resolve({ canceled: true, filePaths: [] });
+      };
+    });
+    const all = { appearance: true, learning: true, voice: true, provider: true, keys: true };
+
+    const results = await page.evaluate(
+      async ([where, parts]) => {
+        type Loose = Record<string, (...args: unknown[]) => Promise<unknown>>;
+        const settings = window.adle!.settings as unknown as Loose;
+        const invoke = window.adle!.core.invoke as unknown as (
+          operation: string,
+          params?: unknown,
+        ) => Promise<unknown>;
+        const without = { ...parts, keys: false };
+        const plain = { password: null, setUpVoice: false };
+        return {
+          // The keys are never written without a password to lock them with.
+          noPassword: await settings.saveFile!(parts, null),
+          shortPassword: await settings.saveFile!(parts, 'short'),
+          // A place to save, named every way the page can think of.
+          withPath: await settings.saveFile!({ ...without, path: where }, null),
+          extra: await settings.saveFile!(without, null, where, { filePath: where }),
+          // A file to read, the same.
+          choose: await settings.chooseFile!(where, { filePaths: [where] }),
+          pathAsToken: await settings.bringIn!(where, without, plain),
+          forgedToken: await settings.bringIn!('0'.repeat(32), without, plain),
+          looseOptions: await settings.bringIn!('0'.repeat(32), without, {
+            ...plain,
+            path: where,
+          }),
+          // And the core's own routes for it are the main process's alone.
+          save: await invoke('settings.save_file'),
+          look: await invoke('settings.look_at_file', { body: { voice: {} } }),
+          bringIn: await invoke('settings.bring_in_file', { body: {} }),
+        };
+      },
+      [target, all] as const,
+    );
+
+    const refused = { ok: false, error: { code: 'invalid_request' } };
+    expect(results.noPassword).toMatchObject({ ok: false, error: { code: 'password_needed' } });
+    expect(results.shortPassword).toMatchObject({
+      ok: false,
+      error: { code: 'password_needed' },
+    });
+    expect(results.withPath).toMatchObject(refused);
+    expect(results.pathAsToken).toMatchObject(refused);
+    expect(results.looseOptions).toMatchObject(refused);
+    expect(results.save).toMatchObject(refused);
+    expect(results.look).toMatchObject(refused);
+    expect(results.bringIn).toMatchObject(refused);
+    expect(results.forgedToken).toMatchObject({ ok: false, error: { code: 'file_not_chosen' } });
+    // What else the page passed was not looked at: the learner was asked, and said no.
+    expect(results.extra).toEqual({ ok: true, data: null });
+    expect(results.choose).toEqual({ ok: true, data: null });
+    const asked = await app.evaluate(
+      () => (globalThis as Record<string, unknown>).adleAskedKinds as string[],
+    );
+    expect(asked).toEqual(['save', 'open']);
+    expect(existsSync(target)).toBe(false);
   });
 });
 

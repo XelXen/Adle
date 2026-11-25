@@ -215,7 +215,7 @@ class NarrationClip(BaseModel):
     data: str
 
 
-def _sources(tier: Tier) -> list[str]:
+def sources_of(tier: Tier) -> list[str]:
     """Where setting a size up downloads from: its models from Hugging Face, its programs
     from the Python Package Index, torch (and Qwen3-TTS's aligner) from PyTorch, and the
     English model Kokoro reads words with from GitHub."""
@@ -246,7 +246,7 @@ def _status(services: Services) -> VoiceStatus:
                 description=tier.description,
                 model_bytes=download_size(tier),
                 program_bytes=program_bytes(tier.family),
-                sources=_sources(tier),
+                sources=sources_of(tier),
                 min_memory_gb=tier.min_memory_gb,
                 speakers=[
                     VoiceSpeaker(id=item.id, name=item.name, description=item.description)
