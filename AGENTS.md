@@ -207,7 +207,10 @@ is built from it, and an alpha or a stable version is published from a release c
   stands for. The case comes first and alone, and the rule is made out of it (ADR-050): a
   formula never shares a slide's first step with its case, and its numbers can fly out of
   the picture into it. A picture's words never lie over each other, under a line, or past the
-  edge of the screen, and a step is never longer than its words (ADR-055, ADR-056).
+  edge of the screen, and a step is never longer than its words (ADR-055, ADR-056). Where a
+  script leaves one over another or under a line all the same, the later word is given a
+  soft shadow in the stage's own color, never a color of its own, and nothing else is
+  dimmed (ADR-069).
 - How a lesson is formed is written down once (ADR-061, `lessons/axioms.py`): the rules of
   every lesson, and what each subject needs besides (mathematics a picture and an example
   before its equation, a language its rule inside real sentences, chemistry an experiment

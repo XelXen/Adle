@@ -414,6 +414,13 @@ everything and decides nothing.
   the middle of its box), or something lies past the edge:
   the journeys fail on it for every example, so a template that puts words over words is
   found by `npm run e2e`. A drawing over a drawing is usually meant and is not looked at.
+  As it counts them, `audit` gives each such word on the stage a shadow (ADR-069,
+  `shade`, `shadow`): copies of the word added to the front of its parts, a little below
+  and to the right, each only a background stroke in `self.camera.background_color` with
+  round corners, wider and fainter one after another (`SHADOW_RIMS`, `SHADOW_DROP`), and a
+  word with a line through it raised above the line; it says how many have no shadow
+  that can be seen. Never give a shadow a color of its own, and never fill it: a color
+  given to the word later must not reach it.
   The methods live on the scene: a name they take (`still_lines`, `lines_of`, `pin`, ...)
   must not be one a template already uses, or the template's is replaced. A slide's step is no longer
   than its words (`_fitted`, from `drafts._step_seconds`): never slower than written,

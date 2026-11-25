@@ -22,12 +22,12 @@ from adle_core.generation.drafts import (
     parse_lesson_draft,
 )
 from adle_core.generation.figures import _cell
-from adle_core.generation.layout import LAYOUT_METHODS
+from adle_core.generation.layout import LAYOUT_METHODS, SHADOW_DROP, SHADOW_RIMS
 from adle_core.generation.prompts import visual_example
 from adle_core.generation.scene_policy import check_scene_source
 from adle_core.generation.slides import KINDS, VERBS, SlideError, _fitted, compile_slide
 from adle_core.lessons.bundle import inspect_scene, parse_bundle
-from adle_core.tools.export_slides import EXAMPLES, steps, written
+from adle_core.tools.export_slides import CROWDED, EXAMPLES, steps, written
 from tests.support.model import LESSON
 
 SLIDES = Path(__file__).resolve().parents[4] / "apps" / "desktop" / "e2e" / "fixtures" / "slides"
@@ -66,6 +66,49 @@ def test_the_slides_the_player_runs_are_what_the_module_writes() -> None:
     assert files == written(), "Run `npm run slides` and commit what it writes."
     plan = json.loads((SLIDES / "steps.json").read_text(encoding="utf-8"))
     assert plan == steps()
+    # And the slides that cannot be laid out clear, which the player steps through too
+    # (ADR-069).
+    crowded = SLIDES / "crowded"
+    files = {path.name: path.read_text(encoding="utf-8") for path in crowded.glob("*.py")}
+    assert files == written(CROWDED), "Run `npm run slides` and commit what it writes."
+    plan = json.loads((crowded / "steps.json").read_text(encoding="utf-8"))
+    assert plan == steps(CROWDED)
+
+
+@pytest.mark.parametrize("name", sorted(CROWDED))
+def test_a_slide_that_cannot_be_laid_out_clear_is_still_drawn_whole(name: str) -> None:
+    # A model's script as it wrote it: nothing of it left out, and the scene the policy
+    # accepts; what lies over something is given a shadow as it is shown (ADR-069).
+    slide = compile_slide(CROWDED[name])
+    assert slide.left_out == []
+    assert check_scene_source(slide.source).ok
+
+
+def test_a_shadow_is_soft_in_the_stages_own_color_under_the_word() -> None:
+    # As the owner asked (ADR-069): like a mouse pointer's shadow, a little below and to the
+    # right, fading out from the letters and never quite opaque, in the color the player
+    # gives the stage, so that it hides what lies behind the word in either theme.
+    assert "under.set_stroke(self.camera.background_color, rim[0], rim[1] * seen, True)" in (
+        LAYOUT_METHODS
+    )
+    widths = [rim[0] for rim in SHADOW_RIMS]
+    assert widths == sorted(widths, reverse=True)
+    clear = 1.0
+    for _, opacity in SHADOW_RIMS:
+        assert 0 < opacity < 1
+        clear *= 1 - opacity
+    # Strongest under the letters, and still not full there.
+    assert 0.6 < 1 - clear < 0.9
+    assert 0 < SHADOW_DROP < 0.25
+    # Copies of the word first of its parts, so every rim lies under every letter; with round
+    # corners, which a wide stroke's sharp corners would otherwise push out in spikes.
+    assert "word.add_to_back(under)" in LAYOUT_METHODS
+    assert 'part.joint_type = "ROUND"' in LAYOUT_METHODS
+    # A word with a line through it is raised above the line, and a step ends saying how
+    # many such words have no shadow that can be seen.
+    assert "word.set_z_index(1)" in LAYOUT_METHODS
+    assert "found = self.shade(words, paths)" in LAYOUT_METHODS
+    assert '" without a shadow"' in LAYOUT_METHODS
 
 
 def test_what_cannot_be_drawn_is_left_out_and_said_and_the_rest_is_drawn() -> None:

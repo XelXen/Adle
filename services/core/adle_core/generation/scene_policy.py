@@ -39,7 +39,10 @@ from importlib import resources
 from typing import Final
 
 MAX_SOURCE_CHARS: Final = 40_000
-MAX_AST_NODES: Final = 6_000
+#: How large a scene may be. A slide or a figure Adle writes carries its layout methods
+#: (``layout.py``, about 2,200 nodes of Adle's own) beside what it draws: the bound leaves a
+#: busy picture room for both (ADR-069). It was 6,000 before they shaded words.
+MAX_AST_NODES: Final = 8_000
 MAX_SCENE_CLASSES: Final = 3
 
 ALLOWED_MODULES: Final = frozenset({"manim", "numpy", "math", "random", "itertools"})

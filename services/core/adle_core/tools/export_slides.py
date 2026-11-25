@@ -528,18 +528,67 @@ for _key, _example in SUBJECT_EXAMPLES.items():
     EXAMPLES[_name] = _example.part["visual"]
 
 
-def written() -> dict[str, str]:
+#: Slides a model might write that Adle cannot lay out clear (ADR-069): what lies over
+#: what came before it, or under a line, is given a shadow. Kept apart from the examples,
+#: every step of which is laid out clear: the end-to-end suite steps through these
+#: expecting each fault to have its shadow.
+CROWDED: dict[str, dict[str, Any]] = {
+    # An arrow from one side of the stage to the other, through the word between.
+    "arrow_through_words": {
+        "elements": [
+            {"id": "ice", "kind": "text", "text": "Ice", "place": "left", "size": "large"},
+            {"id": "water", "kind": "text", "text": "Water", "place": "center", "size": "large"},
+            {"id": "steam", "kind": "text", "text": "Steam", "place": "right", "size": "large"},
+            {"id": "heat", "kind": "arrow", "from": "ice", "to": "steam", "color": "orange"},
+        ],
+        "steps": [[{"show": ["ice", "water", "steam"]}], [{"show": "heat"}]],
+    },
+    # More long labels on one point than there is room for round it, as a model notes
+    # everything about a point at once.
+    "labels_on_one_point": {
+        "elements": [
+            {"id": "p", "kind": "dot", "place": "center", "label": "the point"},
+            {"id": "a", "kind": "label", "on": "p", "text": "where the two lines cross", "side": "above"},
+            {"id": "b", "kind": "label", "on": "p", "text": "the answer to both equations", "side": "above"},
+            {"id": "c", "kind": "label", "on": "p", "text": "x = 2 and y = 3 at once", "side": "above"},
+            {"id": "d", "kind": "label", "on": "p", "text": "one solution, not two", "side": "below"},
+            {"id": "e", "kind": "label", "on": "p", "text": "found by substitution", "side": "below"},
+            {"id": "f", "kind": "label", "on": "p", "text": "and by elimination too", "side": "right"},
+            {"id": "g", "kind": "label", "on": "p", "text": "the same on any graph", "side": "left"},
+        ],
+        "steps": [[{"show": ["p", "a", "b"]}], [{"show": ["c", "d", "e"]}], [{"show": ["f", "g"]}]],
+    },
+}  # fmt: skip
+
+
+def written(examples: dict[str, dict[str, Any]] = EXAMPLES) -> dict[str, str]:
     """Each example's file name and the scene the slides module writes for it."""
-    return {f"{name}.py": compile_slide(example).source for name, example in EXAMPLES.items()}
+    return {f"{name}.py": compile_slide(example).source for name, example in examples.items()}
 
 
-def steps() -> dict[str, dict[str, Any]]:
+def steps(examples: dict[str, dict[str, Any]] = EXAMPLES) -> dict[str, dict[str, Any]]:
     """How many steps each example takes, and whether it ends on a live page."""
     found = {}
-    for name, example in EXAMPLES.items():
+    for name, example in examples.items():
         slide = compile_slide(example)
         found[f"{name}.py"] = {"steps": slide.steps, "interactive": slide.interactive}
     return found
+
+
+def _write(folder: Path, examples: dict[str, dict[str, Any]]) -> int:
+    folder.mkdir(parents=True, exist_ok=True)
+    files = written(examples)
+    for stale in folder.glob("*.py"):
+        if stale.name not in files:
+            stale.unlink()
+    for name, source in files.items():
+        (folder / name).write_text(source, encoding="utf-8", newline="\n")
+    (folder / "steps.json").write_text(
+        json.dumps(steps(examples), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    return len(files)
 
 
 def main(argv: list[str]) -> int:
@@ -547,17 +596,9 @@ def main(argv: list[str]) -> int:
         print("usage: export_slides <folder>", file=sys.stderr)
         return 2
     folder = Path(argv[0])
-    folder.mkdir(parents=True, exist_ok=True)
-    files = written()
-    for stale in folder.glob("*.py"):
-        if stale.name not in files:
-            stale.unlink()
-    for name, source in files.items():
-        (folder / name).write_text(source, encoding="utf-8", newline="\n")
-    (folder / "steps.json").write_text(
-        json.dumps(steps(), indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
-    )
-    print(f"wrote {len(files)} slides to {folder}")
+    count = _write(folder, EXAMPLES)
+    crowded = _write(folder / "crowded", CROWDED)
+    print(f"wrote {count} slides to {folder}, and {crowded} that cannot be laid out clear")
     return 0
 
 

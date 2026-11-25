@@ -200,9 +200,10 @@ most, a file's name.
   both validators, both sides, and the tests in one commit.
 - A slide or a figure Adle wrote says, as each step ends, whether any of its words lie over
   others or under a line, or anything lies past the edge of the screen (the scene event
-  `layout`, ADR-055, ADR-056).
-  Nothing in the app acts on it; `slide-player.spec.ts` and the figures in
-  `scene-player.spec.ts` fail on it.
+  `layout`, ADR-055, ADR-056), and gives each such word a soft shadow in the stage's color
+  as it does (ADR-069). Nothing in the app acts on it; `slide-player.spec.ts` and the
+  figures in `scene-player.spec.ts` fail on it, but for the slides of
+  `fixtures/slides/crowded/`, which must say it, each such word with its shadow.
 - A frame may send `MESSAGE_BUDGET_PER_SECOND` messages a second and no more; past that the
   adapter ends the scene like one that hangs. A scene that needs to say something on every
   frame is saying too much: report a change, not a state.

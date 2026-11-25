@@ -215,6 +215,56 @@ class Slide(InteractiveScene):
         up = min(a.get_top()[1], b.get_top()[1]) - max(a.get_bottom()[1], b.get_bottom()[1])
         return across > 0.06 and up > 0.06
 
+    def shadow(self, word, above):
+        # Once to a word, like a pointer's: copies of it, first of its parts, a little below
+        # and to the right, each only a rim in the stage's color round every letter, wider and
+        # fainter one after another, as clear as its letters are, with round corners: a wide
+        # stroke's sharp corners would reach out in spikes. Above the lines when one runs
+        # through it.
+        if not self.shaded(word):
+            letters = word.family_members_with_points()
+            seen = letters[0].get_fill_opacity() if len(letters) > 0 else 1
+            drop = word.height * 0.08
+            base = word.copy().shift(RIGHT * drop * 0.75 + DOWN * drop)
+            for rim in [[22, 0.15], [15, 0.22], [9, 0.32], [5, 0.5]]:
+                under = base.copy()
+                under.set_fill(None, 0)
+                under.set_stroke(self.camera.background_color, rim[0], rim[1] * seen, True)
+                for part in under.family_members_with_points():
+                    part.joint_type = "ROUND"
+                word.add_to_back(under)
+        if above:
+            word.set_z_index(1)
+
+    def shaded(self, word):
+        # Whether a word has a shadow that can be seen: its first part a rim, not clear.
+        parts = word.submobjects
+        if len(parts) == 0:
+            return False
+        return parts[0].get_stroke_width(True) > 0 and parts[0].get_stroke_opacity(True) > 0
+
+    def shade(self, words, paths):
+        # Each word over one drawn before it, or with a line through it, given a shadow; the
+        # words in the order they are drawn. How many pairs of words meet, how many words a
+        # line runs through, and how many of the words given a shadow have none after all.
+        found = [0, 0, 0]
+        for j in range(len(words)):
+            over = 0
+            for i in range(j):
+                if self.meet(words[i], words[j]):
+                    over += 1
+            struck = 0
+            for path in paths:
+                if struck == 0 and self.struck(words[j], path):
+                    struck = 1
+            if over + struck > 0:
+                self.shadow(words[j], struck > 0)
+                if not self.shaded(words[j]):
+                    found[2] += 1
+            found[0] += over
+            found[1] += struck
+        return found
+
     def within(self, m, x, y):
         across = m.get_left()[0] >= -x and m.get_right()[0] <= x
         return across and m.get_bottom()[1] >= -y and m.get_top()[1] <= y
@@ -274,6 +324,9 @@ class Slide(InteractiveScene):
                 way = side if kept is None else kept[0]
                 found = self.placed(label, anchor, way, buff, self.still)
                 self.sides[key] = [found[0], found[1], found[2], here[0], here[1]]
+            if not self.sides[key][2]:
+                # No place clear of what stays put: a shadow under it, above the lines.
+                self.shadow(label, True)
         return label
 
     def tidy(self):
@@ -296,26 +349,17 @@ class Slide(InteractiveScene):
 
     def audit(self):
         # As a step ends: words over other words, words a line runs through, and anything
-        # past the edge of the screen.
+        # past the edge of the screen. A word over one drawn before it, or with a line through
+        # it, is given a shadow now if it has none.
         words = []
         lines = []
         for m in self.mobjects:
             self.words_of(m, words)
             self.lines_of(m, lines)
-        overlapping = 0
-        for i in range(len(words)):
-            for j in range(i + 1, len(words)):
-                if self.meet(words[i], words[j]):
-                    overlapping += 1
         paths = []
         for line in lines:
             paths.append(self.path_of(line))
-        struck = 0
-        for word in words:
-            for path in paths:
-                if self.struck(word, path):
-                    struck += 1
-                    break
+        found = self.shade(words, paths)
         outside = 0
         for m in self.mobjects:
             # A value that a step has moved is among them, and is no drawing: it stands at
@@ -324,9 +368,10 @@ class Slide(InteractiveScene):
                 continue
             if not self.within(m, 7.12, 4.02):
                 outside += 1
-        if overlapping > 0 or struck > 0 or outside > 0:
-            said = str(overlapping) + " overlapping, " + str(struck) + " under a line, "
-            self.post_message("layout", said + str(outside) + " past the edge")
+        if found[0] > 0 or found[1] > 0 or outside > 0:
+            said = str(found[0]) + " overlapping, " + str(found[1]) + " under a line, "
+            said = said + str(outside) + " past the edge, " + str(found[2]) + " without a shadow"
+            self.post_message("layout", said)
 
     def die(self, spots, hue):
         body = RoundedRectangle(corner_radius=0.16, width=1.1, height=1.1, color=hue)

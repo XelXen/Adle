@@ -22,6 +22,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Words stay readable where a slide crowds them.** When a word on a slide lands on
+  another word, or a line runs through it, the later word gets a soft shadow in the color
+  of the screen behind it, like the shadow under a mouse pointer. It hides most of what is
+  behind the word, and nothing else on the slide is dimmed.
 - **Faster with NVIDIA NIM.** Adle now keeps to each provider's own limits: NVIDIA's 40
   requests a minute with no daily limit, and AIHubMix's 100 requests a day (it stopped at
   90 before). With NVIDIA, up to six requests go at once: a film writes up to three
