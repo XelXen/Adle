@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx2 as httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -25,10 +26,13 @@ from adle_core.application.narration import NarrationService
 from adle_core.application.services import Services
 from adle_core.film.runtime import FilmPaths
 from adle_core.infrastructure.orm import Film, ModelUsage
-from tests.support.model import FILM_CHAPTER, FakeProvider
+from tests.support.model import FILM_CHAPTER, FakeProvider, pictures_of
 from tests.unit.test_narration import WITH_CARD, set_up
 
 KEY = "sk-test-0123456789abcdefghijklmnop"
+NVIDIA_KEY = "nvapi-test-0000000000000000000000000000"
+#: The model that sees pictures (ADR-060, ADR-066).
+SUPER_VL = "nvidia/nemotron-3.5-super-vl-120b-a12b"
 SUPPORT = Path(__file__).resolve().parents[1] / "support"
 FAKE_ENGINE = SUPPORT / "fake_film_engine.py"
 VIDEO = (SUPPORT / "film.mp4").read_bytes()
@@ -82,6 +86,15 @@ def keyed(client: TestClient, filming: Services) -> TestClient:
     return client
 
 
+@pytest.fixture
+def seeing(client: TestClient, filming: Services) -> TestClient:
+    """NVIDIA NIM chosen, with a key: its chapters are looked over by a model that sees
+    pictures (ADR-066)."""
+    filming.credentials.set_api_key(NVIDIA_KEY, "nvidia")
+    filming.gateway.select("nvidia")
+    return client
+
+
 def a_course(client: TestClient, *titles: str) -> str:
     course = client.post(
         "/v1/courses",
@@ -123,11 +136,13 @@ def test_a_film_is_a_chapter_a_concept_each_written_checked_and_put_together(
 ) -> None:
     course = a_course(keyed, "Area", "Volume")
     plan = keyed.get(f"/v1/courses/{course}/film").json()["plan"]
+    # AIHubMix alone has no model that sees pictures: nothing is looked over (ADR-066).
     assert plan == {
         "chapters": ["Area", "Volume"],
         "requests_at_most": 8,
         "voice": None,
         "blocked": None,
+        "checks_pictures": False,
     }
 
     film = made(filming, keyed, course)
@@ -465,3 +480,99 @@ def test_a_film_is_read_in_the_natural_voice_and_its_words_are_timed_by_it(
     line = next(cue for cue in cues if cue["text"].startswith("How much floor"))
     spoken = len(line["text"].split())
     assert line["end"] - line["start"] == pytest.approx(spoken * 0.3, abs=0.05)
+
+
+# -- a chapter's pictures, looked over (ADR-066) --------------------------------------------
+
+
+def test_a_chapters_pictures_are_looked_over_once_and_what_is_seen_is_mended(
+    seeing: TestClient, filming: Services, provider: FakeProvider
+) -> None:
+    course = a_course(seeing, "Area", "Volume")
+    plan = seeing.get(f"/v1/courses/{course}/film").json()["plan"]
+    # Each chapter once, mended three times at most, and looked over once: said before.
+    assert (plan["checks_pictures"], plan["requests_at_most"]) == (True, 10)
+    provider.queue(
+        FILM_CHAPTER,
+        "Each in turn.\n#1: The label '2 tall' sits far from the grid; put it beside it.",
+        FILM_CHAPTER,
+        FILM_CHAPTER,
+        "NOTHING",
+    )
+
+    film = made(filming, seeing, course)
+
+    # Looked over when it first ran clean; mended for what was seen, and not looked over
+    # again. The second chapter was seen to be right.
+    assert provider.kinds() == ["film", "storyboard", "film", "film", "storyboard"]
+    look = provider.requests[1]
+    assert look["model"] == SUPER_VL
+    # The stand-in draws a sheet for every six of the chapter's seventeen animations.
+    sheets = pictures_of(look)
+    assert len(sheets) == 3
+    for sheet in sheets:
+        assert sheet.startswith("data:image/png;base64,")
+        assert base64.b64decode(sheet.split(",", 1)[1]).startswith(b"\x89PNG")
+    # With what is said while each animation plays, quoted.
+    assert '#0: "How much floor does a rug cover? Let us count it."' in provider.prompt(1)
+    mend = provider.prompt(2)
+    assert "looked at a picture of the screen at the end of each animation" in mend
+    assert "line 22, in the picture at " in mend
+    assert "The label '2 tall' sits far from the grid; put it beside it." in mend
+    assert film["status"] == "ready"
+    assert [chapter["state"] for chapter in film["chapters"]] == ["written", "written"]
+    assert "Nemotron 3.5 Super" in film["written_by"]["models"]
+
+
+def test_a_chapter_not_clean_by_its_last_mend_is_looked_over_before_it(
+    seeing: TestClient, filming: Services, provider: FakeProvider
+) -> None:
+    course = a_course(seeing, "Area")
+    provider.queue(
+        marked("overlap"),
+        marked("overlap"),
+        marked("overlap"),
+        "#0: The title is squeezed into the top of the screen.",
+        FILM_CHAPTER,
+    )
+
+    film = made(filming, seeing, course)
+
+    assert provider.kinds() == ["film", "film", "film", "storyboard", "film"]
+    # The one mend left is told what the engine found and what was seen, together.
+    last = provider.prompt(4)
+    assert "overlaps title" in last
+    assert "line 14, in the picture at " in last
+    assert "The title is squeezed into the top of the screen." in last
+    assert film["chapters"][0]["problems"] == 0
+
+
+def test_a_look_that_fails_or_cannot_be_read_is_passed_over(
+    seeing: TestClient, filming: Services, provider: FakeProvider
+) -> None:
+    course = a_course(seeing, "Area", "Volume")
+    provider.queue(
+        FILM_CHAPTER,
+        httpx.Response(400, json={"error": {"message": "That request was refused."}}),
+        FILM_CHAPTER,
+        "I can't make out the pictures, sorry.",
+    )
+
+    film = made(filming, seeing, course)
+
+    # Nothing waits on a look: each chapter is kept as it ran, and nothing more is asked.
+    assert provider.kinds() == ["film", "storyboard", "film", "storyboard"]
+    assert film["status"] == "ready"
+    assert [chapter["state"] for chapter in film["chapters"]] == ["written", "written"]
+
+
+def test_a_chapter_with_no_storyboard_is_not_looked_over(
+    seeing: TestClient, filming: Services, provider: FakeProvider
+) -> None:
+    course = a_course(seeing, "Area")
+    provider.queue(marked("no storyboard"))
+
+    film = made(filming, seeing, course)
+
+    assert provider.kinds() == ["film"]
+    assert film["chapters"][0]["state"] == "written"

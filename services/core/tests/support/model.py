@@ -104,6 +104,8 @@ class FakeProvider:
             return "read"
         if "one chapter of a narrated teaching film" in system:
             return "film"
+        if "looking over pictures of one chapter" in system:
+            return "storyboard"
         return "lesson"
 
     def kinds(self) -> list[str]:
@@ -128,6 +130,8 @@ class FakeProvider:
             return READ_PAGE
         if kind == "film":
             return FILM_CHAPTER
+        if kind == "storyboard":
+            return "NOTHING"
         user = text_of(body["messages"][1]["content"])
         return INTERACTIVE_SCENE if "Kind: interactive" in user else ANIMATION_SCENE
 

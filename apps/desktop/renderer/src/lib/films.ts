@@ -85,6 +85,22 @@ export function lengthOf(seconds: number): string {
  * chapter usually takes where it would be written. Each chapter is checked and may be
  * mended, so it is said as at least that, and never more exactly than it is known.
  */
+/**
+ * What making a film sends besides its chapters' words, and how many requests it may make
+ * at most, as the core planned it: put after "Sends … to …". Each chapter's pictures go to
+ * a model that reads them when one can be asked (ADR-066).
+ */
+export function filmRequests(requestsAtMost: number, picturesTo: string | null): string {
+  if (picturesTo) {
+    return (
+      `Sends pictures of each chapter to ${picturesTo} to be checked. At most ${requestsAtMost} ` +
+      'requests: one for each chapter, up to three more for each to fix it, and one for each ' +
+      'to check its pictures.'
+    );
+  }
+  return `At most ${requestsAtMost} requests: one for each chapter, and up to three more for each to fix it.`;
+}
+
 export function makingTakes(chapters: number, secondsPerChapter: number): string {
   const minutes = Math.round((chapters * Math.max(60, secondsPerChapter) * 1.5) / 60);
   if (minutes < 50) return `at least ${Math.max(5, Math.round(minutes / 5) * 5)} minutes`;

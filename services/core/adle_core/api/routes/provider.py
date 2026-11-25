@@ -130,6 +130,9 @@ class ProviderRoutes(BaseModel):
     read: ProviderRoute
     #: A chapter of a film of a whole course (ADR-065).
     film: ProviderRoute
+    #: The pictures of a chapter of a film, looked over (ADR-066). Like ``read``, it names no
+    #: provider when nobody the learner chose can see pictures.
+    storyboard: ProviderRoute
 
 
 class ProviderStatus(BaseModel):
@@ -194,7 +197,7 @@ def _status(services: Services) -> ProviderStatus:
     gateway = services.gateway
     plans = {
         work: gateway.plan(work)
-        for work in ("ask", "curriculum", "lesson", "scene", "read", "film")
+        for work in ("ask", "curriculum", "lesson", "scene", "read", "film", "storyboard")
     }
     config = gateway.config
     selection = gateway.selection
@@ -231,6 +234,7 @@ def _status(services: Services) -> ProviderStatus:
             scene=_route(services, "scene", plans["scene"]),
             read=_route(services, "read", plans["read"]),
             film=_route(services, "film", plans["film"]),
+            storyboard=_route(services, "storyboard", plans["storyboard"]),
         ),
     )
 

@@ -82,12 +82,15 @@ class FilmPlanOut(BaseModel):
     """What a film of the course would be, before it is begun or continued."""
 
     chapters: list[str]
-    #: The most requests it may send: each chapter once, and three more to mend it.
+    #: The most requests it may send: each chapter once, three more to mend it, and one to
+    #: look over its pictures when they are looked over.
     requests_at_most: int
     #: The natural voice it would be read in; none for a film without a voice.
     voice: str | None
     #: Why it cannot be made now, in a sentence.
     blocked: str | None
+    #: Whether each chapter's pictures are looked over by a model that sees them (ADR-066).
+    checks_pictures: bool
 
 
 class CourseFilm(BaseModel):
@@ -143,6 +146,7 @@ def _plan(plan: FilmPlan) -> FilmPlanOut:
         requests_at_most=plan.requests_at_most,
         voice=plan.voice,
         blocked=plan.blocked,
+        checks_pictures=plan.checks_pictures,
     )
 
 

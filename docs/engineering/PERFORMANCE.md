@@ -400,6 +400,44 @@ A first chapter written earlier the same day, before these changes, took 593 s (
 thinking). A course of a dozen concepts is therefore two to four hours, nearly all of it
 the model's, and at most 48 requests.
 
+## A chapter's pictures, looked over (2026-11-25)
+
+A chapter's storyboard, the screen at the end of each of its animations six to a sheet, is
+sent to NVIDIA's Nemotron 3.5 Super to be looked over (ADR-066). By hand, a chapter of
+history from the second film (31 animations, 205 s, no fault of layout; drawn again by the
+engine in 8 s), its four sheets of 1928 by 1720 (140 to 200 KB) in one request:
+
+| | Took | Tokens in / thought / out | Found |
+|---|---|---|---|
+| Asked broadly, given 3,000 tokens | 26.8 s | 14,446 / all 3,000 / none | nothing: it thought to the end of its tokens |
+| Asked broadly, given 16,000 | 114.5 s | 14,446 / 14,021 / 165 | two real faults, one half right, one a matter of taste; missed an arrow pointing at nothing |
+| Asked to go through each picture, every arrow by its two ends | 95.1 s | 14,501 / 10,502 / 113 | three real faults, the arrow among them, nothing false; missed arrows too short to see |
+
+Then a film of one chapter on the same concept, made through Adle's own services with a
+film maker's home never used before (readied in 22 s), Kokoro reading it:
+
+| | Took |
+|---|---|
+| The chapter written (Kimi K3.1 Pro, 354 s thinking) | 673 s; it stopped in the engine: a run time given to a line (now mended instead) |
+| Mended once | 270 s; ran with 5 faults of layout (lines and arrows through words) |
+| Mended twice | 334 s; ran with 1 fault, so it was looked over before the last mend |
+| Looked over (Nemotron 3.5 Super, four sheets) | 238 s; thought past its 24,000 tokens and wrote nothing |
+| Mended a third time | 414 s; ran with none |
+| Recording, the whole film looked at, the video | 102 s, for 3 min 16 s of film at 1080p; 7.5 MB |
+| **Altogether** | **34.5 minutes, 5 requests** |
+
+The same look sent again by hand, with `reasoning_effort`:
+
+| Effort | Took | Tokens of thought | Faults named |
+|---|---|---|---|
+| "medium" | 95.2 s | 11,135 | 2: one real, one not (a timeline to be cut short at its first date) |
+| "low" | 169.7 s | 19,451 | 4: one real, three doubtful |
+| "none" | 7.5 s | 0 | 8, mostly wrong |
+
+A look is now sent at "medium". A sheet is about 3,300 tokens; a look is 25,000 to 29,000
+tokens of the 3,000,000 a day Adle allows itself at NVIDIA, and takes a half to a quarter
+of the time a chapter takes to be written.
+
 ## What was not measured
 
 - **Generating with AIHubMix's model.** That provider has not answered a request yet (see

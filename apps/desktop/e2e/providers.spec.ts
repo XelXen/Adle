@@ -154,14 +154,16 @@ test.describe('the AI providers', () => {
 
     await saveProviderKey(page, NVIDIA, NVIDIA_KEY);
     await expect(providerCard(page, NVIDIA)).toContainText('In use');
-    // One provider, and each kind of request at the model measured to do it best: pages
-    // that are pictures too, by the one model seen to read them (ADR-060).
+    // One provider, and each kind of request at the model measured to do it best: a film's
+    // pictures checked, and pages that are pictures, by the one model seen to read them
+    // (ADR-060, ADR-066).
     await expect(routes(page).getByRole('definition')).toHaveText([
       `${NVIDIA}Nemotron 3.5 Super`,
       `${NVIDIA}Nemotron 3 Ultra`,
       `${NVIDIA}Nemotron 3 Ultra`,
       `${NVIDIA}Kimi K3.1 Pro`,
       `${NVIDIA}Kimi K3.1 Pro`,
+      `${NVIDIA}Nemotron 3.5 Super`,
       `${NVIDIA}Nemotron 3.5 Super`,
     ]);
     expect(await keyStates(page)).toEqual({
@@ -299,8 +301,13 @@ test.describe('the AI providers', () => {
     // Said before anything is sent, with the reason: AIHubMix's model for code draws the
     // pictures; NVIDIA writes everything else, each kind with its own model.
     const writes = `${NVIDIA}, then ${AIHUBMIX} if needed`;
-    // With NVIDIA's key, pages that are pictures can be read: by NVIDIA alone (ADR-060).
-    await expect(routes(page).getByRole('term')).toHaveText([...KINDS, 'Pages that are pictures']);
+    // With NVIDIA's key, a film's pictures can be checked and pages that are pictures read:
+    // by NVIDIA alone (ADR-060, ADR-066).
+    await expect(routes(page).getByRole('term')).toHaveText([
+      ...KINDS,
+      'Checking films',
+      'Pages that are pictures',
+    ]);
     const lines = routes(page).getByRole('definition');
     for (const [index, model] of [
       'Nemotron 3.5 Super',
@@ -325,6 +332,7 @@ test.describe('the AI providers', () => {
       `${NVIDIA} writes this, and ${AIHUBMIX} is kept for the pictures.`,
     );
     await expect(lines.nth(5)).toHaveText(`${NVIDIA}Nemotron 3.5 Super`);
+    await expect(lines.nth(6)).toHaveText(`${NVIDIA}Nemotron 3.5 Super`);
     await expect(providerCard(page, AIHUBMIX)).toContainText(
       'With “Automatic”, draws the pictures: its model is made for code. A small daily allowance.',
     );

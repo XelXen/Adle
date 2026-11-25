@@ -130,8 +130,10 @@ most, a file's name.
   says it (`films.get`, `films.maker_status`; `filmStage` in `lib/films.ts`): the film
   maker to set up (what it downloads, and from where, said first: it is downloaded only
   when the learner presses it), what stands in the way, the film to make (what is sent,
-  and the most requests it may cost, one press away with `WhatIsSent`), the film being
-  made chapter by chapter, one left unfinished to continue, and one made.
+  and the most requests it may cost, one press away with `WhatIsSent`; where each
+  chapter's pictures go to be checked when the core plans to, `checks_pictures` and
+  `routes.storyboard`, in `filmRequests`, ADR-066), the film being made chapter by
+  chapter, one left unfinished to continue, and one made.
 - **A film is played from what the core holds**: `fetchFilm` asks for its video a part at
   a time (`films.video_part`) and makes a `blob:` of it; its words come as cues
   (`films.captions`) and become WebVTT in the page, as plain text (`vttOf`). The page names

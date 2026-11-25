@@ -7,7 +7,7 @@ import type { Job, ProviderStatus } from '@adle/contracts';
  */
 
 /** The kinds of work a request can be for, as the core names its routes. */
-export type Work = 'ask' | 'curriculum' | 'lesson' | 'scene' | 'read' | 'film';
+export type Work = 'ask' | 'curriculum' | 'lesson' | 'scene' | 'read' | 'film' | 'storyboard';
 
 /** The choice that lets Adle use every provider the learner has a key for (ADR-023). */
 export const AUTOMATIC = 'auto';

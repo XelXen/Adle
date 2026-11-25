@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Course, CourseFilm, FilmMakerStatus, Job } from '@adle/contracts';
+import type { Course, CourseFilm, FilmMakerStatus, Job, ProviderStatus } from '@adle/contracts';
 import { ToastProvider } from '@adle/design-system';
 
 import { FilmPanel } from './FilmPanel';
@@ -16,6 +16,8 @@ const core = {
   maker: null as unknown as FilmMakerStatus,
   jobs: new Map<string, Job>(),
   asked: [] as string[],
+  /** Where requests would go; none, and the tab says "your AI provider". */
+  status: null as ProviderStatus | null,
 };
 
 vi.mock('../../lib/core-client', () => ({
@@ -29,7 +31,7 @@ vi.mock('../../lib/core-client', () => ({
       case 'films.maker_status':
         return Promise.resolve(copy(core.maker));
       case 'provider.status':
-        return Promise.reject(new Error('not needed'));
+        return core.status ? Promise.resolve(copy(core.status)) : Promise.reject(new Error('none'));
       case 'films.set_up_maker': {
         const job = {
           id: 'job_setup',
@@ -65,8 +67,15 @@ const COURSE = { id: `crs_${'1'.repeat(20)}`, title: 'Photosynthesis' } as Cours
 beforeEach(() => {
   core.asked = [];
   core.jobs.clear();
+  core.status = null;
   core.view = {
-    plan: { chapters: ['Light', 'Sugar'], requests_at_most: 8, voice: null, blocked: null },
+    plan: {
+      chapters: ['Light', 'Sugar'],
+      requests_at_most: 8,
+      voice: null,
+      blocked: null,
+      checks_pictures: false,
+    },
     film: null,
   };
   core.maker = {
@@ -133,5 +142,25 @@ describe('the Film tab', () => {
       await screen.findByText('The film maker doesn’t run on this kind of computer.'),
     ).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Set up the film maker' })).toBeNull();
+  });
+
+  it('says where each chapter’s pictures are sent to be checked before a film is begun', async () => {
+    core.maker.ready = true;
+    core.view.plan = { ...core.view.plan, requests_at_most: 10, checks_pictures: true };
+    const to = (sentence: string) => ({ sentence, wait_seconds: 120 });
+    core.status = {
+      routes: { film: to('NVIDIA NIM'), storyboard: to('NVIDIA NIM') },
+    } as unknown as ProviderStatus;
+    show();
+    expect(
+      await screen.findByText(
+        'Sends pictures of each chapter to NVIDIA NIM to be checked. At most 10 requests: one ' +
+          'for each chapter, up to three more for each to fix it, and one for each to check ' +
+          'its pictures.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Make the film' })).toBeTruthy();
+    // The time it takes counts the look as well as the writing: two minutes a chapter each.
+    expect(screen.getByText(/Making it takes at least 10 minutes/)).toBeTruthy();
   });
 });

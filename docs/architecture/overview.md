@@ -348,7 +348,7 @@ development it is the uv environment in `services/core`. See ADR-019.
 | `services/core/adle_core/ingestion` | Type detection, parsers, chunking, and the parser worker process |
 | `services/core/adle_core/generation` | Provider credentials and client, quota rules, routing between providers, prompts, drafts, scene policy |
 | `services/core/adle_core/voice` | A natural voice (ADR-042): what is pinned, setting it up, and its engine, a process of its own on another Python |
-| `services/core/adle_core/film` | A film of a whole course (ADR-065): the film maker pinned and set up, the policy a chapter passes before the engine runs it, reading what the engine says, and the files Adle writes around a chapter. The engine is ManimGX, a process of its own on a Python of its own, started for one scene at a time with nothing of the computer's in its environment |
+| `services/core/adle_core/film` | A film of a whole course (ADR-065): the film maker pinned and set up, the policy a chapter passes before the engine runs it, reading what the engine says, the files Adle writes around a chapter, and a chapter's storyboard, looked over by a model that sees pictures (ADR-066). The engine is ManimGX, a process of its own on a Python of its own, started for one scene at a time with nothing of the computer's in its environment |
 | `skills/wanim-scene-authoring` | How to write a scene; tested examples |
 | `scripts` | Repository tooling: generated contracts and allowlists, the gate (`check.mjs`), packaging (`package.mjs`, `smoke-packaged.mjs`, `e2e-packaged.mjs`), the licence inventory, and timings |
 

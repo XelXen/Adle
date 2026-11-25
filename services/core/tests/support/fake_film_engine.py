@@ -18,7 +18,12 @@ A chapter can ask for trouble with a comment, to test what Adle does about it:
 * ``# fake: hang``: the scene never ends;
 * ``# fake: cold``: the first run with an engine home never ends, as the real engine's first
   run is slow while the graphics driver compiles its shaders into that home; the next is as
-  quick as ever.
+  quick as ever;
+* ``# fake: no storyboard``: ``inspect`` draws no storyboard.
+
+``inspect`` draws a storyboard as ManimGX does, beside the scene: a sheet for every six
+plays, ``<Scene>.storyboard.png`` and then ``<Scene>.storyboard-2.png`` and on, each a small
+gray PNG (ADR-066).
 
 The engine runs with none of the test's environment (``film.runtime.bare_environment``), so
 everything it is told is in the files of the folder it runs in.
@@ -27,6 +32,7 @@ everything it is told is in the files of the folder it runs in.
 from __future__ import annotations
 
 import ast
+import base64
 import hashlib
 import json
 import os
@@ -40,7 +46,11 @@ HERE = Path(__file__).resolve().parent
 VIDEO = HERE / "film.mp4"
 WORDS_A_SECOND = 2.6
 _CHAPTER = re.compile(r"^import (chapter_\d\d)\s*$", re.MULTILINE)
-_MARK = re.compile(r"#\s*fake:\s*(overlap|stop when joined|stop|hang|cold)\s*$")
+_MARK = re.compile(r"#\s*fake:\s*(overlap|stop when joined|stop|hang|cold|no storyboard)\s*$")
+#: One sheet of a storyboard: a PNG of four by three gray pixels.
+SHEET = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAAAAACRn/EaAAAADklEQVR4nGNwAAIGOAEAFo8DAQJfVrUAAAAASUVORK5CYII="
+)
 
 
 def _number(node: ast.AST | None, default: float) -> float:
@@ -117,6 +127,7 @@ def main(arguments: list[str]) -> int:
     clock = 0.0
     plays: list[str] = []
     problems: list[str] = []
+    drawn = True
     cues: list[tuple[float, float, str]] = []
     for module in modules:
         for line, kind in _marks(folder, module):
@@ -132,6 +143,8 @@ def main(arguments: list[str]) -> int:
                 print("    self.play(...)", file=sys.stderr)
                 print("ValueError: the scene stopped on purpose", file=sys.stderr)
                 return 1
+            if kind == "no storyboard":
+                drawn = False
             if kind == "overlap":
                 problems.append(
                     f"  [{len(problems) + 1}] t={clock:.2f}–{clock + 1:.2f}s ({module}.py:{line})  "
@@ -155,7 +168,14 @@ def main(arguments: list[str]) -> int:
         print(f"{video.name}  {clock:.2f} s, 1920x1080 at 30 fps, 0.0 MB (rendered in 0.1 s)")
     else:
         print(f"{file}: {scene}, {clock:.2f} s, {len(plays)} plays")
-        print(f"storyboard: {scene}.storyboard.png")
+        if drawn:
+            names = [
+                f"{scene}.storyboard{'' if number == 1 else f'-{number}'}.png"
+                for number in range(1, max(1, (len(plays) + 5) // 6) + 1)
+            ]
+            for name in names:
+                (folder / name).write_bytes(SHEET)
+            print(f"storyboard: {', '.join(names)}")
         for play in plays:
             print(play)
     if problems:

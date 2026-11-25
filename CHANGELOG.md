@@ -5,6 +5,22 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **A film's pictures are checked.** When the AI you use can read pictures (NVIDIA NIM),
+  every chapter of a film is also looked at the way you would see it: a picture of the
+  screen at the end of each animation. An arrow that points at nothing, a label away from
+  what it names, or a bar that changes only after it is said to is sent back to be fixed.
+  This adds at most one request to each chapter, and **What is sent** beside **Make the
+  film** says where the pictures go.
+
+### Fixed
+
+- A chapter of a film sent back to be fixed is shown to the AI whole. Before, a long
+  chapter was cut off, and the AI wrote the rest again from nothing.
+- A chapter that gives a spoken line its own timing is fixed by Adle instead of being sent
+  back, which saves a request and several minutes.
+
 ## [0.1.0-alpha.10] - 2026-11-25
 
 The tenth alpha. Lessons now follow the way each subject is taught, and a whole course can

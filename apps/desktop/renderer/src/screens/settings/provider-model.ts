@@ -139,12 +139,17 @@ const WORK_LABELS: Record<Work, string> = {
   scene: 'Pictures',
   film: 'Films',
   read: 'Pages that are pictures',
+  storyboard: 'Checking films',
 };
+
+/** What is sent with pictures: listed only where a provider that reads them has a key. */
+const PICTURES: readonly Work[] = ['read', 'storyboard'];
 
 /**
  * Where each kind of request would go at this moment, as the core says. Pages that are
- * pictures are listed only where a provider that reads pictures has a key to (ADR-060):
- * otherwise the core names one only to say whose key is missing.
+ * pictures, and the pictures of a film checked (ADR-066), are listed only where a provider
+ * that reads pictures has a key (ADR-060): otherwise the core names one only to say whose
+ * key is missing.
  */
 export function routeLines(
   status: Pick<ProviderStatus, 'routes'> & {
@@ -154,8 +159,11 @@ export function routeLines(
   const keyed = new Set(
     status.providers.filter((each) => each.key_configured).map((each) => each.provider_id),
   );
-  const works = (['ask', 'curriculum', 'lesson', 'scene', 'film', 'read'] as const).filter(
-    (work) => work !== 'read' || status.routes.read.provider_ids.some((id) => keyed.has(id)),
+  const works = (
+    ['ask', 'curriculum', 'lesson', 'scene', 'film', 'storyboard', 'read'] as const
+  ).filter(
+    (work) =>
+      !PICTURES.includes(work) || status.routes[work].provider_ids.some((id) => keyed.has(id)),
   );
   return works.map((work) => ({
     work,

@@ -160,6 +160,8 @@ _REQUESTS_FOR = {
     "read": ("read",),
     # One chapter of a film, written once (ADR-065).
     "film": ("film",),
+    # One chapter's storyboard, looked over (ADR-066).
+    "storyboard": ("storyboard",),
 }
 #: What a model is seen to be doing while its answer is on the way, in the learner's words.
 _STAGES = {"thinking": "thinking", "writing": "writing"}

@@ -42,7 +42,7 @@ import httpx2 as httpx
 from adle_core.errors import AdleError
 from adle_core.generation.credentials import DEFAULT_PROVIDER_ID, CredentialVault
 from adle_core.generation.quota import DEFAULT_LIMITS, QuotaLimits
-from adle_core.generation.routing import PURPOSES
+from adle_core.generation.routing import PICTURE_PURPOSES, PURPOSES
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +142,13 @@ NEMOTRON_SUPER = ModelSpec(
     # Its reference takes a picture as a part of the message ("image_url", a data URL).
     # On 2026-11-24 it read a typed page and a handwritten one word for word, the drawing
     # described in a line, a PNG of 110 to 190 KB each, in 2 to 16 s (ADR-060).
+    # On 2026-11-25 it took four storyboard sheets of a film's chapter in one request, about
+    # 3,300 tokens each, thought for 10,000 to 14,000 tokens, and named faults a viewer
+    # would see in 95 to 114 s (ADR-066). Then, on another chapter, it thought past 24,000
+    # tokens and wrote nothing (238 s). The same request with "reasoning_effort" (which
+    # the endpoint took) at "medium" was answered after 11,000 tokens, in 95 s; at "low"
+    # after 19,500, in 170 s; at "none" at once, in 7.5 s, and mostly wrongly.
+    reasoning_for=(("storyboard", "medium"),),
     images=True,
 )
 NVIDIA_MODELS = (
@@ -193,6 +200,8 @@ NVIDIA_ORDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     # The one model whose reading of a picture was seen (ADR-060). Mistral Large 4's
     # reference takes pictures too; it is not asked until it has been tried by hand.
     ("read", (_SUPER,)),
+    # The same model looks over a chapter's storyboard (ADR-066).
+    ("storyboard", (_SUPER,)),
 )
 
 #: Adle's own caution for a provider that publishes no daily limit for these models.
@@ -218,6 +227,8 @@ class TypicalSeconds:
     read: int = 10
     #: One chapter of a film, written once (ADR-065).
     film: int = 300
+    #: One chapter's storyboard, looked over (ADR-066).
+    storyboard: int = 120
 
     def of(self, purpose: str) -> int:
         found = getattr(self, purpose, None)
@@ -279,7 +290,8 @@ class ProviderConfig:
     def models_for(self, purpose: str) -> tuple[ModelSpec, ...]:
         """The models to ask for a kind of request, in order: its own order, or all of them.
 
-        Reading a picture asks only models that see pictures: none, at a provider without one.
+        What is sent with pictures (reading a page, looking over a storyboard) asks only
+        models that see pictures: none, at a provider without one.
         """
         found = self.models
         for listed, ids in self.orders:
@@ -287,7 +299,7 @@ class ProviderConfig:
                 by_id = {spec.id: spec for spec in self.models}
                 found = tuple(by_id[model_id] for model_id in ids)
                 break
-        if purpose == "read":
+        if purpose in PICTURE_PURPOSES:
             return tuple(spec for spec in found if spec.images)
         return found
 
@@ -338,7 +350,7 @@ NVIDIA = ProviderConfig(
     # on 2026-11-21: a lesson's text in about two minutes, a picture in two to three, a
     # list of concepts in half a minute, an answer in ten seconds.
     typical=TypicalSeconds(
-        lesson=120, scene=150, curriculum=35, ask=10, check=10, read=8, film=420
+        lesson=120, scene=150, curriculum=35, ask=10, check=10, read=8, film=420, storyboard=110
     ),
     # These models think before they answer, and the shared endpoints queue: a small
     # question took forty seconds to begin to be answered when this was written.

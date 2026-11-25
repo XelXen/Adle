@@ -63,6 +63,12 @@ understanding with short questions, and adapts the next step to what you have ac
   break, and tells you when it is ready, with a notification if you are doing something else.
 - **Read aloud:** lessons are read by a voice installed on your computer, with nothing sent
   anywhere. Without a voice, narration is shown as text.
+- **A film of a whole course:** on a course's **Film** tab, the AI writes a narrated,
+  animated chapter for each concept, in the order they are learned. Adle runs each chapter
+  to check every moment of it, and with NVIDIA NIM also has its pictures looked over, then
+  sends back what is wrong to be fixed. The film is made into a video you can watch or
+  save. It takes hours, and you don't need to wait. The film maker (about 110 MB) is
+  downloaded only when you set it up.
 - **Settings → Learning:** pace, explanation depth, narration, voice and volume, captions, and
   your goal.
 - **Settings → AI provider:** use AIHubMix, NVIDIA NIM, or both ("Automatic": each for what
@@ -76,10 +82,12 @@ understanding with short questions, and adapts the next step to what you have ac
 ## Your data
 
 - Course files, answers, and progress are stored only on your computer.
-- One thing uses the internet: when you ask Adle to suggest concepts, write a lesson, or
-  answer a question, the text needed for that request is sent to an AI provider you gave a
+- One thing uses the internet: when you ask Adle to suggest concepts, write a lesson,
+  answer a question, read pages that are pictures, or make a film, what that request needs
+  (text, or pictures for pages and a film's chapters) is sent to an AI provider you gave a
   key to (AIHubMix or NVIDIA NIM), named beside the button before you press it. Nothing is
-  sent before you add a key and ask.
+  sent before you add a key and ask. A natural voice and the film maker are downloaded
+  only when you set them up.
 - No accounts, no analytics, no telemetry, no crash uploads.
 - In Settings → Privacy & data you can save a copy of everything as one file, restore from a
   copy (what it replaces is kept, so a restore can be undone), and delete everything.

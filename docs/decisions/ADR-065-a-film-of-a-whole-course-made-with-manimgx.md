@@ -72,13 +72,17 @@ Tried by hand on 2026-11-24, on Windows 11 with an RTX 4080 Laptop GPU:
    text; no `while`, `try`, `with`, `global`, decorators or `**`; no text with an address,
    a path, or a typesetter's command that reads a file; and what is said is one plain
    literal line of words, with its brackets whole and one animation for each of them
-   (the engine stops at the first line that has not; the policy names every one). Three
+   (the engine stops at the first line that has not; the policy names every one). Four
    slips are mended rather than sent back (as for a lesson, ADR-047), and the file is
    then checked as any other: an engine name used bare, `WHITE` for `m.WHITE`, which the
    first chapter of the first film made by hand had; `np` or `math` used and not
-   imported; and a line with more bracketed spans than animations, whose spans after the
+   imported; a line with more bracketed spans than animations, whose spans after the
    last animation lose their brackets, so that what is said stays the same (the first
-   chapter of the second film had two such lines, and lost a request to them). A line
+   chapter of the second film had two such lines, and lost a request to them); and a
+   line given a run time, a rate or a lag of its own, which `say` does not take: it goes
+   to each of the line's animations that has none, which is what it meant, and anything
+   else given to a line but its voice is taken off it (the first chapter of a film made
+   on 2026-11-25 had six such lines, and lost a request to the first). A line
    with fewer spans than animations is sent back: which words an animation belongs to is
    not Adle's to guess.
 3. **Then it runs, alone, in the engine, without making a video** (`inspect`): with Adle's

@@ -796,10 +796,11 @@
         "properties": {
           "blocked": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Blocked" },
           "chapters": { "items": { "type": "string" }, "title": "Chapters", "type": "array" },
+          "checks_pictures": { "title": "Checks Pictures", "type": "boolean" },
           "requests_at_most": { "title": "Requests At Most", "type": "integer" },
           "voice": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Voice" }
         },
-        "required": ["chapters", "requests_at_most", "voice", "blocked"],
+        "required": ["chapters", "requests_at_most", "voice", "blocked", "checks_pictures"],
         "title": "FilmPlanOut",
         "type": "object"
       },
@@ -1884,7 +1885,16 @@
           "display_name": { "title": "Display Name", "type": "string" },
           "first_for": {
             "items": {
-              "enum": ["ask", "curriculum", "lesson", "scene", "check", "read", "film"],
+              "enum": [
+                "ask",
+                "curriculum",
+                "lesson",
+                "scene",
+                "check",
+                "read",
+                "film",
+                "storyboard"
+              ],
               "type": "string"
             },
             "title": "First For",
@@ -1985,9 +1995,10 @@
           "film": { "$ref": "#/components/schemas/ProviderRoute" },
           "lesson": { "$ref": "#/components/schemas/ProviderRoute" },
           "read": { "$ref": "#/components/schemas/ProviderRoute" },
-          "scene": { "$ref": "#/components/schemas/ProviderRoute" }
+          "scene": { "$ref": "#/components/schemas/ProviderRoute" },
+          "storyboard": { "$ref": "#/components/schemas/ProviderRoute" }
         },
-        "required": ["ask", "curriculum", "lesson", "scene", "read", "film"],
+        "required": ["ask", "curriculum", "lesson", "scene", "read", "film", "storyboard"],
         "title": "ProviderRoutes",
         "type": "object"
       },

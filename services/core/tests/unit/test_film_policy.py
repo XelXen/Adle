@@ -22,6 +22,7 @@ from adle_core.film.policy import (
     text_problem,
     with_engine_names,
     with_spans_fitted,
+    with_timing_passed_on,
 )
 
 REPO = Path(__file__).resolve().parents[4]
@@ -361,3 +362,65 @@ def test_numpy_or_math_used_and_not_imported_is_imported() -> None:
     # Already imported, or a name of the file's own: left as it is.
     fine = bad("import numpy as np\n" + SCENE + "        xs = np.linspace(0, 1, 5)\n")
     assert with_engine_names(fine) == fine
+
+
+def test_a_line_given_a_run_time_passes_it_to_its_animations_and_says_the_same() -> None:
+    # The first chapter of the film made by hand on 2026-11-25 wrote `run_time=3` on lines
+    # it said, and the engine stopped: `say` takes the words, the animations and a voice.
+    lines = (
+        "        self.say(\n"
+        "            'A [coach left Paris].',\n"
+        "            m.AnimationGroup(\n"
+        "                m.Write(c),\n"
+        "                m.FadeIn(s),\n"
+        "            ),\n"
+        "            run_time=3,\n"
+        "        )\n"
+        "        self.say('Two [here] and [there].', m.Write(c), s.animate.shift(m.UP), "
+        "run_time=2)\n"
+        "        self.say('Its [own].', m.FadeIn(c, run_time=4), run_time=1, "
+        "rate_func=m.smooth)\n"
+        "        self.say('Nothing [else].', m.Indicate(c), wait=1)\n"
+    )
+    slip = bad(SCENE + "        c = m.Circle()\n        s = m.Square()\n" + lines)
+
+    mended = with_timing_passed_on(slip)
+
+    report = check_chapter_source(mended)
+    assert report.ok, report.violations
+    # On a line of its own where the call's arguments are, when the call is written so.
+    assert (
+        "            m.AnimationGroup(\n"
+        "                m.Write(c),\n"
+        "                m.FadeIn(s),\n"
+        "                run_time=3,\n"
+        "            ),\n"
+        "        )\n"
+    ) in mended
+    # To each animation written as the engine's; not to what is not one of its classes.
+    assert (
+        "self.say('Two [here] and [there].', m.Write(c, run_time=2), s.animate.shift(m.UP))"
+        in mended
+    )
+    # An animation's own run time is its own; a rate goes on as a run time does.
+    assert "self.say('Its [own].', m.FadeIn(c, run_time=4, rate_func=m.smooth))" in mended
+    # Anything else given to a line is taken off it.
+    assert "self.say('Nothing [else].', m.Indicate(c))" in mended
+    # What is said does not change.
+    assert [said(line) for line in report.lines] == [
+        "A coach left Paris.",
+        "Two here and there.",
+        "Its own.",
+        "Nothing else.",
+    ]
+
+
+def test_a_line_given_its_voice_or_nothing_is_left_as_it_is() -> None:
+    plain = bad(SCENE + "        c = m.Circle()\n        self.say('A [b].', m.Write(c))\n")
+    assert with_timing_passed_on(plain) == plain
+    voiced = bad(
+        SCENE + "        c = m.Circle()\n        self.say('A [b].', m.Write(c), voice=None)\n"
+    )
+    # A voice of the file's own is the policy's to refuse, not this mend's to take away.
+    assert "voice=None" in with_timing_passed_on(voiced)
+    assert not check_chapter_source(with_timing_passed_on(voiced)).ok

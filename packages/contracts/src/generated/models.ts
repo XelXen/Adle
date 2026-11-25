@@ -350,6 +350,7 @@ export interface JobProgressDetail {
 export interface FilmPlanOut {
   blocked: string | null;
   chapters: string[];
+  checks_pictures: boolean;
   requests_at_most: number;
   voice: string | null;
 }
@@ -985,7 +986,9 @@ export interface ProviderCheck {
 export interface ProviderChoice {
   base_url: string;
   display_name: string;
-  first_for: ('ask' | 'curriculum' | 'lesson' | 'scene' | 'check' | 'read' | 'film')[];
+  first_for: (
+    'ask' | 'curriculum' | 'lesson' | 'scene' | 'check' | 'read' | 'film' | 'storyboard'
+  )[];
   in_use: boolean;
   key_configured: boolean;
   limits_published: boolean;
@@ -1044,6 +1047,7 @@ export interface ProviderRoutes {
   lesson: ProviderRoute;
   read: ProviderRoute;
   scene: ProviderRoute;
+  storyboard: ProviderRoute;
 }
 export interface ProviderSelection {
   selection: string;

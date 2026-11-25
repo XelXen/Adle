@@ -52,8 +52,9 @@ adle_core/
   film/           a film of a whole course (ADR-065): the film maker pinned (catalog),
                   where it lives and running it (runtime), setting it up (install), what a
                   chapter may be (policy), what the engine says of a scene (report), the
-                  files Adle writes around a chapter (script), and data/ (the writer's
-                  guide and example, the engine's names, the locks of its programs)
+                  files Adle writes around a chapter (script), a chapter's storyboard and
+                  what is seen in it (storyboard, ADR-066), and data/ (the writer's guide
+                  and example, the engine's names, the locks of its programs)
   orchestration/ audio/   empty: the computer's voice is the browser's (ADR-013), and jobs
                   are run by application/jobs.py
   tools/          developer entry points (contract export)
@@ -282,16 +283,29 @@ everything and decides nothing.
   the pinned engine's (`film/data/names.json`, from `scripts/dev/film_names.py`): never
   add a name to make a chapter work without reading what it reaches. An engine name used
   bare (`WHITE` for `m.WHITE`), or `np` or `math` not imported, is mended, not sent back
-  (`policy.with_engine_names`), and so is a line with more bracketed spans than
-  animations (`policy.with_spans_fitted`: the spans after the last animation lose their
-  brackets, and what is said stays the same); the file is then checked as any other. A
+  (`policy.with_engine_names`), and so is a line given a run time of its own
+  (`policy.with_timing_passed_on`: it goes to the line's animations) and a line with more
+  bracketed spans than animations (`policy.with_spans_fitted`: the spans after the last
+  animation lose their brackets, and what is said stays the same); the file is then
+  checked as any other. A
   line with fewer spans than animations is sent back, never guessed. A chapter is asked
   for once and sent back `script.MAX_MENDS` times at most, told the policy's or the
   engine's findings (`report.findings`, by the chapter's own line); the version that ran
   with the least wrong is kept, and one that never ran is told in words
   (`script.plain_chapter`, which quotes the course's words only through
-  `policy.text_problem`). What the engine said is told to the model and logged by count
-  only. A film's lines are recorded by `NarrationService.record_film` into the film's
+  `policy.text_problem`). A chapter sent back is shown back whole, up to the policy's
+  `MAX_SOURCE_CHARS`: a chapter is 12,000 to 16,000 characters. What the engine said is
+  told to the model and logged by count only. **A chapter's pictures are looked over once**
+  (ADR-066): the storyboard `inspect` draws beside the take (`storyboard.sheets`, cleared
+  before each run by `FilmEngine.inspect`, at most eight sheets, PNGs only) goes in one
+  request (`prompts.storyboard_request`, purpose `storyboard`, so only to a model whose
+  `ModelSpec.images` is set) with what is said while each animation plays
+  (`storyboard.told`); the answer, a line a fault by picture, becomes what the writer is
+  told by its own line (`storyboard.seen`), in the same mends (`_together`): when a version
+  first runs clean while a mend is left, or before the last mend. Never a second look, and
+  nothing waits on one: a look refused or failed, or no such model by the learner's choice
+  (`FilmService._looks`), and the chapter is kept as it ran. The plan counts it
+  (`checks_pictures`, `requests_at_most`). A film's lines are recorded by `NarrationService.record_film` into the film's
   folder; `script.engine_words` gives the engine a time for every run of the line. The
   film maker is set up only by `FilmInstaller`, at the learner's word, from the pinned
   Python and the lock for this system, and removing it takes only its own folder. A film

@@ -26,8 +26,9 @@ AUTOMATIC = "auto"
 #: What a request is for, as far as choosing a provider goes. ``ask`` is a question the
 #: learner puts to Adle in the middle of a lesson; ``check`` finds out whether a key works;
 #: ``read`` reads a picture of a page of the learner's own (ADR-060); ``film`` writes a
-#: chapter of a film of a whole course (ADR-065).
-Purpose = Literal["ask", "curriculum", "lesson", "scene", "check", "read", "film"]
+#: chapter of a film of a whole course (ADR-065); ``storyboard`` looks over the pictures of
+#: one chapter of a film (ADR-066).
+Purpose = Literal["ask", "curriculum", "lesson", "scene", "check", "read", "film", "storyboard"]
 PURPOSES: tuple[Purpose, ...] = (
     "ask",
     "curriculum",
@@ -36,7 +37,10 @@ PURPOSES: tuple[Purpose, ...] = (
     "check",
     "read",
     "film",
+    "storyboard",
 )
+#: What is sent with pictures: only a model that sees them can be asked it (ADR-060).
+PICTURE_PURPOSES: frozenset[str] = frozenset({"read", "storyboard"})
 
 
 @dataclass(frozen=True, slots=True)

@@ -22,7 +22,8 @@ import { exampleScene } from './player';
 const answers = path.join(repoRoot, 'fixtures', 'model-answers');
 const read = (name: string): string => readFileSync(path.join(answers, name), 'utf8');
 
-export type RequestKind = 'curriculum' | 'lesson' | 'scene' | 'ask' | 'check' | 'read' | 'film';
+export type RequestKind =
+  'curriculum' | 'lesson' | 'scene' | 'ask' | 'check' | 'read' | 'film' | 'storyboard';
 
 /** What the fake reads off a picture of a page (ADR-060), unless told otherwise. */
 export const READ_PAGE =
@@ -110,6 +111,8 @@ function kindOf(system: string): RequestKind {
   if (system.includes('from a picture of it')) return 'read';
   // A chapter of a film of the whole course (ADR-065).
   if (system.includes('one chapter of a narrated teaching film')) return 'film';
+  // Its pictures, looked over by a model that sees them (ADR-066).
+  if (system.includes('looking over pictures of one chapter')) return 'storyboard';
   return 'lesson';
 }
 
@@ -120,6 +123,7 @@ function defaultAnswer(kind: RequestKind, user: string): string {
   if (kind === 'check') return 'ready';
   if (kind === 'read') return READ_PAGE;
   if (kind === 'film') return read('film-chapter.py');
+  if (kind === 'storyboard') return 'NOTHING';
   return exampleScene(user.includes('Kind: interactive') ? 'neuron_weight.py' : 'weighted_sum.py');
 }
 

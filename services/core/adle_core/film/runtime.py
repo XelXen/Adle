@@ -39,6 +39,7 @@ from pathlib import Path
 from adle_core.errors import AdleError
 from adle_core.film.catalog import ENGINE_VERSION, PYTHON_RELEASE, PYTHON_VERSION, build_for
 from adle_core.film.report import Report, read_report
+from adle_core.film.storyboard import clear_sheets
 
 PYTHON_ENV = "ADLE_FILM_PYTHON"
 ENGINE_ENV = "ADLE_FILM_ENGINE"
@@ -226,7 +227,10 @@ class FilmEngine:
         *,
         seconds: float = INSPECT_SECONDS,
     ) -> Report:
-        """Run a scene without making a video: its plays, and what is wrong with it."""
+        """Run a scene without making a video: its plays, and what is wrong with it. Its
+        storyboard is drawn beside it (``film.storyboard``); what an earlier run drew there
+        is removed first, so that every sheet there afterwards is this run's."""
+        clear_sheets(folder, scene)
         _, out, err = self._run(self._command("inspect", file, scene), folder, seconds, cancelled)
         return read_report(out, err)
 

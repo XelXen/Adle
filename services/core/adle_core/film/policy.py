@@ -705,6 +705,117 @@ def with_spans_fitted(source: str) -> str:
     return "\n".join(line.decode("utf-8") for line in lines)
 
 
+#: What a line may pass on to its animations: how long they take, how they ease, and how a
+#: group's parts follow each other. Anything else given to a line is taken off it.
+_PASSED_ON = frozenset({"run_time", "rate_func", "lag_ratio"})
+
+
+def _is_engine_animation(node: ast.expr) -> bool:
+    """A call of one of the engine's own classes: ``m.Write(...)``, ``m.AnimationGroup(...)``."""
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "m"
+        and node.func.attr[:1].isupper()
+    )
+
+
+def _end(node: ast.AST) -> tuple[int, int]:
+    return (getattr(node, "end_lineno", 0) or 0, getattr(node, "end_col_offset", 0) or 0)
+
+
+def _start(node: ast.AST) -> tuple[int, int]:
+    return (getattr(node, "lineno", 0) or 0, getattr(node, "col_offset", 0) or 0)
+
+
+def with_timing_passed_on(source: str) -> str:
+    """A chapter whose lines are given nothing but their words, animations and voice.
+
+    The engine's ``say`` takes the words, the animations and a voice: an animation lasts as
+    long as its words take to say, or its own run time if that is longer. The first chapter
+    of the film made by hand on 2026-11-25 wrote ``run_time=3`` on lines it said, and the
+    engine stopped on the first. It is mended, not sent back: a run time, a rate or a lag
+    given to a line goes to each of its animations written as the engine's
+    (``m.AnimationGroup(...)``) that has none of its own, which is what it meant, and is
+    taken off the line; anything else given to a line but its voice is taken off it. What
+    is said does not change. The file is checked afterwards as any other.
+    """
+    normal = normalise_source(source)
+    try:
+        tree = ast.parse(normal)
+        calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
+        return normal
+    lines = [line.encode("utf-8") for line in normal.split("\n")]
+    # (line, byte, line, byte, what): a span replaced, or a place written into.
+    edits: list[tuple[int, int, int, int, bytes]] = []
+    for call in calls:
+        function = call.func
+        if not (
+            isinstance(function, ast.Attribute)
+            and isinstance(function.value, ast.Name)
+            and function.value.id == "self"
+            and function.attr == "say"
+            and call.args
+            and isinstance(call.args[0], ast.Constant)
+            and isinstance(call.args[0].value, str)
+        ):
+            continue
+        given = [keyword for keyword in call.keywords if keyword.arg != "voice"]
+        if not given or any(keyword.arg is None for keyword in given):
+            continue
+        passed = [
+            (keyword.arg, ast.get_source_segment(normal, keyword.value))
+            for keyword in given
+            if keyword.arg in _PASSED_ON
+        ]
+        for animation in call.args[1:]:
+            if not isinstance(animation, ast.Call) or not _is_engine_animation(animation):
+                continue
+            own = {keyword.arg for keyword in animation.keywords}
+            added = [f"{name}={value}" for name, value in passed if value and name not in own]
+            if not added:
+                continue
+            line, end = _end(animation)
+            inside = [*animation.args, *animation.keywords]
+            last = max((_end(item) for item in inside), default=_end(animation.func))
+            between = b"".join(
+                lines[number - 1][
+                    (last[1] if number == last[0] else 0) : (end - 1 if number == line else None)
+                ]
+                for number in range(last[0], line + 1)
+            )
+            written = ", ".join(added).encode()
+            closing = lines[line - 1][: end - 1]
+            if inside and b"," in between and not closing.strip():
+                # Its parenthesis stands alone on its line, after a trailing comma: one more
+                # argument, on a line of its own, as the call's own arguments are.
+                edits.append((line, 0, line, 0, closing + b"    " + written + b",\n"))
+            else:
+                joiner = b"" if not inside else (b" " if b"," in between else b", ")
+                edits.append((line, end - 1, line, end - 1, joiner + written))
+        everything = sorted([*call.args, *call.keywords], key=_start)
+        for keyword in given:
+            before = [item for item in everything if _end(item) <= _start(keyword)]
+            if not before:
+                continue
+            begin, finish = _end(before[-1]), _end(keyword)
+            edits.append((begin[0], begin[1], finish[0], finish[1], b""))
+    if not edits:
+        return normal
+    for start_line, start, end_line, end, written in sorted(edits, reverse=True):
+        head = lines[start_line - 1][:start]
+        tail = lines[end_line - 1][end:]
+        lines[start_line - 1 : end_line] = [head + written + tail]
+    mended = "\n".join(line.decode("utf-8") for line in lines)
+    try:
+        ast.parse(mended)
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
+        return normal
+    return mended
+
+
 def check_chapter_source(source: str) -> ChapterReport:
     """Whether a chapter's file may be run by the film engine, without running any of it."""
     normal = normalise_source(source)

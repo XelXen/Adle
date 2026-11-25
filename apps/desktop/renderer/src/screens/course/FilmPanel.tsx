@@ -21,6 +21,7 @@ import { getBridge } from '../../lib/bridge';
 import { callCore, describeError } from '../../lib/core-client';
 import {
   aboutBytes,
+  filmRequests,
   chapterState,
   type FilmStage,
   filmStage,
@@ -115,7 +116,10 @@ export function FilmPanel({ course }: { course: Course }) {
   const data: CourseFilm = view.resource.data;
   const stage = filmStage(data, maker.resource.data);
   const status = provider.resource.status === 'ready' ? provider.resource.data : undefined;
-  const perChapter = status?.routes.film.wait_seconds ?? 300;
+  // A chapter is written, and its pictures looked over when they are (ADR-066).
+  const perChapter =
+    (status?.routes.film.wait_seconds ?? 300) +
+    (data.plan.checks_pictures ? (status?.routes.storyboard.wait_seconds ?? 0) : 0);
 
   const act = async (work: () => Promise<unknown>, failed: string): Promise<boolean> => {
     setBusy(true);
@@ -177,6 +181,7 @@ export function FilmPanel({ course }: { course: Course }) {
         busy={busy}
         perChapter={perChapter}
         sendsTo={destination(status, 'film')}
+        picturesTo={data.plan.checks_pictures ? destination(status, 'storyboard') : null}
         setupFailed={setupFailed}
         onSetUp={() => {
           setSetupFailed(null);
@@ -266,6 +271,8 @@ interface BodyProps {
   busy: boolean;
   perChapter: number;
   sendsTo: string;
+  /** Where each chapter's pictures are sent to be checked; none when they are not (ADR-066). */
+  picturesTo: string | null;
   /** Why the last setup of the film maker failed, when it did. */
   setupFailed: string | null;
   onSetUp: () => void;
@@ -281,6 +288,7 @@ function Body({
   busy,
   perChapter,
   sendsTo,
+  picturesTo,
   setupFailed,
   onSetUp,
   onMake,
@@ -360,7 +368,7 @@ function Body({
             <WhatIsSent
               what={FILM_SENDS}
               to={sendsTo}
-              after={`At most ${plan.plan.requests_at_most} requests: one for each chapter, and up to three more for each to fix it.`}
+              after={filmRequests(plan.plan.requests_at_most, picturesTo)}
             />
           </div>
         </Section>
@@ -399,7 +407,11 @@ function Body({
             <Button variant="primary" loading={busy} onClick={onMake}>
               Continue
             </Button>
-            <WhatIsSent what={FILM_SENDS} to={sendsTo} />
+            <WhatIsSent
+              what={FILM_SENDS}
+              to={sendsTo}
+              after={filmRequests(plan.plan.requests_at_most, picturesTo)}
+            />
             <Button variant="tertiary" icon={<Trash2 />} onClick={() => onAsk('remove')}>
               Remove
             </Button>

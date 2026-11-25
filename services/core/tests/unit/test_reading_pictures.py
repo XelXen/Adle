@@ -198,6 +198,9 @@ def test_a_picture_goes_with_the_words_as_a_part_of_the_message() -> None:
 def test_a_provider_without_a_model_that_sees_pictures_cannot_be_asked_to_read_one() -> None:
     assert AIHUBMIX.models_for("read") == ()
     assert [spec.id for spec in NVIDIA.models_for("read")] == [SUPER_VL]
+    # Nor to look over a film's pictures (ADR-066).
+    assert not AIHUBMIX.serves("storyboard")
+    assert [spec.id for spec in NVIDIA.models_for("storyboard")] == [SUPER_VL]
     reads = frozenset({"ask", "curriculum", "lesson", "scene", "check"})
     aihubmix = Standing("aihubmix", "AIHubMix", has_key=True, serves=reads)
     nvidia = Standing("nvidia", "NVIDIA NIM", has_key=False)

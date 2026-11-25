@@ -10,6 +10,7 @@ import {
   cueAt,
   filmStage,
   lengthOf,
+  filmRequests,
   makingTakes,
   nextChapter,
   vttOf,
@@ -55,7 +56,13 @@ function film(patch: Partial<Film> = {}): Film {
 
 function view(patch: Partial<CourseFilm> = {}): CourseFilm {
   return {
-    plan: { chapters: ['Area', 'Volume'], requests_at_most: 8, voice: null, blocked: null },
+    plan: {
+      chapters: ['Area', 'Volume'],
+      requests_at_most: 8,
+      voice: null,
+      blocked: null,
+      checks_pictures: false,
+    },
     film: null,
     ...patch,
   };
@@ -124,6 +131,17 @@ describe('times and lengths', () => {
     expect(lengthOf(720)).toBe('12 minutes');
     expect(lengthOf(3840)).toBe('1 hour 4 minutes');
     expect(lengthOf(7200)).toBe('2 hours');
+  });
+
+  it('say what a film sends besides its words, and the most requests it may make', () => {
+    expect(filmRequests(8, null)).toBe(
+      'At most 8 requests: one for each chapter, and up to three more for each to fix it.',
+    );
+    expect(filmRequests(10, 'NVIDIA NIM')).toBe(
+      'Sends pictures of each chapter to NVIDIA NIM to be checked. At most 10 requests: one ' +
+        'for each chapter, up to three more for each to fix it, and one for each to check its ' +
+        'pictures.',
+    );
   });
 
   it('say how long making a film takes as at least that, never more exactly than known', () => {

@@ -132,7 +132,8 @@ is built from it, and an alpha or a stable version is published from a release c
 - User documents and model output are data, never instructions.
 - A picture of a page of the learner's leaves the computer only when they press "Read
   them" on that file, and only for a model seen to read pictures (ADR-060). Importing sends
-  nothing.
+  nothing. A film's pictures (each chapter's storyboard) go only to a model seen to read
+  pictures, and that is said before the film is begun (ADR-066).
 - A natural voice is downloaded only at the learner's word, from what is pinned: every model
   file by its hash (`voice/catalog.py`), every program by the lock for its system
   (`voice/data/`). It runs in an environment and a process of its own, and the core never
@@ -246,7 +247,9 @@ account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day 
   Reading a file's pages that are pictures is one request a page, at the learner's word
   (ADR-060).
   A chapter of a film is one request, and three more at most, each told what the film
-  engine found in it, by line (ADR-065); that bound is said before a film is begun.
+  engine found in it, by line (ADR-065), and its pictures looked over once by a model that
+  sees them, whose findings go into those mends (ADR-066); that bound is said before a film
+  is begun.
   Asking a provider's next model because the one before is away is not a retry of the answer,
   and is bounded by the number of models.
 - Send a model only the fields its own reference lists (`ModelSpec` in `provider.py`), and

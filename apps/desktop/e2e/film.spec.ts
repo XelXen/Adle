@@ -37,7 +37,14 @@ const VIDEO = readFileSync(path.join(core, 'tests', 'support', 'film.mp4'));
 
 /** A recognisable fake key. It only ever reaches the fake provider. */
 const KEY = 'sk-e2e-not-a-real-key-Fm3kQ8zR2vY6';
+const NVIDIA_KEY = 'nvapi-e2e-not-a-real-key-Fm8wQ2kR5tZ1';
+const NVIDIA = 'NVIDIA NIM (custom endpoint 127.0.0.1)';
 const COURSE = 'Area and volume';
+/** The chapter the stand-in provider writes, which runs clean. */
+const CHAPTER = readFileSync(
+  path.join(repoRoot, 'fixtures', 'model-answers', 'film-chapter.py'),
+  'utf8',
+);
 
 const now = (page: Page) => page.getByRole('navigation').getByRole('group', { name: 'Now' });
 
@@ -203,6 +210,74 @@ test.describe('a film of the whole course', () => {
     } finally {
       await adle.close();
       await provider.close();
+    }
+  });
+
+  test('has each chapter’s pictures checked by a model that sees them, where one has a key', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(150_000);
+    const aihubmix = await startFakeProvider();
+    const nvidia = await startFakeProvider();
+    const adle = await launchApp(profileDir, {
+      onboarded: true,
+      env: {
+        ADLE_PROVIDER_ENDPOINTS: JSON.stringify({
+          aihubmix: aihubmix.baseUrl,
+          nvidia: nvidia.baseUrl,
+        }),
+        ADLE_FILM_PYTHON: corePython,
+        ADLE_FILM_ENGINE: standIn,
+      },
+    });
+    const { page } = adle;
+    try {
+      await waitForCore(page);
+      await page.getByRole('button', { name: 'Settings' }).click();
+      await saveProviderKey(page, NVIDIA, NVIDIA_KEY);
+      await page.getByRole('button', { name: 'Library', exact: true }).click();
+      await createCourse(page, COURSE, { topic: 'Measuring shapes.' });
+      await openCourseTab(page, 'Curriculum');
+      await addConcept(page, 'Area', 'Find the area of a rectangle by counting squares.');
+
+      // ---- Said before anything is sent: the pictures, where they go, and the bound ----
+      await openCourseTab(page, 'Film');
+      const note = await openWhatIsSent(page);
+      await expect(note).toContainText(
+        `Sends pictures of each chapter to ${NVIDIA} to be checked.`,
+      );
+      await expect(note).toContainText(
+        'At most 5 requests: one for each chapter, up to three more for each to fix it, and ' +
+          'one for each to check its pictures.',
+      );
+      await closeWhatIsSent(page);
+      expect(nvidia.requests).toHaveLength(0);
+
+      // ---- Looked over once it ran clean, and mended for what was seen (ADR-066) ----
+      nvidia.queue(
+        CHAPTER,
+        '#1: The label "2 tall" sits far from the grid; put it beside the grid.',
+        CHAPTER,
+      );
+      await page.getByRole('button', { name: 'Make the film' }).click();
+      const marks = page.getByRole('navigation', { name: 'Chapters of the film' });
+      await expect(marks).toBeVisible({ timeout: 90_000 });
+      await expect(marks.getByRole('button', { name: /^1\. Area \d+:\d\d$/ })).toBeVisible();
+      expect(nvidia.requests.map((each) => each.kind)).toEqual(['film', 'storyboard', 'film']);
+      expect(aihubmix.requests).toHaveLength(0);
+      const look = nvidia.requests[1]!;
+      expect(look.body.model).toBe('nvidia/nemotron-3.5-super-vl-120b-a12b');
+      // The storyboard the film maker drew of the chapter: a sheet for every six animations.
+      expect(look.pictures).toHaveLength(3);
+      for (const sheet of look.pictures) expect(sheet).toMatch(/^data:image\/png;base64,/);
+      expect(look.prompt).toContain('#0: "How much floor does a rug cover? Let us count it."');
+      const mend = nvidia.requests[2]!.prompt;
+      expect(mend).toContain('looked at a picture of the screen at the end of each animation');
+      expect(mend).toContain('The label "2 tall" sits far from the grid; put it beside the grid.');
+    } finally {
+      await adle.close();
+      await aihubmix.close();
+      await nvidia.close();
     }
   });
 

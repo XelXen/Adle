@@ -11,18 +11,21 @@ wait, and it is made in a lane of its own:
    it, lies over other words or under a line, or goes past the edge is found, by the line
    of the file. What was found is told to the model, and the file sent back to be mended,
    up to ``MAX_MENDS`` times. The version that ran with the least wrong is kept; a chapter
-   whose every version was refused or stopped is told in words by Adle instead.
+   whose every version was refused or stopped is told in words by Adle instead. Where a
+   model that sees pictures can be asked, a chapter's storyboard (the screen at the end of
+   each animation) is looked over once, and what it sees is told to the writer in the same
+   way (ADR-066).
 2. As each chapter is kept, its lines are recorded in the natural voice, in the voice lane,
    while the next chapter is written. Without a natural voice the film is quiet, and its
    words are shown as it plays.
 3. The chapters are put together, after an opening Adle writes (``film.script``), looked at
    whole with their recordings, and made into a video at 1920 by 1080, with subtitles.
 
-The requests are bounded: a chapter is asked for once and mended at most ``MAX_MENDS``
-times, and the learner is told that number before anything is sent. Nothing made is lost:
-a film stopped, failed, or left when Adle closed is unfinished, and continuing it begins at
-the first chapter not yet kept. Removing it, or its course, stops the work and takes its
-files away.
+The requests are bounded: a chapter is asked for once, mended at most ``MAX_MENDS``
+times, and looked over at most once, and the learner is told that number before anything
+is sent. Nothing made is lost: a film stopped, failed, or left when Adle closed is
+unfinished, and continuing it begins at the first chapter not yet kept. Removing it, or
+its course, stops the work and takes its files away.
 """
 
 from __future__ import annotations
@@ -57,10 +60,15 @@ from adle_core.application.model_gateway import ModelGateway, QuotaExhaustedErro
 from adle_core.application.narration import KIND_FILM_NARRATION, NarrationService
 from adle_core.application.retrieval import Passage as StoredPassage
 from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
-from adle_core.film import script
+from adle_core.film import script, storyboard
 from adle_core.film.catalog import INSTALLED_BYTES, SOURCES, build_for
 from adle_core.film.install import FilmInstaller
-from adle_core.film.policy import check_chapter_source, with_engine_names, with_spans_fitted
+from adle_core.film.policy import (
+    check_chapter_source,
+    with_engine_names,
+    with_spans_fitted,
+    with_timing_passed_on,
+)
 from adle_core.film.report import Report, chapter_starts, findings
 from adle_core.film.runtime import (
     INSPECT_SECONDS,
@@ -156,12 +164,15 @@ class FilmPlan:
     """What a film of a course would be, before it is begun or continued."""
 
     chapters: list[str]
-    #: The most requests it may send: each chapter once, and up to ``MAX_MENDS`` more.
+    #: The most requests it may send: each chapter once, up to ``MAX_MENDS`` more, and one
+    #: to look over its pictures when they are looked over.
     requests_at_most: int
     #: The voice it would be read in, as a learner names it; none for a quiet film.
     voice: str | None
     #: Why it cannot be made now, in a sentence; none when it can.
     blocked: str | None
+    #: Whether each chapter's pictures are looked over by a model that sees them (ADR-066).
+    checks_pictures: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -344,12 +355,24 @@ class FilmService:
             blocked = "Set up the film maker first."
         if blocked is None and not self._gateway.has_key:
             blocked = "Add an AI provider’s key first: the chapters are written by the AI."
+        looks = self._looks()
         return FilmPlan(
             chapters=[concept.title for concept in concepts],
-            requests_at_most=len(concepts) * (1 + script.MAX_MENDS),
+            requests_at_most=len(concepts) * (1 + script.MAX_MENDS + (1 if looks else 0)),
             voice=self._narration.voice_name(voice) if voice is not None else None,
             blocked=blocked,
+            checks_pictures=looks,
         )
+
+    def _looks(self) -> bool:
+        """Whether a chapter's pictures can be looked over now (ADR-066): a model that sees
+        pictures can be asked, by the learner's choice, with a key. Without one, nothing is
+        looked over and nothing is sent in its place."""
+        try:
+            self._gateway.ready_for("storyboard")
+        except AdleError:
+            return False
+        return True
 
     def making(self) -> list[JobSnapshot]:
         """Films being made, or the film maker being set up, in any course, oldest first."""
@@ -679,6 +702,7 @@ class FilmService:
         record(opening.lines)
         total = len(chapters) + 2
         results: list[ChatResult] = []
+        looks = self._looks()
         for index, chapter in enumerate(chapters):
             context.check_cancelled()
             if chapter.state != WAITING:
@@ -704,6 +728,7 @@ class FilmService:
                 context,
                 results,
                 total,
+                looks=looks,
             )
             if made is None:
                 plain = script.plain_chapter(
@@ -850,10 +875,18 @@ class FilmService:
         context: JobContext,
         results: list[ChatResult],
         total: int,
+        *,
+        looks: bool = False,
     ) -> _Best | None:
         """A chapter written by a model, checked, run, and mended until nothing is wrong
         with it, or ``MAX_MENDS`` times: the version that ran with the least wrong, or
-        nothing when no version ran."""
+        nothing when no version ran.
+
+        With ``looks``, its pictures are looked over once (ADR-066): the first version that
+        runs clean while a mend is left, or else the version before the last mend if it ran,
+        so that what is seen can still be acted on. What is seen is told to the writer with
+        what the engine found, and a version written after the look is kept over one looked
+        at unless the engine finds more wrong with it."""
         position = index + 1  # the opening is the film's first chapter
         module = script.chapter_module(position)
         take = script.take_module(position)
@@ -861,6 +894,9 @@ class FilmService:
         previous: str | None = None
         problems: list[str] = []
         best: _Best | None = None
+        # Whether the one look has been had; whether the problems told next include what it
+        # saw; and whether the version being judged was written after it.
+        looked = telling_pictures = after_look = False
         for attempt in range(1 + script.MAX_MENDS):
             context.check_cancelled()
             doing = (
@@ -869,16 +905,23 @@ class FilmService:
                 else f"Mending chapter {number} of {count}"
             )
             result = self._ask(
-                prompts.film_chapter_request(brief, previous=previous, problems=problems),
+                prompts.film_chapter_request(
+                    brief, previous=previous, problems=problems, looked_over=telling_pictures
+                ),
                 context,
                 index,
                 total,
                 doing,
             )
             results.append(result)
-            # Two slips are mended, not sent back: an engine name used bare (`WHITE` for
-            # `m.WHITE`), and a line with more bracketed spans than animations.
-            source = with_spans_fitted(with_engine_names(script.written_file(result.text)))
+            after_look = after_look or telling_pictures
+            telling_pictures = False
+            # Slips mended, not sent back: an engine name used bare (`WHITE` for `m.WHITE`)
+            # or numpy not imported, a line given a run time of its own, and a line with
+            # more bracketed spans than animations.
+            source = with_spans_fitted(
+                with_timing_passed_on(with_engine_names(script.written_file(result.text)))
+            )
             checked = check_chapter_source(source)
             previous = source
             if not checked.ok:
@@ -910,20 +953,84 @@ class FilmService:
                     f"The chapter says {len(lines)} lines. A chapter says 16 to 28: teach "
                     "every objective, each with an example."
                 )
-            if report.ran:
-                score = len(report.problems) + (_SHORT if short else 0)
-                if best is None or score < best.score:
-                    best = _Best(score, source, lines, len(report.problems))
-                if score == 0:
-                    break
             logger.info(
                 "film.chapter_checked attempt=%s ran=%s problems=%s",
                 attempt,
                 report.ran,
                 len(report.problems),
             )
+            if report.ran:
+                score = len(report.problems) + (_SHORT if short else 0)
+                if best is None or score < best.score or (after_look and score <= best.score):
+                    best = _Best(score, source, lines, len(report.problems))
+                last_chance = attempt == script.MAX_MENDS - 1
+                if (
+                    looks
+                    and not looked
+                    and attempt < script.MAX_MENDS
+                    and (score == 0 or last_chance)
+                ):
+                    looked = True
+                    seen = self._look_over(
+                        brief.concept.title,
+                        work,
+                        module,
+                        source,
+                        report,
+                        context,
+                        results,
+                        index,
+                        total,
+                        f"Checking the pictures of chapter {number} of {count}",
+                    )
+                    if seen:
+                        problems = _together(found, seen)
+                        telling_pictures = True
+                        continue
+                if score == 0:
+                    break
             problems = found or [_stopped(report)]
         return best
+
+    def _look_over(
+        self,
+        title: str,
+        work: Path,
+        module: str,
+        source: str,
+        report: Report,
+        context: JobContext,
+        results: list[ChatResult],
+        done: int,
+        total: int,
+        doing: str,
+    ) -> list[str]:
+        """What a model that sees pictures sees wrong in the storyboard the engine just drew
+        of a chapter (ADR-066), a sentence each for its writer. Nothing waits on it: with no
+        sheets, or a look that is refused or fails, nothing is seen."""
+        sheets = storyboard.sheets(work, script.TAKE_SCENE)
+        if not sheets:
+            return []
+        chapter = f"{module}.py"
+        told = storyboard.told(report, source, chapter)
+        request = prompts.storyboard_request(
+            prompts.StoryboardBrief(
+                chapter_title=title,
+                told=[(item.index, item.said) for item in told],
+                sheets=sheets,
+            )
+        )
+        try:
+            result = self._ask(request, context, done, total, doing)
+        except JobCancelledError:
+            raise
+        except AdleError as error:
+            logger.info("film.chapter_not_looked_over %s", where(error))
+            return []
+        results.append(result)
+        seen = storyboard.seen(result.text, report, chapter)
+        logger.info("film.chapter_looked_over sheets=%s seen=%s", len(sheets), len(seen))
+        return seen
 
     def _looked_at(self, work: Path, take: str, context: JobContext) -> Report | None:
         """A chapter run alone by the engine, or nothing when it ran out of time twice. The
@@ -1084,6 +1191,15 @@ class FilmService:
 def _count(number: int, noun: str) -> str:
     """A number of things as it is said: "one chapter", "3 chapters"."""
     return f"one {noun}" if number == 1 else f"{number} {noun}s"
+
+
+def _together(found: Sequence[str], seen: Sequence[str]) -> list[str]:
+    """What the engine found and what was seen in the pictures, told in one mend: the
+    engine's first, as what it finds is sure, but never so much of it that what was seen is
+    crowded out of what a mend is told."""
+    room = prompts.MAX_PROBLEMS_IN_RETRY
+    told_seen = min(len(seen), max(room - len(found), room // 2))
+    return [*found[: room - told_seen], *seen[:told_seen]]
 
 
 def _stopped(report: Report) -> str:

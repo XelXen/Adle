@@ -171,8 +171,9 @@ describe('routeLines', () => {
         lesson: route('NVIDIA NIM', 'This is long work.', 'Nemotron 3 Ultra'),
         scene: route('AIHubMix', 'Its model is made for code.', 'Coding Kimi K3 (free)'),
         film: route('NVIDIA NIM', '', 'Kimi K3.1 Pro'),
-        // Nobody chosen reads pictures (ADR-060): the line is left out.
+        // Nobody chosen reads pictures (ADR-060, ADR-066): those lines are left out.
         read: route(''),
+        storyboard: route(''),
       },
       providers: [],
     });
@@ -196,7 +197,7 @@ describe('routeLines', () => {
     });
   });
 
-  it('lists pages that are pictures where a provider chosen reads them', () => {
+  it('lists what is sent with pictures where a provider chosen reads them', () => {
     const lines = routeLines({
       routes: {
         ask: route('NVIDIA NIM'),
@@ -204,16 +205,24 @@ describe('routeLines', () => {
         lesson: route('NVIDIA NIM'),
         scene: route('NVIDIA NIM'),
         film: route('NVIDIA NIM'),
+        storyboard: { ...route('NVIDIA NIM', '', 'Nemotron 3.5 Super'), provider_ids: ['nvidia'] },
         read: { ...route('NVIDIA NIM', '', 'Nemotron 3.5 Super'), provider_ids: ['nvidia'] },
       },
       providers: [{ provider_id: 'nvidia', key_configured: true }],
     });
+    // A film's pictures are checked just after the film's line (ADR-066).
+    expect(lines.slice(-3).map((line) => line.label)).toEqual([
+      'Films',
+      'Checking films',
+      'Pages that are pictures',
+    ]);
     expect(lines.at(-1)).toMatchObject({
       work: 'read',
       label: 'Pages that are pictures',
       destination: 'NVIDIA NIM',
       model: 'Nemotron 3.5 Super',
     });
+    expect(lines.at(-2)).toMatchObject({ work: 'storyboard', model: 'Nemotron 3.5 Super' });
   });
 
   it('leaves pages that are pictures out while the provider that reads them has no key', () => {
@@ -224,6 +233,7 @@ describe('routeLines', () => {
         lesson: route('AIHubMix'),
         scene: route('AIHubMix'),
         film: route('AIHubMix'),
+        storyboard: { ...route('NVIDIA NIM'), provider_ids: ['nvidia'] },
         read: { ...route('NVIDIA NIM'), provider_ids: ['nvidia'] },
       },
       providers: [
@@ -232,6 +242,7 @@ describe('routeLines', () => {
       ],
     });
     expect(lines.map((line) => line.work)).not.toContain('read');
+    expect(lines.map((line) => line.work)).not.toContain('storyboard');
   });
 });
 
