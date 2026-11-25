@@ -50,11 +50,15 @@ export function keyBadge(state: ProviderKeyState | undefined): {
     : { text: 'No key', tone: undefined };
 }
 
-/** What a provider is for, in a sentence: what "Automatic" goes by (ADR-039). */
+/**
+ * What a provider is for, in a sentence: what "Automatic" goes by (ADR-039). A provider
+ * with a limit a day says it has a small allowance; one with none (ADR-068) says nothing
+ * of it.
+ */
 export function providerCharacter(
-  choice: Pick<ProviderChoice, 'first_for' | 'limits_published'>,
+  choice: Pick<ProviderChoice, 'first_for'> & { usage: Pick<ProviderUsage, 'requests_per_day'> },
 ): string {
-  const allowance = choice.limits_published ? ' A small daily allowance.' : '';
+  const allowance = choice.usage.requests_per_day ? ' A small daily allowance.' : '';
   const first = new Set<string>(choice.first_for);
   if (first.size === 1 && first.has('scene')) {
     return `With “Automatic”, draws the pictures: its model is made for code.${allowance}`;
@@ -67,20 +71,29 @@ export function providerCharacter(
 }
 
 /**
- * What today's count is measured against, in a sentence.
+ * What today's count is measured against, in a sentence, and how fast and how many at once
+ * Adle asks (ADR-068).
  *
- * Where a provider publishes its limits, Adle stops a little short of them. Where it does
- * not, the limits are Adle's own, and saying "the provider's limit" would be untrue.
+ * The limits are the provider's own where it publishes them. Where it publishes none, they
+ * are Adle's own, and saying "the provider's limit" would be untrue. A provider with no
+ * daily limit has its day counted, not capped.
  */
 export function limitsNote(
   provider: Pick<ProviderChoice, 'display_name'>,
-  usage: Pick<ProviderUsage, 'limits_published' | 'requests_per_minute'>,
+  usage: Pick<
+    ProviderUsage,
+    'limits_published' | 'requests_per_minute' | 'requests_per_day' | 'at_once'
+  >,
   resetsAt: string,
 ): string {
-  const pace = `At most ${usage.requests_per_minute} requests a minute, one at a time.`;
+  const together = usage.at_once > 1 ? `up to ${usage.at_once} at once` : 'one at a time';
+  const pace = `At most ${usage.requests_per_minute} requests a minute, ${together}.`;
   const reset = resetsAt ? ` Resets at ${resetsAt}.` : '';
+  if (usage.requests_per_day === null || usage.requests_per_day === undefined) {
+    return `${provider.display_name} has no daily limit: this is Adle’s count of today. ${pace}${reset}`;
+  }
   if (usage.limits_published) {
-    return `Adle’s own count, kept just under the provider’s daily limit. ${pace}${reset}`;
+    return `Adle’s own count, against the provider’s daily limit. ${pace}${reset}`;
   }
   return `${provider.display_name} publishes no daily limit, so this is Adle’s own cap. ${pace}${reset}`;
 }

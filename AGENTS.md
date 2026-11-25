@@ -229,12 +229,14 @@ is built from it, and an alpha or a stable version is published from a release c
   colours). New visual patterns go into the design system first.
 
 **Model quota** (AIHubMix `coding-kimi-k3-free`: 5 requests/min, 100/day, 1M tokens/day per
-account. NVIDIA NIM publishes none: Adle keeps to 4/min, 200/day, 3M tokens/day of its own)
+account. NVIDIA NIM: 40 requests/min and no daily limit. Adle keeps to each one's own, ADR-068)
 
 - Tests never call a real provider; use the fake server.
-- One request in flight at each provider, at most 4/minute there. When trying a real provider
-  by hand, budget 80 requests and 800k tokens per day; the app itself stops at 90 and 900k
-  for AIHubMix (ADR-012).
+- One request in flight at AIHubMix, at most 5/minute there; up to 6 at once at NVIDIA, at
+  most 40/minute (ADR-068). Where the provider takes several, a film writes up to 3 chapters
+  at once and a file reads up to 4 pages at once. When trying a real provider by hand,
+  budget 80 requests and 800k tokens per day; the app itself stops at 100 and 1M for
+  AIHubMix (ADR-012), and counts NVIDIA's day without stopping it.
 - A slide is no request at all: the lesson's answer scripts it as data, and Adle lays it
   out and writes its scene (ADR-049).
 - A figure is no request at all: the lesson gives its kind and data, and Adle writes the

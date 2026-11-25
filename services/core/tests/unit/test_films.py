@@ -11,6 +11,8 @@ from __future__ import annotations
 import base64
 import sys
 import threading
+import time
+from collections import Counter
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -413,7 +415,8 @@ def test_when_the_days_allowance_is_used_up_what_was_made_is_kept(
 ) -> None:
     course = a_course(keyed, "Area")
     with filming.database.session() as session:
-        for _ in range(90):
+        # AIHubMix's day: a hundred requests (ADR-068).
+        for _ in range(100):
             session.add(
                 ModelUsage(
                     started_at=datetime.now(UTC),
@@ -488,23 +491,21 @@ def test_a_film_is_read_in_the_natural_voice_and_its_words_are_timed_by_it(
 def test_a_chapters_pictures_are_looked_over_once_and_what_is_seen_is_mended(
     seeing: TestClient, filming: Services, provider: FakeProvider
 ) -> None:
-    course = a_course(seeing, "Area", "Volume")
+    course = a_course(seeing, "Area")
     plan = seeing.get(f"/v1/courses/{course}/film").json()["plan"]
-    # Each chapter once, mended three times at most, and looked over once: said before.
-    assert (plan["checks_pictures"], plan["requests_at_most"]) == (True, 10)
+    # The chapter once, mended three times at most, and looked over once: said before.
+    assert (plan["checks_pictures"], plan["requests_at_most"]) == (True, 5)
     provider.queue(
         FILM_CHAPTER,
         "Each in turn.\n#1: The label '2 tall' sits far from the grid; put it beside it.",
         FILM_CHAPTER,
-        FILM_CHAPTER,
-        "NOTHING",
     )
 
     film = made(filming, seeing, course)
 
     # Looked over when it first ran clean; mended for what was seen, and not looked over
-    # again. The second chapter was seen to be right.
-    assert provider.kinds() == ["film", "storyboard", "film", "film", "storyboard"]
+    # again.
+    assert provider.kinds() == ["film", "storyboard", "film"]
     look = provider.requests[1]
     assert look["model"] == SUPER_VL
     # The stand-in draws a sheet for every six of the chapter's seventeen animations.
@@ -520,7 +521,7 @@ def test_a_chapters_pictures_are_looked_over_once_and_what_is_seen_is_mended(
     assert "line 22, in the picture at " in mend
     assert "The label '2 tall' sits far from the grid; put it beside it." in mend
     assert film["status"] == "ready"
-    assert [chapter["state"] for chapter in film["chapters"]] == ["written", "written"]
+    assert [chapter["state"] for chapter in film["chapters"]] == ["written"]
     assert "Nemotron 3.5 Super" in film["written_by"]["models"]
 
 
@@ -551,17 +552,18 @@ def test_a_look_that_fails_or_cannot_be_read_is_passed_over(
     seeing: TestClient, filming: Services, provider: FakeProvider
 ) -> None:
     course = a_course(seeing, "Area", "Volume")
-    provider.queue(
-        FILM_CHAPTER,
+    # The two chapters are written side by side (ADR-068): whichever is looked over first is
+    # refused, and the other's look cannot be read.
+    provider.queue_for(
+        "storyboard",
         httpx.Response(400, json={"error": {"message": "That request was refused."}}),
-        FILM_CHAPTER,
         "I can't make out the pictures, sorry.",
     )
 
     film = made(filming, seeing, course)
 
     # Nothing waits on a look: each chapter is kept as it ran, and nothing more is asked.
-    assert provider.kinds() == ["film", "storyboard", "film", "storyboard"]
+    assert Counter(provider.kinds()) == {"film": 2, "storyboard": 2}
     assert film["status"] == "ready"
     assert [chapter["state"] for chapter in film["chapters"]] == ["written", "written"]
 
@@ -576,3 +578,131 @@ def test_a_chapter_with_no_storyboard_is_not_looked_over(
 
     assert provider.kinds() == ["film"]
     assert film["chapters"][0]["state"] == "written"
+
+
+# -- chapters side by side (ADR-068) ------------------------------------------------------------
+
+
+def engine_runs_counted(
+    filming: Services, monkeypatch: pytest.MonkeyPatch
+) -> Callable[[], tuple[int, int]]:
+    """The engine's runs counted: how many, and the most at one time."""
+    engine = filming.films._engine
+    inspect = engine.inspect
+    guard = threading.Lock()
+    counts = {"now": 0, "most": 0, "runs": 0}
+
+    def counted(*args: Any, **kwargs: Any) -> Any:
+        with guard:
+            counts["now"] += 1
+            counts["runs"] += 1
+            counts["most"] = max(counts["most"], counts["now"])
+        try:
+            return inspect(*args, **kwargs)
+        finally:
+            with guard:
+                counts["now"] -= 1
+
+    monkeypatch.setattr(engine, "inspect", counted)
+    return lambda: (counts["runs"], counts["most"])
+
+
+def test_chapters_are_written_side_by_side_where_the_provider_takes_several_at_once(
+    seeing: TestClient,
+    filming: Services,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    course = a_course(seeing, "Area", "Volume", "Weight")
+    runs = engine_runs_counted(filming, monkeypatch)
+    # NVIDIA takes several requests at once: the three chapters are asked for together,
+    # or the first waits here in vain and fails.
+    all_asked = threading.Barrier(3, timeout=20)
+    release = threading.Event()
+
+    def together(body: dict[str, Any]) -> str:
+        all_asked.wait()
+        release.wait(20)
+        return FILM_CHAPTER
+
+    provider.queue_for("film", together, together, together)
+    started = seeing.post(f"/v1/courses/{course}/film")
+    assert started.status_code == 202, started.text
+    eventually(lambda: provider.kinds().count("film") == 3, "the three chapters asked for")
+    eventually(
+        lambda: (
+            [
+                chapter["state"]
+                for chapter in seeing.get(f"/v1/courses/{course}/film").json()["film"]["chapters"]
+            ]
+            == ["writing"] * 3
+        ),
+        "each chapter said to be being written",
+    )
+    release.set()
+    job = filming.jobs.wait(started.json()["id"], timeout=60)
+    assert job.status == "succeeded", (job.error_code, job.error_message)
+
+    assert not all_asked.broken
+    film = seeing.get(f"/v1/courses/{course}/film").json()["film"]
+    assert [chapter["state"] for chapter in film["chapters"]] == ["written"] * 3
+    # Each asked for once and looked over once; nothing seen, so nothing mended.
+    assert Counter(provider.kinds()) == {"film": 3, "storyboard": 3}
+    asked = [
+        provider.prompt(index) for index, kind in enumerate(provider.kinds()) if kind == "film"
+    ]
+    for number in (1, 2, 3):
+        assert sum(f"Write chapter {number} of 3" in prompt for prompt in asked) == 1
+    # The film maker ran for one chapter at a time, the takes sharing the film's folder:
+    # each chapter's take, and then the whole film.
+    assert runs() == (4, 1)
+
+
+def test_where_the_provider_takes_one_at_a_time_chapters_are_written_in_order(
+    keyed: TestClient, filming: Services, provider: FakeProvider
+) -> None:
+    course = a_course(keyed, "Area", "Volume")
+
+    film = made(filming, keyed, course)
+
+    assert film["status"] == "ready"
+    assert provider.kinds() == ["film", "film"]
+    assert "Write chapter 1 of 2" in provider.prompt(0)
+    assert "Write chapter 2 of 2" in provider.prompt(1)
+
+
+def test_a_chapter_that_fails_stops_the_others_and_they_wait_to_be_written_again(
+    seeing: TestClient,
+    filming: Services,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    course = a_course(seeing, "Area", "Volume")
+    runs = engine_runs_counted(filming, monkeypatch)
+
+    both_asked = threading.Barrier(2, timeout=20)
+
+    def refused(body: dict[str, Any]) -> httpx.Response:
+        both_asked.wait()
+        return httpx.Response(401, json={"error": {"message": "No."}})
+
+    def later(body: dict[str, Any]) -> str:
+        both_asked.wait()
+        time.sleep(1.0)
+        return FILM_CHAPTER
+
+    # Both chapters are asked for; one is refused at once, and the other's answer comes a
+    # moment later, by when the work has stopped: it is not checked, and nothing more is
+    # asked.
+    provider.when("Write chapter 1 of 2", refused)
+    provider.when("Write chapter 2 of 2", later)
+    started = seeing.post(f"/v1/courses/{course}/film")
+    assert started.status_code == 202, started.text
+    job = filming.jobs.wait(started.json()["id"], timeout=60)
+
+    assert (job.status, job.error_code) == ("failed", "provider_key_rejected")
+    assert provider.kinds() == ["film", "film"]
+    assert runs() == (0, 0)
+    film = seeing.get(f"/v1/courses/{course}/film").json()["film"]
+    assert film["status"] == "unfinished"
+    assert [chapter["state"] for chapter in film["chapters"]] == ["waiting", "waiting"]

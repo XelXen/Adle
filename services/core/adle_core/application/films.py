@@ -55,6 +55,8 @@ from adle_core.application.jobs import (
     JobContext,
     JobRunner,
     JobSnapshot,
+    WorkContext,
+    side_by_side,
 )
 from adle_core.application.model_gateway import ModelGateway, QuotaExhaustedError
 from adle_core.application.narration import KIND_FILM_NARRATION, NarrationService
@@ -92,9 +94,14 @@ logger = logging.getLogger(__name__)
 #: Setting the film maker up (``KIND_FILM``, making a film, is generation's: it is long work).
 KIND_FILM_SETUP = "film_setup"
 
-#: A chapter's state: still to be written, written by a model and checked, or told in words
-#: by Adle because no version of a model's would run.
-WAITING, WRITTEN, IN_WORDS = "waiting", "written", "in_words"
+#: A chapter's state: still to be written, being written now, written by a model and
+#: checked, or told in words by Adle because no version of a model's would run. A chapter
+#: being written when the work stopped is waiting again.
+WAITING, WRITING, WRITTEN, IN_WORDS = "waiting", "writing", "written", "in_words"
+#: The most chapters written at once, where the provider that writes them takes several
+#: requests at once (ADR-068): each is minutes of a model's work, and they do not depend on
+#: each other's words.
+CHAPTERS_AT_ONCE = 3
 #: The opening is Adle's, and is always the first chapter.
 OPENING_TITLE = "Introduction"
 #: How much of a video one request for it carries.
@@ -222,7 +229,7 @@ class _Chapter:
         return cls(
             concept_id=raw.get("concept_id") if isinstance(raw.get("concept_id"), str) else None,
             title=raw["title"],
-            state=state if state in (WAITING, WRITTEN, IN_WORDS) else WAITING,
+            state=state if state in (WAITING, WRITING, WRITTEN, IN_WORDS) else WAITING,
             by=str(raw.get("by") or ""),
             problems=int(raw.get("problems") or 0),
             lines=[line for line in lines if isinstance(line, str)]
@@ -281,6 +288,9 @@ class FilmService:
         self._engine = engine(paths)
         #: The longest a chapter may take to be looked at alone.
         self._inspect_seconds = inspect_seconds
+        # The engine is run for one chapter at a time, even while several are written: the
+        # takes share the film's folder, and what a run writes there is named by its scene.
+        self._engine_turn = threading.Lock()
         #: Looking for work under way and starting it are one step (as in generation).
         self._starting = threading.Lock()
 
@@ -393,6 +403,12 @@ class FilmService:
             if isinstance(mark, dict) and isinstance(mark.get("start"), int | float)
         }
         chapters = [chapter for chapter in map(_Chapter.read, film.chapters or []) if chapter]
+        making = self._jobs.find_active(KIND_FILM, film.course_id)
+        if making is None:
+            # Being written when the work stopped: waiting to be written again.
+            for chapter in chapters:
+                if chapter.state == WRITING:
+                    chapter.state = WAITING
         voice = film.voice
         return FilmRecord(
             id=film.id,
@@ -418,7 +434,7 @@ class FilmService:
             reason=film.reason,
             created_at=film.created_at,
             finished_at=film.finished_at,
-            making=self._jobs.find_active(KIND_FILM, film.course_id),
+            making=making,
         )
 
     def make(self, course_id: str) -> JobSnapshot:
@@ -703,12 +719,20 @@ class FilmService:
         total = len(chapters) + 2
         results: list[ChatResult] = []
         looks = self._looks()
-        for index, chapter in enumerate(chapters):
-            context.check_cancelled()
+        for chapter in chapters:
             if chapter.state != WAITING:
                 record(chapter.lines or [])
-                continue
-            concept = concepts[index]
+        waiting = [index for index, chapter in enumerate(chapters) if chapter.state == WAITING]
+        guard = threading.Lock()
+        written_so_far = [len(chapters) - len(waiting)]
+
+        def write(index: int, shared: WorkContext) -> None:
+            """One chapter written, checked, and kept; recorded as soon as it is."""
+            chapter, concept = chapters[index], concepts[index]
+            with guard:
+                chapter.state = WRITING
+                self._save_chapters(film_id, chapters)
+            written: list[ChatResult] = []
             made = self._chapter(
                 prompts.FilmChapterBrief(
                     course_title=course_title,
@@ -725,10 +749,11 @@ class FilmService:
                 ),
                 work,
                 index,
-                context,
-                results,
+                shared,
+                written,
                 total,
                 looks=looks,
+                done=lambda: written_so_far[0],
             )
             if made is None:
                 plain = script.plain_chapter(
@@ -736,17 +761,23 @@ class FilmService:
                     [objective.statement for objective in concept.objectives]
                     or [concept.summary or concept.title],
                 )
-                chapter.state, chapter.by, chapter.problems = IN_WORDS, "adle", 0
-                chapter.lines = list(plain.lines)
+                state, by, problems, lines = IN_WORDS, "adle", 0, list(plain.lines)
                 source = plain.source
             else:
-                chapter.state, chapter.by, chapter.problems = WRITTEN, "model", made.problems
-                chapter.lines = made.lines
+                state, by, problems, lines = WRITTEN, "model", made.problems, made.lines
                 source = made.source
             (kept / f"{concept.id}.py").write_text(source, encoding="utf-8")
-            authors = self._authors(earlier_authors, results)
-            self._save_chapters(film_id, chapters, written_by=authors)
-            record(chapter.lines)
+            with guard:
+                results.extend(written)
+                chapter.state, chapter.by, chapter.problems = state, by, problems
+                chapter.lines = lines
+                written_so_far[0] += 1
+                self._save_chapters(
+                    film_id, chapters, written_by=self._authors(earlier_authors, results)
+                )
+                record(chapter.lines)
+
+        side_by_side(waiting, write, context, min(CHAPTERS_AT_ONCE, self._gateway.at_once("film")))
 
         def voiced() -> int:
             """Wait for every line to be recorded, and write down where each one is."""
@@ -837,7 +868,7 @@ class FilmService:
         return {**now, "authors": unique, "note": notes}
 
     def _ask(
-        self, request: Any, context: JobContext, done: int, total: int, doing: str
+        self, request: Any, context: WorkContext, done: int, total: int, doing: str
     ) -> ChatResult:
         """One request from inside the film's job, its wait said as it goes."""
 
@@ -872,11 +903,12 @@ class FilmService:
         brief: prompts.FilmChapterBrief,
         work: Path,
         index: int,
-        context: JobContext,
+        context: WorkContext,
         results: list[ChatResult],
         total: int,
         *,
         looks: bool = False,
+        done: Callable[[], int] | None = None,
     ) -> _Best | None:
         """A chapter written by a model, checked, run, and mended until nothing is wrong
         with it, or ``MAX_MENDS`` times: the version that ran with the least wrong, or
@@ -888,6 +920,8 @@ class FilmService:
         what the engine found, and a version written after the look is kept over one looked
         at unless the engine finds more wrong with it."""
         position = index + 1  # the opening is the film's first chapter
+        # How many chapters are written, for the job's progress: several may be under way.
+        so_far: Callable[[], int] = done if done is not None else (lambda: index)
         module = script.chapter_module(position)
         take = script.take_module(position)
         number, count = index + 1, len(brief.chapters)
@@ -909,7 +943,7 @@ class FilmService:
                     brief, previous=previous, problems=problems, looked_over=telling_pictures
                 ),
                 context,
-                index,
+                so_far(),
                 total,
                 doing,
             )
@@ -933,12 +967,19 @@ class FilmService:
                 ]
                 logger.info("film.chapter_refused attempt=%s", attempt)
                 continue
-            (work / f"{module}.py").write_text(source, encoding="utf-8")
-            (work / f"{take}.py").write_text(script.take_source(position), encoding="utf-8")
-            context.report(
-                index, total, f"Checking chapter {number} of {count}", {"stage": "drawing"}
-            )
-            report = self._looked_at(work, take, context)
+            with self._engine_turn:
+                (work / f"{module}.py").write_text(source, encoding="utf-8")
+                (work / f"{take}.py").write_text(script.take_source(position), encoding="utf-8")
+                context.report(
+                    so_far(), total, f"Checking chapter {number} of {count}", {"stage": "drawing"}
+                )
+                report = self._looked_at(work, take, context)
+                # Read while it is this chapter's: the next run draws over it.
+                sheets = (
+                    storyboard.sheets(work, script.TAKE_SCENE)
+                    if looks and not looked and report is not None
+                    else []
+                )
             if report is None:
                 problems = [
                     "It ran for longer than five minutes without ending: something in it "
@@ -973,13 +1014,13 @@ class FilmService:
                     looked = True
                     seen = self._look_over(
                         brief.concept.title,
-                        work,
+                        sheets,
                         module,
                         source,
                         report,
                         context,
                         results,
-                        index,
+                        so_far(),
                         total,
                         f"Checking the pictures of chapter {number} of {count}",
                     )
@@ -995,20 +1036,19 @@ class FilmService:
     def _look_over(
         self,
         title: str,
-        work: Path,
+        sheets: Sequence[bytes],
         module: str,
         source: str,
         report: Report,
-        context: JobContext,
+        context: WorkContext,
         results: list[ChatResult],
         done: int,
         total: int,
         doing: str,
     ) -> list[str]:
-        """What a model that sees pictures sees wrong in the storyboard the engine just drew
-        of a chapter (ADR-066), a sentence each for its writer. Nothing waits on it: with no
+        """What a model that sees pictures sees wrong in the storyboard the engine drew of a
+        chapter (ADR-066), a sentence each for its writer. Nothing waits on it: with no
         sheets, or a look that is refused or fails, nothing is seen."""
-        sheets = storyboard.sheets(work, script.TAKE_SCENE)
         if not sheets:
             return []
         chapter = f"{module}.py"
@@ -1032,7 +1072,7 @@ class FilmService:
         logger.info("film.chapter_looked_over sheets=%s seen=%s", len(sheets), len(seen))
         return seen
 
-    def _looked_at(self, work: Path, take: str, context: JobContext) -> Report | None:
+    def _looked_at(self, work: Path, take: str, context: WorkContext) -> Report | None:
         """A chapter run alone by the engine, or nothing when it ran out of time twice. The
         first run on a computer can spend its time compiling the graphics driver's shaders,
         which the next finds kept (``FilmPaths.home``): a chapter is not blamed for that."""

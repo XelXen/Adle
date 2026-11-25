@@ -333,7 +333,7 @@ Implement a provider adapter and quota-aware scheduler with:
 - Per-minute sliding-window limiter.
 - Daily request and token estimates.
 - One in-flight request by default.
-- Configurable safety margins (initial runtime defaults: 4 requests/minute, 90 requests/day, 900,000 tokens/day).
+- Configurable safety margins (initial runtime defaults: 4 requests/minute, 90 requests/day, 900,000 tokens/day; since ADR-068 the providers' own: AIHubMix 5/minute, 100/day, 1,000,000 tokens/day, NVIDIA 40/minute and no daily limit).
 - `Retry-After` handling, exponential backoff with jitter, and a small bounded retry count.
 - No retry storm and no automatic retry of non-idempotent generation without a job/idempotency key.
 - Request cancellation and timeout handling.
@@ -1182,6 +1182,7 @@ changes its subject, and 42 slide examples stepped through by `e2e/slide-player`
   moves a request to another (ADR-023).
 - **One request in flight at each provider**, not one overall (section 6.3): two providers are
   two accounts, and a question to one does not wait for a lesson at the other (ADR-023).
+  Since ADR-068, as many as the provider takes: one at AIHubMix, six at NVIDIA.
 - **A learner can ask a question during a lesson** (section 3.3's "request a simpler
   explanation, derivation, example"), as a note beside the part and not as a chat (ADR-024).
 - **A break is offered while a lesson is written**, and the learner is told when it is ready
@@ -1215,9 +1216,10 @@ changes its subject, and 42 slide examples stepped through by `e2e/slide-player`
   there is nothing to stream in parts (ADR-012). The lesson is stored and can be started as
   soon as that text is written; its pictures, one request each, are added as they are drawn
   (ADR-031).
-- **Runtime quota defaults** are 4 requests a minute, 90 a day, and 900,000 tokens a day, as
-  section 6.3 says; sampling parameters are never sent, as the provider advises for this model
-  (ADR-012).
+- **Runtime quota defaults** were 4 requests a minute, 90 a day, and 900,000 tokens a day, as
+  section 6.3 says, and are the providers' own since ADR-068 (AIHubMix 5, 100 and a million;
+  NVIDIA 40 a minute and no daily limit); sampling parameters are never sent, as the provider
+  advises for this model (ADR-012).
 - **There is no `packages/lesson-ir`.** The Lesson IR is defined once, in the core, and its JSON
   Schema is generated into `packages/contracts/schemas/` with the API contract (ADR-010).
 - **Questions are scored and recorded from M4**, not M6: a lesson without working questions is

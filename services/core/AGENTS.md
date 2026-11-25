@@ -259,7 +259,10 @@ everything and decides nothing.
   voice's work (setting one up, recording a lesson, a film's lines) runs in the voice lane,
   one at a time, so that a recording never runs while its programs are being replaced. A
   film, and setting up what makes it, run in the film lane: an hour of it holds nothing
-  else up. One request is in flight at each provider, whichever lane asks.
+  else up. As many requests are in flight at each provider as it takes (`at_once`: one at
+  AIHubMix, six at NVIDIA, ADR-068), whichever lane asks; within a job, pieces asked for
+  side by side go through `jobs.side_by_side` (a film's chapters, three at most; a file's
+  pages, four at most), which stops the rest at the first failure or the learner's Stop.
 - **A natural voice is set up only by `VoiceInstaller`, at the learner's word** (ADR-042).
   A model file is kept only if its size and hash are the catalogue's; a program only from
   the lock for this system, by its hash. A new file is a new pinned entry; a new version of

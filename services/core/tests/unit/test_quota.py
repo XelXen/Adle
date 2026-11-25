@@ -27,11 +27,41 @@ def at(seconds_ago: float, tokens: int = 1000) -> UsageEntry:
     return UsageEntry(started_at=NOON - timedelta(seconds=seconds_ago), tokens=tokens)
 
 
-def test_the_defaults_stay_under_the_documented_limits() -> None:
-    # Documented: 5 requests a minute, 100 a day, 1,000,000 tokens a day.
-    assert DEFAULT_LIMITS.requests_per_minute < 5
-    assert DEFAULT_LIMITS.requests_per_day < 100
-    assert DEFAULT_LIMITS.tokens_per_day < 1_000_000
+def test_the_defaults_are_the_documented_limits() -> None:
+    # Documented for AIHubMix's free model: 5 requests a minute, 100 a day, 1,000,000 tokens
+    # a day; kept to as they are, with no margin of Adle's under them (ADR-068).
+    limits = DEFAULT_LIMITS
+    assert (limits.requests_per_minute, limits.requests_per_day, limits.tokens_per_day) == (
+        5,
+        100,
+        1_000_000,
+    )
+
+
+def test_a_day_with_no_limit_is_never_used_up() -> None:
+    # NVIDIA's: 40 a minute, and none a day (ADR-068).
+    limits = QuotaLimits(requests_per_minute=40, requests_per_day=None, tokens_per_day=None)
+    busy_day = [at(3600 + second, tokens=500_000) for second in range(1000)]
+    decision = decide(busy_day, NOON, estimated_tokens=900_000, limits=limits)
+    assert decision.verdict is Verdict.ALLOWED
+    summary = summarise(busy_day, NOON, limits)
+    assert (summary.requests_today, summary.tokens_today) == (1000, 500_000_000)
+
+
+def test_a_minute_still_counts_where_the_day_does_not() -> None:
+    limits = QuotaLimits(requests_per_minute=40, requests_per_day=None, tokens_per_day=None)
+    entries = [at(59 - second * 1.4) for second in range(40)]
+    decision = decide(entries, NOON, estimated_tokens=10, limits=limits)
+    assert decision.verdict is Verdict.WAIT
+    assert decision.wait_seconds == pytest.approx(1.0)
+
+
+def test_a_limit_is_at_least_one() -> None:
+    with pytest.raises(ValueError, match="at least 1"):
+        QuotaLimits(requests_per_minute=0)
+    with pytest.raises(ValueError, match="at least 1"):
+        QuotaLimits(requests_per_day=0, tokens_per_day=None)
+    QuotaLimits(requests_per_minute=1, requests_per_day=None, tokens_per_day=None)
 
 
 def test_a_first_request_is_allowed() -> None:
@@ -44,7 +74,7 @@ def test_requests_within_the_minute_allowance_go_straight_through() -> None:
 
 
 def test_a_full_minute_means_waiting_only_until_the_oldest_request_leaves_it() -> None:
-    entries = [at(50), at(30), at(20), at(5)]
+    entries = [at(50), at(30), at(20), at(10), at(5)]
     decision = decide(entries, NOON, estimated_tokens=1000)
     assert decision.verdict is Verdict.WAIT
     assert decision.wait_seconds == pytest.approx(10.0)
@@ -54,8 +84,8 @@ def test_a_full_minute_means_waiting_only_until_the_oldest_request_leaves_it() -
 
 
 def test_with_more_than_a_window_of_recent_requests_the_wait_covers_enough_of_them() -> None:
-    # Six in the last minute against a limit of four: three of them have to leave the window.
-    entries = [at(55), at(50), at(40), at(30), at(20), at(10)]
+    # Seven in the last minute against a limit of five: three of them have to leave it.
+    entries = [at(55), at(50), at(40), at(30), at(20), at(10), at(5)]
     decision = decide(entries, NOON, estimated_tokens=1000)
     assert decision.verdict is Verdict.WAIT
     assert decision.wait_seconds == pytest.approx(20.0)
@@ -100,13 +130,13 @@ def test_the_minute_window_runs_across_midnight() -> None:
     just_after = datetime(2026, 11, 20, 0, 0, 10, tzinfo=UTC)
     entries = [
         UsageEntry(just_after - timedelta(seconds=seconds), tokens=10)
-        for seconds in (20, 25, 30, 40)
+        for seconds in (20, 25, 30, 40, 45)
     ]
     decision = decide(entries, just_after, estimated_tokens=10)
     # None of them counts against the new day, all of them against the last minute.
     assert decision.verdict is Verdict.WAIT
     assert summarise(entries, just_after).requests_today == 0
-    assert summarise(entries, just_after).requests_last_minute == 4
+    assert summarise(entries, just_after).requests_last_minute == 5
 
 
 def test_the_day_is_counted_in_utc_whatever_zone_the_clock_is_in() -> None:

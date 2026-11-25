@@ -283,18 +283,37 @@ function ProviderCard({
 
           <div className={styles.usage}>
             <h4 className={styles.usageTitle}>Usage today</h4>
-            <ProgressBar
-              label="Requests"
-              showLabel
-              value={usage.requests_today / usage.requests_per_day}
-              valueText={`${usage.requests_today.toLocaleString()} of ${usage.requests_per_day.toLocaleString()}`}
-            />
-            <ProgressBar
-              label="Tokens"
-              showLabel
-              value={usage.tokens_today / usage.tokens_per_day}
-              valueText={`about ${usage.tokens_today.toLocaleString()} of ${usage.tokens_per_day.toLocaleString()}`}
-            />
+            {/* A day with no limit is counted, not measured against one (ADR-068). */}
+            {usage.requests_per_day ? (
+              <ProgressBar
+                label="Requests"
+                showLabel
+                value={usage.requests_today / usage.requests_per_day}
+                valueText={`${usage.requests_today.toLocaleString()} of ${usage.requests_per_day.toLocaleString()}`}
+              />
+            ) : (
+              <p className={styles.usageCount}>
+                <span className={styles.usageCountLabel}>Requests</span>
+                <span className={styles.usageCountValue}>
+                  {usage.requests_today.toLocaleString()} sent
+                </span>
+              </p>
+            )}
+            {usage.tokens_per_day ? (
+              <ProgressBar
+                label="Tokens"
+                showLabel
+                value={usage.tokens_today / usage.tokens_per_day}
+                valueText={`about ${usage.tokens_today.toLocaleString()} of ${usage.tokens_per_day.toLocaleString()}`}
+              />
+            ) : (
+              <p className={styles.usageCount}>
+                <span className={styles.usageCountLabel}>Tokens</span>
+                <span className={styles.usageCountValue}>
+                  about {usage.tokens_today.toLocaleString()} used
+                </span>
+              </p>
+            )}
             <p className={styles.usageNote}>
               {limitsNote(choice, usage, formatClockTime(usage.resets_at))}
             </p>

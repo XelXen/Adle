@@ -452,8 +452,11 @@ most, a file's name.
 - No end-to-end test reaches a real provider: start `startFakeProvider()` and pass its
   address in `ADLE_PROVIDER_BASE_URL` (one endpoint in place of the choice), or start two and
   pass both in `ADLE_PROVIDER_ENDPOINTS` (the two providers, moved; `e2e/providers.spec.ts`).
-  The app keeps its real limit of four requests a minute, so a journey that needs a fifth
-  will see the app wait: test that, or stay under it. `{ slowly: true, thinkMs, pieceMs }`
+  The app keeps the providers' real limits (ADR-068): five requests a minute at AIHubMix,
+  one at a time, so a journey that needs a sixth will see the app wait (test that, or stay
+  under it); forty a minute at NVIDIA, up to six at once, so a film's chapters sent to its
+  stand-in can arrive together, and a queue answers them in the order they arrive. A file's
+  pages arrive in order: each is drawn, one at a time, before it is sent. `{ slowly: true, thinkMs, pieceMs }`
   answers like a model that thinks first and writes a title at a time.
 - A toast that reports a failure is an `alert`; one that reports a success is a `status`.
 - **Words** (ADR-028, ADR-044): American English, short, plain, about the learner's task.

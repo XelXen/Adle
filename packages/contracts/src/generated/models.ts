@@ -324,7 +324,7 @@ export interface Film {
 export interface FilmChapter {
   problems: number;
   start: number | null;
-  state: 'waiting' | 'written' | 'in_words';
+  state: 'waiting' | 'writing' | 'written' | 'in_words';
   title: string;
 }
 export interface Job {
@@ -1019,14 +1019,15 @@ export interface ProviderModel {
  *
  */
 export interface ProviderUsage {
+  at_once: number;
   limits_published: boolean;
   provider_id: string;
   requests_last_minute: number;
-  requests_per_day: number;
+  requests_per_day: number | null;
   requests_per_minute: number;
   requests_today: number;
   resets_at: string;
-  tokens_per_day: number;
+  tokens_per_day: number | null;
   tokens_today: number;
 }
 export interface ProviderCredential {

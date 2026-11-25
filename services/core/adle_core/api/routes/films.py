@@ -46,9 +46,10 @@ class FilmMakerStatus(BaseModel):
 
 class FilmChapter(BaseModel):
     title: str
-    #: ``waiting`` to be written, ``written`` by the AI and checked, or ``in_words``: told
-    #: in words by Adle, when no version the AI wrote would run.
-    state: Literal["waiting", "written", "in_words"]
+    #: ``waiting`` to be written, ``writing`` now (several at once where the provider takes
+    #: several requests at once, ADR-068), ``written`` by the AI and checked, or
+    #: ``in_words``: told in words by Adle, when no version the AI wrote would run.
+    state: Literal["waiting", "writing", "written", "in_words"]
     #: How many problems of layout are still in it, for a chapter the AI wrote.
     problems: int
     #: When it begins in the video, once the film is made.

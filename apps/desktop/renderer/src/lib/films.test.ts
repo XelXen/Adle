@@ -12,7 +12,6 @@ import {
   lengthOf,
   filmRequests,
   makingTakes,
-  nextChapter,
   vttOf,
 } from './films';
 
@@ -95,12 +94,12 @@ describe('where a course’s film stands', () => {
 
 describe('a film’s chapters', () => {
   it('says how each stands, and which is being written', () => {
-    expect(chapterState(chapter('written'), false)).toBe('Written and checked');
-    expect(chapterState(chapter('written', null, 2), false)).toBe('Written, with a little overlap');
-    expect(chapterState(chapter('in_words'), false)).toBe('Told in words');
-    expect(chapterState(chapter('waiting'), true)).toBe('Being written');
-    expect(chapterState(chapter('waiting'), false)).toBe('Waiting');
-    expect(nextChapter(film({ chapters: [chapter('written'), chapter('waiting')] }))).toBe(1);
+    expect(chapterState(chapter('written'))).toBe('Written and checked');
+    expect(chapterState(chapter('written', null, 2))).toBe('Written, with a little overlap');
+    expect(chapterState(chapter('in_words'))).toBe('Told in words');
+    // Several at once, where the provider takes several requests at once (ADR-068).
+    expect(chapterState(chapter('writing'))).toBe('Being written');
+    expect(chapterState(chapter('waiting'))).toBe('Waiting');
   });
 
   it('knows which chapter a moment is in', () => {

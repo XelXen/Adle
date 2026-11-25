@@ -20,8 +20,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
   This adds at most one request to each chapter, and **What is sent** beside **Make the
   film** says where the pictures go.
 
+### Changed
+
+- **Faster with NVIDIA NIM.** Adle now keeps to each provider's own limits: NVIDIA's 40
+  requests a minute with no daily limit, and AIHubMix's 100 requests a day (it stopped at
+  90 before). With NVIDIA, up to six requests go at once: a film writes up to three
+  chapters at the same time, and **Read them** reads up to four pages at the same time.
+  Settings shows how many requests have been sent today, and how many go at once.
+
 ### Fixed
 
+- Removing a file while its pages are being read no longer fails on Windows.
 - A chapter of a film sent back to be fixed is shown to the AI whole. Before, a long
   chapter was cut off, and the AI wrote the rest again from nothing.
 - A chapter that gives a spoken line its own timing is fixed by Adle instead of being sent

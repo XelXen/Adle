@@ -23,16 +23,19 @@ MINUTE = timedelta(minutes=1)
 class QuotaLimits:
     """How much may be asked of one provider. Each provider has its own (``ProviderConfig``).
 
-    The defaults are safety margins under the limits AIHubMix documents for its free
-    model (5/min, 100/day, 1M tokens/day).
+    The defaults are the limits AIHubMix documents for its free model (5 a minute, 100 a
+    day, 1M tokens a day), as the owner asked on 2026-11-25 ("100, not 90"; ADR-068).
+    A daily limit of ``None`` is none: NVIDIA's endpoints have a limit a minute and none a
+    day.
     """
 
-    requests_per_minute: int = 4
-    requests_per_day: int = 90
-    tokens_per_day: int = 900_000
+    requests_per_minute: int = 5
+    requests_per_day: int | None = 100
+    tokens_per_day: int | None = 1_000_000
 
     def __post_init__(self) -> None:
-        if min(self.requests_per_minute, self.requests_per_day, self.tokens_per_day) < 1:
+        daily = [day for day in (self.requests_per_day, self.tokens_per_day) if day is not None]
+        if min([self.requests_per_minute, *daily]) < 1:
             raise ValueError("every limit must be at least 1")
 
 
@@ -118,9 +121,12 @@ def decide(
     recorded = list(entries)
     summary = summarise(recorded, now, limits)
 
-    if summary.requests_today >= limits.requests_per_day:
+    if limits.requests_per_day is not None and summary.requests_today >= limits.requests_per_day:
         return Decision(Verdict.EXHAUSTED, resets_at=summary.resets_at, exhausted="requests")
-    if summary.tokens_today + max(0, estimated_tokens) > limits.tokens_per_day:
+    if (
+        limits.tokens_per_day is not None
+        and summary.tokens_today + max(0, estimated_tokens) > limits.tokens_per_day
+    ):
         return Decision(Verdict.EXHAUSTED, resets_at=summary.resets_at, exhausted="tokens")
 
     recent = sorted(
@@ -138,8 +144,8 @@ def estimate_tokens(text: str) -> int:
 
     About four characters per token for English prose; code and JSON run a
     little denser, so this rounds up. It only has to be the right order of
-    magnitude: the daily budget has a margin, and the provider's own count
-    replaces the estimate whenever it is reported.
+    magnitude: the provider's own count replaces the estimate whenever it is
+    reported.
     """
     return tokens_for_characters(len(text))
 

@@ -29,7 +29,14 @@ from adle_core.application.courses import (
     place,
     title_from_file,
 )
-from adle_core.application.jobs import JobCancelledError, JobContext, JobRunner, JobSnapshot
+from adle_core.application.jobs import (
+    JobCancelledError,
+    JobContext,
+    JobRunner,
+    JobSnapshot,
+    WorkContext,
+    side_by_side,
+)
 from adle_core.errors import NotFoundError, ValidationFailedError
 from adle_core.generation.prompts import read_page_request
 from adle_core.generation.provider import RequestCancelledError
@@ -211,8 +218,13 @@ def _warnings(stored: Any, picture_pages: Any) -> list[str]:
     return [*list(stored), *([picture_sentence(pages)] if pages else [])]
 
 
+#: The most pages read at once, where the provider that reads them takes several requests
+#: at once (ADR-068). A page is one request either way (ADR-060).
+PAGES_AT_ONCE = 4
+
+
 def _reading_result(source_id: str, read: list[int], writer: dict[str, str]) -> dict[str, Any]:
-    return {"source_id": source_id, "pages_read": list(read), "written_by": dict(writer)}
+    return {"source_id": source_id, "pages_read": sorted(read), "written_by": dict(writer)}
 
 
 def _waiting(said: Callable[[int, str], None], index: int, seconds: float) -> None:
@@ -344,10 +356,11 @@ class SourceService:
         """Delete stored originals that no source refers to. Returns how many.
 
         After the data has been replaced by a copy, the folder of originals still holds
-        the files of whatever was there before. Nothing lists them and nothing would
-        ever delete them, so a file the learner can no longer see would stay on disk.
-        The reverse case needs nothing: a source whose original is missing works, since
-        an original is not read again after import, and nothing may come to rely on it.
+        the files of whatever was there before; and a file removed while a page of it was
+        being drawn can leave its original behind (``AssetStore.delete``). Nothing lists
+        them and nothing would ever delete them, so a file the learner can no longer see
+        would stay on disk. The reverse case needs nothing: a source whose original is
+        missing works, and says so where its pictures would be read (ADR-060).
 
         Call only while nothing is being imported (at start-up, before serving).
         """
@@ -655,37 +668,52 @@ class SourceService:
         name: str,
         gateway: ModelGateway,
     ) -> Callable[[JobContext], dict[str, Any]]:
-        """The work of reading a file's pictures, page by page."""
+        """The work of reading a file's pictures, a page a request: several pages at once
+        where the provider takes several requests at once (ADR-068), each drawn in turn."""
 
         def work(context: JobContext) -> dict[str, Any]:
             read: list[int] = []
             writer: dict[str, str] = {}
+            guard = threading.Lock()
+            drawing = threading.Lock()
 
             def said(done: int, message: str) -> None:
                 context.report(done, len(pages), message)
 
-            for index, page in enumerate(pages):
-                context.check_cancelled(_reading_result(source_id, read, writer))
+            def one(page: int, shared: WorkContext) -> None:
+                with guard:
+                    shared.check_cancelled(_reading_result(source_id, read, writer))
                 if not self._waiting_to_be_read(source_id, page):
-                    continue
-                said(index, f"Reading page {page}")
+                    return
+                said(len(read), f"Reading page {page}")
                 try:
-                    picture = self._draw_page(original, page)
+                    with drawing:
+                        # Not drawn once the reading has stopped: the file may be going.
+                        if shared.cancelled:
+                            with guard:
+                                stopped = _reading_result(source_id, read, writer)
+                            raise JobCancelledError(stopped)
+                        picture = self._draw_page(original, page)
                 except IngestionError:
                     # This page cannot be drawn; the others can still be read.
-                    continue
+                    return
                 try:
                     result = gateway.complete(
                         read_page_request(name, page, picture),
-                        cancelled=lambda: context.cancelled,
-                        on_wait=partial(_waiting, said, index),
-                        on_busy=partial(_busy, said, index),
+                        cancelled=lambda: shared.cancelled,
+                        on_wait=partial(_waiting, said, len(read)),
+                        on_busy=partial(_busy, said, len(read)),
                     )
                 except RequestCancelledError as error:
-                    raise JobCancelledError(_reading_result(source_id, read, writer)) from error
+                    with guard:
+                        partial_result = _reading_result(source_id, read, writer)
+                    raise JobCancelledError(partial_result) from error
                 self._store_read_page(source_id, page, result.text)
-                read.append(page)
-                writer = {"provider": result.provider_name, "model": result.model_name}
+                with guard:
+                    read.append(page)
+                    writer.update(provider=result.provider_name, model=result.model_name)
+
+            side_by_side(pages, one, context, min(PAGES_AT_ONCE, gateway.at_once("read")))
             said(len(pages), "")
             return _reading_result(source_id, read, writer)
 

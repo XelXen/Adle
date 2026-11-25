@@ -615,7 +615,8 @@ def test_when_todays_allowance_is_used_up_nothing_is_sent(
     course = topic_course(keyed)
     concept = add_concept(keyed, course["id"])
     with services.database.session() as session:
-        for _ in range(90):
+        # AIHubMix's day: a hundred requests (ADR-068).
+        for _ in range(100):
             session.add(
                 ModelUsage(
                     started_at=datetime.now(UTC),

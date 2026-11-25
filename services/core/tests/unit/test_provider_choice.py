@@ -188,10 +188,14 @@ def test_each_kind_of_request_goes_to_the_nvidia_model_measured_to_do_it_best() 
     }
     # AIHubMix's one model is asked for everything when it is the provider chosen.
     assert [model.id for model in AIHUBMIX.models_for("lesson")] == ["coding-kimi-k3-free"]
-    # Limits NVIDIA does not publish are Adle's own, and are said to be.
+    # Each provider's own limits (ADR-068): NVIDIA's minute of 40 and no daily limit,
+    # several requests at once; AIHubMix's minute, day and tokens, one at a time.
     assert NVIDIA.limits is NVIDIA_LIMITS
-    assert NVIDIA.limits_published is False
-    assert AIHUBMIX.limits_published is True
+    assert (NVIDIA_LIMITS.requests_per_minute, NVIDIA_LIMITS.requests_per_day) == (40, None)
+    assert NVIDIA_LIMITS.tokens_per_day is None
+    assert (NVIDIA.limits_published, NVIDIA.at_once) == (True, 6)
+    assert (AIHUBMIX.limits_published, AIHUBMIX.at_once) == (True, 1)
+    assert (AIHUBMIX.limits.requests_per_minute, AIHUBMIX.limits.requests_per_day) == (5, 100)
 
 
 def test_a_developers_single_endpoint_replaces_the_choice_and_says_so() -> None:
@@ -887,7 +891,7 @@ def test_the_interface_is_told_every_provider_and_what_was_chosen(client: TestCl
         "Kimi K3.1 Pro",
         "Mistral Large 4",
     ]
-    assert nvidia["limits_published"] is False
+    assert nvidia["limits_published"] is True
 
 
 def test_choosing_a_provider_changes_what_is_in_use_and_nothing_else(client: TestClient) -> None:
@@ -904,7 +908,9 @@ def test_choosing_a_provider_changes_what_is_in_use_and_nothing_else(client: Tes
         for choice in status["providers"]
     ] == [("aihubmix", False, True), ("nvidia", True, False)]
     usage = client.get("/v1/provider/usage").json()
-    assert (usage["provider_id"], usage["limits_published"]) == ("nvidia", False)
+    assert (usage["provider_id"], usage["limits_published"]) == ("nvidia", True)
+    # It takes several requests at once (ADR-068). Its limits here are the tests' own.
+    assert usage["at_once"] == 6
 
     # Choosing the one already in use is not an error.
     assert choose(client, "nvidia").status_code == 204

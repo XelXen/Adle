@@ -220,6 +220,27 @@
   border-top: var(--ad-border-width) solid var(--ad-color-border);
 }
 
+/* A day counted and not capped (ADR-068): a bar's words without the bar. */
+.usageCount {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ad-space-3);
+  margin: 0;
+}
+
+.usageCountLabel {
+  font: var(--ad-text-supporting);
+  font-weight: 500;
+  color: var(--ad-color-ink);
+}
+
+.usageCountValue {
+  font: var(--ad-text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--ad-color-faint);
+}
+
 .usageTitle {
   margin: 0;
   font: var(--ad-text-eyebrow);

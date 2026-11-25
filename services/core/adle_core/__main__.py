@@ -196,10 +196,12 @@ def main(argv: list[str] | None = None) -> int:
         return 3
     for handler in logging.getLogger().handlers:
         handler.addFilter(SecretRedactionFilter(services.credentials))
-    if restore is not None and restore["ok"]:
-        # Nothing is being imported yet, so the folder of originals can be made to match.
-        removed = services.sources.forget_unreferenced_files()
-        logger.info("Removed %d stored files the restored data does not refer to", removed)
+    # Nothing is being imported yet, so the folder of originals can be made to match the
+    # data: a restored copy's, or what was left by a file removed while a page of it was
+    # being drawn.
+    removed = services.sources.forget_unreferenced_files()
+    if removed:
+        logger.info("Removed %d stored files the data does not refer to", removed)
     app = create_app(services)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

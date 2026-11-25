@@ -183,10 +183,10 @@ is the one you build from the source. How, and what is still missing:
 | Use a separate data folder | Start with the environment variable `ADLE_USER_DATA_DIR` set to an empty folder |
 
 The free AIHubMix model allows 5 requests per minute, 100 per day, and one million tokens per day
-per account (as published on 2026-11-19; the provider's page is authoritative). Adle paces itself
-below those limits. NVIDIA publishes no daily limit for its models, so there Adle keeps to limits
-of its own (4 requests a minute, 200 a day, three million tokens a day) and says that they are
-its own.
+per account (as published on 2026-11-19; the provider's page is authoritative). Adle keeps to
+those limits, one request at a time. NVIDIA's models take 40 requests a minute and have no daily
+limit: Adle keeps to that minute, counts the day without stopping it, and sends up to six requests
+at once, so that a film's chapters and a file's pages are asked for side by side (ADR-068).
 
 NVIDIA's models think before they write. On 2026-11-20 a lesson's text took Kimi K3.1 Pro about
 six minutes, and its pictures about as long again. You can start a lesson as soon as its text

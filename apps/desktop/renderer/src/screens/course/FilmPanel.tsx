@@ -27,7 +27,6 @@ import {
   filmStage,
   lengthOf,
   makingTakes,
-  nextChapter,
 } from '../../lib/films';
 import { destination } from '../../lib/provider';
 import { useJob } from '../../lib/use-job';
@@ -483,18 +482,17 @@ function FilmMakerNeeded({
 }
 
 function Chapters({ film, making }: { film: Film; making: boolean }) {
-  const next = making ? nextChapter(film) : -1;
   return (
     <ol className={styles.chapters} aria-label="Chapters">
       {film.chapters.map((chapter, index) => (
         <li
           key={`${index}-${chapter.title}`}
-          className={`${styles.chapter} ${index === next ? styles.current : ''}`}
+          className={`${styles.chapter} ${making && chapter.state === 'writing' ? styles.current : ''}`}
         >
           <span className={styles.chapterTitle}>
             {index + 1}. {chapter.title}
           </span>
-          <span className={styles.chapterState}>{chapterState(chapter, index === next)}</span>
+          <span className={styles.chapterState}>{chapterState(chapter)}</span>
         </li>
       ))}
     </ol>

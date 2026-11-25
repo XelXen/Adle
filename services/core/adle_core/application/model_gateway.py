@@ -22,11 +22,12 @@ Nothing else is retried here.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import statistics
 import threading
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import replace
 from datetime import datetime, timedelta
 from functools import partial
@@ -188,10 +189,17 @@ class ModelGateway:
         self._limits = limits
         self._clock = clock
         self._sleep = sleep
-        # One request in flight at each provider, whoever asks. Two providers are two
+        # As many requests in flight at each provider as it takes (``at_once``: one at
+        # AIHubMix, several at NVIDIA, ADR-068), whoever asks. Two providers are two
         # accounts with two allowances, so a short question to one does not have to wait
         # for a lesson that is being written at the other.
-        self._in_flight = {name: threading.Lock() for name in self._clients}
+        self._in_flight = {
+            name: threading.BoundedSemaphore(client.config.at_once)
+            for name, client in self._clients.items()
+        }
+        # A request is let in and counted as one step, so that two let in together cannot
+        # both take the last place in a minute.
+        self._admitting = {name: threading.Lock() for name in self._clients}
         #: Models that did not answer, and until when each is passed over. Kept in memory
         #: only: after a restart every model is asked afresh.
         self._resting: dict[tuple[str, str], datetime] = {}
@@ -282,8 +290,10 @@ class ModelGateway:
                     has_key=client.has_key,
                     first_for=config.first_for,
                     used=max(
-                        used.requests_today / limits.requests_per_day,
-                        used.tokens_today / limits.tokens_per_day,
+                        used.requests_today / limits.requests_per_day
+                        if limits.requests_per_day
+                        else 0.0,
+                        used.tokens_today / limits.tokens_per_day if limits.tokens_per_day else 0.0,
                     ),
                     spent=verdict.verdict is Verdict.EXHAUSTED,
                     resting=until is not None and until > now,
@@ -295,6 +305,12 @@ class ModelGateway:
     def plan(self, purpose: str) -> Plan:
         """Which providers a request of this kind would go to, in order, and why."""
         return plan(purpose, self._vault.selection, self.standings())
+
+    def at_once(self, purpose: str) -> int:
+        """How many requests of this kind the provider asked first takes at once (ADR-068):
+        how many pieces of one piece of work may be asked for side by side."""
+        planned = self.plan(purpose).provider_ids
+        return self._clients[planned[0]].config.at_once if planned else 1
 
     def seconds_for(self, provider_id: str, purpose: str) -> tuple[int, bool]:
         """How long one answer of this kind takes at this provider, and whether measured.
@@ -565,8 +581,9 @@ class ModelGateway:
         budget = max(request.max_output_tokens, spec.min_max_tokens)
         retried_after_rate_limit = False
         while True:
-            self._wait_for_room(client.config, prompt_tokens + budget, cancelled, on_wait)
-            usage_id = self._record_start(client.config, spec, request, prompt_tokens)
+            with self._admitted(client.config, cancelled):
+                self._wait_for_room(client.config, prompt_tokens + budget, cancelled, on_wait)
+                usage_id = self._record_start(client.config, spec, request, prompt_tokens)
             began = time.monotonic()
             try:
                 result = client.complete(
@@ -615,6 +632,23 @@ class ModelGateway:
                 UsageEntry(started_at=started_at, tokens=prompt + completion)
                 for started_at, prompt, completion in rows
             ]
+
+    @contextlib.contextmanager
+    def _admitted(self, config: ProviderConfig, cancelled: Callable[[], bool]) -> Iterator[None]:
+        """Hold the provider's door while one request is let in and counted; stopped work
+        stops waiting for it."""
+        door = self._admitting[config.provider_id]
+        while not door.acquire(timeout=_STEP_SECONDS):
+            if cancelled():
+                raise RequestCancelledError
+        try:
+            # Work stopped while this one waited for its turn sends nothing: pieces of it
+            # asked for side by side stop where they are (ADR-068).
+            if cancelled():
+                raise RequestCancelledError
+            yield
+        finally:
+            door.release()
 
     def _wait_for_room(
         self,

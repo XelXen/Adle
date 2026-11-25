@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+import time
 from collections.abc import Collection
 from pathlib import Path
 
@@ -27,6 +28,12 @@ def hash_file(path: Path) -> tuple[str, int]:
             digest.update(block)
             size += len(block)
     return digest.hexdigest(), size
+
+
+#: How many times, and how far apart, an original held open is tried again as it is
+#: deleted: five seconds in all.
+_DELETE_TRIES = 25
+_DELETE_PAUSE_SECONDS = 0.2
 
 
 class AssetStore:
@@ -56,8 +63,20 @@ class AssetStore:
         return stored_name
 
     def delete(self, stored_name: str | None) -> None:
-        if stored_name:
-            self.path_for(stored_name).unlink(missing_ok=True)
+        """Delete a stored original, if there is one. On Windows a file held open cannot go:
+        one held a moment (a page of it being drawn as its reading stops) is tried again for
+        a few seconds; one held longer is left, and the next start deletes it with every
+        original that no source refers to (``keep_only``)."""
+        if not stored_name:
+            return
+        path = self.path_for(stored_name)
+        for _ in range(_DELETE_TRIES):
+            try:
+                path.unlink(missing_ok=True)
+            except PermissionError:
+                time.sleep(_DELETE_PAUSE_SECONDS)
+            else:
+                return
 
     def keep_only(self, stored_names: Collection[str]) -> int:
         """Delete every stored file whose name is not in ``stored_names``.

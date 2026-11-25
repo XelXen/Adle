@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
-from adle_core.application.jobs import LANE_QUICK, JobContext, JobRunner
+from adle_core.application.jobs import (
+    LANE_QUICK,
+    JobContext,
+    JobRunner,
+    WorkContext,
+    side_by_side,
+)
 from adle_core.errors import AdleError, NotFoundError
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.migrate import migrate
@@ -313,3 +320,102 @@ def test_short_work_does_not_wait_behind_long_work(runner: JobRunner) -> None:
 def test_a_job_says_when_it_was_asked_for(runner: JobRunner) -> None:
     finished = runner.wait(runner.submit("import_sources", lambda _: None).id)
     assert finished.created_at is not None
+
+
+# -- pieces of a job side by side (ADR-068) ---------------------------------------------------
+
+
+def test_pieces_of_a_job_are_worked_on_in_order_when_one_at_a_time(runner: JobRunner) -> None:
+    done: list[int] = []
+
+    def work(context: JobContext) -> list[int]:
+        side_by_side([1, 2, 3], lambda item, shared: done.append(item), context, 1)
+        return done
+
+    finished = runner.wait(runner.submit("film", work).id)
+    assert (finished.status, finished.result) == ("succeeded", [1, 2, 3])
+
+
+def test_pieces_of_a_job_are_worked_on_side_by_side_as_many_at_once_as_asked(
+    runner: JobRunner,
+) -> None:
+    # The first two are worked on together, or the first waits here in vain and fails.
+    two_in = threading.Barrier(2, timeout=10)
+    guard = threading.Lock()
+    counts = {"now": 0, "most": 0}
+    done: list[int] = []
+
+    def piece(item: int, shared: WorkContext) -> None:
+        with guard:
+            counts["now"] += 1
+            counts["most"] = max(counts["most"], counts["now"])
+        if item < 2:
+            two_in.wait()
+        time.sleep(0.05)
+        with guard:
+            counts["now"] -= 1
+            done.append(item)
+
+    def work(context: JobContext) -> int:
+        side_by_side([0, 1, 2, 3, 4], piece, context, 2)
+        return counts["most"]
+
+    finished = runner.wait(runner.submit("film", work).id)
+    assert (finished.status, finished.result) == ("succeeded", 2)
+    assert not two_in.broken
+    assert sorted(done) == [0, 1, 2, 3, 4]
+
+
+def test_the_first_piece_to_fail_stops_the_others_and_is_what_the_job_fails_with(
+    runner: JobRunner,
+) -> None:
+    stopped: list[int] = []
+    begun = threading.Barrier(3, timeout=10)
+
+    def piece(item: int, shared: WorkContext) -> None:
+        begun.wait()
+        if item == 0:
+            raise AdleError("The provider is out of quota for today.", code="quota_exhausted")
+        for _ in range(500):
+            if shared.cancelled:
+                stopped.append(item)
+                shared.check_cancelled()
+            time.sleep(0.01)
+
+    def work(context: JobContext) -> None:
+        side_by_side([0, 1, 2], piece, context, 3)
+
+    finished = runner.wait(runner.submit("film", work).id, timeout=30)
+    assert (finished.status, finished.error_code) == ("failed", "quota_exhausted")
+    assert sorted(stopped) == [1, 2]
+
+
+def test_stopping_the_job_stops_every_piece_being_worked_on(runner: JobRunner) -> None:
+    begun = threading.Barrier(3, timeout=10)
+    stopped: list[int] = []
+    worked: list[int] = []
+    guard = threading.Lock()
+
+    def piece(item: int, shared: WorkContext) -> None:
+        shared.check_cancelled()
+        with guard:
+            worked.append(item)
+        begun.wait()
+        for _ in range(500):
+            if shared.cancelled:
+                with guard:
+                    stopped.append(item)
+                shared.check_cancelled()
+            time.sleep(0.01)
+
+    def work(context: JobContext) -> None:
+        side_by_side([0, 1, 2, 3], piece, context, 2)
+
+    job = runner.submit("film", work)
+    # Two at once: both have begun when the job is stopped, and no other begins.
+    begun.wait()
+    runner.cancel(job.id)
+    finished = runner.wait(job.id, timeout=30)
+    assert finished.status == "cancelled"
+    assert sorted(stopped) == [0, 1]
+    assert sorted(worked) == [0, 1]

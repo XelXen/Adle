@@ -85,12 +85,15 @@ def gateway_for(
     *,
     key: str | None = KEY,
     limits: QuotaLimits | None = None,
+    at_once: int = 1,
 ) -> tuple[ModelGateway, FakeTime]:
     vault = CredentialVault()
     if key:
         vault.set_api_key(key)
     fake = FakeTime()
-    client = ChatClient(ProviderConfig(), vault, transport=httpx.MockTransport(provider))
+    client = ChatClient(
+        ProviderConfig(at_once=at_once), vault, transport=httpx.MockTransport(provider)
+    )
     gateway = ModelGateway(
         services.database,
         client,
@@ -146,14 +149,14 @@ def test_a_full_minute_is_waited_out_not_failed(services: Services) -> None:
     provider = Provider()
     gateway, fake = gateway_for(services, provider)
     waits: list[float] = []
-    for _ in range(4):
+    for _ in range(5):
         gateway.complete(REQUEST, on_wait=waits.append)
     assert waits == []
     assert fake.slept == 0
 
     gateway.complete(REQUEST, on_wait=waits.append)
 
-    assert provider.requests == 5
+    assert provider.requests == 6
     assert len(waits) == 1
     assert waits[0] == pytest.approx(60.0)
     # It waited as long as it said, and no longer than a moment more.
@@ -246,21 +249,37 @@ def test_other_failures_are_recorded_and_never_retried(
 def test_cancelling_while_waiting_sends_nothing_more(services: Services) -> None:
     provider = Provider()
     gateway, fake = gateway_for(services, provider)
-    for _ in range(4):
+    for _ in range(5):
         gateway.complete(REQUEST)
 
     with pytest.raises(RequestCancelledError):
         gateway.complete(REQUEST, cancelled=lambda: fake.slept >= 3.0)
 
-    assert provider.requests == 4
+    assert provider.requests == 5
     assert fake.slept < 4.0
 
 
 def test_cancelling_while_the_answer_arrives_is_recorded_as_such(services: Services) -> None:
-    gateway, _ = gateway_for(services, Provider(answer("partial")))
+    sent: list[httpx.Request] = []
+
+    def partly(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        return answer("partial")
+
+    gateway, _ = gateway_for(services, partly)
+    with pytest.raises(RequestCancelledError):
+        gateway.complete(REQUEST, cancelled=lambda: bool(sent))
+    assert [row.outcome for row in rows(services)] == ["cancelled"]
+
+
+def test_work_stopped_before_its_request_is_let_in_sends_nothing(services: Services) -> None:
+    # Pieces of one piece of work asked for side by side stop where they are (ADR-068).
+    provider = Provider()
+    gateway, _ = gateway_for(services, provider)
     with pytest.raises(RequestCancelledError):
         gateway.complete(REQUEST, cancelled=lambda: True)
-    assert [row.outcome for row in rows(services)] == ["cancelled"]
+    assert provider.requests == 0
+    assert rows(services) == []
 
 
 def test_only_one_request_is_in_flight_at_a_time(services: Services) -> None:
@@ -293,6 +312,58 @@ def test_only_one_request_is_in_flight_at_a_time(services: Services) -> None:
     assert len(rows(services)) == 3
 
 
+def test_a_provider_that_takes_several_at_once_is_sent_that_many_and_no_more(
+    services: Services,
+) -> None:
+    # NVIDIA takes several requests at once (ADR-068): as many as it says, and no more.
+    three_in = threading.Barrier(3, timeout=10)
+    in_flight = 0
+    most_at_once = 0
+    calls = 0
+    guard = threading.Lock()
+
+    def together(request: httpx.Request) -> httpx.Response:
+        nonlocal in_flight, most_at_once, calls
+        with guard:
+            in_flight += 1
+            calls += 1
+            first_three = calls <= 3
+            most_at_once = max(most_at_once, in_flight)
+        if first_three:
+            # The first three are in flight together, or this waits in vain and fails.
+            three_in.wait()
+        with guard:
+            in_flight -= 1
+        return answer()
+
+    gateway, _ = gateway_for(services, together, at_once=3, limits=QuotaLimits(60))
+    threads = [threading.Thread(target=gateway.complete, args=(REQUEST,)) for _ in range(5)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(15)
+    assert not three_in.broken
+    assert most_at_once == 3
+    assert len(rows(services)) == 5
+
+
+def test_requests_let_in_together_never_overrun_the_minute(services: Services) -> None:
+    # Several may be in flight at once, but each is let in and counted as one step: four
+    # sent together against a minute of two make two of them wait for it (ADR-068).
+    limits = QuotaLimits(2, requests_per_day=None, tokens_per_day=None)
+    gateway, _ = gateway_for(services, Provider(), at_once=4, limits=limits)
+    threads = [threading.Thread(target=gateway.complete, args=(REQUEST,)) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(15)
+    begun = sorted(row.started_at for row in rows(services))
+    assert len(begun) == 4
+    # No three of them begun within one minute.
+    for first, third in zip(begun, begun[2:], strict=False):
+        assert third - first >= timedelta(seconds=60)
+
+
 def test_usage_older_than_a_day_no_longer_counts(services: Services) -> None:
     gateway, fake = gateway_for(services, Provider())
     gateway.complete(REQUEST)
@@ -321,11 +392,12 @@ def test_the_interface_can_read_the_provider_and_the_local_estimate(client: Test
         "key_configured": False,
     }
     usage = client.get("/v1/provider/usage").json()
-    # AIHubMix publishes its limits, and Adle stays under them.
+    # AIHubMix publishes its limits, and Adle keeps to them (ADR-068), one at a time.
     assert (usage["provider_id"], usage["limits_published"]) == ("aihubmix", True)
     assert usage["requests_today"] == 0
     assert usage["tokens_today"] == 0
     # The daily allowance is the real default; the test fixture lifts the per-minute limit.
-    assert (usage["requests_per_day"], usage["tokens_per_day"]) == (90, 900_000)
+    assert (usage["requests_per_day"], usage["tokens_per_day"]) == (100, 1_000_000)
     assert usage["requests_per_minute"] >= 1
+    assert usage["at_once"] == 1
     assert usage["resets_at"].endswith(("Z", "+00:00"))

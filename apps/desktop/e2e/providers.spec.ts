@@ -173,11 +173,15 @@ test.describe('the AI providers', () => {
     // Having keys for both and using one is a choice; the other way is offered, not taken.
     await expect(page.getByText('You have keys for both providers')).toBeVisible();
 
-    // The limits shown are said to be Adle's own: this provider publishes none.
-    await expect(providerCard(page, NVIDIA).getByText('0 of 200', { exact: true })).toBeVisible();
+    // NVIDIA has no daily limit: its day is counted, not capped, and it takes several
+    // requests at once (ADR-068).
+    await expect(providerCard(page, NVIDIA).getByText('0 sent', { exact: true })).toBeVisible();
     await expect(providerCard(page, NVIDIA)).toContainText(
-      'publishes no daily limit, so this is Adle’s own cap.',
+      `${NVIDIA} has no daily limit: this is Adle’s count of today. At most 40 requests a ` +
+        'minute, up to 6 at once.',
     );
+    // Nor is it said to have a small allowance, as AIHubMix is.
+    await expect(providerCard(page, NVIDIA)).not.toContainText('A small daily allowance');
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'settings-providers');
 
@@ -266,7 +270,7 @@ test.describe('the AI providers', () => {
     await expect(providerCard(again.page, NVIDIA)).toContainText('Key saved · ends in Lp2k');
     // Both requests were counted, for this provider, and survived the restart.
     await expect(
-      providerCard(again.page, NVIDIA).getByText('2 of 200', { exact: true }),
+      providerCard(again.page, NVIDIA).getByText('2 sent', { exact: true }),
     ).toBeVisible();
     // Starting again sent nothing to anyone.
     expect(servers.aihubmix.requests).toHaveLength(0);
@@ -358,7 +362,7 @@ test.describe('the AI providers', () => {
     );
     expect(servers.aihubmix.requests).toHaveLength(0);
     // It counted as one of today's requests there.
-    await expect(providerCard(page, NVIDIA).getByText('1 of 200', { exact: true })).toBeVisible();
+    await expect(providerCard(page, NVIDIA).getByText('1 sent', { exact: true })).toBeVisible();
 
     // A key the provider does not accept is said in words, and only that provider is asked.
     servers.aihubmix.queue({ status: 401 });

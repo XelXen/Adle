@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -61,7 +63,9 @@ def test_a_file_s_pictures_are_read_page_by_page_and_become_its_text(
 ) -> None:
     keys(services, "nvidia", "aihubmix")
     source = notes(client, services)
-    provider.queue(TYPED, READ_PAGE)
+    # The pages are read side by side (ADR-068): each answered for what it shows.
+    provider.when("scanned-notes.pdf, page 1", TYPED)
+    provider.when("scanned-notes.pdf, page 2", READ_PAGE)
 
     job = read(client, services, source["id"])
 
@@ -76,7 +80,8 @@ def test_a_file_s_pictures_are_read_page_by_page_and_become_its_text(
         assert picture.startswith("data:image/png;base64,")
         assert base64.b64decode(picture.split(",", 1)[1]).startswith(PNG)
     # The file's name is the learner's text, in a block of its own.
-    assert '<learner_material kind="file">\nscanned-notes.pdf, page 1' in provider.prompt(0)
+    prompts = [provider.prompt(index) for index in range(2)]
+    assert any('<learner_material kind="file">\nscanned-notes.pdf, page 1' in p for p in prompts)
 
     (after,) = client.get(f"/v1/courses/{source['course_id']}/sources").json()["sources"]
     assert after["picture_pages"] == []
@@ -114,6 +119,34 @@ def test_only_a_model_that_sees_pictures_is_sent_one(
     assert provider.requests == []
 
 
+def test_pages_are_read_side_by_side_where_the_provider_takes_several_at_once(
+    client: TestClient, services: Services, provider: FakeProvider
+) -> None:
+    # NVIDIA takes several requests at once (ADR-068): both pages are being read together,
+    # or the first waits here in vain and fails. Each is still drawn in turn.
+    both_read = threading.Barrier(2, timeout=20)
+
+    def together(answer: str) -> Callable[[dict[str, Any]], str]:
+        def read_together(body: dict[str, Any]) -> str:
+            both_read.wait()
+            return answer
+
+        return read_together
+
+    keys(services, "nvidia")
+    source = notes(client, services)
+    provider.when("scanned-notes.pdf, page 1", together(TYPED))
+    provider.when("scanned-notes.pdf, page 2", together(READ_PAGE))
+
+    job = read(client, services, source["id"])
+
+    assert job.status == "succeeded"
+    assert not both_read.broken
+    assert job.result["pages_read"] == [1, 2]
+    detail = client.get(f"/v1/sources/{source['id']}").json()
+    assert [section["page_number"] for section in detail["sections"]] == [1, 2, 3]
+
+
 def test_where_a_page_would_be_read_is_said_before_it_is_sent(
     client: TestClient, services: Services
 ) -> None:
@@ -131,7 +164,7 @@ def test_a_page_with_nothing_on_it_is_read_once_and_adds_nothing(
 ) -> None:
     keys(services, "nvidia")
     source = notes(client, services)
-    provider.queue("[no text]", READ_PAGE)
+    provider.when("scanned-notes.pdf, page 1", "[no text]")
     assert read(client, services, source["id"]).status == "succeeded"
     detail = client.get(f"/v1/sources/{source['id']}").json()
     assert [section["page_number"] for section in detail["sections"]] == [2, 3]
@@ -144,15 +177,20 @@ def test_removing_the_file_stops_its_reading(
     keys(services, "nvidia")
     source = notes(client, services)
 
+    sent_by_then: list[int] = []
+
     def removed_while_read(body: dict[str, Any]) -> str:
+        # Removed as its first page is read, and while the next may be drawn from it.
         services.sources.delete(source["id"])
+        sent_by_then.append(len(provider.requests))
         return READ_PAGE
 
-    provider.queue(removed_while_read)
+    provider.when("scanned-notes.pdf, page 1", removed_while_read)
     job = read(client, services, source["id"])
     assert job.status == "cancelled"
-    # The page being read when the file went is the last request: nothing more is sent.
-    assert len(provider.requests) == 1
+    # The pages being read when the file went are the last requests: nothing more is sent.
+    assert len(provider.requests) == sent_by_then[0]
+    assert client.get(f"/v1/sources/{source['id']}").status_code == 404
 
 
 def test_a_file_whose_original_is_gone_says_to_import_it_again(

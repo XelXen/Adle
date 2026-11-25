@@ -72,27 +72,28 @@ describe('keyBadge', () => {
 
 describe('providerCharacter', () => {
   it('says what a provider is asked first for with “Automatic”', () => {
-    const coder = providerCharacter({ first_for: ['scene'], limits_published: true });
+    const coder = providerCharacter({ first_for: ['scene'], usage: { requests_per_day: 100 } });
     expect(coder).toBe(
       'With “Automatic”, draws the pictures: its model is made for code. A small daily allowance.',
     );
+    // A provider with no daily limit (ADR-068) says nothing of an allowance.
     const writer = providerCharacter({
       first_for: ['ask', 'check', 'curriculum', 'lesson'],
-      limits_published: false,
+      usage: { requests_per_day: null },
     });
     expect(writer).toBe('With “Automatic”, writes lessons, suggested concepts and answers.');
     // Asked first for films too, it says so.
     expect(
       providerCharacter({
         first_for: ['ask', 'check', 'curriculum', 'lesson', 'film'],
-        limits_published: false,
+        usage: { requests_per_day: null },
       }),
     ).toBe('With “Automatic”, writes lessons, films, suggested concepts and answers.');
     // A provider asked first for everything has nothing to tell it apart.
     expect(
       providerCharacter({
         first_for: ['ask', 'check', 'curriculum', 'lesson', 'scene'],
-        limits_published: false,
+        usage: { requests_per_day: null },
       }),
     ).toBe('');
     // It never promises a speed.
@@ -103,19 +104,34 @@ describe('providerCharacter', () => {
 describe('limitsNote', () => {
   const nvidia = { display_name: 'NVIDIA NIM' };
 
-  it("speaks of the provider's limit only where the provider publishes one", () => {
+  it("speaks of the provider's limit where the provider publishes one", () => {
     const published = limitsNote(
       { display_name: 'AIHubMix' },
-      { limits_published: true, requests_per_minute: 4 },
+      { limits_published: true, requests_per_minute: 5, requests_per_day: 100, at_once: 1 },
       '7:00 PM',
     );
-    expect(published).toContain('just under the provider’s daily limit');
-    expect(published).toContain('At most 4 requests a minute');
+    expect(published).toContain('against the provider’s daily limit');
+    expect(published).toContain('At most 5 requests a minute, one at a time.');
     expect(published).toContain('Resets at 7:00 PM.');
   });
 
+  it('says a day with no limit is counted, and how many go at once (ADR-068)', () => {
+    const counted = limitsNote(
+      nvidia,
+      { limits_published: true, requests_per_minute: 40, requests_per_day: null, at_once: 6 },
+      '7:00 PM',
+    );
+    expect(counted).toContain('NVIDIA NIM has no daily limit');
+    expect(counted).not.toContain('the provider’s daily limit');
+    expect(counted).toContain('At most 40 requests a minute, up to 6 at once.');
+  });
+
   it("says the limits are Adle's own where the provider publishes none", () => {
-    const own = limitsNote(nvidia, { limits_published: false, requests_per_minute: 4 }, '7:00 PM');
+    const own = limitsNote(
+      nvidia,
+      { limits_published: false, requests_per_minute: 4, requests_per_day: 200, at_once: 1 },
+      '7:00 PM',
+    );
     expect(own).toContain('NVIDIA NIM publishes no daily limit');
     expect(own).toContain('Adle’s own');
     expect(own).not.toContain('the provider’s daily limit');
@@ -124,8 +140,12 @@ describe('limitsNote', () => {
 
   it('leaves out the time when it is not known', () => {
     expect(
-      limitsNote(nvidia, { limits_published: false, requests_per_minute: 4 }, ''),
-    ).not.toContain('starts again');
+      limitsNote(
+        nvidia,
+        { limits_published: false, requests_per_minute: 4, requests_per_day: 200, at_once: 1 },
+        '',
+      ),
+    ).not.toContain('Resets');
   });
 });
 

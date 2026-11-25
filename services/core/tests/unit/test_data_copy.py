@@ -19,6 +19,7 @@ from adle_core.application.data_copy import restore_copy
 from adle_core.application.services import Services, build_services
 from adle_core.config import Settings
 from adle_core.generation.quota import QuotaLimits
+from adle_core.infrastructure import asset_store
 from adle_core.infrastructure.asset_store import AssetStore
 from adle_core.infrastructure.migrate import CopyOutOfDateError, InvalidBackupError
 from adle_core.ingestion.extract import extract_in_process
@@ -433,6 +434,42 @@ def test_after_a_restore_originals_that_nothing_refers_to_are_removed(
         # The source in the copy is whole, with or without its original.
         sources = client.get(f"/v1/courses/{course['id']}/sources").json()["sources"]
         assert [source["display_name"] for source in sources] == ["study-notes.txt"]
+
+
+def test_an_original_held_open_goes_once_let_go_of_or_at_the_next_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # On Windows a file held open cannot be deleted: a page of it being drawn as the file is
+    # removed holds it a moment (ADR-068).
+    store = AssetStore(tmp_path / "originals")
+    notes = tmp_path / "notes.pdf"
+    notes.write_bytes(b"%PDF-1.4")
+    held = {"times": 0}
+    unlink = Path.unlink
+
+    def held_open(path: Path, missing_ok: bool = False) -> None:
+        if path.parent == store.root and held["times"] > 0:
+            held["times"] -= 1
+            raise PermissionError("The file is in use.")
+        unlink(path, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", held_open)
+    monkeypatch.setattr(asset_store, "_DELETE_PAUSE_SECONDS", 0.0)
+
+    # Held a moment: tried again, and gone.
+    first = store.import_file(notes, "src_first", "notes.pdf")
+    held["times"] = 3
+    store.delete(first)
+    assert not store.path_for(first).exists()
+
+    # Held for longer than it is tried for: left, and deleted with what no source refers to.
+    second = store.import_file(notes, "src_second", "notes.pdf")
+    held["times"] = 1000
+    store.delete(second)
+    assert store.path_for(second).exists()
+    held["times"] = 0
+    assert store.keep_only(set()) == 1
+    assert not store.path_for(second).exists()
 
 
 def test_a_source_whose_original_is_missing_still_works_and_can_be_removed(

@@ -352,8 +352,10 @@ drawing), each drawn gray at 150 dots to the inch and sent to NVIDIA's Nemotron 
 | Typed page, the first request | 110 KB | 15.6 s | 2,285 / 160 | word for word |
 | Handwritten page with a drawing | 183 KB | 2.3 s | 2,285 / 119 | word for word, the drawing in a line; "fulcrum" once as "fuIcrum" |
 
-A page is one request: a notebook of 21 pages is 21 of NVIDIA's 200 a day for Adle, and
-at 4 a minute takes about five minutes. AIHubMix's free model was not tried: the account
+A page is one request: a notebook of 21 pages is 21 requests to NVIDIA, which has no
+daily limit and takes 40 a minute. Measured at 4 a minute, one at a time, it took about
+five minutes; since ADR-068 four pages are read at once, while the next is drawn here
+(not measured yet). AIHubMix's free model was not tried: the account
 answered that it can make ten requests until it is paid for.
 
 A detailed drawing on a PDF page goes past pypdf's budget of work (2,000,000 tokens):
@@ -442,7 +444,9 @@ of the time a chapter takes to be written.
 
 - **Generating with AIHubMix's model.** That provider has not answered a request yet (see
   PROJECT_STATE.md). The times above are NVIDIA's models on one afternoon; they are a shared
-  service and will vary. Each request is one at a time, at most four a minute, by design.
+  service and will vary. They were measured one request at a time, at most four a minute;
+  since ADR-068 NVIDIA is sent up to six at once, at most 40 a minute, and a film's
+  chapters and a file's pages are asked for side by side: not measured yet.
 - **Large courses.** The sample course has eight concepts and eight lessons. Opening a course
   reads every answer given in it; the session summary bounds its own look back at 600.
   Nothing here says how a course with thousands of answers behaves.

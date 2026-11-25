@@ -37,18 +37,16 @@ export function filmStage(view: CourseFilm, maker: FilmMakerStatus): FilmStage {
   return { kind: 'ready-to-make' };
 }
 
-/** A chapter's state as the learner reads it, while a film is made or after. */
-export function chapterState(chapter: FilmChapter, next: boolean): string {
+/**
+ * A chapter's state as the learner reads it, while a film is made or after. Several can be
+ * written at once, where the provider takes several requests at once (ADR-068).
+ */
+export function chapterState(chapter: FilmChapter): string {
   if (chapter.state === 'written') {
     return chapter.problems > 0 ? 'Written, with a little overlap' : 'Written and checked';
   }
   if (chapter.state === 'in_words') return 'Told in words';
-  return next ? 'Being written' : 'Waiting';
-}
-
-/** The chapter being worked on now: the first not written yet. */
-export function nextChapter(film: Film): number {
-  return film.chapters.findIndex((chapter) => chapter.state === 'waiting');
+  return chapter.state === 'writing' ? 'Being written' : 'Waiting';
 }
 
 /** A time in a film, as a player shows it: 0:05, 3:41, 1:02:09. */

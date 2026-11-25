@@ -9,6 +9,7 @@ Everything that was asked is recorded so tests can assert on what was sent.
 from __future__ import annotations
 
 import json
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -87,10 +88,40 @@ class FakeProvider:
         #: The address every request was sent to.
         self.urls: list[str] = []
         self._queued: list[Answer] = []
+        #: Answers kept for the requests of one kind, or for those whose words say something,
+        #: each in the order they arrive: requests sent side by side (ADR-068) arrive in no
+        #: order of their own.
+        self._kept: list[tuple[Callable[[dict[str, Any]], bool], list[Answer]]] = []
+        self._lock = threading.Lock()
 
     def queue(self, *answers: Answer) -> None:
         """Answer the next requests with these, before falling back to the defaults."""
-        self._queued.extend(answers)
+        with self._lock:
+            self._queued.extend(answers)
+
+    def queue_for(self, kind: str, *answers: Answer) -> None:
+        """Answer the next requests of this kind with these, whatever else arrives first."""
+        with self._lock:
+            self._kept.append((lambda body: self.kind(body) == kind, list(answers)))
+
+    def when(self, words: str, *answers: Answer) -> None:
+        """Answer the next requests whose system or user text says ``words`` with these."""
+
+        def says(body: dict[str, Any]) -> bool:
+            return any(words in text_of(message["content"]) for message in body["messages"])
+
+        with self._lock:
+            self._kept.append((says, list(answers)))
+
+    def _answer_for(self, body: dict[str, Any]) -> Answer:
+        with self._lock:
+            self.requests.append(body)
+            for matches, answers in self._kept:
+                if answers and matches(body):
+                    return answers.pop(0)
+            if self._queued:
+                return self._queued.pop(0)
+        return self.default(body)
 
     @staticmethod
     def kind(body: dict[str, Any]) -> str:
@@ -145,10 +176,9 @@ class FakeProvider:
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
-        self.requests.append(body)
         self.authorizations.append(request.headers.get("authorization"))
         self.urls.append(str(request.url))
-        answer: Answer = self._queued.pop(0) if self._queued else self.default(body)
+        answer: Answer = self._answer_for(body)
         if callable(answer) and not isinstance(answer, httpx.Response | Exception):
             answer = answer(body)
         if isinstance(answer, Exception):

@@ -64,11 +64,14 @@ class ProviderUsage(BaseModel):
 
     provider_id: str
     requests_today: int
-    requests_per_day: int
+    #: None when the provider has no daily limit (ADR-068): the day is counted, not capped.
+    requests_per_day: int | None
     tokens_today: int
-    tokens_per_day: int
+    tokens_per_day: int | None
     requests_last_minute: int
     requests_per_minute: int
+    #: How many of its requests may be in flight at once (ADR-068).
+    at_once: int
     resets_at: datetime
     #: False when these limits are Adle's own caution and not ones the provider publishes.
     limits_published: bool
@@ -162,6 +165,7 @@ def _usage(services: Services, config: ProviderConfig) -> ProviderUsage:
         tokens_per_day=usage.limits.tokens_per_day,
         requests_last_minute=usage.requests_last_minute,
         requests_per_minute=usage.limits.requests_per_minute,
+        at_once=config.at_once,
         resets_at=usage.resets_at,
         limits_published=config.limits_published,
     )

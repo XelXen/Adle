@@ -762,7 +762,7 @@
           "problems": { "title": "Problems", "type": "integer" },
           "start": { "anyOf": [{ "type": "number" }, { "type": "null" }], "title": "Start" },
           "state": {
-            "enum": ["waiting", "written", "in_words"],
+            "enum": ["waiting", "writing", "written", "in_words"],
             "title": "State",
             "type": "string"
           },
@@ -2063,14 +2063,21 @@
       "ProviderUsage": {
         "description": "Adle's own count of today's requests to one provider.\n\nAn estimate: the provider keeps the real one.",
         "properties": {
+          "at_once": { "title": "At Once", "type": "integer" },
           "limits_published": { "title": "Limits Published", "type": "boolean" },
           "provider_id": { "title": "Provider Id", "type": "string" },
           "requests_last_minute": { "title": "Requests Last Minute", "type": "integer" },
-          "requests_per_day": { "title": "Requests Per Day", "type": "integer" },
+          "requests_per_day": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Requests Per Day"
+          },
           "requests_per_minute": { "title": "Requests Per Minute", "type": "integer" },
           "requests_today": { "title": "Requests Today", "type": "integer" },
           "resets_at": { "format": "date-time", "title": "Resets At", "type": "string" },
-          "tokens_per_day": { "title": "Tokens Per Day", "type": "integer" },
+          "tokens_per_day": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Tokens Per Day"
+          },
           "tokens_today": { "title": "Tokens Today", "type": "integer" }
         },
         "required": [
@@ -2081,6 +2088,7 @@
           "tokens_per_day",
           "requests_last_minute",
           "requests_per_minute",
+          "at_once",
           "resets_at",
           "limits_published"
         ],

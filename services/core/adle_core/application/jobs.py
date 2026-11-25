@@ -24,9 +24,10 @@ import logging
 import queue
 import threading
 from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import select
 
@@ -146,6 +147,74 @@ class JobContext:
 
 
 Work = Callable[[JobContext], Any]
+
+
+class WorkContext(Protocol):
+    """What a piece of a job's work needs of the job: whether to stop, and saying where it
+    is. A job's own context, or one that pieces worked on side by side share."""
+
+    @property
+    def cancelled(self) -> bool: ...
+
+    def check_cancelled(self, partial_result: Any | None = None) -> None: ...
+
+    def report(
+        self, done: int, total: int, message: str = "", detail: dict[str, Any] | None = None
+    ) -> None: ...
+
+
+class SharedContext:
+    """A job's context as pieces of its work that run side by side share it: stopped when
+    the job is, or as soon as one of them has failed, so that the rest do not go on for
+    nothing (ADR-068)."""
+
+    def __init__(self, context: JobContext) -> None:
+        self._context = context
+        self._stopped = threading.Event()
+
+    @property
+    def cancelled(self) -> bool:
+        return self._context.cancelled or self._stopped.is_set()
+
+    def check_cancelled(self, partial_result: Any | None = None) -> None:
+        if self.cancelled:
+            raise JobCancelledError(partial_result)
+
+    def stop(self) -> None:
+        self._stopped.set()
+
+    def report(
+        self, done: int, total: int, message: str = "", detail: dict[str, Any] | None = None
+    ) -> None:
+        self._context.report(done, total, message, detail)
+
+
+def side_by_side[T](
+    items: Sequence[T],
+    work: Callable[[T, WorkContext], None],
+    context: JobContext,
+    at_once: int,
+) -> None:
+    """Each item worked on, at most ``at_once`` at a time, and in order when that is one
+    (ADR-068). The first failure, or the learner's Stop, stops the rest and is what is
+    raised, once they have stopped."""
+    if at_once <= 1 or len(items) <= 1:
+        for item in items:
+            context.check_cancelled()
+            work(item, context)
+        return
+    shared = SharedContext(context)
+    prefix = f"adle-{context.job_id}"
+    with ThreadPoolExecutor(max_workers=at_once, thread_name_prefix=prefix) as pool:
+        futures = [pool.submit(work, item, shared) for item in items]
+        try:
+            for future in as_completed(futures):
+                future.result()
+        except BaseException:
+            shared.stop()
+            for future in futures:
+                future.cancel()
+            raise
 
 
 class JobRunner:

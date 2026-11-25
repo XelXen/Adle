@@ -204,9 +204,12 @@ NVIDIA_ORDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("storyboard", (_SUPER,)),
 )
 
-#: Adle's own caution for a provider that publishes no daily limit for these models.
-#: It is there so that a mistake cannot run away with an account, not to ration lessons.
-NVIDIA_LIMITS = QuotaLimits(requests_per_minute=4, requests_per_day=200, tokens_per_day=3_000_000)
+#: NVIDIA's endpoints take 40 requests a minute and have no daily limit (the owner,
+#: 2026-11-25, ADR-068): Adle keeps to that minute and counts the day without stopping it.
+NVIDIA_LIMITS = QuotaLimits(requests_per_minute=40, requests_per_day=None, tokens_per_day=None)
+#: How many requests NVIDIA is sent at once: room for a lesson, a question and a film's
+#: chapters together, far under its minute's 40 (each takes seconds to minutes).
+NVIDIA_AT_ONCE = 6
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,9 +254,12 @@ class ProviderConfig:
     #: another provider, and here after it.
     first_for: frozenset[str] = frozenset(PURPOSES)
     limits: QuotaLimits = DEFAULT_LIMITS
-    #: True when ``limits`` sit just under limits the provider publishes; False when they
-    #: are only Adle's own caution. The interface says which.
+    #: True when ``limits`` are limits the provider publishes; False when they are only
+    #: Adle's own caution. The interface says which.
     limits_published: bool = True
+    #: How many of its requests may be in flight at once (ADR-068). One for a provider whose
+    #: allowance is small: a second request would only wait at the provider instead of here.
+    at_once: int = 1
     #: What to expect of it before anything has been measured here.
     typical: TypicalSeconds = TypicalSeconds()
     connect_timeout_seconds: float = 15.0
@@ -277,6 +283,8 @@ class ProviderConfig:
                 )
         if not self.first_for <= set(PURPOSES):
             raise ProviderConfigError("A provider can be asked first only for known requests.")
+        if self.at_once < 1:
+            raise ProviderConfigError("A provider takes at least one request at a time.")
 
     @property
     def model(self) -> str:
@@ -345,7 +353,8 @@ NVIDIA = ProviderConfig(
     orders=NVIDIA_ORDERS,
     first_for=frozenset(PURPOSES) - {"scene"},
     limits=NVIDIA_LIMITS,
-    limits_published=False,
+    limits_published=True,
+    at_once=NVIDIA_AT_ONCE,
     # With each kind of request at the model that does it soonest (ADR-039), as measured
     # on 2026-11-21: a lesson's text in about two minutes, a picture in two to three, a
     # list of concepts in half a minute, an answer in ten seconds.

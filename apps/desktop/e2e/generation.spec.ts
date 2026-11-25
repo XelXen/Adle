@@ -251,7 +251,7 @@ test.describe('generation with the AI provider', () => {
     ).toBeVisible();
     // It is the only provider there is, so there is nothing to choose between.
     await expect(page.getByRole('group', { name: 'Provider' })).toHaveCount(0);
-    await expect(page.getByText('0 of 90', { exact: true })).toBeVisible();
+    await expect(page.getByText('0 of 100', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Library', exact: true }).click();
 
     await createCourse(page, 'Calculus refresher', { topic: 'Limits and derivatives.' });
@@ -354,8 +354,8 @@ test.describe('generation with the AI provider', () => {
     // A lesson has the whole window; the way to the rest of the app is back through the course.
     await page.getByRole('button', { name: 'Back to course' }).click();
     await page.getByRole('navigation').getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByText('4 of 90', { exact: true })).toBeVisible();
-    await expect(page.getByText(/about 7,200 of 900,000/)).toBeVisible();
+    await expect(page.getByText('4 of 100', { exact: true })).toBeVisible();
+    await expect(page.getByText(/about 7,200 of 1,000,000/)).toBeVisible();
     await expectNoAccessibilityViolations(page);
     await screenshot(page, 'generation-usage');
 
@@ -1000,12 +1000,18 @@ test.describe('generation with the AI provider', () => {
     await expect(another).toBeVisible({ timeout: 60_000 });
     expect(provider.requests).toHaveLength(4);
 
-    // ---- Four requests in a minute is the limit Adle keeps: the fifth waits, and says so ----
+    // ---- Five requests in a minute is AIHubMix's limit, which Adle keeps (ADR-068): a fifth
+    // goes, and fails; the sixth, asked for again at once, waits, and says so ----
+    provider.queue({ status: 500 });
     await another.click();
+    const again = limits.getByRole('alert');
+    await expect(again).toContainText('Couldn’t create the lesson', { timeout: 30_000 });
+    expect(provider.requests).toHaveLength(5);
+    await again.getByRole('button', { name: 'Try again' }).click();
     await expect(
       limits.getByText(/Waiting about \d+ seconds to stay under the rate limit/),
     ).toBeVisible({ timeout: 15_000 });
-    expect(provider.requests).toHaveLength(4);
+    expect(provider.requests).toHaveLength(5);
 
     // ---- Cancelling while it waits sends nothing and leaves nothing behind ----
     await limits.getByRole('button', { name: 'Cancel' }).click();
@@ -1016,7 +1022,7 @@ test.describe('generation with the AI provider', () => {
     ).toHaveCount(1);
     await limits.getByRole('button', { name: 'Dismiss' }).click();
     await expect(limits.getByText('Canceled')).toHaveCount(0);
-    expect(provider.requests).toHaveLength(4);
+    expect(provider.requests).toHaveLength(5);
 
     expect(session.adle.problems).toEqual([]);
     await close(session);
