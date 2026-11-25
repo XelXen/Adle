@@ -7,6 +7,7 @@ per-concept state is derived from it and can be rebuilt at any time.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 
@@ -241,6 +242,30 @@ class LearnerService:
             session.add(state)
         _store_knowledge(state, transition.after, transition)
         return transition
+
+    def replay(self, course_id: str, shown: Sequence[tuple[str, Observation]]) -> int:
+        """Record what a learner showed somewhere else, in the order given (a course
+        brought in from a file, ADR-063): each observation is recorded as any other is,
+        so every state and every sentence is worked out here, from the observations,
+        and nothing is taken from what a file says a learner knows. One for a concept
+        that is not in the course is passed over. Returns how many were recorded."""
+        recorded = 0
+        with self._database.session() as session:
+            concepts = {
+                concept.id: concept
+                for concept in session.scalars(
+                    select(Concept).where(Concept.course_id == course_id)
+                )
+            }
+            for concept_id, observation in shown:
+                concept = concepts.get(concept_id)
+                if concept is None:
+                    continue
+                self.record_in(session, concept, observation)
+                # The next one of this concept reads the state this one left.
+                session.flush()
+                recorded += 1
+        return recorded
 
     def self_rate(self, concept_id: str, level: SelfReport) -> ConceptEvidenceRecord:
         """Record how well the learner says they already know a concept."""

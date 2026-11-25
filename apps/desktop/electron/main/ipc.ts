@@ -30,6 +30,7 @@ import {
 } from '../shared/ipc';
 import { callCore } from './core/client';
 import type { CoreProcess } from './core/process';
+import { registerCourseFileHandlers } from './course-files';
 import { registerDataHandlers } from './data';
 import {
   MAX_IMPORT_FILES,
@@ -311,6 +312,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 
   registerImportHandlers(core, handle);
   registerDataHandlers({ core, dataDir: deps.dataDir }, handle);
+  registerCourseFileHandlers({ core, dataDir: deps.dataDir }, handle);
 
   handle(
     IPC.providerClearApiKey,

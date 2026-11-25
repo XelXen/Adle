@@ -24,6 +24,9 @@ export const IPC = {
   providerSelect: 'adle:provider:select',
   sourcesImportWithPicker: 'adle:sources:import-with-picker',
   sourcesImportPaths: 'adle:sources:import-paths',
+  coursesSaveFile: 'adle:courses:save-file',
+  coursesChooseFile: 'adle:courses:choose-file',
+  coursesBringIn: 'adle:courses:bring-in',
   dataSaveCopy: 'adle:data:save-copy',
   dataRestoreCopy: 'adle:data:restore-copy',
   dataEraseAll: 'adle:data:erase-all',
@@ -139,6 +142,69 @@ export interface SavedCopy {
   fileName: string;
 }
 
+/**
+ * A course saved as a file (ADR-063): a template, the course and its lessons with
+ * nothing of the learner in it, or a transfer, everything, to carry it to another
+ * computer.
+ */
+export type CourseFileKind = 'template' | 'transfer';
+
+/** What goes into a course file, or is brought in from one. The plan always is. */
+export interface CourseFileHolds {
+  lessons: boolean;
+  /** The documents the course was made from, and their text. */
+  materials: boolean;
+  /** The learner's own: answers, what they showed, where they stopped. */
+  progress: boolean;
+  /** The questions they asked during lessons, and the answers. */
+  notes: boolean;
+}
+
+/** What a course file holds, as it was counted when it was made. */
+export interface CourseFileCounts {
+  concepts: number;
+  lessons: number;
+  materials: number;
+  /** Of the materials, how many have the document itself in the file. */
+  files: number;
+  progress: boolean;
+  notes: number;
+}
+
+/** A course was written to a file where the learner chose. */
+export interface SavedCourseFile {
+  /** The name of the file, for saying what was saved. Never a path. */
+  fileName: string;
+  counts: CourseFileCounts;
+  /** Lessons still being written or drawn, which were left out. */
+  lessonsLeftOut: number;
+}
+
+/**
+ * A course file the learner chose, and what it says is in it. The page knows the file
+ * by `token` and by its name: never by where it is.
+ */
+export interface CourseFileFound {
+  token: string;
+  fileName: string;
+  title: string;
+  kind: CourseFileKind;
+  counts: CourseFileCounts;
+}
+
+/** A new course made of what a file held. */
+export interface BroughtInCourse {
+  courseId: string;
+  title: string;
+  concepts: number;
+  lessons: number;
+  /** Lessons this Adle could not use, which were left out. */
+  lessonsLeftOut: number;
+  materials: number;
+  progress: boolean;
+  notes: number;
+}
+
 /** External destinations the UI may open in the system browser. Nothing else can be opened. */
 export const EXTERNAL_LINKS = {
   aihubmixKeys: 'https://aihubmix.com/token',
@@ -198,6 +264,26 @@ export interface AdleBridge {
     importWithPicker(courseId: string): Promise<CoreResult<ImportJob | null>>;
     /** Import files the learner dropped onto the window. */
     importDropped(courseId: string, files: File[]): Promise<CoreResult<ImportJob>>;
+  };
+  /**
+   * A course as a file (ADR-063). The page says which course and what the file should
+   * hold, or what to bring in of a file the learner chose. Where a file is saved, and
+   * which file is opened, is asked in a window of the operating system: the page never
+   * names a place.
+   */
+  courses: {
+    /** Save a course as a file. Resolves with `null` if the learner backed out. */
+    saveFile(
+      courseId: string,
+      request: { kind: CourseFileKind; holds: CourseFileHolds },
+    ): Promise<CoreResult<SavedCourseFile | null>>;
+    /**
+     * Have the learner choose a course file, and say what it holds. Nothing is brought
+     * in yet. Resolves with `null` if they backed out.
+     */
+    chooseFile(): Promise<CoreResult<CourseFileFound | null>>;
+    /** Make a new course of the file last chosen: as much of it as `holds` says. */
+    bringIn(token: string, holds: CourseFileHolds): Promise<CoreResult<BroughtInCourse>>;
   };
   /**
    * The learner's own data as a whole. Each of these asks the learner in a window of the

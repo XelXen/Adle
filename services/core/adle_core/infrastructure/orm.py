@@ -99,6 +99,11 @@ class Course(Base):
     subject_by_adle: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()
     )
+    #: It was brought in from a file (ADR-063): what it holds was made elsewhere, and
+    #: the interface says so.
+    brought_in: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
     last_opened_at: Mapped[datetime | None] = mapped_column(UtcDateTime)

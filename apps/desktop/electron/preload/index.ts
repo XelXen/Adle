@@ -10,6 +10,8 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent, webUtils } from 'ele
 import {
   type AdleBridge,
   type CoreInvokeParams,
+  type CourseFileHolds,
+  type CourseFileKind,
   type CoreStatus,
   type ExternalLinkId,
   IPC,
@@ -56,6 +58,14 @@ const bridge: AdleBridge = {
       const paths = droppedPaths(files, (file) => webUtils.getPathForFile(file));
       return ipcRenderer.invoke(IPC.sourcesImportPaths, courseId, paths);
     },
+  },
+  courses: {
+    // Which course and what the file holds; where it goes is asked by the main process.
+    saveFile: (courseId: string, request: { kind: CourseFileKind; holds: CourseFileHolds }) =>
+      ipcRenderer.invoke(IPC.coursesSaveFile, courseId, request),
+    chooseFile: () => ipcRenderer.invoke(IPC.coursesChooseFile),
+    bringIn: (token: string, holds: CourseFileHolds) =>
+      ipcRenderer.invoke(IPC.coursesBringIn, token, holds),
   },
   data: {
     // No arguments: the main process asks the learner where, which, and whether.

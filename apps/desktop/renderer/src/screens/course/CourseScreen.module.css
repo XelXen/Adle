@@ -10,6 +10,13 @@
   gap: var(--ad-space-2) var(--ad-space-3);
 }
 
+/* A quiet line in the dialog that saves a course as a file (ADR-063). */
+.fileNote {
+  margin: 0;
+  font: var(--ad-text-supporting);
+  color: var(--ad-color-muted);
+}
+
 /* ---- How lessons are formed (ADR-061) ----------------------------------- */
 .rulesHeading {
   margin: 0 0 var(--ad-space-2);

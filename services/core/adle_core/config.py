@@ -56,6 +56,13 @@ class Settings:
         """Automatic pre-migration database backups."""
         return self.data_dir / "backups"
 
+    @property
+    def handover_dir(self) -> Path:
+        """Files written for the desktop shell to hand to the learner (a course saved
+        as a file, ADR-063): each is here for a moment, under a generated name, and
+        none is kept."""
+        return self.data_dir / "handover"
+
     def ensure_directories(self) -> None:
         for directory in (self.data_dir, self.sources_dir, self.assets_dir, self.backups_dir):
             directory.mkdir(parents=True, exist_ok=True)

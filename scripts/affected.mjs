@@ -74,6 +74,13 @@ const RULES = [
   ],
   // How a lesson is formed, and a course's subject (ADR-061).
   [new RegExp(`^${CORE}lessons/axioms\\.py$`), ['generation.spec.ts', 'curriculum.spec.ts']],
+  // A course saved as a file and brought in from one (ADR-063).
+  [
+    new RegExp(
+      `^${CORE}(application/(course_file|course_sharing)\\.py|api/routes/course_files\\.py)$`,
+    ),
+    ['course-files.spec.ts', 'security.spec.ts'],
+  ],
   [new RegExp(`^${CORE}application/courses\\.py$`), [...MATERIALS, ...CURRICULUM]],
   [new RegExp(`^${CORE}(lessons/|application/lessons\\.py$)`), LESSONS],
   [new RegExp(`^${CORE}sample_course/`), [...LESSONS, SCENE]],
@@ -90,7 +97,14 @@ const RULES = [
       'break.spec.ts',
     ],
   ],
-  [/^apps\/desktop\/renderer\/src\/screens\/course\//, [...MATERIALS, ...CURRICULUM]],
+  [
+    /^apps\/desktop\/(electron\/main\/course-file|renderer\/src\/lib\/course-files)/,
+    ['course-files.spec.ts', 'security.spec.ts'],
+  ],
+  [
+    /^apps\/desktop\/renderer\/src\/screens\/course\//,
+    [...MATERIALS, ...CURRICULUM, 'course-files.spec.ts'],
+  ],
   [/^apps\/desktop\/renderer\/src\/lib\/lesson-rules\.ts$/, [...CURRICULUM, 'lesson.spec.ts']],
   [/^apps\/desktop\/renderer\/src\/screens\/practice\//, ['learning.spec.ts']],
   [
@@ -107,7 +121,12 @@ const RULES = [
   ],
   [
     /^apps\/desktop\/renderer\/src\/screens\/(home|welcome)\//,
-    ['first-run.spec.ts', 'course-materials.spec.ts', 'appearance-a11y.spec.ts'],
+    [
+      'first-run.spec.ts',
+      'course-materials.spec.ts',
+      'appearance-a11y.spec.ts',
+      'course-files.spec.ts',
+    ],
   ],
   [/^apps\/desktop\/renderer\/src\/screens\/break\//, ['break.spec.ts']],
 ];

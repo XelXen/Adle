@@ -163,6 +163,30 @@
         "title": "Beat",
         "type": "object"
       },
+      "BroughtInCourse": {
+        "properties": {
+          "concepts": { "title": "Concepts", "type": "integer" },
+          "course_id": { "title": "Course Id", "type": "string" },
+          "lessons": { "title": "Lessons", "type": "integer" },
+          "lessons_left_out": { "title": "Lessons Left Out", "type": "integer" },
+          "materials": { "title": "Materials", "type": "integer" },
+          "notes": { "title": "Notes", "type": "integer" },
+          "progress": { "title": "Progress", "type": "boolean" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": [
+          "course_id",
+          "title",
+          "concepts",
+          "lessons",
+          "lessons_left_out",
+          "materials",
+          "progress",
+          "notes"
+        ],
+        "title": "BroughtInCourse",
+        "type": "object"
+      },
       "Concept": {
         "properties": {
           "complexity": { "title": "Complexity", "type": "integer" },
@@ -347,6 +371,7 @@
       },
       "Course": {
         "properties": {
+          "brought_in": { "default": false, "title": "Brought In", "type": "boolean" },
           "concept_count": { "title": "Concept Count", "type": "integer" },
           "created_at": { "format": "date-time", "title": "Created At", "type": "string" },
           "description": { "title": "Description", "type": "string" },
@@ -423,6 +448,87 @@
         },
         "required": ["origin"],
         "title": "CourseCreate",
+        "type": "object"
+      },
+      "CourseFileCounts": {
+        "properties": {
+          "concepts": { "title": "Concepts", "type": "integer" },
+          "files": { "title": "Files", "type": "integer" },
+          "lessons": { "title": "Lessons", "type": "integer" },
+          "materials": { "title": "Materials", "type": "integer" },
+          "notes": { "title": "Notes", "type": "integer" },
+          "progress": { "title": "Progress", "type": "boolean" }
+        },
+        "required": ["concepts", "lessons", "materials", "files", "progress", "notes"],
+        "title": "CourseFileCounts",
+        "type": "object"
+      },
+      "CourseFileHolds": {
+        "additionalProperties": false,
+        "description": "What goes into a file, or is brought in from one. The curriculum always is.",
+        "properties": {
+          "lessons": { "default": true, "title": "Lessons", "type": "boolean" },
+          "materials": { "default": false, "title": "Materials", "type": "boolean" },
+          "notes": { "default": false, "title": "Notes", "type": "boolean" },
+          "progress": { "default": false, "title": "Progress", "type": "boolean" }
+        },
+        "title": "CourseFileHolds",
+        "type": "object"
+      },
+      "CourseFilePath": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "pattern": "^[^\\x00]+$",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": ["path"],
+        "title": "CourseFilePath",
+        "type": "object"
+      },
+      "CourseFileRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "holds": {
+            "anyOf": [{ "$ref": "#/components/schemas/CourseFileHolds" }, { "type": "null" }]
+          },
+          "kind": { "enum": ["template", "transfer"], "title": "Kind", "type": "string" }
+        },
+        "required": ["kind"],
+        "title": "CourseFileRequest",
+        "type": "object"
+      },
+      "CourseFileSummary": {
+        "description": "What a file says it is, for asking the learner before anything is brought in.",
+        "properties": {
+          "counts": { "$ref": "#/components/schemas/CourseFileCounts" },
+          "kind": { "enum": ["template", "transfer"], "title": "Kind", "type": "string" },
+          "made_at": { "format": "date-time", "title": "Made At", "type": "string" },
+          "made_by": { "title": "Made By", "type": "string" },
+          "title": { "title": "Title", "type": "string" }
+        },
+        "required": ["title", "kind", "counts", "made_by", "made_at"],
+        "title": "CourseFileSummary",
+        "type": "object"
+      },
+      "CourseFileToBringIn": {
+        "additionalProperties": false,
+        "properties": {
+          "holds": { "$ref": "#/components/schemas/CourseFileHolds" },
+          "path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "pattern": "^[^\\x00]+$",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": ["path", "holds"],
+        "title": "CourseFileToBringIn",
         "type": "object"
       },
       "CourseList": {
@@ -1828,6 +1934,17 @@
         "title": "ReflectionSegment",
         "type": "object"
       },
+      "SavedCourseFile": {
+        "properties": {
+          "counts": { "$ref": "#/components/schemas/CourseFileCounts" },
+          "lessons_left_out": { "title": "Lessons Left Out", "type": "integer" },
+          "name": { "title": "Name", "type": "string" },
+          "suggested_name": { "title": "Suggested Name", "type": "string" }
+        },
+        "required": ["name", "suggested_name", "counts", "lessons_left_out"],
+        "title": "SavedCourseFile",
+        "type": "object"
+      },
       "SceneArtifact": {
         "additionalProperties": false,
         "description": "One complete Wanim scene file, with what the static policy found in it.",
@@ -3153,6 +3270,74 @@
         "tags": ["curriculum"]
       }
     },
+    "/v1/course-files/bring-in": {
+      "post": {
+        "operationId": "courses.bring_in_file",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CourseFileToBringIn" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BroughtInCourse" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Bring In Course File",
+        "tags": ["courses"],
+        "x-adle-internal": true
+      }
+    },
+    "/v1/course-files/look": {
+      "post": {
+        "operationId": "courses.look_at_file",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CourseFilePath" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CourseFileSummary" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Look At Course File",
+        "tags": ["courses"],
+        "x-adle-internal": true
+      }
+    },
     "/v1/courses": {
       "get": {
         "operationId": "courses.list",
@@ -3545,6 +3730,48 @@
         },
         "summary": "Propose Curriculum",
         "tags": ["generation"]
+      }
+    },
+    "/v1/courses/{course_id}/file": {
+      "post": {
+        "operationId": "courses.save_file",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": { "title": "Course Id", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CourseFileRequest" } }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SavedCourseFile" } }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Save Course File",
+        "tags": ["courses"],
+        "x-adle-internal": true
       }
     },
     "/v1/courses/{course_id}/jobs": {

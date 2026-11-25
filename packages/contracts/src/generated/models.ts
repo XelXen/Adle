@@ -95,6 +95,16 @@ export interface Beat {
   show?: string | null;
   text: string;
 }
+export interface BroughtInCourse {
+  concepts: number;
+  course_id: string;
+  lessons: number;
+  lessons_left_out: number;
+  materials: number;
+  notes: number;
+  progress: boolean;
+  title: string;
+}
 export interface Concept {
   complexity: number;
   course_id: string;
@@ -194,6 +204,7 @@ export interface CopyDestination {
   path: string;
 }
 export interface Course {
+  brought_in?: boolean;
   concept_count: number;
   created_at: string;
   description: string;
@@ -226,6 +237,46 @@ export interface CourseCreate {
   origin: 'topic' | 'materials';
   title?: string | null;
   topic?: string | null;
+}
+export interface CourseFileCounts {
+  concepts: number;
+  files: number;
+  lessons: number;
+  materials: number;
+  notes: number;
+  progress: boolean;
+}
+/**
+ * What goes into a file, or is brought in from one. The curriculum always is.
+ *
+ */
+export interface CourseFileHolds {
+  lessons?: boolean;
+  materials?: boolean;
+  notes?: boolean;
+  progress?: boolean;
+}
+export interface CourseFilePath {
+  path: string;
+}
+export interface CourseFileRequest {
+  holds?: CourseFileHolds | null;
+  kind: 'template' | 'transfer';
+}
+/**
+ * What a file says it is, for asking the learner before anything is brought in.
+ *
+ */
+export interface CourseFileSummary {
+  counts: CourseFileCounts;
+  kind: 'template' | 'transfer';
+  made_at: string;
+  made_by: string;
+  title: string;
+}
+export interface CourseFileToBringIn {
+  holds: CourseFileHolds;
+  path: string;
 }
 export interface CourseList {
   courses: Course[];
@@ -929,6 +980,12 @@ export interface ProviderStatus {
   providers: ProviderChoice[];
   routes: ProviderRoutes;
   selection: string;
+}
+export interface SavedCourseFile {
+  counts: CourseFileCounts;
+  lessons_left_out: number;
+  name: string;
+  suggested_name: string;
 }
 /**
  * A picture to try in the player before a learner is shown it (ADR-038).

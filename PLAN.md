@@ -1104,7 +1104,13 @@ slide and did not get is drawn now. And **the Expressive voice put together from
 parts** (ADR-062): who speaks, age, pitch, pace, tone, feeling, steadiness, accent
 and style, each chosen from a list, with voices to start from and the learner's own
 words kept as the most exact way (`voice/design.py`, `test_voice_design.py`, the
-journey in `e2e/voice`). Evidence for the rules: `test_lesson_axioms.py`,
+journey in `e2e/voice`). And **a course saved as a file and brought in from one**
+(ADR-063): a template with nothing of the learner in it, or everything, to move a
+course; bringing one in always makes a new course, by the roads everything else
+goes in by, and what a learner knows is worked out from their answers
+(`test_course_file.py`, `test_course_sharing.py`, `course-file-rules.test.ts`, the
+journeys in `e2e/course-files` and `e2e/security`). Evidence for the rules:
+`test_lesson_axioms.py`,
 `test_slide_subjects.py`, `test_slide_real_lessons.py`, the renderer's
 `lesson-rules.test.ts`, the journey in `e2e/curriculum` that reads a course's rules and
 changes its subject, and 42 slide examples stepped through by `e2e/slide-player`.

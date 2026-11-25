@@ -80,6 +80,26 @@ most, a file's name.
   dialogs. In end-to-end tests the dialogs are replaced with `app.evaluate` (see
   `e2e/data.spec.ts`), never driven.
 
+## A course as a file
+
+- `window.adle.courses.*` (ADR-063) take what the learner chose in the page and
+  nothing else: `saveFile(courseId, { kind, holds })`, `chooseFile()`,
+  `bringIn(token, holds)`. Their arguments are checked in `course-file-rules.ts`
+  (pure, unit tested): exactly the four choices, each true or false; a kind Adle
+  makes; a course's id. Never add an argument that is, or could carry, a path.
+- **Saving:** the core writes the file in its own folder and says its name; the
+  main process asks where in a save dialog and moves the file there
+  (`handedOverPath` finds it only by a name of the kind the core makes), or removes
+  it if the learner backs out. The core is never told the place.
+- **Bringing in:** the file is chosen in an open dialog. The page is told its name
+  and what it holds, and is given a token; the path stays in the main process, for
+  that one file, for half an hour. `bringIn` works only with the token last given.
+- In the page, `SaveCourseDialog` (a course's page) and `ImportCourseDialog` (the
+  library) show the choices; what either kind holds is `holdsFor` in
+  `lib/course-files.ts`, and the rarely needed choices sit under `Disclosure`
+  ("Advanced"). A course that came in a file says "Imported" (`originLabel`).
+- A journey replaces both dialogs with `app.evaluate` (`e2e/course-files.spec.ts`).
+
 ## When the app itself fails
 
 - What to do about a crashed or hung page, an uncaught error, or a core that died is decided

@@ -33,6 +33,7 @@ export {
   type SwitchProps,
 } from './components/Choice';
 export { Dialog, type DialogProps } from './components/Dialog';
+export { Disclosure, type DisclosureProps } from './components/Disclosure';
 export {
   Select,
   type SelectOption,

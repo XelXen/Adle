@@ -8,6 +8,7 @@ says "comes from your notes" can be traced to the exact place.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import re
 import threading
 import unicodedata
@@ -110,6 +111,33 @@ class SectionRecord:
 class SourceDetail:
     source: SourceRecord
     sections: list[SectionRecord]
+
+
+@dataclass(frozen=True, slots=True)
+class CopiedSource:
+    """A document as it was read somewhere else: what a course file holds of one."""
+
+    display_name: str
+    kind: str
+    content_hash: str
+    size_bytes: int
+    warnings: list[str]
+    picture_pages: list[int]
+    parser: str
+    parser_version: str
+    #: Each section: its kind, title, page number, heading level, and how far its text
+    #: can be trusted.
+    sections: list[tuple[str, str | None, int | None, int | None, float]]
+    #: Each passage: which section it is of (by its place above), its text, and where
+    #: in the section's text it begins and ends.
+    chunks: list[tuple[int, str, int, int]]
+
+
+@dataclass(frozen=True, slots=True)
+class CopiedIds:
+    source_id: str
+    #: The new identifier of each section, in the order the sections were given.
+    section_ids: list[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -418,6 +446,92 @@ class SourceService:
             course_id, source_id, display_name, content_hash, 0, None, document, kind="authored"
         )
         return source_id
+
+    def original_of(self, stored_name: str | None) -> Path | None:
+        """Where a source's document is kept, if it still is: a copy of the data does
+        not carry the documents, so one may be gone."""
+        if not stored_name:
+            return None
+        try:
+            path = self._files.path_for(stored_name)
+        except ValueError:
+            return None
+        return path if path.is_file() else None
+
+    def add_copied(self, course_id: str, copied: CopiedSource, original: Path | None) -> CopiedIds:
+        """Add a document as it was read somewhere else (a course brought in from a
+        file, ADR-063): its sections and passages as they are given, under identifiers
+        made here, and the document itself if it came too. Nothing is read again: a
+        page read from a picture at the learner's word (ADR-060) is in the passages
+        and in no document."""
+        source_id = new_id("src")
+        stored_name = (
+            self._files.import_file(original, source_id, copied.display_name)
+            if original is not None
+            else None
+        )
+        section_ids = [new_id("sec") for _ in copied.sections]
+        try:
+            with self._database.session() as session:
+                get_course_or_404(session, course_id)
+                session.add(
+                    Source(
+                        id=source_id,
+                        course_id=course_id,
+                        display_name=copied.display_name,
+                        kind=copied.kind,
+                        content_hash=copied.content_hash,
+                        stored_name=stored_name,
+                        size_bytes=copied.size_bytes,
+                        status=(
+                            "needs_attention"
+                            if copied.warnings or copied.picture_pages
+                            else "extracted"
+                        ),
+                        warnings=list(copied.warnings),
+                        picture_pages=list(copied.picture_pages),
+                        parser=copied.parser,
+                        parser_version=copied.parser_version,
+                        char_count=sum(len(text) for _, text, _, _ in copied.chunks),
+                    )
+                )
+                lengths = [0] * len(copied.sections)
+                for section, text, _, end in copied.chunks:
+                    lengths[section] = max(lengths[section], end, len(text))
+                for ordinal, (kind, title, page_number, level, confidence) in enumerate(
+                    copied.sections
+                ):
+                    session.add(
+                        SourceSection(
+                            id=section_ids[ordinal],
+                            source_id=source_id,
+                            ordinal=ordinal,
+                            kind=kind,
+                            title=title,
+                            page_number=page_number,
+                            level=level,
+                            char_count=lengths[ordinal],
+                            confidence=confidence,
+                        )
+                    )
+                session.flush()
+                for ordinal, (section, text, start, end) in enumerate(copied.chunks):
+                    session.add(
+                        SourceChunk(
+                            source_id=source_id,
+                            section_id=section_ids[section],
+                            course_id=course_id,
+                            ordinal=ordinal,
+                            text=text,
+                            char_start=start,
+                            char_end=end,
+                            content_hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                        )
+                    )
+        except BaseException:
+            self._files.delete(stored_name)
+            raise
+        return CopiedIds(source_id=source_id, section_ids=section_ids)
 
     def _store(
         self,

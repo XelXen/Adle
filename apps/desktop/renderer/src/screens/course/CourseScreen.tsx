@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, GraduationCap, ListTree, Trash2 } from 'lucide-react';
+import { ArrowLeft, Download, FileText, GraduationCap, ListTree, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -16,12 +16,14 @@ import {
 
 import { type CourseTab, useRouter } from '../../app/router';
 import { callCore, CoreRequestError, describeError } from '../../lib/core-client';
+import { originLabel } from '../../lib/course-files';
 import { taughtAs, useLessonRules } from '../../lib/lesson-rules';
 import { useResource } from '../../lib/use-resource';
 import styles from './CourseScreen.module.css';
 import { CurriculumPanel } from './CurriculumPanel';
 import { LearnPanel } from './LearnPanel';
 import { LessonRulesDialog } from './LessonRulesDialog';
+import { SaveCourseDialog } from './SaveCourseDialog';
 import { SourcesPanel } from './SourcesPanel';
 
 const TABS: readonly TabItem<CourseTab>[] = [
@@ -29,12 +31,6 @@ const TABS: readonly TabItem<CourseTab>[] = [
   { value: 'curriculum', label: 'Curriculum', icon: <ListTree /> },
   { value: 'sources', label: 'Materials', icon: <FileText /> },
 ];
-
-const ORIGIN_LABEL = {
-  sample: 'Sample course',
-  topic: 'From a topic',
-  materials: 'From your materials',
-} as const;
 
 /** One course: what to do next in it, what it teaches, and the materials it draws on. */
 export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseTab }) {
@@ -49,6 +45,8 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
   // How this course's lessons are formed, and as what subject (ADR-061): one press away.
   const rules = useLessonRules();
   const [showingRules, setShowingRules] = useState(false);
+  // The course as a file, for someone else or for another computer (ADR-063).
+  const [savingFile, setSavingFile] = useState(false);
 
   const backToLibrary = (
     <Button
@@ -119,7 +117,7 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
         <Stack gap={2}>
           <span className={styles.facts}>
             <Badge tone={data.origin === 'sample' ? 'accent' : 'neutral'}>
-              {ORIGIN_LABEL[data.origin]}
+              {originLabel(data)}
             </Badge>
             <Button variant="tertiary" size="small" onClick={() => setShowingRules(true)}>
               {taughtAs(data, rules.resource.status === 'ready' ? rules.resource.data : null)}
@@ -130,9 +128,14 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
         </Stack>
       }
       actions={
-        <Button variant="tertiary" icon={<Trash2 />} onClick={() => setConfirmingDelete(true)}>
-          Delete course
-        </Button>
+        <>
+          <Button variant="tertiary" icon={<Download />} onClick={() => setSavingFile(true)}>
+            Save as a file
+          </Button>
+          <Button variant="tertiary" icon={<Trash2 />} onClick={() => setConfirmingDelete(true)}>
+            Delete course
+          </Button>
+        </>
       }
     >
       <Tabs
@@ -162,6 +165,8 @@ export function CourseScreen({ courseId, tab }: { courseId: string; tab: CourseT
         onClose={() => setShowingRules(false)}
         onCourseChanged={course.setData}
       />
+
+      {savingFile ? <SaveCourseDialog course={data} onClose={() => setSavingFile(false)} /> : null}
 
       <Dialog
         open={confirmingDelete}

@@ -9,6 +9,7 @@ import {
   Checkbox,
   ChoiceButtons,
   Dialog,
+  Disclosure,
   EmptyState,
   ErrorState,
   IconButton,
@@ -105,6 +106,36 @@ describe('Select', () => {
     );
     await userEvent.selectOptions(screen.getByLabelText('Pace'), 'brisk');
     expect(onValueChange).toHaveBeenCalledWith('brisk');
+  });
+});
+
+describe('Disclosure', () => {
+  it('keeps what is behind it out of the way until it is opened, by a press or the keyboard', async () => {
+    const user = userEvent.setup();
+    render(
+      <Disclosure label="Advanced">
+        <Checkbox label="Progress" checked onCheckedChange={() => undefined} />
+      </Disclosure>,
+    );
+    const summary = screen.getByText('Advanced');
+    const details = summary.closest('details');
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute('open');
+    // It is the browser's own: what is inside is in the page either way.
+    expect(screen.getByRole('checkbox', { name: 'Progress', hidden: true })).toBeChecked();
+    await user.click(summary);
+    expect(details).toHaveAttribute('open');
+    await user.click(summary);
+    expect(details).not.toHaveAttribute('open');
+  });
+
+  it('can begin open', () => {
+    render(
+      <Disclosure label="Advanced" defaultOpen>
+        <p>Choices</p>
+      </Disclosure>,
+    );
+    expect(screen.getByText('Advanced').closest('details')).toHaveAttribute('open');
   });
 });
 

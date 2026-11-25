@@ -34,6 +34,8 @@ class CourseRecord:
     subject: str = axioms.GENERAL
     #: Adle placed it; the learner has not chosen.
     subject_by_adle: bool = True
+    #: It was brought in from a file (ADR-063).
+    brought_in: bool = False
 
 
 #: What a course is called until Adle has something better to call it.
@@ -75,6 +77,7 @@ def _record(course: Course, source_count: int, concept_count: int) -> CourseReco
         named_by_adle=bool(course.named_by_adle),
         subject=axioms.subject(course.subject).key,
         subject_by_adle=bool(course.subject_by_adle),
+        brought_in=bool(course.brought_in),
     )
 
 
@@ -201,6 +204,18 @@ class CourseService:
             place(course)
             session.flush()
             return self._counted(session, course)
+
+    def mark_brought_in(self, course_id: str, subject: object, *, by_adle: bool) -> None:
+        """A course just made of what a file holds (ADR-063): it says so, and it is
+        taught as the file says it was, if that is a subject Adle knows. A subject the
+        learner had chosen stands as theirs; one Adle had placed may be placed again."""
+        with self._database.session() as session:
+            course = get_course_or_404(session, course_id)
+            course.brought_in = True
+            key = axioms.subject_key(subject)
+            if key is not None and key != axioms.GENERAL:
+                course.subject = key
+                course.subject_by_adle = by_adle
 
     def settle_subjects(self) -> None:
         """Courses Adle has not placed are given its guess, as the core starts: one made by

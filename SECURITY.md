@@ -251,6 +251,40 @@ Saving a copy of everything, restoring from one, and deleting everything
   standing of the learner's own and no more: text is shown as text, scenes are checked again
   on every read and run only in the player frame.
 
+## A course as a file
+
+A course saved as a file, to give away or to move, and a new course made of one that was
+brought in (a course's page, and the library). Reasoning:
+`docs/decisions/ADR-063-a-course-is-saved-as-a-file-and-brought-in-from-one.md`.
+
+A file that is brought in comes from anywhere. Everything below about bringing in assumes
+someone hostile made it.
+
+| Guarantee | Implementation | Verified by |
+|---|---|---|
+| Page script cannot say where a course is saved or which file one is brought in from | `window.adle.courses.*` take a course, a kind of file and four choices. Both dialogs are opened by the main process (`electron/main/course-files.ts`); a chosen file is known to the page by its name and a token, for that file, for half an hour | `e2e/security.spec.ts` (a path as an argument, as a field and as a token is refused or ignored; each question is still asked); `course-file-rules.test.ts` |
+| The core is never told a place to write | It writes under `handover/` in its own folder, under a name it makes; the main process moves the file, finding it only by a name of that kind | `test_course_sharing.py`; `course-file-rules.test.ts`; `e2e/course-files.spec.ts` (nothing left behind) |
+| The core's routes for it are the main process's alone | `courses.save_file`, `courses.look_at_file`, `courses.bring_in_file` are internal | `e2e/security.spec.ts`; `test_course_sharing.py` |
+| Nothing in a file is extracted, and no name in it is a path | A member is read by a name the core made; a member of any other name, a folder, a locked member, or two of one name refuse the file | `test_course_file.py` (path-like names, other endings, a folder) |
+| A file cannot make the core read without end | Each member is read up to a bound that ignores the size the file gives, and all of them against a bound on the whole; the count of members is bounded | `test_course_file.py` |
+| A file changes nothing that is here | Bringing in always makes a new course; every identifier in a file is replaced by a new one, and none is looked up | `test_course_sharing.py` (no identifier shared; the course saved from is as it was) |
+| A lesson from a file is no more trusted than one a model wrote | `parse_bundle` and `LessonService.store`: shape, text, references, and every scene through the policy; a scene runs only in the player frame | `test_course_sharing.py` (a scene that imports `os`, a lesson about a concept that is not there, text with an address: each left out) |
+| A file cannot say what a learner knows | It has no field for a state. Answers are recorded again through `LearnerService.replay`, and every state is worked out here | `test_course_file.py`; `test_course_sharing.py` (a planted state refuses the file) |
+| A file cannot make a curriculum that cannot be learned | Concepts and what they need go through `CurriculumService` | `test_course_sharing.py` (a loop is not made) |
+| A file is never taken for Adle's own sample | A course from a file is from a topic or from materials, its lessons written elsewhere, and it says "Imported" | `test_course_sharing.py`; `e2e/course-files.spec.ts` |
+| A document from a file is the one its text was read from, or it is not kept | Its size and SHA-256 must be what its entry says; it is stored under a generated name | `test_course_sharing.py` |
+| A template carries nothing of the learner | No answers, no notes, no materials; lessons cite nothing and name no file | `test_course_sharing.py` (the file's bytes are searched) |
+| Half a course is not left behind | The new course is deleted if anything fails | `test_course_sharing.py` |
+
+**Residual risks, accepted**
+
+- A course file is not encrypted. One that holds everything holds the text of the learner's
+  materials and their answers; the dialog says what each choice puts in.
+- Who wrote a lesson is what the file says, kept as names only. It can say anything; it is
+  shown as a name and decides nothing.
+- A document brought in with a course is as trusted as one the learner imported: it is read
+  again only to draw a page as a picture, in the parser's own process.
+
 ## Lessons and answers
 
 Details and reasoning: `docs/decisions/ADR-010-lesson-ir-and-playback.md`.

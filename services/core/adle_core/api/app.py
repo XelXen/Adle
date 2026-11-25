@@ -10,6 +10,7 @@ from adle_core.api.auth import require_launch_token
 from adle_core.api.errors import ErrorResponse, install_error_handlers
 from adle_core.api.gate import Gate
 from adle_core.api.routes import (
+    course_files,
     courses,
     curriculum,
     data,
@@ -57,6 +58,7 @@ def create_app(services: Services) -> FastAPI:
         system,
         provider,
         courses,
+        course_files,
         curriculum,
         lessons,
         generation,

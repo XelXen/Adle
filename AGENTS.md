@@ -131,6 +131,14 @@ is built from it, and an alpha or a stable version is published from a release c
 - The data as a whole (save a copy, restore, delete everything) is touched only through
   `window.adle.data`, whose functions take no arguments: the path or the confirmation comes
   from a dialog the main process opens. Restoring happens only while the core starts (ADR-016).
+- A course leaves as a file and comes in from one only through `window.adle.courses`
+  (ADR-063): the page says which course and what the file holds, never where. The
+  place it is saved, and the file one is brought in from, are chosen in a window of
+  the operating system; the core writes a file only in its own folder and the main
+  process moves it. A file brought in is from anywhere: it always makes a new course,
+  nothing in it is extracted or looked up here, its lessons go through the gate
+  below, and what a learner knows is worked out from their answers, never read
+  from the file.
 - A lesson enters the database only through `lessons.bundle.parse_bundle`, and a picture
   joins a stored lesson only through `LessonService.settle_scene`, which passes the whole
   lesson through it again (ADR-031). Answer keys stay in the core: the renderer gets the

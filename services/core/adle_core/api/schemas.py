@@ -118,6 +118,8 @@ class Course(_Output):
     subject: SubjectKey = "general"
     #: Adle placed it; the learner has not chosen.
     subject_by_adle: bool = True
+    #: It was brought in from a file: what it holds was made elsewhere (ADR-063).
+    brought_in: bool = False
 
 
 class CourseList(_Output):

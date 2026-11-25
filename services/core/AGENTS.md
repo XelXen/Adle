@@ -26,7 +26,8 @@ Add a dependency with `uv add <name>` (or `uv add --dev <name>`) inside `service
 adle_core/
   errors.py       AdleError and friends (no framework imports; usable everywhere)
   api/            FastAPI app factory, auth, error contract, schemas, routes (no domain logic)
-  application/    service container; courses, sources, jobs (three lanes), curriculum,
+  application/    service container; courses (and a course as a file: course_file,
+                  course_sharing), sources, jobs (three lanes), curriculum,
                   learner, retrieval, lessons, asks (questions put to Adle during a lesson),
                   generation and the model gateway, saving and restoring a copy of the data
   curriculum/     PURE rules: concept graph (loops, order, layers), outline from headings
@@ -93,6 +94,24 @@ everything and decides nothing.
   user-supplied path as a destination. The one exception is `data.save_copy` (ADR-016): an
   internal route that writes a copy of the data where the learner chose in a save dialog.
   Do not add a second.
+- **A course as a file** (ADR-063). What is in one, and reading one from anywhere, is
+  `application/course_file.py`: a zip of JSON parts, each a closed Pydantic model
+  (`extra="forbid"`), read by a member name this module made and never past a bound
+  that does not trust the file's own sizes; nothing is ever extracted, and a member of
+  any other name refuses the file. Saving and bringing in is
+  `application/course_sharing.py` (`CourseFileService`). **Bringing in makes a new
+  course and goes by the ordinary roads**: `CurriculumService` for concepts and what
+  they need, `parse_bundle` then `LessonService.store` for a lesson (one that cannot
+  be used is left out and counted), `SourceService.add_copied` for a document's
+  sections and passages, `LearnerService.replay` for what the learner showed (each
+  observation recorded as any other, so no state comes from a file). Identifiers in
+  a file are only names for its own parts: everything gets a new one (`_renamed`). A
+  course from a file is never `sample`, and half a course is deleted again. A new
+  part of a course is a new model there, a line in `Holds` if the learner chooses
+  it, and a test with a hostile one. **The core writes a course file only under
+  `Settings.handover_dir`**, under a generated name it returns; the desktop shell
+  moves it. Its three routes are internal, and the two that read take a path the
+  learner chose in a dialog, like `sources.import_paths`.
 - **A copy of the data is one self-contained file.** Make one with `backup_database` and
   nothing else: it includes the write-ahead log and leaves the copy in SQLite's single-file
   mode, so that looking at it creates nothing beside it.

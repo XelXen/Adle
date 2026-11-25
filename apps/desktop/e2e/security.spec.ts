@@ -3,7 +3,7 @@
  * inside the running app rather than assumed from configuration.
  */
 import dgram from 'node:dgram';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 
@@ -105,6 +105,7 @@ test.describe('renderer boundary', () => {
       bridge: {
         app: ['info', 'notify', 'openExternal', 'showLogs', 'updateUiState'],
         core: ['invoke', 'onStatus', 'restart', 'status'],
+        courses: ['bringIn', 'chooseFile', 'saveFile'],
         data: ['eraseAll', 'restoreCopy', 'saveCopy', 'showSafetyCopies'],
         provider: ['clearApiKey', 'keyState', 'select', 'setApiKey'],
         sources: ['importDropped', 'importWithPicker'],
@@ -299,6 +300,89 @@ test.describe('renderer boundary', () => {
     expect(await page.evaluate(() => window.adle!.core.status())).toMatchObject({
       state: 'ready',
     });
+  });
+
+  test('the page cannot say where a course is saved, or which file one is brought in from', async ({
+    adle,
+    profileDir,
+  }) => {
+    const { app, page } = adle;
+    await waitForCore(page);
+    const target = path.join(profileDir, 'chosen-by-the-page.zip');
+    // The learner backs out of every question the operating system asks.
+    await app.evaluate(({ dialog }) => {
+      const asked: string[] = [];
+      (globalThis as Record<string, unknown>).adleAskedKinds = asked;
+      dialog.showSaveDialog = () => {
+        asked.push('save');
+        return Promise.resolve({ canceled: true, filePath: '' });
+      };
+      dialog.showOpenDialog = () => {
+        asked.push('open');
+        return Promise.resolve({ canceled: true, filePaths: [] });
+      };
+    });
+    const course = await page.evaluate(async () => {
+      const made = await window.adle!.core.invoke('courses.install_sample');
+      return (made as { data: { id: string } }).data.id;
+    });
+    const holds = { lessons: true, materials: true, progress: true, notes: true };
+
+    const results = await page.evaluate(
+      async ([id, where, all]) => {
+        type Loose = Record<string, (...args: unknown[]) => Promise<unknown>>;
+        const courses = window.adle!.courses as unknown as Loose;
+        const invoke = window.adle!.core.invoke as unknown as (
+          operation: string,
+          params?: unknown,
+        ) => Promise<unknown>;
+        return {
+          // A place to save, named every way the page can think of.
+          withPath: await courses.saveFile!(id, { kind: 'template', holds: all, path: where }),
+          extra: await courses.saveFile!(id, { kind: 'template', holds: all }, where, {
+            filePath: where,
+          }),
+          notACourse: await courses.saveFile!('../../etc', { kind: 'template', holds: all }),
+          notAKind: await courses.saveFile!(id, { kind: 'everything', holds: all }),
+          // A file to open, the same.
+          choose: await courses.chooseFile!(where, { filePaths: [where] }),
+          pathAsToken: await courses.bringIn!(where, all),
+          forgedToken: await courses.bringIn!('0'.repeat(32), all),
+          looseHolds: await courses.bringIn!('0'.repeat(32), { ...all, path: where }),
+          // And the core's own routes for it are the main process's alone.
+          save: await invoke('courses.save_file', {
+            path: { course_id: id },
+            body: { kind: 'template' },
+          }),
+          look: await invoke('courses.look_at_file', { body: { path: where } }),
+          bringIn: await invoke('courses.bring_in_file', { body: { path: where, holds: all } }),
+        };
+      },
+      [course, target, holds] as const,
+    );
+
+    const refused = { ok: false, error: { code: 'invalid_request' } };
+    expect(results.withPath).toMatchObject(refused);
+    expect(results.notACourse).toMatchObject(refused);
+    expect(results.notAKind).toMatchObject(refused);
+    expect(results.pathAsToken).toMatchObject(refused);
+    expect(results.looseHolds).toMatchObject(refused);
+    expect(results.save).toMatchObject(refused);
+    expect(results.look).toMatchObject(refused);
+    expect(results.bringIn).toMatchObject(refused);
+    // A token nobody was given names no file.
+    expect(results.forgedToken).toMatchObject({ ok: false, error: { code: 'file_not_chosen' } });
+    // What else the page passed was not looked at: the learner was asked, and said no.
+    expect(results.extra).toEqual({ ok: true, data: null });
+    expect(results.choose).toEqual({ ok: true, data: null });
+    const asked = await app.evaluate(
+      () => (globalThis as Record<string, unknown>).adleAskedKinds as string[],
+    );
+    expect(asked).toEqual(['save', 'open']);
+    expect(existsSync(target)).toBe(false);
+    // Nothing the core wrote for a save that was backed out of is left behind.
+    const handover = path.join(profileDir, 'data', 'handover');
+    expect(existsSync(handover) ? readdirSync(handover) : []).toEqual([]);
   });
 });
 

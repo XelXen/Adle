@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, GraduationCap, KeyRound, Library, Plus } from 'lucide-react';
+import { ArrowRight, BookOpen, GraduationCap, KeyRound, Library, Plus, Upload } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Course } from '@adle/contracts';
@@ -17,18 +17,15 @@ import {
 import { useApp } from '../../app/AppContext';
 import { useRouter } from '../../app/router';
 import { NextSteps } from '../../components/NextSteps';
+import { type CourseFileFound, getBridge } from '../../lib/bridge';
 import { callCore, describeError } from '../../lib/core-client';
+import { originLabel } from '../../lib/course-files';
 import { courseRoute } from '../../lib/courses';
 import { formatRelativeDay, pluralise } from '../../lib/format';
 import { useResource } from '../../lib/use-resource';
 import styles from './HomeScreen.module.css';
+import { ImportCourseDialog } from './ImportCourseDialog';
 import { NewCourseDialog } from './NewCourseDialog';
-
-const ORIGIN_LABEL: Record<Course['origin'], string> = {
-  sample: 'Sample course',
-  topic: 'From a topic',
-  materials: 'From your materials',
-};
 
 function courseSummary(course: Course): string {
   const sources =
@@ -46,6 +43,9 @@ export function HomeScreen() {
   const toast = useToast();
   const [creating, setCreating] = useState(false);
   const [addingSample, setAddingSample] = useState(false);
+  // A course in a file the learner chose, waiting to be asked about (ADR-063).
+  const [choosingFile, setChoosingFile] = useState(false);
+  const [found, setFound] = useState<CourseFileFound | null>(null);
   // Reload when the local service becomes ready (it may still be starting at first paint).
   const courses = useResource(`courses:${coreStatus.state}`, () => callCore('courses.list'));
   // The provider in use, and whether it has a key. Asked again once the service is ready.
@@ -66,6 +66,31 @@ export function HomeScreen() {
   const next = useResource(`home-next:${recentId ?? 'none'}`, async () =>
     recentId ? callCore('learning.overview', { path: { course_id: recentId } }) : null,
   );
+
+  // The file is chosen in a window of the system's own; what it holds is then asked about here.
+  const chooseFile = async (): Promise<void> => {
+    setChoosingFile(true);
+    try {
+      const result = await getBridge().courses.chooseFile();
+      if (!result.ok) {
+        toast.show({
+          tone: 'danger',
+          title: 'Couldn’t open that file',
+          description: result.error.message,
+        });
+      } else if (result.data) {
+        setFound(result.data);
+      }
+    } catch (error) {
+      toast.show({
+        tone: 'danger',
+        title: 'Couldn’t open that file',
+        description: describeError(error),
+      });
+    } finally {
+      setChoosingFile(false);
+    }
+  };
 
   // The sample course is written by Adle and ships with the app: adding it needs no provider.
   const addSample = async (): Promise<void> => {
@@ -93,9 +118,14 @@ export function HomeScreen() {
       title="Library"
       description="Your courses, and where you left off."
       actions={
-        <Button variant="primary" icon={<Plus />} onClick={() => setCreating(true)}>
-          New course
-        </Button>
+        <>
+          <Button icon={<Upload />} loading={choosingFile} onClick={() => void chooseFile()}>
+            Import course
+          </Button>
+          <Button variant="primary" icon={<Plus />} onClick={() => setCreating(true)}>
+            New course
+          </Button>
+        </>
       }
     >
       {/* Shown once it is known; the list of courses below never waits for it. */}
@@ -150,7 +180,7 @@ export function HomeScreen() {
                   meta={
                     <>
                       <Badge tone={course.origin === 'sample' ? 'accent' : 'neutral'}>
-                        {ORIGIN_LABEL[course.origin]}
+                        {originLabel(course)}
                       </Badge>
                       <ArrowRight aria-hidden="true" />
                     </>
@@ -211,6 +241,17 @@ export function HomeScreen() {
           );
         }}
       />
+
+      {found ? (
+        <ImportCourseDialog
+          found={found}
+          onClose={() => setFound(null)}
+          onImported={(courseId) => {
+            setFound(null);
+            navigate({ name: 'course', courseId, tab: 'learn' });
+          }}
+        />
+      ) : null}
     </Page>
   );
 }

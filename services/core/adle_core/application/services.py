@@ -14,9 +14,11 @@ from pathlib import Path
 import httpx2 as httpx
 from fastapi import Request
 
+from adle_core import __version__
 from adle_core.api.auth import LaunchToken
 from adle_core.application.asks import AskService
 from adle_core.application.assessment import AssessmentService
+from adle_core.application.course_sharing import CourseFileService
 from adle_core.application.courses import CourseService
 from adle_core.application.curriculum import CurriculumService
 from adle_core.application.generation import GenerationService
@@ -37,6 +39,7 @@ from adle_core.infrastructure.asset_store import AssetStore
 from adle_core.infrastructure.database import Database
 from adle_core.infrastructure.migrate import MigrationOutcome, migrate
 from adle_core.ingestion.extract import Extractor, extract_isolated, render_isolated
+from adle_core.ingestion.types import Limits
 from adle_core.lessons.player import ItemMask
 from adle_core.voice.runtime import VoicePaths
 
@@ -67,6 +70,8 @@ class Services:
     generation: GenerationService
     #: A lesson's narration in a natural voice, when one is set up (ADR-042).
     narration: NarrationService
+    #: A course saved as a file, and brought in from one (ADR-063).
+    course_files: CourseFileService
 
     def close(self) -> None:
         """Stop background work and release the database. Safe to call more than once."""
@@ -165,6 +170,23 @@ def build_services(
         voice_wait=narration.ready_after,
     )
     narration.on_voiced = generation.voiced
+    sources = SourceService(
+        database, source_files, jobs, extract=extract, gateway=gateway, draw_page=draw_page
+    )
+    course_files = CourseFileService(
+        database,
+        courses,
+        curriculum,
+        sources,
+        lessons,
+        learner,
+        asks,
+        handover_dir=settings.handover_dir,
+        made_by=f"Adle {__version__}",
+        max_file_bytes=Limits().max_file_bytes,
+    )
+    # A file written for the learner and never collected is not kept.
+    course_files.clear_handed_over()
     return Services(
         settings=settings,
         launch_token=launch_token,
@@ -173,9 +195,7 @@ def build_services(
         migration=migration,
         jobs=jobs,
         courses=courses,
-        sources=SourceService(
-            database, source_files, jobs, extract=extract, gateway=gateway, draw_page=draw_page
-        ),
+        sources=sources,
         retriever=retriever,
         curriculum=curriculum,
         learner=learner,
@@ -189,6 +209,7 @@ def build_services(
         gateway=gateway,
         generation=generation,
         narration=narration,
+        course_files=course_files,
     )
 
 

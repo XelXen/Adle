@@ -1,0 +1,54 @@
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The line that opens it: a small arrow that turns, then what is behind it. */
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ad-space-2);
+  align-self: flex-start;
+  padding: var(--ad-space-1) var(--ad-space-2) var(--ad-space-1) 0;
+  font: var(--ad-text-control);
+  color: var(--ad-color-muted);
+  border-radius: var(--ad-radius-control);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary::before {
+  content: '';
+  inline-size: 0.4em;
+  block-size: 0.4em;
+  margin-inline: 0.2em 0.1em;
+  border-inline-end: calc(var(--ad-border-width) * 1.5) solid currentColor;
+  border-block-end: calc(var(--ad-border-width) * 1.5) solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.root[open] > .summary::before {
+  transform: rotate(45deg);
+}
+
+.summary:hover {
+  color: var(--ad-color-ink);
+}
+
+.summary:focus-visible {
+  outline: var(--ad-focus-ring);
+  outline-offset: var(--ad-focus-offset);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-3);
+  padding-block-start: var(--ad-space-3);
+}

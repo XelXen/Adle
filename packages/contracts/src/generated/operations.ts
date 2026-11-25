@@ -6,6 +6,7 @@ import type {
   AnswerResult,
   AskList,
   AskRequest,
+  BroughtInCourse,
   ConceptCreate,
   ConceptEvidence,
   ConceptOrder,
@@ -13,6 +14,10 @@ import type {
   CopyDestination,
   Course,
   CourseCreate,
+  CourseFilePath,
+  CourseFileRequest,
+  CourseFileSummary,
+  CourseFileToBringIn,
   CourseList,
   CourseUpdate,
   Curriculum,
@@ -46,6 +51,7 @@ import type {
   ProviderSelection,
   ProviderStatus,
   ProviderUsage,
+  SavedCourseFile,
   SceneTrialList,
   SceneTrialReport,
   SearchResults,
@@ -67,11 +73,14 @@ import type {
  * Electron main process; the renderer bridge refuses them.
  */
 export const OPERATIONS = {
+  'courses.bring_in_file': { method: 'POST', path: '/v1/course-files/bring-in', internal: true },
   'courses.create': { method: 'POST', path: '/v1/courses', internal: false },
   'courses.delete': { method: 'DELETE', path: '/v1/courses/{course_id}', internal: false },
   'courses.get': { method: 'GET', path: '/v1/courses/{course_id}', internal: false },
   'courses.install_sample': { method: 'POST', path: '/v1/courses/sample', internal: false },
   'courses.list': { method: 'GET', path: '/v1/courses', internal: false },
+  'courses.look_at_file': { method: 'POST', path: '/v1/course-files/look', internal: true },
+  'courses.save_file': { method: 'POST', path: '/v1/courses/{course_id}/file', internal: true },
   'courses.update': { method: 'PATCH', path: '/v1/courses/{course_id}', internal: false },
   'curriculum.add_from_outline': {
     method: 'POST',
@@ -268,6 +277,12 @@ export type OperationId = keyof typeof OPERATIONS;
 
 /** Parameter and result types for each operation. */
 export interface OperationTypes {
+  'courses.bring_in_file': {
+    path: undefined;
+    query: undefined;
+    body: CourseFileToBringIn;
+    result: BroughtInCourse;
+  };
   'courses.create': {
     path: undefined;
     query: undefined;
@@ -297,6 +312,18 @@ export interface OperationTypes {
     query: undefined;
     body: undefined;
     result: CourseList;
+  };
+  'courses.look_at_file': {
+    path: undefined;
+    query: undefined;
+    body: CourseFilePath;
+    result: CourseFileSummary;
+  };
+  'courses.save_file': {
+    path: { course_id: string };
+    query: undefined;
+    body: CourseFileRequest;
+    result: SavedCourseFile;
   };
   'courses.update': {
     path: { course_id: string };

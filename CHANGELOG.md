@@ -19,6 +19,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **New pictures.** A lesson can draw a timeline; a beaker, test tube or flask in which
   something is seen to happen (a color, bubbles, a solid, heat); a molecule; and lines of
   code.
+- **Save a course as a file, and import one.** On a course's page, **Save as a file**
+  makes a zip: a template (the plan and its lessons, nothing about you) for someone
+  else to start from, or everything (your materials, progress and notes too) to move
+  the course to another computer. In the library, **Import course** shows what a file
+  holds and makes a new course of it. What is saved or imported can be changed under
+  **Advanced**.
 - **An Expressive voice put together from parts.** In Settings, choose who speaks, their
   age, pitch, pace, tone, feeling, delivery, accent and style, each from a list, and
   listen before you save. Start from a ready-made voice and change what you like, or
