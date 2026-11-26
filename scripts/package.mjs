@@ -299,7 +299,7 @@ async function packageApp({ appDir, productName, version }, coreStage) {
   const destination = path.join(outDir, forTests ? 'test' : 'release');
   rmSync(destination, { recursive: true, force: true });
 
-  const [built] = await packager({
+  const options = {
     dir: appDir,
     out: destination,
     name: productName,
@@ -319,9 +319,22 @@ async function packageApp({ appDir, productName, version }, coreStage) {
     appBundleId: APP_ID,
     appCategoryType: 'public.app-category.education',
     quiet: true,
-  });
-  if (!built) throw new Error('Nothing was packaged.');
-  return built;
+  };
+  // The packager fetches Electron for this system. On a build machine that download now
+  // and then drops ("fetch failed", run 45866580999): it is tried again a little later.
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const [built] = await packager(options);
+      if (!built) throw new Error('Nothing was packaged.');
+      return built;
+    } catch (error) {
+      const said = error instanceof Error ? error.message : String(error);
+      const dropped = /fetch failed|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up/i.test(said);
+      if (!dropped || attempt === 3) throw error;
+      console.log(`Fetching Electron failed (try ${attempt}): ${said}. Trying again shortly.`);
+      await new Promise((resolve) => setTimeout(resolve, attempt * 15_000));
+    }
+  }
 }
 
 function executableOf(appFolder, productName) {
