@@ -50,7 +50,7 @@ import {
 } from './secrets';
 import { openExternalLink } from './security';
 import { registerSettingsFileHandlers } from './settings-files';
-import { parseUiStatePatch, type UiStateStore } from './ui-state';
+import { colorSchemeOf, parseUiStatePatch, type UiStateStore } from './ui-state';
 
 /** Upper bound on a serialised request body coming from the renderer. */
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -175,7 +175,8 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     if (!patch) throw new Error('Invalid interface settings.');
     const next = uiState.update(patch);
     // Chromium follows this for `prefers-color-scheme`, in the app and in player frames.
-    nativeTheme.themeSource = next.theme;
+    // A pastel color is the page's alone (ADR-074): the window follows it by itself.
+    nativeTheme.themeSource = colorSchemeOf(next.theme);
     return next;
   });
 

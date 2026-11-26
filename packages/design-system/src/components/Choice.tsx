@@ -372,6 +372,11 @@ export interface SliderProps {
   onValueChange: (value: number) => void;
   /** Format the value for display and for assistive technology. */
   formatValue?: (value: number) => string;
+  /**
+   * What the track shows: how far along the value is, or every hue from the first to the
+   * last, for a slider that picks a color of Pastel's (`--ad-pastel-spectrum`, ADR-074).
+   */
+  track?: 'fill' | 'spectrum';
   disabled?: boolean;
   className?: string;
 }
@@ -385,6 +390,7 @@ export function Slider({
   step = 0.01,
   onValueChange,
   formatValue = (current) => String(current),
+  track = 'fill',
   disabled,
   className,
 }: SliderProps) {
@@ -403,7 +409,7 @@ export function Slider({
       <input
         id={id}
         type="range"
-        className={styles.range}
+        className={cx(styles.range, track === 'spectrum' && styles.rangeSpectrum)}
         min={min}
         max={max}
         step={step}
@@ -415,6 +421,84 @@ export function Slider({
         }
         onChange={(event) => onValueChange(Number(event.target.value))}
       />
+    </div>
+  );
+}
+
+export interface ColorSwatch {
+  /** A hue in whole degrees round the OKLCH circle. */
+  hue: number;
+  /** What the color is called: its accessible name, and what a pointer over it shows. */
+  name: string;
+}
+
+export interface ColorSwatchesProps {
+  /** Accessible name of the group. */
+  label: string;
+  /** The hue chosen. One between the swatches leaves none of them chosen. */
+  value: number;
+  swatches: readonly ColorSwatch[];
+  onValueChange: (hue: number) => void;
+  className?: string;
+}
+
+/**
+ * A choice of colors, side by side, each a swatch of its hue at Pastel's lightness
+ * (ADR-074). A radio group, like `SegmentedControl`: the arrow keys move the choice.
+ */
+export function ColorSwatches({
+  label,
+  value,
+  swatches,
+  onValueChange,
+  className,
+}: ColorSwatchesProps) {
+  const group = useRef<HTMLDivElement>(null);
+  const chosen = swatches.findIndex((swatch) => swatch.hue === value);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
+    const last = swatches.length - 1;
+    let next: number;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      next = chosen < 0 ? 0 : (chosen + 1) % swatches.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      next = chosen < 0 ? last : (chosen - 1 + swatches.length) % swatches.length;
+    } else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = last;
+    else return;
+    event.preventDefault();
+    const swatch = swatches[next];
+    if (!swatch) return;
+    onValueChange(swatch.hue);
+    group.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
+  };
+
+  return (
+    <div
+      ref={group}
+      role="radiogroup"
+      aria-label={label}
+      className={cx(styles.swatches, className)}
+    >
+      {swatches.map((swatch, index) => {
+        const selected = index === chosen;
+        return (
+          <button
+            key={swatch.hue}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={swatch.name}
+            title={swatch.name}
+            // With none chosen, the first is where Tab enters the group.
+            tabIndex={selected || (chosen < 0 && index === 0) ? 0 : -1}
+            className={cx(styles.swatch, selected && styles.swatchSelected)}
+            style={{ '--ad-swatch-hue': swatch.hue } as CSSProperties}
+            onClick={() => onValueChange(swatch.hue)}
+            onKeyDown={handleKeyDown}
+          />
+        );
+      })}
     </div>
   );
 }

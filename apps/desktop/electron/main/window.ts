@@ -1,7 +1,10 @@
 import { BrowserWindow, nativeTheme } from 'electron';
 
+import type { UiState } from '../shared/ipc';
+import { pastelWindowColors } from './pastel';
 import { paths } from './paths';
 import { APP_ENTRY_URL } from './protocol';
+import { isPastel } from './ui-state';
 
 /** Canvas colours from the Sprout tokens, used to avoid a white flash before first paint. */
 const CANVAS_LIGHT = '#F3F3F3';
@@ -13,6 +16,12 @@ const INK_DARK = '#EDEDED';
 /** How tall the strip at the top of the window is, with the window's buttons at its end. */
 export const TITLE_BAR_HEIGHT = 40;
 
+/** Where the window learns the theme: the learner's interface settings, and their changes. */
+export interface WindowLook {
+  get(): Pick<UiState, 'theme' | 'pastelHue'>;
+  onChange(listener: () => void): () => void;
+}
+
 /**
  * Where the app draws its own title bar (ADR-030). On Windows and macOS the window has
  * none of the operating system's: the page's top strip is what it is moved by, and the
@@ -23,18 +32,26 @@ export function ownsTitleBar(platform: NodeJS.Platform = process.platform): bool
   return platform === 'win32' || platform === 'darwin';
 }
 
-const canvas = (): string => (nativeTheme.shouldUseDarkColors ? CANVAS_DARK : CANVAS_LIGHT);
-
-/** The window's buttons in the colours of the app, so they belong to the strip they sit on. */
-function buttons(): Electron.TitleBarOverlayOptions {
-  return {
-    color: canvas(),
-    symbolColor: nativeTheme.shouldUseDarkColors ? INK_DARK : INK_LIGHT,
-    height: TITLE_BAR_HEIGHT,
-  };
+/** The canvas and the ink of the theme in effect, as the page has them. */
+function colors(look: WindowLook | undefined): { canvas: string; ink: string } {
+  const dark = nativeTheme.shouldUseDarkColors;
+  const chosen = look?.get();
+  // Pastel and Pastel dark (ADR-074): the canvas and the ink take the learner's color.
+  if (chosen && isPastel(chosen.theme)) return pastelWindowColors(chosen.pastelHue, dark);
+  return dark ? { canvas: CANVAS_DARK, ink: INK_DARK } : { canvas: CANVAS_LIGHT, ink: INK_LIGHT };
 }
 
-export function createMainWindow(options: { showDevTools: boolean }): BrowserWindow {
+/** The window's buttons in the colours of the app, so they belong to the strip they sit on. */
+function buttons(look: WindowLook | undefined): Electron.TitleBarOverlayOptions {
+  const { canvas, ink } = colors(look);
+  return { color: canvas, symbolColor: ink, height: TITLE_BAR_HEIGHT };
+}
+
+export function createMainWindow(options: {
+  showDevTools: boolean;
+  look?: WindowLook;
+}): BrowserWindow {
+  const { look } = options;
   const window = new BrowserWindow({
     width: 1280,
     height: 832,
@@ -48,14 +65,15 @@ export function createMainWindow(options: { showDevTools: boolean }): BrowserWin
     title: 'Adle',
     // Windows and Linux take the window and taskbar icon from here; macOS uses the bundle's.
     icon: paths.windowIcon,
-    backgroundColor: canvas(),
+    backgroundColor: colors(look).canvas,
     autoHideMenuBar: true,
     ...(ownsTitleBar()
       ? {
           titleBarStyle:
             process.platform === 'darwin' ? ('hiddenInset' as const) : ('hidden' as const),
           // macOS draws its own buttons; it is only told how tall the strip is.
-          titleBarOverlay: process.platform === 'darwin' ? { height: TITLE_BAR_HEIGHT } : buttons(),
+          titleBarOverlay:
+            process.platform === 'darwin' ? { height: TITLE_BAR_HEIGHT } : buttons(look),
         }
       : {}),
     webPreferences: {
@@ -79,14 +97,19 @@ export function createMainWindow(options: { showDevTools: boolean }): BrowserWin
   });
 
   // The theme can change while the window is open (the learner's choice, or the system's).
-  // The page repaints itself; what the window draws must follow.
+  // The page repaints itself; what the window draws must follow. A pastel color changes
+  // nothing the operating system sees, so the learner's settings are followed too.
   const repaint = (): void => {
     if (window.isDestroyed()) return;
-    window.setBackgroundColor(canvas());
-    if (process.platform === 'win32') window.setTitleBarOverlay(buttons());
+    window.setBackgroundColor(colors(look).canvas);
+    if (process.platform === 'win32') window.setTitleBarOverlay(buttons(look));
   };
   nativeTheme.on('updated', repaint);
-  window.once('closed', () => nativeTheme.off('updated', repaint));
+  const stopFollowing = look?.onChange(repaint);
+  window.once('closed', () => {
+    nativeTheme.off('updated', repaint);
+    stopFollowing?.();
+  });
 
   void window.loadURL(APP_ENTRY_URL);
   return window;

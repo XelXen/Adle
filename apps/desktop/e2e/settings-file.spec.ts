@@ -82,6 +82,14 @@ async function openPrivacy(page: Page): Promise<void> {
 const prefersDark = (page: Page): Promise<boolean> =>
   page.evaluate(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
 
+/** The hue of a Pastel theme the page is in, or null in any other theme (ADR-074). */
+const pastel = (page: Page): Promise<string | null> =>
+  page.evaluate(() =>
+    document.documentElement.dataset.adPalette === 'pastel'
+      ? document.documentElement.style.getPropertyValue('--ad-pastel-hue')
+      : null,
+  );
+
 test.describe('settings as a file', () => {
   test('settings are saved with the keys locked, and set another computer up as this one is', async ({
     profileDir,
@@ -109,8 +117,11 @@ test.describe('settings as a file', () => {
       await page.getByRole('navigation').getByRole('button', { name: 'Settings' }).click();
       await saveProviderKey(page, /Custom endpoint/, KEY);
       await page.getByRole('tab', { name: 'Appearance' }).click();
-      await page.getByRole('radio', { name: 'Dark' }).click();
+      // Pastel dark, in mint (ADR-074): the color goes with the theme.
+      await page.getByRole('radio', { name: 'Pastel dark', exact: true }).click();
+      await page.getByRole('radio', { name: 'Mint', exact: true }).click();
       await expect.poll(() => prefersDark(page)).toBe(true);
+      await expect.poll(() => pastel(page)).toBe('160');
       await invoke(page, 'learner.update_preferences', {
         body: { pace: 'brisk', volume: 35, goal: 'Pass the exam in June.' },
       });
@@ -140,7 +151,7 @@ test.describe('settings as a file', () => {
     const text = readFileSync(file, 'utf8');
     const saved = JSON.parse(text) as Record<string, Record<string, unknown>>;
     expect(saved.format).toBe('adle-settings');
-    expect(saved.appearance).toEqual({ theme: 'dark', notifications: true });
+    expect(saved.appearance).toEqual({ theme: 'pastel-dark', notifications: true, pastelHue: 160 });
     expect(saved.learning).toMatchObject({ pace: 'brisk', volume: 35 });
     expect(saved.voice).toMatchObject({ enabled: true, tier: 'kokoro' });
     expect(saved.provider).toEqual({ selection: 'auto' });
@@ -210,6 +221,7 @@ test.describe('settings as a file', () => {
       await expect(page.getByRole('heading', { name: 'Your settings', level: 2 })).toBeVisible();
       await waitForCore(page);
       await expect.poll(() => prefersDark(page)).toBe(true);
+      await expect.poll(() => pastel(page)).toBe('160');
       // The key is kept here for this provider, and the core has it: never the page.
       expect((await page.evaluate(() => window.adle!.provider.keyState())).custom).toEqual({
         stored: true,

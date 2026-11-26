@@ -9,6 +9,14 @@ Read the root `AGENTS.md` and `DESIGN_SYSTEM.md` first.
   else. `tokens.test.ts` fails on a raw colour in any stylesheet here or in the renderer.
 - **A new or changed colour must pass contrast in both themes.** Add its pairings to `PAIRS` in
   `tokens.test.ts`. The dark theme must define every colour token.
+- **Pastel and Pastel dark** (ADR-074) are the light and dark themes with some tokens in the
+  learner's hue, in the block at the end of `tokens.css` (`:root[data-ad-palette='pastel']`).
+  A tinted token is `oklch(L C var(--ad-pastel-hue))` at a lightness and chroma sRGB can
+  show in every hue: `tokens.test.ts` works it out in all 360 and holds each to `PAIRS`.
+  Pastel dark sets again everything Pastel sets. Tint only grounds, text, borders and the
+  one color; never what a color means (success, danger, accents, focus), the scene palette
+  or the stage. The window's canvas and ink are worked out again in
+  `apps/desktop/electron/main/pastel.ts`: change both, a test compares them.
 - **Brand and success are different colours.** `primary` / `action` are the teal of the mark;
   `success` is green and means only "this went well". `brand-ink` is for the logo alone
   (ADR-011).
@@ -21,9 +29,10 @@ Read the root `AGENTS.md` and `DESIGN_SYSTEM.md` first.
   page). A new text colour needs a contrast pair on each ground it is used on.
 - **Teal is for the filled action and for selection.** Do not use it to decorate, and do not
   mark importance with a coloured edge.
-- **The grounds and the text are neutral** (ADR-027): no tint in any grey, in either theme.
-  The filled action is a deep fill with a white label in both themes; do not bring back a
-  bright fill with dark text for the dark theme.
+- **The grounds and the text are neutral** (ADR-027): no tint in any grey, in Light or Dark.
+  The filled action is a deep fill with a white label in both; do not bring back a bright
+  fill with dark text for the dark theme. Pastel and Pastel dark tint them on purpose, and
+  only there (ADR-074).
 - `scene-ink` and `scene-muted` are frozen: scene files have those values written into
   them. `scene-background` is the player's (`scene-run.ts`) and follows `surface`: change
   the token, `scene-palette.ts`, the player and the skill together. If you

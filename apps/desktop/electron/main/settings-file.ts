@@ -11,6 +11,7 @@ import {
 } from '../shared/ipc';
 import { isInside } from './data-copy';
 import { parseSelection, validateApiKey } from './secrets';
+import { isPastelHue } from './ui-state';
 
 /**
  * A settings file (ADR-064): what one holds, reading one that may come from anywhere, and
@@ -60,7 +61,8 @@ export interface KeyForProvider {
 
 /** What a settings file holds. Every part is optional: a file holds what was chosen. */
 export interface SettingsFile {
-  appearance?: { theme: ThemePreference; notifications: boolean };
+  /** The theme and its pastel color (ADR-074), and whether the computer may say things. */
+  appearance?: { theme: ThemePreference; notifications: boolean; pastelHue?: number };
   /** How the learner likes to learn, as the core keeps it: checked by the core. */
   learning?: Record<string, unknown>;
   /** The voice chosen, as the core keeps it: checked by the core. */
@@ -272,6 +274,8 @@ export function parseSettingsFile(text: string): ParsedSettingsFile {
       : null;
     if (theme && typeof appearance.notifications === 'boolean') {
       file.appearance = { theme, notifications: appearance.notifications };
+      // A file from before Pastel (ADR-074) has no color: the one here stays.
+      if (isPastelHue(appearance.pastelHue)) file.appearance.pastelHue = appearance.pastelHue;
     }
   }
   if (isPlainRecord(learning)) file.learning = learning;

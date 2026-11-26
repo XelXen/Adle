@@ -7,6 +7,7 @@ import { App } from './App';
 import { AppProvider } from './app/AppContext';
 import { RouterProvider } from './app/router';
 import { getBridge } from './lib/bridge';
+import { applyPalette } from './lib/theme';
 
 async function boot(): Promise<void> {
   const container = document.getElementById('root');
@@ -22,6 +23,8 @@ async function boot(): Promise<void> {
   if (info.platform === 'win32' || info.platform === 'darwin') {
     document.documentElement.dataset.adTitlebar = info.platform;
   }
+  // A Pastel theme's color, before the first paint too (ADR-074).
+  applyPalette(info.ui);
 
   createRoot(container).render(
     <StrictMode>

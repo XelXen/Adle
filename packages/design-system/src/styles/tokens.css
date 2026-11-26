@@ -16,8 +16,12 @@
  *   - The dark theme is designed, not inverted: near-black grounds that step up in
  *     small amounts, and the same deep teal action with a white label as the light one.
  *   - The theme follows `prefers-color-scheme`. The desktop shell maps the
- *     learner's choice (system / light / dark) onto it, so there is exactly one
- *     theming mechanism.
+ *     learner's choice (system / light / dark, and Pastel as light, Pastel dark as dark)
+ *     onto it, so there is exactly one way the scheme is set.
+ *   - Pastel and Pastel dark (ADR-074) are the light and the dark theme in a color the
+ *     learner picks: the page is marked `data-ad-palette="pastel"` and told the hue in
+ *     `--ad-pastel-hue`, and the block at the end of this file gives the grounds, the text
+ *     and the one color that hue. Nothing else changes.
  *
  * See DESIGN_SYSTEM.md for usage guidance and contrast notes.
  */
@@ -102,6 +106,33 @@
   --ad-color-stage-muted: #9db0a5;
   --ad-color-stage-rule: #2e2e2e;
   --ad-color-stage-mark: #1d4a52;
+
+  /* ---- Pastel's color (ADR-074) ---------------------------------------------
+   * The hue of the Pastel themes, in degrees round the OKLCH circle: the page sets it from
+   * the learner's choice; this is lavender, the color Pastel starts in. A swatch of a hue,
+   * and the strip of every hue a slider moves along, are drawn at one lightness and chroma
+   * that every hue can show. */
+  --ad-pastel-hue: 295;
+  --ad-pastel-swatch-lightness: 0.85;
+  --ad-pastel-swatch-chroma: 0.07;
+  /* The mark in the swatch chosen: a swatch is light in either theme, so this is dark in both. */
+  --ad-pastel-swatch-mark: #1a1a1a;
+  --ad-pastel-spectrum: linear-gradient(
+    to right,
+    oklch(0.85 0.07 0),
+    oklch(0.85 0.07 30),
+    oklch(0.85 0.07 60),
+    oklch(0.85 0.07 90),
+    oklch(0.85 0.07 120),
+    oklch(0.85 0.07 150),
+    oklch(0.85 0.07 180),
+    oklch(0.85 0.07 210),
+    oklch(0.85 0.07 240),
+    oklch(0.85 0.07 270),
+    oklch(0.85 0.07 300),
+    oklch(0.85 0.07 330),
+    oklch(0.85 0.07 359)
+  );
 
   /* ---- Typography ------------------------------------------------------- */
   /* One family, three voices: Geist Sans, Geist Serif, and Geist Mono (ADR-025). */
@@ -255,5 +286,64 @@
     --ad-duration-fast: 0.01ms;
     --ad-duration-base: 0.01ms;
     --ad-duration-slow: 0.01ms;
+  }
+}
+
+/* ---- Pastel and Pastel dark (ADR-074) ------------------------------------------
+ * The light and the dark theme, their grounds, text, borders and one color in the hue the
+ * learner picked. Each is written in OKLCH at a lightness and chroma that sRGB can show in
+ * every hue, so a token has the same contrast whatever the color (tokens.test.ts tries all
+ * 360 of them). What a color means stays as it is in every theme: success, danger and the
+ * accents, the focus ring, the scene palette and the lesson's screen are not tinted. The
+ * window's own ground and buttons take the canvas and the ink (electron/main/pastel.ts). */
+:root[data-ad-palette='pastel'] {
+  --ad-color-canvas: oklch(0.925 0.034 var(--ad-pastel-hue));
+  --ad-color-page: oklch(0.968 0.014 var(--ad-pastel-hue));
+  --ad-color-surface: oklch(0.988 0.005 var(--ad-pastel-hue));
+  --ad-color-surface-subtle: oklch(0.952 0.02 var(--ad-pastel-hue));
+  --ad-color-surface-sunken: oklch(0.905 0.036 var(--ad-pastel-hue));
+  --ad-color-ink: oklch(0.25 0.03 var(--ad-pastel-hue));
+  --ad-color-muted: oklch(0.465 0.04 var(--ad-pastel-hue));
+  --ad-color-faint: oklch(0.49 0.036 var(--ad-pastel-hue));
+  --ad-color-border: oklch(0.895 0.03 var(--ad-pastel-hue));
+  --ad-color-border-control: oklch(0.84 0.034 var(--ad-pastel-hue));
+  --ad-color-border-strong: oklch(0.585 0.04 var(--ad-pastel-hue));
+
+  /* The one color is the learner's: a deep shade of it filled, with a white label. */
+  --ad-color-primary: oklch(0.56 0.093 var(--ad-pastel-hue));
+  --ad-color-primary-soft: oklch(0.935 0.029 var(--ad-pastel-hue));
+  --ad-color-action: oklch(0.5 0.083 var(--ad-pastel-hue));
+  --ad-color-action-hover: oklch(0.46 0.076 var(--ad-pastel-hue));
+  --ad-color-action-pressed: oklch(0.42 0.069 var(--ad-pastel-hue));
+  --ad-color-primary-text: oklch(0.44 0.073 var(--ad-pastel-hue));
+
+  --ad-shadow-action:
+    inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px oklch(0.3 0.05 var(--ad-pastel-hue) / 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-ad-palette='pastel'] {
+    --ad-color-canvas: oklch(0.17 0.02 var(--ad-pastel-hue));
+    --ad-color-page: oklch(0.19 0.022 var(--ad-pastel-hue));
+    --ad-color-surface: oklch(0.225 0.026 var(--ad-pastel-hue));
+    --ad-color-surface-subtle: oklch(0.25 0.028 var(--ad-pastel-hue));
+    --ad-color-surface-sunken: oklch(0.145 0.018 var(--ad-pastel-hue));
+    --ad-color-ink: oklch(0.95 0.012 var(--ad-pastel-hue));
+    --ad-color-muted: oklch(0.79 0.03 var(--ad-pastel-hue));
+    --ad-color-faint: oklch(0.73 0.03 var(--ad-pastel-hue));
+    --ad-color-border: oklch(0.29 0.026 var(--ad-pastel-hue));
+    --ad-color-border-control: oklch(0.36 0.03 var(--ad-pastel-hue));
+    --ad-color-border-strong: oklch(0.56 0.035 var(--ad-pastel-hue));
+
+    /* Pastel dark: the color itself, light, filled, with a dark label of its own hue. */
+    --ad-color-primary: oklch(0.8 0.085 var(--ad-pastel-hue));
+    --ad-color-primary-soft: oklch(0.3 0.045 var(--ad-pastel-hue));
+    --ad-color-action: oklch(0.8 0.085 var(--ad-pastel-hue));
+    --ad-color-action-hover: oklch(0.84 0.075 var(--ad-pastel-hue));
+    --ad-color-action-pressed: oklch(0.76 0.085 var(--ad-pastel-hue));
+    --ad-color-on-action: oklch(0.2 0.03 var(--ad-pastel-hue));
+    --ad-color-primary-text: oklch(0.85 0.07 var(--ad-pastel-hue));
+
+    --ad-shadow-action: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 1px 2px rgb(0 0 0 / 0.4);
   }
 }

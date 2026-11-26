@@ -18,7 +18,7 @@ import {
 import { syncProviders } from './providers';
 import { createSecureEncryptor, ProviderKeyStore } from './secrets';
 import { hardenSession, hardenWebContents, refuseNameLookups } from './security';
-import { UiStateStore } from './ui-state';
+import { colorSchemeOf, UiStateStore } from './ui-state';
 import { createMainWindow } from './window';
 
 /**
@@ -149,7 +149,7 @@ async function start(): Promise<void> {
   });
   const uiState = new UiStateStore(paths.uiStateFile());
   // Apply the saved theme before the window exists so there is no flash of the wrong one.
-  nativeTheme.themeSource = uiState.get().theme;
+  nativeTheme.themeSource = colorSchemeOf(uiState.get().theme);
   const deps = {
     core,
     keyStore,
@@ -178,7 +178,7 @@ async function start(): Promise<void> {
   forwardCoreStatus(core, () => mainWindow?.webContents ?? null);
 
   const openWindow = (): void => {
-    const window = createMainWindow({ showDevTools: isDevelopment });
+    const window = createMainWindow({ showDevTools: isDevelopment, look: uiState });
     mainWindow = window;
     window.on('closed', () => {
       mainWindow = null;

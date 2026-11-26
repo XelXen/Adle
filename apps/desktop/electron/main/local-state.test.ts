@@ -272,7 +272,12 @@ describe('createSecureEncryptor', () => {
   });
 });
 
-const DEFAULTS = { theme: 'system', onboardingCompleted: false, notifications: true };
+const DEFAULTS = {
+  theme: 'system',
+  pastelHue: 295,
+  onboardingCompleted: false,
+  notifications: true,
+};
 
 describe('UiStateStore', () => {
   it('starts with defaults and persists updates', () => {
@@ -284,6 +289,7 @@ describe('UiStateStore', () => {
     store.update({ onboardingCompleted: true });
     expect(new UiStateStore(file).get()).toEqual({
       theme: 'dark',
+      pastelHue: 295,
       onboardingCompleted: true,
       notifications: true,
     });
@@ -297,9 +303,24 @@ describe('UiStateStore', () => {
     writeFileSync(file, JSON.stringify({ theme: 'light', onboardingCompleted: true }));
     expect(new UiStateStore(file).get()).toEqual({
       theme: 'light',
+      pastelHue: 295,
       onboardingCompleted: true,
       notifications: true,
     });
+  });
+
+  it('keeps a Pastel theme and its color, and says each change to who follows it', () => {
+    const file = path.join(directory, 'ui-state.json');
+    const store = new UiStateStore(file);
+    const seen: string[] = [];
+    const stop = store.onChange((state) => seen.push(`${state.theme} ${state.pastelHue}`));
+    store.update({ theme: 'pastel', pastelHue: 160 });
+    store.update({ theme: 'dark' });
+    stop();
+    store.update({ theme: 'pastel-dark' });
+    expect(seen).toEqual(['pastel 160', 'dark 160']);
+    // The color stays while another theme is chosen, so Pastel comes back in it.
+    expect(new UiStateStore(file).get()).toMatchObject({ theme: 'pastel-dark', pastelHue: 160 });
   });
 
   it('falls back to defaults when the file is corrupt or tampered with', () => {
@@ -317,6 +338,14 @@ describe('UiStateStore', () => {
     expect(parseUiStatePatch({ notifications: false })).toEqual({ notifications: false });
     expect(parseUiStatePatch({ notifications: 'off' })).toBeNull();
     expect(parseUiStatePatch(['theme'])).toBeNull();
+    expect(parseUiStatePatch({ theme: 'pastel', pastelHue: 0 })).toEqual({
+      theme: 'pastel',
+      pastelHue: 0,
+    });
+    expect(parseUiStatePatch({ pastelHue: 359 })).toEqual({ pastelHue: 359 });
+    for (const pastelHue of [360, -1, 1.5, '200', null]) {
+      expect(parseUiStatePatch({ pastelHue }), String(pastelHue)).toBeNull();
+    }
     expect(parseUiStatePatch(null)).toBeNull();
   });
 });

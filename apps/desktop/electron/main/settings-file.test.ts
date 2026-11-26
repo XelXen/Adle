@@ -166,6 +166,22 @@ describe('a settings file', () => {
     expect(parseSettingsFile(text)).toEqual({ ok: true, file: { learning: { pace: 'brisk' } } });
   });
 
+  it('carries the color of a Pastel theme, and only a color it can be (ADR-074)', () => {
+    const read = (appearance: Record<string, unknown>) =>
+      parseSettingsFile(JSON.stringify({ format: 'adle-settings', version: 1, appearance }));
+    expect(read({ theme: 'pastel-dark', notifications: true, pastelHue: 160 })).toEqual({
+      ok: true,
+      file: { appearance: { theme: 'pastel-dark', notifications: true, pastelHue: 160 } },
+    });
+    // From before Pastel, or a color that is not one: the theme comes, the color here stays.
+    for (const pastelHue of [undefined, 360, -1, 12.5, '160']) {
+      expect(read({ theme: 'pastel', notifications: false, pastelHue })).toEqual({
+        ok: true,
+        file: { appearance: { theme: 'pastel', notifications: false } },
+      });
+    }
+  });
+
   it('never takes an address for a provider or for a key', () => {
     const locked = lockKeys(KEYS, PASSWORD);
     const text = JSON.stringify({

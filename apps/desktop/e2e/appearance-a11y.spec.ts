@@ -4,6 +4,7 @@ import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 
+import { pastelWindowColors } from '../electron/main/pastel';
 import { desktopDir, expect, expectReadyOnPage, launchApp, test } from './support/app';
 import { pressableUnderTheStrip, providerKeyField, settled } from './support/courses';
 
@@ -44,37 +45,85 @@ test.describe('theme', () => {
     await page.getByRole('button', { name: 'Settings' }).click();
     await page.getByRole('tab', { name: 'Appearance' }).click();
 
-    await page.getByRole('radio', { name: 'Dark' }).click();
+    await page.getByRole('radio', { name: 'Dark', exact: true }).click();
     await expect.poll(() => prefersDark(page)).toBe(true);
     await expect.poll(() => canvasColour(page)).toBe('rgb(10, 10, 10)');
+    // Only Pastel and Pastel dark are in a color the learner picks.
+    await expect(page.getByRole('radiogroup', { name: 'Color' })).toHaveCount(0);
 
-    await page.getByRole('radio', { name: 'Light' }).click();
+    await page.getByRole('radio', { name: 'Light', exact: true }).click();
     await expect.poll(() => prefersDark(page)).toBe(false);
     await expect.poll(() => canvasColour(page)).toBe('rgb(243, 243, 243)');
 
-    await page.getByRole('radio', { name: 'Dark' }).click();
+    // Pastel (ADR-074): the light theme, in lavender until another color is picked.
+    await page.getByRole('radio', { name: 'Pastel', exact: true }).click();
+    await expect.poll(() => prefersDark(page)).toBe(false);
+    await expect.poll(() => canvasColour(page)).toBe('oklch(0.925 0.034 295)');
+    const colors = page.getByRole('radiogroup', { name: 'Color' });
+    await expect(colors.getByRole('radio', { name: 'Lavender' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await colors.getByRole('radio', { name: 'Mint' }).click();
+    await expect.poll(() => canvasColour(page)).toBe('oklch(0.925 0.034 160)');
+    // The window draws itself in the same color, its buttons on the strip too.
+    const windowColour = () =>
+      first.app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]!.getBackgroundColor().toUpperCase(),
+      );
+    await expect.poll(windowColour).toBe(pastelWindowColors(160, false).canvas);
+    // Any color between them, from the slider: by the keyboard, a step at a time.
+    const slider = page.getByRole('slider', { name: 'Any color' });
+    await slider.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(slider).toHaveAttribute('aria-valuetext', 'Near mint');
+    await expect.poll(() => canvasColour(page)).toBe('oklch(0.925 0.034 161)');
+    await page.keyboard.press('ArrowLeft');
+    await expect(colors.getByRole('radio', { name: 'Mint' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    // Pastel dark: the dark theme, in the same color.
+    await page.getByRole('radio', { name: 'Pastel dark', exact: true }).click();
     await expect.poll(() => prefersDark(page)).toBe(true);
+    await expect.poll(() => canvasColour(page)).toBe('oklch(0.17 0.02 160)');
+    await expect.poll(windowColour).toBe(pastelWindowColors(160, true).canvas);
     await first.close();
 
     const second = await launchApp(profileDir);
     expect(await prefersDark(second.page)).toBe(true);
+    expect(await canvasColour(second.page)).toBe('oklch(0.17 0.02 160)');
     await second.page.getByRole('button', { name: 'Settings' }).click();
     await second.page.getByRole('tab', { name: 'Appearance' }).click();
-    await expect(second.page.getByRole('radio', { name: 'Dark' })).toHaveAttribute(
+    await expect(
+      second.page.getByRole('radio', { name: 'Pastel dark', exact: true }),
+    ).toHaveAttribute('aria-checked', 'true');
+    await expect(second.page.getByRole('radio', { name: 'Mint', exact: true })).toHaveAttribute(
       'aria-checked',
       'true',
     );
+    // Away from Pastel and back: the color is kept for it.
+    await second.page.getByRole('radio', { name: 'Dark', exact: true }).click();
+    await expect.poll(() => canvasColour(second.page)).toBe('rgb(10, 10, 10)');
+    await second.page.getByRole('radio', { name: 'Pastel', exact: true }).click();
+    await expect.poll(() => canvasColour(second.page)).toBe('oklch(0.925 0.034 160)');
     await second.close();
   });
 });
 
-for (const theme of ['light', 'dark'] as const) {
+// Pastel and Pastel dark (ADR-074) each in a color of their own: the tokens are checked in
+// every hue (tokens.test.ts); here the screens are, as a learner sees them.
+const PASTEL_HUES = { light: undefined, dark: undefined, pastel: 50, 'pastel-dark': 235 };
+
+for (const theme of ['light', 'dark', 'pastel', 'pastel-dark'] as const) {
   test.describe(`${theme} theme screens`, () => {
     test('every primary screen passes axe and is captured for review', async ({ profileDir }) => {
-      const { page, problems, close } = await launchApp(profileDir, { theme });
+      const pastelHue = PASTEL_HUES[theme];
+      const { page, problems, close } = await launchApp(profileDir, { theme, pastelHue });
       expect(
         await page.evaluate(() => window.matchMedia('(prefers-color-scheme: dark)').matches),
-      ).toBe(theme === 'dark');
+      ).toBe(theme === 'dark' || theme === 'pastel-dark');
 
       await expectNoAxeViolations(page, 'welcome');
       await capture(page, `${theme}-welcome`);

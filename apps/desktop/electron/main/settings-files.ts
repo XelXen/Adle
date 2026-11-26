@@ -39,7 +39,7 @@ import {
   writeSettingsFile,
   WrongPasswordError,
 } from './settings-file';
-import type { UiStateStore } from './ui-state';
+import { colorSchemeOf, type UiStateStore } from './ui-state';
 
 /**
  * Settings saved as a file, and brought in from one (ADR-064).
@@ -107,8 +107,8 @@ export function registerSettingsFileHandlers(deps: SettingsFileDependencies, han
 
       const file: SettingsFile = {};
       if (wanted.appearance) {
-        const { theme, notifications } = uiState.get();
-        file.appearance = { theme, notifications };
+        const { theme, notifications, pastelHue } = uiState.get();
+        file.appearance = { theme, notifications, pastelHue };
       }
       if (wanted.learning || wanted.voice) {
         const kept = await callCore(core.getConnection(), OPERATIONS['settings.save_file']);
@@ -353,7 +353,7 @@ export function registerSettingsFileHandlers(deps: SettingsFileDependencies, han
       if (wanted.appearance && file.appearance) {
         const next = uiState.update(file.appearance);
         // Chromium follows this for `prefers-color-scheme`, in the app and in player frames.
-        nativeTheme.themeSource = next.theme;
+        nativeTheme.themeSource = colorSchemeOf(next.theme);
       }
 
       return {

@@ -141,8 +141,19 @@ see "Scenes".
 
 ### Theme
 
-Light and dark only, selected by `prefers-color-scheme`. The shell maps the learner's choice
-(System / Light / Dark) onto it. There is no theme class or attribute to set.
+Light or dark is selected by `prefers-color-scheme`, and only by it. The shell maps the
+learner's choice onto it: System, Light, Dark, and **Pastel** (light) and **Pastel dark**
+(dark), the last two in a color the learner picks (ADR-074).
+
+A Pastel theme is the light or the dark one with its grounds, text, borders and one color
+(the filled action, its soft ground, its text) in the learner's hue. The page is marked
+`data-ad-palette="pastel"` and given the hue as `--ad-pastel-hue`; the block at the end of
+`tokens.css` does the rest, each tinted token `oklch(L C var(--ad-pastel-hue))` at a
+lightness and chroma that sRGB can show in every hue, so it keeps its contrast whatever the
+color (checked in all 360). In Pastel the action is a deep shade of the color with a white
+label; in Pastel dark it is the color itself, light, with a dark label of its own hue. What a
+color means does not change (success, danger, the accents, the focus ring), nor the scene
+palette, nor the lesson's screen. A screen never sets the attribute or the hue itself.
 
 ## Components
 
@@ -155,10 +166,11 @@ Light and dark only, selected by `prefers-color-scheme`. The shell maps the lear
 | `InfoPopover` | Something worth knowing that nobody needs to read every time (what a request sends and where, who wrote a lesson) | An icon button and a note that opens beside it, above everything else; Escape or a press elsewhere closes it; the button says whether it is open. Never the only place for something the learner must act on |
 | `Switch` | An immediate on/off setting | `role="switch"`, optional description |
 | `Checkbox` | One of several independent choices in a form that is submitted | Native checkbox; label, optional description, disabled |
-| `SegmentedControl` | Two to four exclusive options | Radio group, arrow keys, single tab stop |
+| `SegmentedControl` | Two to five exclusive options | Radio group, arrow keys, single tab stop |
+| `ColorSwatches` | A color, from a few named ones (Pastel's, ADR-074) | Radio group of round swatches, each its hue at Pastel's swatch lightness and named for assistive technology and on hover; the one chosen has a ring of ink and a dark mark; a hue between them chooses none, and Tab enters at the first |
 | `ChoiceButtons` | One of a few options that takes effect, and is recorded, the moment it is pressed (which provider to use) | A group of buttons with `aria-pressed`; arrow keys change nothing; each named by its title, badge, and description in that order; `pending` while the choice is being put into force |
 | `RadioGroup` | One of a few options that may each be a sentence long, confirmed with a button | Native radios in a fieldset; the whole row is the target; each option named by its own text, with an optional description; disabled; **`readOnly`**: a settled choice that can be read but not changed, nothing dimmed, the chosen row marked without the action tint |
-| `Slider` | A bounded number | Native range input; value always shown as text |
+| `Slider` | A bounded number | Native range input; value always shown as text; `track="spectrum"` draws every hue along the track for a color between `ColorSwatches` |
 | `Card` | Group related content | `surface` / `subtle`; padding `none`/`compact`/`comfortable`; semantic element via `as` |
 | `ActionCard` | A whole-card choice | Media, title, description, meta; hover, pressed, disabled |
 | `Badge` | Short status | `neutral`, `success`, `info`, `warning`, `danger`, `accent`; optional icon |
@@ -206,7 +218,8 @@ render nothing while waiting.
 | The choice | Use |
 |---|---|
 | A setting that applies the moment it changes | `Switch` |
-| One of two to four options, applied at once and harmless to step through | `SegmentedControl` |
+| One of two to five options, applied at once and harmless to step through | `SegmentedControl` |
+| A color | `ColorSwatches`, with a `Slider` along every hue for any between them |
 | Several independent options confirmed with a Save button | `Checkbox` |
 | An option whose selection *records* something | Separate `Button`s with `aria-pressed`. Never a control that changes as the arrow keys move through it |
 | One answer to a question, checked with a button | `RadioGroup`; after checking, `readOnly` with a description on the options that says what each turned out to be |
@@ -430,7 +443,8 @@ to `apps/desktop/test-results/screens/`. That set is the current visual referenc
 
 1. Change tokens or components here first, never in a screen.
 2. Add contrast pairs for new colours, on every ground they are used on; keep the dark theme
-   complete.
+   complete. A token tinted in Pastel is set again in Pastel dark, and is checked in every
+   hue; the window's canvas and ink in `electron/main/pastel.ts` follow the tokens.
 3. Update this document and, for the accents scenes share, the scene skill. Leave the
    `scene-*` tokens alone.
 4. Run `npm run check` and `npm run e2e`; look at the screenshots. A check for contrast waits

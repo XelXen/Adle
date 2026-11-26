@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import { type AppInfo, type CoreStatus, getBridge, type UiState } from '../lib/bridge';
+import { applyPalette } from '../lib/theme';
 
 interface AppContextValue {
   info: AppInfo;
@@ -45,6 +46,11 @@ export function AppProvider({ initialInfo, initialCoreStatus, children }: AppPro
   useEffect(() => {
     document.documentElement.dataset.core = coreStatus.state;
   }, [coreStatus.state]);
+
+  // A Pastel theme's color follows the learner's choice at once (ADR-074).
+  useEffect(() => {
+    applyPalette({ theme: ui.theme, pastelHue: ui.pastelHue });
+  }, [ui.theme, ui.pastelHue]);
 
   const updateUi = useCallback(async (patch: Partial<UiState>) => {
     setUi(await getBridge().app.updateUiState(patch));

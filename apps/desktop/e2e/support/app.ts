@@ -56,7 +56,9 @@ export interface LaunchOptions {
    * launch. This exercises the real mechanism (main process -> nativeTheme ->
    * prefers-color-scheme) instead of emulating the media query.
    */
-  theme?: 'light' | 'dark';
+  theme?: 'light' | 'dark' | 'pastel' | 'pastel-dark';
+  /** The color of a Pastel theme (ADR-074), saved with the theme. */
+  pastelHue?: number;
   viewport?: { width: number; height: number };
   /** Skip the first-run welcome so a test can start in the main shell. */
   onboarded?: boolean;
@@ -193,7 +195,11 @@ export async function launchApp(
   if (options.theme) {
     writeFileSync(
       path.join(profileDir, 'ui-state.json'),
-      JSON.stringify({ theme: options.theme, onboardingCompleted: false }),
+      JSON.stringify({
+        theme: options.theme,
+        ...(options.pastelHue === undefined ? {} : { pastelHue: options.pastelHue }),
+        onboardingCompleted: false,
+      }),
     );
   }
   const switches = [

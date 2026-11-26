@@ -130,6 +130,113 @@ describe.each([
   });
 });
 
+/**
+ * Pastel and Pastel dark (ADR-074): the light and the dark theme with some of their tokens
+ * in OKLCH, at the learner's hue. Each is worked out as a screen shows it, for every hue.
+ */
+const pastelStart = tokensCss.indexOf('/* ---- Pastel and Pastel dark');
+const pastelDarkStart = tokensCss.indexOf('@media (prefers-color-scheme: dark)', pastelStart);
+const PASTEL_VALUE = /^oklch\(([0-9.]+) ([0-9.]+) var\(--ad-pastel-hue\)\)$/;
+
+/** An OKLCH color in linear sRGB, unclipped, so that what sRGB cannot show can be seen. */
+function oklchToLinear(lightness: number, chroma: number, hue: number): [number, number, number] {
+  const a = chroma * Math.cos((hue * Math.PI) / 180);
+  const b = chroma * Math.sin((hue * Math.PI) / 180);
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+}
+
+function oklchToHex(lightness: number, chroma: number, hue: number): string {
+  return `#${oklchToLinear(lightness, chroma, hue)
+    .map((value) => (value <= 0.0031308 ? 12.92 * value : 1.055 * value ** (1 / 2.4) - 0.055))
+    .map((value) => Math.round(Math.min(1, Math.max(0, value)) * 255))
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+const pastelLight = declarations(tokensCss.slice(pastelStart, pastelDarkStart));
+const pastelDark = declarations(tokensCss.slice(pastelDarkStart));
+
+/** A theme as it is in one hue: its own tokens, and Pastel's worked out at that hue. */
+function inHue(base: Map<string, string>, pastel: Map<string, string>, hue: number) {
+  const theme = new Map(base);
+  for (const [name, value] of pastel) {
+    const found = PASTEL_VALUE.exec(value);
+    if (found) theme.set(name, oklchToHex(Number(found[1]), Number(found[2]), hue));
+  }
+  return theme;
+}
+
+const HUES = Array.from({ length: 360 }, (_, hue) => hue);
+
+describe('Pastel dark', () => {
+  it('sets again everything Pastel sets, so nothing light is left in it', () => {
+    // Pastel's own block applies in the dark scheme too: Pastel dark must cover all of it.
+    expect([...pastelLight.keys()].filter((name) => !pastelDark.has(name))).toEqual([]);
+  });
+});
+
+describe.each([
+  ['Pastel', light, pastelLight],
+  ['Pastel dark', dark, pastelDark],
+])('the %s theme', (_name, base, pastel) => {
+  it('tints the grounds, the text, the borders and the one color, and nothing else', () => {
+    const tinted = [...pastel.keys()].filter((name) => name.startsWith('--ad-color-'));
+    expect(tinted).toEqual(
+      expect.arrayContaining([
+        '--ad-color-canvas',
+        '--ad-color-page',
+        '--ad-color-surface',
+        '--ad-color-ink',
+        '--ad-color-muted',
+        '--ad-color-border-strong',
+        '--ad-color-action',
+        '--ad-color-primary-text',
+      ]),
+    );
+    // What a color means is the same in every theme, and so are the scene's colors.
+    for (const name of tinted) {
+      expect(name).toMatch(
+        /^--ad-color-(canvas|page|surface|ink|muted|faint|border|primary|action|on-action)/,
+      );
+      expect(pastel.get(name), name).toMatch(PASTEL_VALUE);
+    }
+  });
+
+  it('has colors a screen can show, in every hue', () => {
+    const outside: string[] = [];
+    for (const [name, value] of pastel) {
+      const found = PASTEL_VALUE.exec(value);
+      if (!found) continue;
+      for (const hue of HUES) {
+        const channels = oklchToLinear(Number(found[1]), Number(found[2]), hue);
+        if (channels.some((channel) => channel < -0.0005 || channel > 1.0005)) {
+          outside.push(`${name} at ${hue}`);
+          break;
+        }
+      }
+    }
+    expect(outside).toEqual([]);
+  });
+
+  it.each(PAIRS)('%s on %s has at least %s:1 contrast in every hue', (fg, bg, minimum) => {
+    let worst = Number.POSITIVE_INFINITY;
+    let at = 0;
+    for (const hue of HUES) {
+      const theme = inHue(base, pastel, hue);
+      const ratio = contrast(theme.get(`--ad-color-${fg}`)!, theme.get(`--ad-color-${bg}`)!);
+      if (ratio < worst) [worst, at] = [ratio, hue];
+    }
+    expect(worst, `at hue ${at}`).toBeGreaterThanOrEqual(minimum);
+  });
+});
+
 describe('dark theme', () => {
   it('redefines every colour rather than inheriting a light value', () => {
     const darkOnly = declarations(tokensCss.slice(darkStart, darkEnd));

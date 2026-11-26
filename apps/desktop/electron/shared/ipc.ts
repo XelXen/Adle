@@ -46,12 +46,21 @@ export type CoreStatus =
   | { state: 'failed'; message: string }
   | { state: 'stopped' };
 
-export const THEME_PREFERENCES = ['system', 'light', 'dark'] as const;
+/**
+ * The themes. Pastel and Pastel dark (ADR-074) are the light and the dark one with their
+ * grounds, text and one color taken from a color the learner picks (`pastelHue`).
+ */
+export const THEME_PREFERENCES = ['system', 'light', 'dark', 'pastel', 'pastel-dark'] as const;
 export type ThemePreference = (typeof THEME_PREFERENCES)[number];
 
 /** Interface preferences kept by the main process so the first paint is already correct. */
 export interface UiState {
   theme: ThemePreference;
+  /**
+   * The color of the Pastel themes: a hue in whole degrees round the OKLCH circle, from 0
+   * to 359. Kept while another theme is chosen, so Pastel comes back in the same color.
+   */
+  pastelHue: number;
   /** True once the learner has finished the first-run welcome. */
   onboardingCompleted: boolean;
   /**

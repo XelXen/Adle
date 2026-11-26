@@ -8,6 +8,7 @@ import {
   Callout,
   Checkbox,
   ChoiceButtons,
+  ColorSwatches,
   Dialog,
   Disclosure,
   EmptyState,
@@ -377,7 +378,72 @@ describe('SegmentedControl', () => {
   });
 });
 
+describe('ColorSwatches', () => {
+  const SWATCHES = [
+    { hue: 355, name: 'Pink' },
+    { hue: 160, name: 'Mint' },
+    { hue: 295, name: 'Lavender' },
+  ];
+
+  function Example({ start }: { start: number }) {
+    const [hue, setHue] = useState(start);
+    return <ColorSwatches label="Color" value={hue} swatches={SWATCHES} onValueChange={setHue} />;
+  }
+
+  it('is a radio group of named colors, each drawn in its own hue', async () => {
+    render(<Example start={160} />);
+    expect(screen.getByRole('radiogroup', { name: 'Color' })).toBeInTheDocument();
+    const [pink, mint, lavender] = screen.getAllByRole('radio');
+    expect(mint).toHaveAccessibleName('Mint');
+    expect(mint).toHaveAttribute('aria-checked', 'true');
+    expect(mint).toHaveAttribute('tabindex', '0');
+    expect(pink).toHaveAttribute('tabindex', '-1');
+    expect(lavender!.style.getPropertyValue('--ad-swatch-hue')).toBe('295');
+
+    mint!.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(lavender).toHaveAttribute('aria-checked', 'true');
+    expect(lavender).toHaveFocus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(pink).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(mint!);
+    expect(mint).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('chooses none for a hue between them, and is entered at its first', async () => {
+    render(<Example start={200} />);
+    const [pink, mint] = screen.getAllByRole('radio');
+    for (const radio of screen.getAllByRole('radio')) {
+      expect(radio).toHaveAttribute('aria-checked', 'false');
+    }
+    expect(pink).toHaveAttribute('tabindex', '0');
+    pink!.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(pink).toHaveAttribute('aria-checked', 'true');
+    await userEvent.keyboard('{ArrowRight}');
+    expect(mint).toHaveAttribute('aria-checked', 'true');
+  });
+});
+
 describe('Slider', () => {
+  it('can show every hue along its track, for a color of Pastel', () => {
+    render(
+      <Slider
+        label="Any color"
+        value={120}
+        min={0}
+        max={359}
+        step={1}
+        track="spectrum"
+        onValueChange={() => undefined}
+        formatValue={() => 'Near sage'}
+      />,
+    );
+    const input = screen.getByRole('slider', { name: 'Any color' });
+    expect(input).toHaveAttribute('aria-valuetext', 'Near sage');
+    expect(input.className).toMatch(/rangeSpectrum/);
+  });
+
   it('shows its value as text and reports changes', () => {
     const onValueChange = vi.fn();
     render(

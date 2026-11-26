@@ -444,3 +444,66 @@
 .range:hover::-webkit-slider-thumb {
   transform: scale(1.1);
 }
+
+/* A slider along every hue: the track is the colors themselves, and nothing is filled. */
+.rangeSpectrum::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  background: var(--ad-pastel-spectrum);
+}
+
+.rangeSpectrum::-webkit-slider-thumb {
+  margin-top: -0.25rem;
+}
+
+/* ---- Color swatches (ADR-074) -------------------------------------------- */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+}
+
+/* Each is its hue at the lightness of Pastel's swatches, with an edge that can be seen on
+   any ground; the one chosen has a ring of ink round it and a mark of ink in it. */
+.swatch {
+  --ad-swatch-hue: 0;
+
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: var(--ad-border-width) solid var(--ad-color-border-strong);
+  border-radius: var(--ad-radius-pill);
+  background: oklch(
+    var(--ad-pastel-swatch-lightness) var(--ad-pastel-swatch-chroma) var(--ad-swatch-hue)
+  );
+  cursor: pointer;
+  transition:
+    transform var(--ad-duration-fast) var(--ad-ease-out),
+    box-shadow var(--ad-duration-fast) var(--ad-ease-out);
+}
+
+.swatch:hover {
+  transform: scale(1.08);
+}
+
+/* Outside the ring of the one chosen, so that both can be seen at once. */
+.swatch:focus-visible {
+  outline-offset: 5px;
+}
+
+.swatchSelected {
+  box-shadow:
+    0 0 0 2px var(--ad-color-surface),
+    0 0 0 4px var(--ad-color-ink);
+}
+
+.swatchSelected::after {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-pastel-swatch-mark);
+  content: '';
+}

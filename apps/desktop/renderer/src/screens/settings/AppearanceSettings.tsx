@@ -1,16 +1,27 @@
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Blend, Monitor, Moon, MoonStar, Sun } from 'lucide-react';
 
-import { Card, Section, SegmentedControl, Stack, Switch } from '@adle/design-system';
+import {
+  Card,
+  ColorSwatches,
+  Section,
+  SegmentedControl,
+  Slider,
+  Stack,
+  Switch,
+} from '@adle/design-system';
 
 import { useApp } from '../../app/AppContext';
 import type { ThemePreference } from '../../lib/bridge';
 import { usePrefersReducedMotion } from '../../lib/theme';
+import { hueName, isPastelTheme, PASTEL_SWATCHES } from './appearance-model';
 import styles from './Settings.module.css';
 
 const THEME_OPTIONS = [
   { value: 'system', label: 'System', icon: <Monitor /> },
   { value: 'light', label: 'Light', icon: <Sun /> },
   { value: 'dark', label: 'Dark', icon: <Moon /> },
+  { value: 'pastel', label: 'Pastel', icon: <Blend /> },
+  { value: 'pastel-dark', label: 'Pastel dark', icon: <MoonStar /> },
 ] as const;
 
 /** Theme, motion, and notifications. Changes apply immediately and are remembered. */
@@ -22,12 +33,41 @@ export function AppearanceSettings() {
     <Stack gap={6}>
       <Section title="Theme" description="System follows your computer’s setting.">
         <Card>
-          <SegmentedControl<ThemePreference>
-            label="Theme"
-            value={ui.theme}
-            options={THEME_OPTIONS}
-            onValueChange={(theme) => void updateUi({ theme })}
-          />
+          <Stack gap={5}>
+            <SegmentedControl<ThemePreference>
+              label="Theme"
+              value={ui.theme}
+              options={THEME_OPTIONS}
+              onValueChange={(theme) => void updateUi({ theme })}
+            />
+            {/* Pastel and Pastel dark are in a color the learner picks (ADR-074). */}
+            {isPastelTheme(ui.theme) ? (
+              <Stack gap={4}>
+                <Stack gap={2}>
+                  <span className={styles.fieldLabel} aria-hidden="true">
+                    Color
+                  </span>
+                  <ColorSwatches
+                    label="Color"
+                    value={ui.pastelHue}
+                    swatches={PASTEL_SWATCHES}
+                    onValueChange={(pastelHue) => void updateUi({ pastelHue })}
+                  />
+                </Stack>
+                <Slider
+                  label="Any color"
+                  value={ui.pastelHue}
+                  min={0}
+                  max={359}
+                  step={1}
+                  track="spectrum"
+                  formatValue={hueName}
+                  onValueChange={(pastelHue) => void updateUi({ pastelHue })}
+                  className={styles.hueSlider}
+                />
+              </Stack>
+            ) : null}
+          </Stack>
         </Card>
       </Section>
 
