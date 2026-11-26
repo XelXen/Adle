@@ -390,6 +390,9 @@ most, a file's name.
   never as a share of the answers given, and it does not list wrong ones.
 - Practice reuses `CheckpointPanel` and `lessons.answer`. A practice question is answered at the
   lesson it belongs to (`lesson_id` comes with it).
+- An answer that is almost right (`outcome: 'near'`, ADR-078) is not a result: the panel
+  says "Almost" and what the core said, keeps the answer open as typed, and calls
+  `onAnswered` only for the answer that follows. Never show anything of the answer then.
 - Opening a route again must be able to start afresh: `useRouter().visit` goes up with every
   navigation; key a screen on it when "the same place again" means "a new run"
   (`PracticeScreen`).

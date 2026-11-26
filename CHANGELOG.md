@@ -5,12 +5,20 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **A typo gets another try.** If a typed answer is off by a slip of the keys, like
+  `CH3CHWCH3` for `CH3CH2CH3`, Adle says "Almost" and lets you fix it, without counting
+  it or showing the answer. Once a question: a second near miss is marked as it is.
+
 ### Changed
 
-- **See every chapter of a film being made.** With NVIDIA NIM, up to three chapters of a
-  film are written at the same time, and now each says what it is doing in its own row
-  of the Film tab ("Writing", "Waiting for the film maker", "Mending it (1 of 3)"). The
-  bar above says how many chapters are written.
+- **Films are written faster with NVIDIA NIM.** Up to five chapters are written at the
+  same time, where it was three, and one request is always left free, so you can go on
+  studying lessons and asking questions while the film is made.
+- **See every chapter of a film being made.** Each chapter being written says what it is
+  doing in its own row of the Film tab ("Writing", "Waiting for the film maker",
+  "Mending it (1 of 3)"). The bar above says how many chapters are written.
 
 ## [0.2.1] - 2026-11-25
 

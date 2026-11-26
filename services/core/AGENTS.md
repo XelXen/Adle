@@ -200,6 +200,11 @@ everything and decides nothing.
 - **An answer is recorded once, whole:** the attempt and its observation in one transaction
   (`AssessmentService.answer`). Scoring is deterministic; anything a model helps judge (M6) is
   bounded by a rubric and marked as such.
+- **A slip of the keys is answered again, and nothing of it is kept** (ADR-078): a typed
+  answer within `scoring.near_miss` of an accepted one (a character in four or more, two in
+  ten or more; never in a shorter answer or a number) returns `outcome: "near"`, with no
+  attempt, no evidence, and nothing of the answer; once a sitting a question
+  (`_second_chance`, `FRESH_AGAIN_AFTER`), after which an answer is scored as it is.
 - **A hypothesis about a mistake is never stored.** It is folded from attempts and dismissals
   by `learner_model.misconceptions.fold` (read them with `application/evidence.py`). Do not add
   a table or a cache for it. What reaches the knowledge state is one flag on the observation.
@@ -261,7 +266,8 @@ everything and decides nothing.
   film, and setting up what makes it, run in the film lane: an hour of it holds nothing
   else up. As many requests are in flight at each provider as it takes (`at_once`: one at
   AIHubMix, six at NVIDIA, ADR-068), whichever lane asks; within a job, pieces asked for
-  side by side go through `jobs.side_by_side` (a film's chapters, three at most; a file's
+  side by side go through `jobs.side_by_side` (a film's chapters, all the provider's
+  requests but one and five at most, `chapters_at_once`, ADR-077; a file's
   pages, four at most; a lesson's model-written pictures, three at most, ADR-073), which
   stops the rest at the first failure or the learner's Stop. A film's chapter works through
   its own view of the job (`_ChapterContext`), so that what it says is its own line in the

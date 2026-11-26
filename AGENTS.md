@@ -250,8 +250,9 @@ account. NVIDIA NIM: 40 requests/min and no daily limit. Adle keeps to each one'
 
 - Tests never call a real provider; use the fake server.
 - One request in flight at AIHubMix, at most 5/minute there; up to 6 at once at NVIDIA, at
-  most 40/minute (ADR-068). Where the provider takes several, a film writes up to 3 chapters
-  at once, a file reads up to 4 pages at once, a lesson's model-written pictures are drawn
+  most 40/minute (ADR-068). Where the provider takes several, a film writes as many chapters
+  at once as it takes requests but one, which stays free for the learner, and 5 at most
+  (ADR-077), a file reads up to 4 pages at once, a lesson's model-written pictures are drawn
   up to 3 at once, and up to 2 of its slides are mended at once (ADR-073). When trying a
   real provider by hand,
   budget 80 requests and 800k tokens per day; the app itself stops at 100 and 1M for
