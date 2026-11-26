@@ -773,11 +773,8 @@ class FilmService:
         self._engine.prime(lambda: context.cancelled)
         (work / f"{script.VOICE_MODULE}.py").write_text(script.voice_source(), encoding="utf-8")
         (work / script.VOICE_INDEX).unlink(missing_ok=True)
-        opening = script.plain_chapter(
-            course_title,
-            script.opening_points(titles),
-            opening=f"This film goes through {course_title}, in {_count(len(titles), 'chapter')}.",
-        )
+        # The course, and its chapters as an index that fits, said in two lines (ADR-079).
+        opening = script.opening_chapter(course_title, titles)
         recordings: list[str] = []
 
         def record(lines: Sequence[str]) -> None:

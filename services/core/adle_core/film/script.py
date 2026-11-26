@@ -66,6 +66,7 @@ from pathlib import Path
 
 import numpy as np
 from manimgx.audio import Speech, Word
+from manimgx.audio.sound import RATE
 
 
 def _nothing_is_asked(*_arguments, **_keywords):
@@ -87,24 +88,49 @@ except (OSError, ValueError):
     _SAID = {{}}
 
 
+def _breath(text: str) -> float:
+    """How long a line rests before the next one: lines are recorded one at a time, and
+    played end to end they ran into each other. Longer after a sentence than a clause."""
+    end = text.rstrip().rstrip({closing})[-1:]
+    return {sentence} if end in {stops} else {clause}
+
+
 def voice(text: str) -> Speech:
-    """A line as it was recorded on this computer, with when each word is said; or, for a
-    line that was not, quiet for as long as it would take to say."""
+    """A line as it was recorded on this computer, with when each word is said, and a breath
+    after it; or, for a line that was not, quiet for as long as it would take to say."""
     said = _SAID.get(" ".join(text.split()))
+    rest = _breath(text)
     if said:
         words = [Word(word, start, end) for word, start, end in said["words"]]
-        return Speech((_HERE / said["clip"]).read_bytes(), text=text, words=words)
+        heard = Speech((_HERE / said["clip"]).read_bytes(), text=text, words=words).samples
+        quiet = np.zeros((int(RATE * rest), *heard.shape[1:]), dtype=heard.dtype)
+        return Speech(np.concatenate([heard, quiet]), text=text, words=words, rate=RATE)
     count = max(1, len(text.split()))
-    seconds = max(1.2, count / {pace})
-    return Speech(np.zeros(int(24000 * seconds), dtype=np.float32), text=text, rate=24000)
+    seconds = max(1.2, count / {pace}) + rest
+    return Speech(np.zeros(int(RATE * seconds), dtype=np.float32), text=text, rate=RATE)
 '''
 
 #: How many words a second a line is given when nobody has recorded it.
 QUIET_WORDS_A_SECOND = 2.6
+#: The rest after a line of the film's voice, in seconds (ADR-079): after a sentence,
+#: and after a clause.
+SENTENCE_REST = 0.45
+CLAUSE_REST = 0.25
+#: What may close a line after its last word, and what ends a sentence: a line that ends in
+#: one of these rests for a sentence.
+_CLOSING = "\"')\N{RIGHT DOUBLE QUOTATION MARK}\N{RIGHT SINGLE QUOTATION MARK}"
+_FULL_STOPS = ".!?:\N{HORIZONTAL ELLIPSIS}"
 
 
 def voice_source() -> str:
-    return _VOICE_SOURCE.format(index=VOICE_INDEX, pace=QUIET_WORDS_A_SECOND)
+    return _VOICE_SOURCE.format(
+        index=VOICE_INDEX,
+        pace=QUIET_WORDS_A_SECOND,
+        sentence=SENTENCE_REST,
+        clause=CLAUSE_REST,
+        closing=ascii(_CLOSING),
+        stops=ascii(_FULL_STOPS),
+    )
 
 
 def spoken_key(script: str) -> str:
@@ -281,12 +307,104 @@ def plain_chapter(title: str, points: Sequence[str], opening: str | None = None)
     return PlainChapter(source=source, lines=tuple(lines))
 
 
-def opening_points(titles: Sequence[str]) -> list[str]:
-    """What a film says it is about to cover: its chapters, a few to a line."""
-    if len(titles) <= MAX_POINTS:
-        return list(titles)
-    size = -(-len(titles) // MAX_POINTS)
-    return [", ".join(titles[start : start + size]) for start in range(0, len(titles), size)]
+#: How an opening lists a film's chapters (ADR-079): up to this many to a column, and this
+#: many columns to a screen; more, and the index turns to its next screen.
+INDEX_ROWS = 10
+INDEX_COLUMNS = 2
+#: By how many columns the index has: the size its entries are set in, and how many
+#: characters of a chapter's title an entry holds.
+_INDEX_SET = {1: (30, 48), 2: (26, 34)}
+#: The room between an entry's line and the next one's, in ems.
+_INDEX_SPACING = 0.6
+#: The room the index has below the course's name, wide and high. Every screen of it is set
+#: at one size: the largest at which each one fits.
+_INDEX_ROOM = (12.6, 5.6)
+
+
+def _cut(text: str, width: int) -> str:
+    """As much of a course's words as ``width`` characters hold, cut at a word, with an
+    ellipsis where something was left off."""
+    plain = " ".join(_NOT_SPOKEN.sub(" ", text).split())
+    if len(plain) <= width:
+        return plain
+    room = plain[: width - 1]
+    if plain[width - 1] != " " and " " in room:
+        room = room.rsplit(" ", 1)[0]
+    return room.rstrip(" ,;:-") + "\N{HORIZONTAL ELLIPSIS}"
+
+
+def _entry(number: int, title: str, width: int) -> str:
+    """A chapter as an entry of the opening's index: its number, and as much of its title as
+    the column has room for."""
+    entry = f"{number}. {_cut(title, width) or 'A chapter'}"
+    return f"{number}. A chapter" if text_problem(entry) else entry
+
+
+def opening_chapter(course: str, titles: Sequence[str]) -> PlainChapter:
+    """What a film opens with (ADR-079): the course's name, and its chapters as an index, a
+    screen of them at a time where there are many, every screen set at one size that fits.
+    It is said in two lines, never chapter by chapter: what the film goes through and in
+    how many chapters, and that here they are."""
+    count = len(titles)
+    many = "one chapter" if count == 1 else f"{count} chapters"
+    # The course's name is made something a voice can say before it goes into the line, so
+    # that what is taken out of it takes nothing of the line with it.
+    first = f"This film goes through {spoken(course) or 'this course'}, in {many}."
+    if spoken(first) != first:
+        first = f"This film goes through this course, in {many}."
+    second = "Here it is." if count == 1 else "Here they are, in order."
+    heading = _cut(course, 40)
+    if not heading or text_problem(heading):
+        heading = "This course"
+    body = [
+        f"        title = m.Text({json.dumps(heading)}, font_size=44)",
+        "        title.to_edge(m.UP, buff=0.5)",
+        f"        self.say({json.dumps(first)}, m.Write(title))",
+    ]
+    size, width = _INDEX_SET[max(1, min(INDEX_COLUMNS, -(-count // INDEX_ROWS)))]
+    per_screen = INDEX_ROWS * INDEX_COLUMNS
+    pages: list[tuple[str, int]] = []
+    for start in range(0, count, per_screen):
+        screen = titles[start : start + per_screen]
+        columns = []
+        for top in range(0, len(screen), INDEX_ROWS):
+            # A column is one paragraph, so that its entries stand on one grid of lines
+            # whatever letters they hold.
+            entries = ", ".join(
+                json.dumps(_entry(start + top + row + 1, named, width))
+                for row, named in enumerate(screen[top : top + INDEX_ROWS])
+            )
+            columns.append(
+                f"m.Paragraph({entries}, font_size={size}, line_spacing={_INDEX_SPACING})"
+            )
+        page = f"page_{len(pages) + 1}"
+        pages.append((page, len(screen)))
+        body += [
+            f"        {page} = m.VGroup({', '.join(columns)})",
+            f"        {page}.arrange(m.RIGHT, aligned_edge=m.UP, buff=1.0)",
+        ]
+    if pages:
+        wide, high = _INDEX_ROOM
+        room = ", ".join(f"{wide} / {page}.width, {high} / {page}.height" for page, _ in pages)
+        body.append(f"        fit = min(1, {room})")
+        body += [f"        {page}.scale(fit).next_to(title, m.DOWN, buff=0.6)" for page, _ in pages]
+    for at, (page, shown) in enumerate(pages):
+        if at:
+            body += [
+                f"        self.play(m.FadeOut({pages[at - 1][0]}), run_time=0.5)",
+                f"        self.play(m.FadeIn({page}), run_time=0.6)",
+            ]
+        else:
+            body.append(f"        self.say({json.dumps(second)}, m.FadeIn({page}))")
+        # Time to read the screen: a little for each chapter on it.
+        body.append(f"        self.wait({round(min(8.0, max(2.0, 0.4 * shown)), 1)})")
+    source = (
+        '"""Adle\'s: the film\'s opening, and an index of its chapters."""\n'
+        "import manimgx as m\n\n\n"
+        f"class {CHAPTER_SCENE}(m.Scene):\n"
+        "    def construct(self):\n" + "\n".join(body) + "\n"
+    )
+    return PlainChapter(source=source, lines=(first, second) if pages else (first,))
 
 
 # -- the words of a film, as it was rendered ---------------------------------------------------

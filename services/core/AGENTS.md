@@ -306,7 +306,13 @@ everything and decides nothing.
   engine's findings (`report.findings`, by the chapter's own line); the version that ran
   with the least wrong is kept, and one that never ran is told in words
   (`script.plain_chapter`, which quotes the course's words only through
-  `policy.text_problem`). A chapter sent back is shown back whole, up to the policy's
+  `policy.text_problem`). **The opening is an index, said in two lines** (ADR-079,
+  `script.opening_chapter`): the chapters numbered, ten to a column and two columns to a
+  screen, each column one `Paragraph`, every screen at one size that fits, a long title
+  cut at a word; never a chapter's title read out. **Every line of the film's voice ends
+  in a breath** (`SENTENCE_REST`, `CLAUSE_REST`, in `voice_source`), recorded or not:
+  lines are recorded one at a time, and played end to end they ran together. A chapter
+  sent back is shown back whole, up to the policy's
   `MAX_SOURCE_CHARS`: a chapter is 12,000 to 16,000 characters. What the engine said is
   told to the model and logged by count only. **A chapter's pictures are looked over once**
   (ADR-066): the storyboard `inspect` draws beside the take (`storyboard.sheets`, cleared

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import ast
 import itertools
+from collections.abc import Callable
+from typing import Any, cast
 
-from adle_core.film import script
+from adle_core.film import policy, script
 from adle_core.generation import prompts
 from adle_core.generation.prompts import ConceptBrief, FilmChapterBrief, Passage
 
@@ -71,12 +73,92 @@ def test_adles_own_files_are_python_and_shut_the_network_out() -> None:
     assert any(isinstance(node, ast.ClassDef) and node.name == "Film" for node in tree.body)
 
 
-def test_a_film_opens_on_what_it_covers_a_few_chapters_to_a_line() -> None:
-    assert script.opening_points(["A", "B"]) == ["A", "B"]
-    many = [f"Chapter {number}" for number in range(12)]
-    points = script.opening_points(many)
-    assert len(points) <= script.MAX_POINTS
-    assert ", ".join(points) == ", ".join(many)
+def _breath() -> Callable[[str], float]:
+    """The voice's rest after a line, taken alone out of the module it is written into: the
+    module imports the film maker, which the core never does."""
+    tree = ast.parse(script.voice_source())
+    found = next(
+        node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_breath"
+    )
+    space: dict[str, Any] = {}
+    # Adle's own function, as the film maker runs it.
+    exec(compile(ast.Module(body=[found], type_ignores=[]), "adle_voice", "exec"), space)  # noqa: S102
+    return cast("Callable[[str], float]", space["_breath"])
+
+
+def test_every_line_of_a_films_voice_is_followed_by_a_breath() -> None:
+    voice = script.voice_source()
+    assert voice.isascii()
+    # Lines are recorded one at a time: played end to end, they ran into each other
+    # (ADR-079). A recorded line has quiet put after it, and so does one never recorded.
+    assert "np.concatenate([heard, quiet])" in voice
+    assert "count / 2.6) + rest" in voice
+    breath = _breath()
+    assert breath("Here they are, in order.") == script.SENTENCE_REST
+    assert breath("Is that all? ") == script.SENTENCE_REST
+    assert breath('Then she said, "Stop."') == script.SENTENCE_REST
+    assert breath("There are two of them:") == script.SENTENCE_REST
+    assert breath("First the mass,") == script.CLAUSE_REST
+    assert breath("and then the force") == script.CLAUSE_REST
+    assert script.SENTENCE_REST > script.CLAUSE_REST > 0
+
+
+def _said(source: str) -> list[str]:
+    """What a chapter says, a line at a time, as its file has it."""
+    return [
+        str(node.args[0].value)
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "say"
+        and isinstance(node.args[0], ast.Constant)
+    ]
+
+
+def test_a_film_opens_on_an_index_of_its_chapters_said_in_two_lines() -> None:
+    titles = ["Area", "Volume", "Surface area of a cylinder"]
+    opening = script.opening_chapter("Area and volume", titles)
+    assert opening.lines == (
+        "This film goes through Area and volume, in 3 chapters.",
+        "Here they are, in order.",
+    )
+    assert _said(opening.source) == list(opening.lines)
+    assert policy.check_chapter_source(opening.source).ok
+    # Every chapter is on the screen, numbered; none is read out (ADR-079).
+    for number, title in enumerate(titles, start=1):
+        assert f'"{number}. {title}"' in opening.source
+    assert "m.Paragraph(" in opening.source
+    one = script.opening_chapter("Area", ["Area"])
+    assert one.lines == ("This film goes through Area, in one chapter.", "Here it is.")
+
+
+def test_a_long_index_turns_its_screens_at_one_size_and_cuts_a_long_title() -> None:
+    titles = [f"The {number}th idea of this rather long and winding course" for number in range(60)]
+    titles[11] = "Saturated and unsaturated carbon compounds"
+    opening = script.opening_chapter("Carbon and its compounds", titles)
+    assert len(opening.lines) == 2
+    assert _said(opening.source) == list(opening.lines)
+    assert policy.check_chapter_source(opening.source).ok
+    screens = -(-len(titles) // (script.INDEX_ROWS * script.INDEX_COLUMNS))
+    assert f"page_{screens} = " in opening.source
+    assert f"page_{screens + 1} = " not in opening.source
+    # One size for every screen: the largest at which each fits.
+    assert opening.source.count(".scale(fit)") == screens
+    assert all(
+        call.count('", "') < script.INDEX_ROWS for call in opening.source.split("m.Paragraph(")[1:]
+    )
+    # A title too long for its column is cut at a word, and says so.
+    assert '"12. Saturated and unsaturated carbon\\u2026"' in opening.source
+    for number in range(1, 61):
+        assert f'"{number}. ' in opening.source
+
+
+def test_an_opening_holds_none_of_a_courses_words_it_cannot_show() -> None:
+    opening = script.opening_chapter("https://example.com/course", ["Area", "Volume"])
+    assert opening.lines[0] == "This film goes through this course, in 2 chapters."
+    assert "example.com" not in opening.source
+    assert '"This course"' in opening.source
+    assert policy.check_chapter_source(opening.source).ok
 
 
 def test_the_subtitles_are_read_as_when_each_line_is_shown() -> None:

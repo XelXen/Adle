@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **A film opens on its list of chapters.** They are shown numbered, in two columns that
+  always fit, a page at a time for a long course, and not read aloud one by one.
+- **A film's voice pauses between sentences.** Each line ends with a short breath, a
+  little longer after a full stop, so lines no longer run into each other.
+
 ## [0.2.2] - 2026-11-26
 
 Films are written faster with NVIDIA NIM, and you can see what every chapter is doing
