@@ -7,6 +7,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Choose your teacher.** Lessons and answers are now written as a teacher would say
+  them, and you can say who that is in **Settings → Learning → Teacher**: their manner,
+  what kind of teacher they are, how much they joke, whether they share a fun fact now and
+  then, and how formally they speak. Start from a teacher (Storyteller, Curious scientist,
+  Calm guide, Playful coach, Thoughtful professor) or describe one in your own words. When
+  the Expressive voice reads your lessons, the teacher can be the person you made that
+  voice as. A teacher changes how things are said, never what is taught.
+- **Two new themes: Pastel and Pastel dark.** Pick their color in **Settings →
+  Appearance**: ten named colors, or any color between them with the slider. Every color
+  keeps text as readable as the other themes, and the window's own title bar follows it.
+  Lessons look the same in every theme.
 - **Change a lesson's picture by asking.** If a picture leaves out something it should
   show (say, the hydrogen bonds between water molecules), press **Ask a question**,
   choose **Change the picture**, and say what it should show. Adle draws that part's
@@ -22,6 +33,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Deeper lessons.** A lesson now takes as long as its concept needs: usually 10 to 16
+  parts, explained so that someone new to it could follow every step, with a short
+  summary every few parts of what you have learned so far, one of the whole lesson at the
+  end, and the step from the examples to the general idea. Now and then, rarely, a light
+  moment or a fun fact that belongs to the topic.
+- **Crowded slides are drawn again.** With NVIDIA NIM, a slide whose words come out on top
+  of each other is sent back to be drawn again with them apart while the rest of the
+  lesson is still being written, at most twice. The new one is used only if it is clearer;
+  a part you are already in keeps its picture until you come back to it.
+- **Pictures are ready sooner.** With NVIDIA NIM, up to three of a lesson's pictures are
+  drawn at the same time.
 - **Words stay readable where a slide crowds them.** When a word on a slide lands on
   another word, or a line runs through it, the later word gets a soft shadow in the color
   of the screen behind it, like the shadow under a mouse pointer. It hides most of what is

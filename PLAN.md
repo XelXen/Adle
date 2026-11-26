@@ -977,7 +977,7 @@ Status is updated as work proceeds. The detailed, current picture (test results,
 actions) is in `docs/engineering/PROJECT_STATE.md`. A milestone is "Done" only when its acceptance
 criteria were demonstrated by tests that were actually run.
 
-_Last updated: 2026-11-24._
+_Last updated: 2026-11-25._
 
 | Milestone | Status | Notes and acceptance evidence |
 |---|---|---|
@@ -1128,6 +1128,26 @@ requests). Evidence for the rules:
 `test_slide_subjects.py`, `test_slide_real_lessons.py`, the renderer's
 `lesson-rules.test.ts`, the journey in `e2e/curriculum` that reads a course's rules and
 changes its subject, and 42 slide examples stepped through by `e2e/slide-player`.
+
+After 0.1.0-alpha.10, on 2026-11-25, at the owner's word: **a film's pictures looked over**
+by a model that sees them (ADR-066); **a question that has its part's picture drawn again**
+(ADR-067); **each provider's own limits, and several requests at once at NVIDIA**
+(ADR-068); and **a soft shadow under a word that lands on another** (ADR-069). Then, for
+0.2.0: a lesson's pictures **stay Wanim scenes** in the frame, ManimGX's browser player
+looked at and set aside for now (ADR-070); **a teacher the learner chooses**, made of parts,
+from one to start from, in their own words, or the Expressive voice's person, given to the
+writer of every lesson and answer, with light moments rare (ADR-071); **deeper lessons**, in
+10 to 16 parts with summaries along the way, explained so that a child could follow
+(ADR-072); **a crowded slide drawn again beside the writing**, and a lesson's pictures drawn
+side by side, where the provider takes several requests at once (ADR-073); and **Pastel and
+Pastel dark**, in a color the learner picks, every contrast kept in every hue (ADR-074).
+Evidence: `test_teacher_character.py`, `teacher-model.test.ts`, the teacher journey in
+`e2e/generation`; `test_lesson_axioms.py` and `test_prompt_quoting.py`;
+`test_slide_mends.py`, `scene-trial.test.ts` and the crowded slides in
+`e2e/slide-player`; `tokens.test.ts` (every hue), `pastel.test.ts`,
+`appearance-model.test.ts`, `local-state.test.ts`, `settings-file.test.ts`, and the
+journeys in `e2e/appearance-a11y` (axe on every primary screen in both Pastel themes) and
+`e2e/settings-file`.
 
 ### Deviations from this plan (each has an ADR)
 

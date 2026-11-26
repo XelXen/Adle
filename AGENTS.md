@@ -210,7 +210,9 @@ is built from it, and an alpha or a stable version is published from a release c
   edge of the screen, and a step is never longer than its words (ADR-055, ADR-056). Where a
   script leaves one over another or under a line all the same, the later word is given a
   soft shadow in the stage's own color, never a color of its own, and nothing else is
-  dimmed (ADR-069).
+  dimmed (ADR-069); and where the provider takes several requests at once, the slide is
+  drawn again with them apart, beside the writing, and kept only when it is better
+  (ADR-073).
 - How a lesson is formed is written down once (ADR-061, `lessons/axioms.py`): the rules of
   every lesson, and what each subject needs besides (mathematics a picture and an example
   before its equation, a language its rule inside real sentences, chemistry an experiment
@@ -218,6 +220,13 @@ is built from it, and an alpha or a stable version is published from a release c
   named by the AI with its plan, or chosen by the learner, whose choice stands. The learner
   can read the rules a course's lessons follow, one press away. A rule about how lessons
   are taught goes there, never into a prompt alone.
+- A lesson takes the time its concept needs (ADR-072): explained so that a child could
+  follow, nothing skipped, summed up along the way and at its end, and taken from its
+  examples to the general idea. Never hurry a lesson to make it shorter.
+- A lesson and an answer are written as a teacher the learner chose (ADR-071): made of
+  parts, from one to start from, in their own words, or the Expressive voice's person. A
+  teacher changes how things are said, never what is taught or how carefully; a light
+  moment or a fun fact is rare whatever the teacher, true, and never in a question.
 - A lesson in a natural voice is made with its voice (ADR-051): ready once its first part
   can be heard, and a line not recorded yet is waited for, never read in another voice
   unless the learner chooses that or no recording will come. A voice chosen is recorded at
@@ -230,6 +239,10 @@ is built from it, and an alpha or a stable version is published from a release c
 
 - Use Sprout tokens and components. No raw colours, radii, or spacing in screens (a test enforces
   colours). New visual patterns go into the design system first.
+- Five themes: System, Light, Dark, and Pastel and Pastel dark in a color the learner picks
+  (ADR-074). Light or dark is set one way only (`nativeTheme.themeSource`); Pastel's color
+  is the page's `data-ad-palette` and `--ad-pastel-hue`, and every tinted token keeps its
+  contrast in all 360 hues. Pictures and the lesson's screen look the same in every theme.
 
 **Model quota** (AIHubMix `coding-kimi-k3-free`: 5 requests/min, 100/day, 1M tokens/day per
 account. NVIDIA NIM: 40 requests/min and no daily limit. Adle keeps to each one's own, ADR-068)
@@ -237,11 +250,15 @@ account. NVIDIA NIM: 40 requests/min and no daily limit. Adle keeps to each one'
 - Tests never call a real provider; use the fake server.
 - One request in flight at AIHubMix, at most 5/minute there; up to 6 at once at NVIDIA, at
   most 40/minute (ADR-068). Where the provider takes several, a film writes up to 3 chapters
-  at once and a file reads up to 4 pages at once. When trying a real provider by hand,
+  at once, a file reads up to 4 pages at once, a lesson's model-written pictures are drawn
+  up to 3 at once, and up to 2 of its slides are mended at once (ADR-073). When trying a
+  real provider by hand,
   budget 80 requests and 800k tokens per day; the app itself stops at 100 and 1M for
   AIHubMix (ADR-012), and counts NVIDIA's day without stopping it.
 - A slide is no request at all: the lesson's answer scripts it as data, and Adle lays it
-  out and writes its scene (ADR-049).
+  out and writes its scene (ADR-049). One whose words came out crowded as it was tried is
+  sent back to be drawn again, one request each time and twice at most, only where the
+  provider takes several requests at once (ADR-073).
 - A figure is no request at all: the lesson gives its kind and data, and Adle writes the
   scene from a template (ADR-045). A scene a model writes is one request = one complete
   file. No repair loops; at most one deliberate retry,

@@ -179,6 +179,19 @@ most, a file's name.
 - To see the window as a person does, with the system's buttons on it, draw the app's own
   window into a picture (`PrintWindow`); a screenshot of the page has no buttons in it.
 
+## Themes
+
+- The learner's theme is kept by the main process (`UiStateStore`, checked by
+  `parseUiStatePatch`), with Pastel's color (`pastelHue`, a whole hue 0 to 359).
+  `colorSchemeOf` turns it into the one setting of the scheme
+  (`nativeTheme.themeSource`): Pastel is light, Pastel dark is dark.
+- The page marks a Pastel theme with `applyPalette` (`lib/theme.ts`): before its first
+  paint (`main.tsx`) and on every change (`AppContext`), through the CSSOM. Anything
+  that cannot read CSS asks `useResolvedTheme()`, which is only ever light or dark.
+- The window draws its ground and its buttons' strip in the page's canvas and ink
+  (`window.ts`), following the learner's settings as well as the system's
+  (`look.onChange`): a Pastel color changes nothing the operating system sees.
+
 ## URLs and origins
 
 - Never use `new URL(x).origin` for `adle://` URLs in main-process code: Node reports `"null"` for
@@ -201,9 +214,13 @@ most, a file's name.
 - A slide or a figure Adle wrote says, as each step ends, whether any of its words lie over
   others or under a line, or anything lies past the edge of the screen (the scene event
   `layout`, ADR-055, ADR-056), and gives each such word a soft shadow in the stage's color
-  as it does (ADR-069). Nothing in the app acts on it; `slide-player.spec.ts` and the
-  figures in `scene-player.spec.ts` fail on it, but for the slides of
-  `fixtures/slides/crowded/`, which must say it, each such word with its shadow.
+  as it does (ADR-069), naming what is in whose way by its elements' keys. A hidden trial
+  (`runTrial`) hands what a slide said back with its verdict (`layout`, each once, eight
+  at most), and the core may draw a crowded slide again (ADR-073); an open lesson looks
+  again while one is (`mending`), and a part on the screen keeps the picture it began
+  with. `slide-player.spec.ts` and the figures in `scene-player.spec.ts` fail on it, but
+  for the slides of `fixtures/slides/crowded/`, which must say it, each such word with its
+  shadow and its names.
 - A frame may send `MESSAGE_BUDGET_PER_SECOND` messages a second and no more; past that the
   adapter ends the scene like one that hangs. A scene that needs to say something on every
   frame is saying too much: report a change, not a state.
@@ -268,6 +285,7 @@ most, a file's name.
 - `e2e/` drives the built app. Use the `adle` or `profileDir` fixture from `e2e/support/app.ts`;
   never launch against the default profile. `mountRawPlayer` tests the frame at the protocol level.
 - Set a theme with `launchApp(dir, { theme })`, not media emulation: it exercises the real path.
+  Pastel and Pastel dark take `pastelHue` too (ADR-074).
 - `getByRole(role, { name })` matches substrings. Add `exact: true` for short names such as
   navigation items; a card on the same screen may contain the same word.
 - A course is in two places: its card in the library and its entry in the rail. Ask for the
@@ -449,6 +467,11 @@ most, a file's name.
   a voice is saved and heard by its parts when it has any (`voiceRequest`); while lessons are recorded in
   a voice just chosen, the card in use says which (`recordingNote`). A journey uses a stand-in engine
   (`e2e/voice.spec.ts`), never a real download.
+- **The teacher** a lesson and an answer are written as (ADR-071) is chosen in Settings →
+  Learning → Teacher (`TeacherSettings`), the way the Expressive voice is: its parts, the
+  teachers to start from and the sentence they make are the core's (`learner.character`,
+  `learner.describe_character`), never written in the page; the switch to teach as the
+  Expressive voice's person is offered only while that voice reads the lessons.
 - End-to-end journeys that are not about speech call `showNarrationAsText(page)` first.
 - No end-to-end test reaches a real provider: start `startFakeProvider()` and pass its
   address in `ADLE_PROVIDER_BASE_URL` (one endpoint in place of the choice), or start two and

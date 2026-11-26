@@ -262,7 +262,8 @@ everything and decides nothing.
   else up. As many requests are in flight at each provider as it takes (`at_once`: one at
   AIHubMix, six at NVIDIA, ADR-068), whichever lane asks; within a job, pieces asked for
   side by side go through `jobs.side_by_side` (a film's chapters, three at most; a file's
-  pages, four at most), which stops the rest at the first failure or the learner's Stop.
+  pages, four at most; a lesson's model-written pictures, three at most, ADR-073), which
+  stops the rest at the first failure or the learner's Stop.
 - **A natural voice is set up only by `VoiceInstaller`, at the learner's word** (ADR-042).
   A model file is kept only if its size and hash are the catalogue's; a program only from
   the lock for this system, by its hash. A new file is a new pinned entry; a new version of
@@ -392,6 +393,17 @@ everything and decides nothing.
   nobody has placed is formed by a guess from its concept (`generation.subject_of`).
   Nothing asks a model what subject something is in a request of its own, and the ways of
   teaching tried for another explanation are those that suit the subject (`next_strategy`).
+  A lesson takes the time its concept needs (ADR-072): 10 to 16 parts asked for, up to
+  `MAX_SEGMENTS` (20), summaries along the way and at the end (the axioms
+  `child_could_follow`, `summed_up_along_the_way`, `beyond_the_examples`).
+- **A lesson and an answer are written as a teacher** (ADR-071, `lessons/character.py`,
+  pure): the learner's, made of parts (`PARTS`, `PRESETS`, `compose`) or in their own
+  words (`described`), or the Expressive voice's person while that voice reads and the
+  learner lets it (`following_voice`, `GenerationService.teacher`). It reaches the writer
+  only as a quoted block (`prompts._teacher`) in `lesson_request` and `ask_request`,
+  told that it changes how things are said, never what. Light moments and fun facts are an
+  axiom (`light_touch`), not the teacher's: rare whatever it is. A new part is an entry in
+  `PARTS`; the page shows the core's (`learner.character`), never its own.
 - **A timeline, a vessel, a molecule and code are elements like the rest** (ADR-061,
   `generation/slides.py`). A vessel draws everything it will ever show where it goes
   (`vessel_seen` reads the steps as written) and keeps what has not happened off the stage
@@ -420,7 +432,15 @@ everything and decides nothing.
   round corners, wider and fainter one after another (`SHADOW_RIMS`, `SHADOW_DROP`), and a
   word with a line through it raised above the line; it says how many have no shadow
   that can be seen. Never give a shadow a color of its own, and never fill it: a color
-  given to the word later must not reach it.
+  given to the word later must not reach it. After its counts it names each word over
+  another and each under a line by its element's key (`name_of`: "note over water"),
+  which the hidden trial hands back (ADR-073): a slide that was crowded is sent to the
+  model that writes lessons to be drawn again (`GenerationService._mend_slide`,
+  `generation/slide_mends.py`, `prompts.slide_mend_request`), only where that provider
+  takes several requests at once, `MAX_SLIDE_MENDS` (2) times at most, beside the rest of
+  the writing; kept only in the same steps at the same cues, when fewer words are in each
+  other's way, under the same name, through the gate (`LessonService.mend_scene`). Only
+  names from the slide's own script are ever passed to a model.
   The methods live on the scene: a name they take (`still_lines`, `lines_of`, `pin`, ...)
   must not be one a template already uses, or the template's is replaced. A slide's step is no longer
   than its words (`_fitted`, from `drafts._step_seconds`): never slower than written,
