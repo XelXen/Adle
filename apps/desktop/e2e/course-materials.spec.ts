@@ -70,7 +70,9 @@ test.describe('course materials', () => {
       // Nothing is sent until the learner says so.
       expect(nvidia.requests).toHaveLength(0);
 
-      nvidia.queue(TYPED, READ_PAGE);
+      // Each page is answered by its own number: they are read side by side (ADR-068), and
+      // the second may arrive first.
+      nvidia.answer('read', (words) => (words.includes(', page 1') ? TYPED : READ_PAGE));
       await notes.getByRole('button', { name: 'Read them' }).click();
       await expect(notes).toContainText('Ready', { timeout: 60_000 });
       await expect(notes).not.toContainText('pictures');

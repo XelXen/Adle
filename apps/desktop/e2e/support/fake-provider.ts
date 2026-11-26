@@ -100,6 +100,13 @@ export interface FakeProvider {
   /** Answer the next requests with these before falling back to the defaults. */
   queue: (...next: Answer[]) => void;
   /**
+   * From now on, answer each request of this kind with what `choose` gives for its words,
+   * whatever order such requests arrive in: those the app sends side by side (a file's
+   * pages, ADR-068) may arrive in any order, so a queue cannot say which gets what. A queued
+   * answer still comes first.
+   */
+  answer: (kind: RequestKind, choose: (words: string) => Answer) => void;
+  /**
    * From now on, every request of this kind hangs like `HANG`, whatever is queued: a
    * picture that takes its time while the lesson it belongs to is already written.
    */
@@ -262,6 +269,7 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
   const requests: RecordedRequest[] = [];
   const queued: Answer[] = [];
   const held = new Set<RequestKind>();
+  const chosen = new Map<RequestKind, (words: string) => Answer>();
   const hanging = new Set<() => void>();
 
   const server = createServer((request, response) => {
@@ -284,7 +292,9 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
         body,
       });
 
-      const answer = held.has(kind) ? HANG : (queued.shift() ?? defaultAnswer(kind, user));
+      const answer = held.has(kind)
+        ? HANG
+        : (queued.shift() ?? chosen.get(kind)?.(user) ?? defaultAnswer(kind, user));
       const released = (): Promise<void> =>
         new Promise<void>((resolve) => {
           hanging.add(resolve);
@@ -338,6 +348,9 @@ export async function startFakeProvider(options: { delayMs?: number } = {}): Pro
     requests,
     queue: (...next) => {
       queued.push(...next);
+    },
+    answer: (kind, choose) => {
+      chosen.set(kind, choose);
     },
     hold: (kind) => {
       held.add(kind);
