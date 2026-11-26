@@ -226,10 +226,19 @@ def _math(text: str) -> str:
     return tex
 
 
+def _slash(text: str) -> str:
+    """A slash a model escaped once more than JSON asks ("mass \\/ volume", a real lesson,
+    2026-11-25) is a slash, outside a formula written between dollar signs (ADR-075)."""
+    pieces = re.split(r"(\$[^$]*\$)", text)
+    return "".join(
+        piece if index % 2 else piece.replace("\\/", "/") for index, piece in enumerate(pieces)
+    )
+
+
 def _content(text: str) -> list[Any]:
     """Words, a formula, or both, as ``[is a formula, what is drawn]`` (``figures._cell``):
     TeX without dollar signs, and mathematics in its own symbols, are set as formulas."""
-    spec = _cell(text)
+    spec = _cell(_slash(text))
     if spec[0]:
         spec[1] = _tex_colors(spec[1])
     return spec
@@ -249,7 +258,7 @@ _QUANTITY = re.compile(
 def _token(text: str) -> list[Any]:
     """A short name for something on the stage: a formula when it reads as one (H, (1,2),
     x_1, 1/2), words when it is words."""
-    text = " ".join(str(text).split())
+    text = " ".join(_slash(str(text)).split())
     if not text:
         raise ValueError("must say something")
     quantity = _QUANTITY.fullmatch(small_as_tex(text)) if "$" not in text else None
@@ -2622,15 +2631,39 @@ _BASE = """\
             return [other.get_left()[0] - 0.55 - mine.width / 2, other.get_center()[1], 0]
         return [other.get_right()[0] + 0.55 + mine.width / 2, other.get_center()[1], 0]
 
-    def stand_beside(self, key, anchor, ways):
+    def covered(self, a, b):
+        across = min(a.get_right()[0], b.get_right()[0]) - max(a.get_left()[0], b.get_left()[0])
+        up = min(a.get_top()[1], b.get_top()[1]) - max(a.get_bottom()[1], b.get_bottom()[1])
+        if across <= 0 or up <= 0:
+            return 0
+        return across * up
+
+    def stand_beside(self, key, anchor, ways, avoid=None):
         # Beside what it was put beside: on the side asked for, or, where that would take it
         # past the edge (under what already stands at the foot of the stage), on the next
-        # side there is to try.
+        # side there is to try; and never onto what is on the stage with it: the first
+        # place inside the stage that covers none of it, any side round, else the one that
+        # covers least.
         mine = self.e[key]
-        for way in ways:
+        others = [self.e[k] for k in (avoid or [])]
+        sides = list(ways)
+        if len(others) > 0:
+            sides = sides + [w for w in [3, 2, 0, 1] if w not in ways]
+        best = None
+        for way in sides:
             mine.move_to(self.beside([key], [anchor], way))
-            if self.within(mine, 6.2, 3.4):
+            if not self.within(mine, 6.2, 3.4):
+                continue
+            over = 0
+            for other in others:
+                over = over + self.covered(mine, other)
+            if over == 0:
                 return
+            if best is None or over < best[0]:
+                best = [over, way]
+        if best is not None:
+            mine.move_to(self.beside([key], [anchor], best[1]))
+            return
         mine.move_to(self.beside([key], [anchor], ways[0]))
         self.keep(mine)
 
@@ -2661,6 +2694,37 @@ _BASE = """\
         if fill > 0:
             look.set_fill(hue, fill)
         return Transform(m, look)
+
+    def landing(self, keys, anchor, side, avoid=None):
+        # Where what moves beside another lands: on the side asked for, or, past the edge or
+        # onto what shares the stage with it, the first side round that is clear, else the
+        # one that covers least; with no side inside, the one asked for, moved in.
+        mine = self.group(keys)
+        w = mine.width / 2
+        h = mine.height / 2
+        others = [self.e[k] for k in (avoid or [])]
+        sides = [side, [1, 0, 3, 2][side]]
+        if len(others) > 0:
+            sides = sides + [s for s in [3, 2, 0, 1] if s not in sides]
+        best = None
+        for way in sides:
+            p = self.beside(keys, anchor, way)
+            if p[0] - w < -6.2 or p[0] + w > 6.2 or p[1] - h < -3.4 or p[1] + h > 3.4:
+                continue
+            over = 0
+            for other in others:
+                across = min(p[0] + w, other.get_right()[0]) - max(p[0] - w, other.get_left()[0])
+                up = min(p[1] + h, other.get_top()[1]) - max(p[1] - h, other.get_bottom()[1])
+                if across > 0 and up > 0:
+                    over = over + across * up
+            if over == 0:
+                return p
+            if best is None or over < best[0]:
+                best = [over, p]
+        if best is not None:
+            return best[1]
+        p = self.beside(keys, anchor, side)
+        return [min(max(p[0], -6.2 + w), 6.2 - w), min(max(p[1], -3.4 + h), 3.4 - h), 0]
 
     def shift_to(self, keys, point):
         mine = self.group(keys)
@@ -3442,6 +3506,9 @@ class _Scene:
             out.say(f"self.put({_py(names)}, {box.literal()}, {_columns(len(names), box)})")
         together = c.shown_together()
         beside: dict[tuple[str, int, float, float], str] = {}
+        # What already stands where it goes, as each is put beside another: everything put
+        # in a region, then each put beside or in the place of another, in order.
+        placed = [name for names in c.cells.values() for name in names]
         for name in c.order:
             if name in c.relative:
                 side, ref = c.relative[name]
@@ -3463,14 +3530,24 @@ class _Scene:
                 # the thing they both stand beside is).
                 turns = [3, 2] if side in (0, 1) else [0, 1]
                 ways = [side, *turns] if chained else [side, [1, 0, 3, 2][side]]
-                out.say(f"self.stand_beside({_py(name)}, {_py(anchor)}, {_py(ways)})")
+                # Never onto what is on the stage with it (ADR-075): a real lesson's ice,
+                # its right-hand molecules pushed past the edge, stood them on the water's.
+                clear = [
+                    other
+                    for other in placed
+                    if other != anchor and tuple(sorted((other, name))) in together
+                ]
+                avoid = f", {_py(clear)}" if clear else ""
+                out.say(f"self.stand_beside({_py(name)}, {_py(anchor)}, {_py(ways)}{avoid})")
                 if across or up:
                     out.say(f"{_e(name)}.shift(RIGHT * {_py(across)} + UP * {_py(up)})")
                     out.say(f"self.keep({_e(name)})")
+                placed.append(name)
             elif name in c.inherits:
                 box = c.box_of(c.inherits[name])
                 out.say(f"self.fit({_e(name)}, {_py(round(box.w, 3))}, {_py(round(box.h, 3))})")
                 out.say(f"{_e(name)}.move_to({_e(c.inherits[name])}.get_center())")
+                placed.append(name)
         for name in later:
             self.make(out, name, c.elements[name])
         # Everything is where it goes: a label over other words or past the edge moves now,
@@ -4467,7 +4544,21 @@ class _Scene:
             point = f"[{_py(round(box.x, 3))}, {_py(round(box.y, 3))}, 0]"
         elif isinstance(place, tuple):
             side, anchor = place
-            point = f"self.beside({_py(keys)}, {_py(list(anchor.keys))}, {side})"
+            # Beside what it is moved beside, as asked, unless that is past the edge or onto
+            # what shares the stage with it (ADR-075): a real lesson's stone, moved below
+            # its pond, landed on the box that came after it.
+            moving = {key.split(".")[0].split("/")[0] for key in keys}
+            together = self.c.shown_together()
+            clear = [
+                name
+                for name in self.c.order
+                if self.c.elements[name].kind in _PLACED
+                and name not in moving
+                and name != anchor.element
+                and any(tuple(sorted((name, mover))) in together for mover in moving)
+            ]
+            avoid = f", {_py(clear)}" if clear else ""
+            point = f"self.landing({_py(keys)}, {_py(list(anchor.keys))}, {side}{avoid})"
         else:
             point = f"self.group({_py(list(place.keys))}).get_center()"
             if (

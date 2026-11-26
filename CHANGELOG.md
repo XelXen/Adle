@@ -5,6 +5,20 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **You can hear your teacher.** The teacher you choose now shapes how every part of a
+  lesson is said, and two or three times a lesson brings a light moment or a fun fact,
+  never more than one part in four. A teacher you build without jokes or fun facts keeps
+  to the subject.
+
+### Fixed
+
+- Pictures on a slide no longer land on each other when there is no room on the side they
+  were put: a group of molecules beside another, a stone moved below its pond. They take
+  the nearest clear side instead.
+- A slash on a slide no longer shows with a stray backslash (`mass \/ volume`).
+
 ## [0.2.0] - 2026-11-25
 
 The first version that is not an alpha. Lessons are now written by a teacher you choose,

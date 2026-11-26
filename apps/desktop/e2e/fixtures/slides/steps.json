@@ -99,6 +99,10 @@
     "interactive": false,
     "steps": 2
   },
+  "moved_beside.py": {
+    "interactive": false,
+    "steps": 3
+  },
   "number_line.py": {
     "interactive": false,
     "steps": 3
@@ -160,6 +164,10 @@
     "steps": 4
   },
   "tree.py": {
+    "interactive": false,
+    "steps": 2
+  },
+  "two_groups_beside.py": {
     "interactive": false,
     "steps": 2
   },

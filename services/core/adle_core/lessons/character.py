@@ -207,8 +207,15 @@ def compose(parts: Mapping[str, str] | None) -> str:
     who = f"{_phrase(chosen, 'manner', 'warm')} {_phrase(chosen, 'style', 'classroom teacher')}"
     article = "An" if who[:1].lower() in "aeiou" else "A"
     sentence = f"{article} {who}, speaking {_phrase(chosen, 'register', 'plainly')}"
-    if chosen.get("humor") == "none":
-        sentence += ", who never jokes"
+    # What this teacher never does is said too: a lesson has a light moment or a fun fact
+    # two or three times, as its teacher allows (ADR-075).
+    never = [
+        said
+        for key, said in (("humor", "never jokes"), ("facts", "tells no fun facts"))
+        if chosen.get(key) == "none"
+    ]
+    if never:
+        sentence += ", who " + " and ".join(never)
     extras = [
         phrase
         for phrase in (

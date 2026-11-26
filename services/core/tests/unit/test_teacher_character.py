@@ -19,8 +19,12 @@ def test_a_teacher_is_put_together_from_its_parts() -> None:
         "A calm guide who walks beside the learner, speaking plainly, who never jokes, with "
         "a fun fact now and then that belongs to the topic."
     )
-    assert character.compose({"manner": "enthusiastic", "facts": "none"}).startswith(
-        "An enthusiastic classroom teacher"
+    assert character.compose({"manner": "enthusiastic", "facts": "none"}) == (
+        "An enthusiastic classroom teacher, speaking plainly, who tells no fun facts, with a "
+        "light, witty moment now and then."
+    )
+    assert character.compose({"humor": "none", "facts": "none"}) == (
+        "A warm classroom teacher, speaking plainly, who never jokes and tells no fun facts."
     )
     # A part left alone is Adle's teacher's: light moments and fun facts now and then.
     assert "a light, witty moment now and then" in character.compose({"style": "professor"})

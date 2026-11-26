@@ -517,6 +517,39 @@ EXAMPLES: dict[str, dict[str, Any]] = {
             [{"set": "jar", "to": {"liquid": "colorless"}}],
         ],
     },
+    # As a real lesson wrote it (2026-11-25): water's molecules on the left and ice's on
+    # the right, each put beside another; those beyond the edge stand clear of the rest
+    # (ADR-075), where they were once turned back onto the water's.
+    "two_groups_beside": {
+        "elements": [
+            {"id": "liquid", "kind": "molecule", "atoms": ["H", "O", "H"], "bonds": [[1, 2], [2, 3]], "place": "left", "label": "liquid water", "color": "blue"},
+            {"id": "liquid_two", "kind": "molecule", "atoms": ["H", "O", "H"], "bonds": [[1, 2], [2, 3]], "place": {"right of": "liquid", "offset": 40}, "color": "blue"},
+            {"id": "liquid_three", "kind": "molecule", "atoms": ["H", "O", "H"], "bonds": [[1, 2], [2, 3]], "place": {"below": "liquid", "offset": 40}, "color": "blue"},
+            {"id": "ice", "kind": "molecule", "atoms": ["H", "O", "H"], "bonds": [[1, 2], [2, 3]], "place": "right", "label": "ice", "color": "teal"},
+            {"id": "ice_two", "kind": "molecule", "atoms": ["H", "O", "H"], "bonds": [[1, 2], [2, 3]], "place": {"right of": "ice", "offset": 100}, "color": "teal"},
+            {"id": "ice_three", "kind": "molecule", "atoms": ["H", "O", "H"], "bonds": [[1, 2], [2, 3]], "place": {"below": "ice", "offset": 100}, "color": "teal"},
+        ],
+        "steps": [
+            [{"show": ["liquid", "liquid_two", "liquid_three"]}],
+            [{"show": ["ice", "ice_two", "ice_three"]}],
+        ],
+    },
+    # As a real lesson wrote it (2026-11-25): a stone moved below its pond and a twig above
+    # it land clear of the edge and of the box that comes after them (ADR-075), and a slash
+    # escaped twice is a slash.
+    "moved_beside": {
+        "elements": [
+            {"id": "pond", "kind": "vessel", "shape": "beaker", "liquid": "blue", "level": 0.8, "label": "water", "place": "center"},
+            {"id": "stone", "kind": "shape", "shape": "circle", "color": "gray", "size": "small", "label": "stone", "place": {"below": "pond"}},
+            {"id": "twig", "kind": "shape", "shape": "rectangle", "color": "brown", "size": "small", "label": "twig", "place": {"above": "pond"}},
+            {"id": "def", "kind": "box", "text": "density = mass \\/ volume", "place": "bottom"},
+        ],
+        "steps": [
+            [{"show": "pond"}, {"show": "stone"}, {"show": "twig"}],
+            [{"move": "stone", "to": {"below": "pond"}}, {"move": "twig", "to": {"above": "pond"}}],
+            [{"show": "def"}],
+        ],
+    },
 }  # fmt: skip
 
 

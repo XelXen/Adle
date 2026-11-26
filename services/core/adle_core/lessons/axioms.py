@@ -113,10 +113,12 @@ AXIOMS: tuple[Axiom, ...] = (
     Axiom(
         "light_touch",
         "Now and then, a light moment or a fun fact, never in the way.",
-        "Write every word as the teacher described above would say it. Now and then, "
-        "rarely (in one part of every four at most), a light, witty moment or a fun fact that "
-        "belongs to the topic and is true, as that teacher allows: never in a question, never "
-        "at the learner's expense, and never in place of a step of the teaching.",
+        "Write every word as the teacher described above would say it, so that their manner "
+        "is heard in every part. Two or three times in a lesson, and never in more than one "
+        "part of every four, a light, witty moment or a fun fact that belongs to the topic "
+        "and is true, as that teacher allows (one who never jokes, or tells no fun facts, "
+        "leaves that out): never in a question, never at the learner's expense, and never in "
+        "place of a step of the teaching.",
     ),
     Axiom(
         "nothing_made_up",

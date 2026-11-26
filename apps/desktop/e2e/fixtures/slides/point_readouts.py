@@ -68,15 +68,39 @@ class Slide(InteractiveScene):
             return [other.get_left()[0] - 0.55 - mine.width / 2, other.get_center()[1], 0]
         return [other.get_right()[0] + 0.55 + mine.width / 2, other.get_center()[1], 0]
 
-    def stand_beside(self, key, anchor, ways):
+    def covered(self, a, b):
+        across = min(a.get_right()[0], b.get_right()[0]) - max(a.get_left()[0], b.get_left()[0])
+        up = min(a.get_top()[1], b.get_top()[1]) - max(a.get_bottom()[1], b.get_bottom()[1])
+        if across <= 0 or up <= 0:
+            return 0
+        return across * up
+
+    def stand_beside(self, key, anchor, ways, avoid=None):
         # Beside what it was put beside: on the side asked for, or, where that would take it
         # past the edge (under what already stands at the foot of the stage), on the next
-        # side there is to try.
+        # side there is to try; and never onto what is on the stage with it: the first
+        # place inside the stage that covers none of it, any side round, else the one that
+        # covers least.
         mine = self.e[key]
-        for way in ways:
+        others = [self.e[k] for k in (avoid or [])]
+        sides = list(ways)
+        if len(others) > 0:
+            sides = sides + [w for w in [3, 2, 0, 1] if w not in ways]
+        best = None
+        for way in sides:
             mine.move_to(self.beside([key], [anchor], way))
-            if self.within(mine, 6.2, 3.4):
+            if not self.within(mine, 6.2, 3.4):
+                continue
+            over = 0
+            for other in others:
+                over = over + self.covered(mine, other)
+            if over == 0:
                 return
+            if best is None or over < best[0]:
+                best = [over, way]
+        if best is not None:
+            mine.move_to(self.beside([key], [anchor], best[1]))
+            return
         mine.move_to(self.beside([key], [anchor], ways[0]))
         self.keep(mine)
 
@@ -107,6 +131,37 @@ class Slide(InteractiveScene):
         if fill > 0:
             look.set_fill(hue, fill)
         return Transform(m, look)
+
+    def landing(self, keys, anchor, side, avoid=None):
+        # Where what moves beside another lands: on the side asked for, or, past the edge or
+        # onto what shares the stage with it, the first side round that is clear, else the
+        # one that covers least; with no side inside, the one asked for, moved in.
+        mine = self.group(keys)
+        w = mine.width / 2
+        h = mine.height / 2
+        others = [self.e[k] for k in (avoid or [])]
+        sides = [side, [1, 0, 3, 2][side]]
+        if len(others) > 0:
+            sides = sides + [s for s in [3, 2, 0, 1] if s not in sides]
+        best = None
+        for way in sides:
+            p = self.beside(keys, anchor, way)
+            if p[0] - w < -6.2 or p[0] + w > 6.2 or p[1] - h < -3.4 or p[1] + h > 3.4:
+                continue
+            over = 0
+            for other in others:
+                across = min(p[0] + w, other.get_right()[0]) - max(p[0] - w, other.get_left()[0])
+                up = min(p[1] + h, other.get_top()[1]) - max(p[1] - h, other.get_bottom()[1])
+                if across > 0 and up > 0:
+                    over = over + across * up
+            if over == 0:
+                return p
+            if best is None or over < best[0]:
+                best = [over, p]
+        if best is not None:
+            return best[1]
+        p = self.beside(keys, anchor, side)
+        return [min(max(p[0], -6.2 + w), 6.2 - w), min(max(p[1], -3.4 + h), 3.4 - h), 0]
 
     def shift_to(self, keys, point):
         mine = self.group(keys)
@@ -563,7 +618,7 @@ class Slide(InteractiveScene):
         self.put(['axes'], [-2.48, -0.209, 7.44, 4.481], 1)
         self.put(['where'], [2.48, 2.891, 7.44, 1.019], 1)
         self.fit(self.e['slope'], 7.44, 6.8)
-        self.stand_beside('slope', 'where', [0, 1])
+        self.stand_beside('slope', 'where', [0, 1], ['axes'])
         self.make_curve('curve', self.ax['axes'], 0, -3.0, 3.0, self.blue, False, False)
         self.make_point('p', 'axes', 0, None, -3.0, 3.0, None, self.coral)
         self.make_tangent('tangent', self.ax['axes'], 0, 'p', -3.0, 3.0, self.violet)

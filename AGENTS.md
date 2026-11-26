@@ -68,6 +68,7 @@ Run from the repository root. Requires Node ≥ 22.12 (pinned: 24.3.0) and `uv`.
 | Third-party licences: list / check | `npm run licenses` / `npm run licenses:check` (part of `check`) |
 | Nothing secret is about to be committed | `npm run secrets:check` (part of `check`) |
 | Try the real providers by hand (spends allowance; never in a test) | `uv run --directory services/core python ../../scripts/dev/real_provider_check.py --help` |
+| Try the whole app with a real model, by hand (spends allowance) | `node scripts/dev/provider_relay.mjs <NVIDIA key file> <folder outside the repo>`, then start the app with `ADLE_PROVIDER_ENDPOINTS='{"nvidia":"http://127.0.0.1:9100/v1"}'` and a stand-in key in Settings: the relay adds the real one (ADR-075) |
 | Time every model on Adle's own prompts, by hand (spends allowance) | `uv run --directory services/core python ../../scripts/dev/benchmark_models.py --help` |
 | Which figures in kept answers Adle can draw, and why not (offline) | `uv run --directory services/core python ../../scripts/dev/figure_census.py <answer files>` |
 | Measure what a learner waits for | `node scripts/measure.mjs` (`--packaged` for the packaged build) |

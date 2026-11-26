@@ -14,6 +14,7 @@ from adle_core.generation.slides import (
     _offset,
     _outward,
     _relation,
+    _slash,
     _token,
     _vessel_changes,
     compile_slide,
@@ -344,13 +345,14 @@ def test_two_things_on_one_side_of_the_same_thing_do_not_lie_over_each_other() -
     # goes beside it, never back onto what they both stand under.
     together = beside([[{"show": ["law", "one", "two"]}]])
     assert "self.stand_beside('one', 'law', [0, 1])" in together
-    assert "self.stand_beside('two', 'one', [0, 3, 2])" in together
+    # Turned aside where there is no room, it keeps clear of what they stand under.
+    assert "self.stand_beside('two', 'one', [0, 3, 2], ['law'])" in together
     # One that takes the other's place stands where it stood.
     in_turn = beside([[{"show": ["law", "one"]}], [{"hide": "one"}, {"show": "two"}]])
     assert "self.stand_beside('two', 'law', [0, 1])" in in_turn
     # One put a little along from there has a place of its own.
     apart = beside([[{"show": ["law", "one", "two"]}]], x=2)
-    assert "self.stand_beside('two', 'law', [0, 1])" in apart
+    assert "self.stand_beside('two', 'law', [0, 1], ['one'])" in apart
     assert "self.e['one'].shift(RIGHT * 2.0 + UP * 0.0)" in apart
 
 
@@ -365,5 +367,80 @@ def test_an_offset_is_taken_along_the_side_and_never_toward_the_thing() -> None:
     )
     assert "self.e['up'].shift(RIGHT * 0.0 + UP * 2.0)" in made.source
     assert "self.e['down'].shift(RIGHT * 0.0 + UP * -2.0)" in made.source
-    # Each has a place of its own: neither stands beyond the other.
-    assert "self.stand_beside('down', 'law', [2, 3])" in made.source
+    # Each has a place of its own: neither stands beyond the other, nor on it.
+    assert "self.stand_beside('down', 'law', [2, 3], ['up'])" in made.source
+
+
+def test_what_is_put_beside_another_keeps_clear_of_what_is_on_the_stage_with_it() -> None:
+    # A real lesson (2026-11-25): water's molecules on the left, ice's on the right, each
+    # group of four put one beside another; those right of the rightmost went past the edge
+    # and were turned back onto the water's (ADR-075).
+    def molecule(name: str, place: Any) -> dict[str, Any]:
+        return {
+            "id": name,
+            "kind": "molecule",
+            "atoms": ["H", "O", "H"],
+            "bonds": [[1, 2], [2, 3]],
+            "place": place,
+        }
+
+    made = slide(
+        [
+            molecule("water", "left"),
+            molecule("water_two", {"right of": "water"}),
+            molecule("ice", "right"),
+            molecule("ice_two", {"right of": "ice"}),
+            molecule("ice_three", {"below": "ice"}),
+        ],
+        [[{"show": ["water", "water_two"]}], [{"show": ["ice", "ice_two", "ice_three"]}]],
+    )
+    assert "self.stand_beside('water_two', 'water', [3, 2], ['ice'])" in made.source
+    assert "self.stand_beside('ice_two', 'ice', [3, 2], ['water', 'water_two'])" in made.source
+    # The later keeps clear of the earlier, whichever side either was turned to.
+    assert (
+        "self.stand_beside('ice_three', 'ice', [0, 1], ['water', 'water_two', 'ice_two'])"
+        in made.source
+    )
+    # Only what is on the stage with it: one gone before it comes is no obstacle.
+    alone = slide(
+        [
+            molecule("water", "left"),
+            molecule("ice", "right"),
+            molecule("ice_two", {"left of": "ice"}),
+        ],
+        [[{"show": "water"}], [{"hide": "water"}, {"show": ["ice", "ice_two"]}]],
+    )
+    assert "self.stand_beside('ice_two', 'ice', [2, 3])" in alone.source
+    assert check_scene_source(made.source).ok
+
+
+def test_what_is_moved_beside_another_lands_clear_of_what_shares_the_stage() -> None:
+    # A real lesson (2026-11-25): a stone moved below its pond landed on the box shown
+    # after it, and a twig moved above it went past the top of the stage (ADR-075).
+    made = slide(
+        [
+            {"id": "pond", "kind": "vessel", "liquid": "blue", "label": "water", "place": "center"},
+            {"id": "stone", "kind": "shape", "shape": "circle", "place": {"below": "pond"}},
+            {"id": "twig", "kind": "shape", "shape": "rectangle", "place": {"above": "pond"}},
+            {"id": "def", "kind": "box", "text": r"density = mass \/ volume", "place": "bottom"},
+        ],
+        [
+            [{"show": ["pond", "stone", "twig"]}],
+            [{"move": "stone", "to": {"below": "pond"}}],
+            [{"show": "def"}],
+        ],
+    )
+    landing = next(line for line in made.source.splitlines() if "self.landing(" in line)
+    # Beside the pond, as asked, unless that is past the edge or onto what is on the stage
+    # with the stone at some step: the twig, and the box that comes after it.
+    assert "self.landing(['stone'], ['pond/body', 'pond/liquid', 'pond/frame'], 0, " in landing
+    assert landing.endswith("0, ['twig', 'def'])), run_time=1.0)")
+    assert "density = mass / volume" in made.source
+    assert check_scene_source(made.source).ok
+
+
+def test_a_slash_escaped_twice_is_a_slash_except_in_a_formula() -> None:
+    assert _slash(r"density = mass \/ volume") == "density = mass / volume"
+    assert _slash(r"$a \/ b$ and c \/ d") == r"$a \/ b$ and c / d"
+    assert _slash("1/2") == "1/2"
+    assert _token(r"a \/ b") == _token("a / b")
