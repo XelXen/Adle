@@ -99,9 +99,9 @@ KIND_FILM_SETUP = "film_setup"
 #: being written when the work stopped is waiting again.
 WAITING, WRITING, WRITTEN, IN_WORDS = "waiting", "writing", "written", "in_words"
 #: The most chapters written at once, where the provider that writes them takes several
-#: requests at once (ADR-068): each is minutes of a model's work, and they do not depend on
-#: each other's words.
-CHAPTERS_AT_ONCE = 3
+#: requests at once (ADR-068, ADR-077): each is minutes of a model's work, and they do not
+#: depend on each other's words. Five at NVIDIA, which takes six: see ``chapters_at_once``.
+CHAPTERS_AT_ONCE = 5
 #: The opening is Adle's, and is always the first chapter.
 OPENING_TITLE = "Introduction"
 #: How much of a video one request for it carries.
@@ -315,6 +315,14 @@ class _ChapterContext:
     ) -> None:
         stage = (detail or {}).get("stage")
         self._board.say(self._index, message, stage if isinstance(stage, str) else None)
+
+
+def chapters_at_once(provider_at_once: int) -> int:
+    """How many chapters of a film are written at once (ADR-077): as many as the provider
+    takes requests at once but one, which is kept for the lessons and questions of a learner
+    who studies while the film is made; never more than ``CHAPTERS_AT_ONCE``, and one at a
+    time where the provider takes one at a time."""
+    return max(1, min(CHAPTERS_AT_ONCE, provider_at_once - 1))
 
 
 def file_name_for(title: str) -> str:
@@ -849,7 +857,7 @@ class FilmService:
                 record(chapter.lines)
             board.done(index)
 
-        side_by_side(waiting, write, context, min(CHAPTERS_AT_ONCE, self._gateway.at_once("film")))
+        side_by_side(waiting, write, context, chapters_at_once(self._gateway.at_once("film")))
 
         def voiced() -> int:
             """Wait for every line to be recorded, and write down where each one is."""

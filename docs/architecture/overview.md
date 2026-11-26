@@ -259,8 +259,9 @@ sequenceDiagram
 - As many requests are in flight at each provider as it takes (`at_once`: one at
   AIHubMix, six at NVIDIA, ADR-068), each let in and counted as one step. Jobs run in
   lanes: long work one at a time, and what the learner waits for (a question during a
-  lesson, a check of a key) beside it; a film writes up to three chapters at once and a
-  file reads up to four pages at once where the provider takes several.
+  lesson, a check of a key) beside it; a film writes as many chapters at once as the
+  provider takes requests but one, which stays free for the learner (five at most,
+  ADR-077), and a file reads up to four pages at once where the provider takes several.
 - A request that is stopped is given up at once; the connection is let go the next time
   anything arrives on it.
 - While an answer is on its way the job says what the model is doing ("thinking it

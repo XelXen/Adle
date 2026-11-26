@@ -23,7 +23,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from adle_core.api.app import create_app
-from adle_core.application.films import FilmService
+from adle_core.application.films import FilmService, chapters_at_once
 from adle_core.application.narration import NarrationService
 from adle_core.application.services import Services
 from adle_core.film.runtime import FilmPaths
@@ -676,6 +676,42 @@ def test_chapters_are_written_side_by_side_where_the_provider_takes_several_at_o
     # The film maker ran for one chapter at a time, the takes sharing the film's folder:
     # each chapter's take, and then the whole film.
     assert runs() == (4, 1)
+
+
+def test_a_film_takes_all_the_providers_requests_at_once_but_one() -> None:
+    # The one left is the learner's, for lessons and questions while the film is made
+    # (ADR-077): five at NVIDIA, which takes six; one at a time where it takes one.
+    assert chapters_at_once(6) == 5
+    assert chapters_at_once(1) == 1
+    assert chapters_at_once(2) == 1
+    assert chapters_at_once(40) == 5
+
+
+def test_a_film_leaves_a_request_free_for_the_learner(
+    seeing: TestClient, filming: Services, provider: FakeProvider
+) -> None:
+    course = a_course(seeing, "Area", "Volume", "Weight", "Density", "Pressure", "Speed")
+    release = threading.Event()
+
+    def held(body: dict[str, Any]) -> str:
+        release.wait(30)
+        return FILM_CHAPTER
+
+    provider.queue_for("film", *[held] * 6)
+    started = seeing.post(f"/v1/courses/{course}/film")
+    assert started.status_code == 202, started.text
+    # Five of the six chapters are asked for together; the sixth waits for one of them.
+    eventually(lambda: provider.kinds().count("film") == 5, "five chapters asked for")
+    # While they are written, a question of the learner's still goes at once: here, a
+    # check of the key, which goes to the same provider.
+    checked = seeing.post("/v1/provider/check", json={"provider_id": "nvidia"})
+    assert checked.status_code == 202, checked.text
+    assert filming.jobs.wait(checked.json()["id"], timeout=20).status == "succeeded"
+    assert provider.kinds().count("film") == 5
+    release.set()
+    job = filming.jobs.wait(started.json()["id"], timeout=120)
+    assert job.status == "succeeded", (job.error_code, job.error_message)
+    assert provider.kinds().count("film") == 6
 
 
 def test_where_the_provider_takes_one_at_a_time_chapters_are_written_in_order(
