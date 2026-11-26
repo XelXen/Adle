@@ -44,7 +44,7 @@ export interface LessonUpdates {
  */
 export function useLessonUpdates(
   lessonId: string,
-  opened: Pick<LessonForPlayer, 'scenes' | 'pending_scene_ids' | 'writing'> & {
+  opened: Pick<LessonForPlayer, 'scenes' | 'pending_scene_ids' | 'writing' | 'mending'> & {
     lesson: Pick<LessonForPlayer['lesson'], 'segments'>;
   },
 ): LessonUpdates {
@@ -54,7 +54,10 @@ export function useLessonUpdates(
   );
   const [segments, setSegments] = useState<readonly Segment[]>(opened.lesson.segments);
   const [writing, setWriting] = useState(opened.writing ?? false);
-  const waiting = pending.size > 0 || writing;
+  // Slides being drawn again with their words apart (ADR-073): one that comes back is in
+  // the scenes looked at here, and takes its place in a part not begun yet.
+  const [mending, setMending] = useState(opened.mending ?? false);
+  const waiting = pending.size > 0 || writing || mending;
 
   useEffect(() => {
     if (!waiting) return;
@@ -69,6 +72,7 @@ export function useLessonUpdates(
             latest.lesson.segments.length > had.length ? latest.lesson.segments : had,
           );
           setWriting(latest.writing ?? false);
+          setMending(latest.mending ?? false);
         },
         () => {
           // Looked at again on the next turn. The lesson in front of the learner is whole
@@ -87,6 +91,7 @@ export function useLessonUpdates(
     setPending(new Set(latest.pending_scene_ids ?? []));
     setSegments(latest.lesson.segments);
     setWriting(latest.writing ?? false);
+    setMending(latest.mending ?? false);
   }, []);
 
   return { scenes, pending, segments, writing, adopt };

@@ -100,6 +100,9 @@ const DEFAULT_READING: LearnerPreferences = {
   goal: '',
   voice: '',
   volume: 100,
+  character: '',
+  character_parts: {},
+  character_follows_voice: true,
 };
 
 /** Everything that lives exactly as long as one opened lesson. */

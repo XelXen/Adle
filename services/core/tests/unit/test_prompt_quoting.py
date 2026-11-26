@@ -109,6 +109,8 @@ def test_a_question_sends_what_the_interface_says_it_sends_and_nothing_more() ->
         "question",
         "passages",
         "problems",
+        # The teacher the learner chose, which `askDisclosure` names too (ADR-071).
+        "character",
     ]
     request = prompts.ask_request(
         course_title="Course",
@@ -137,6 +139,19 @@ def test_a_question_sends_what_the_interface_says_it_sends_and_nothing_more() ->
     outside = re.sub(r"<learner_material.*?</learner_material>", "", request.user, flags=re.S)
     for about_them in ("goal", "pace", "preference", "has seen of the learner", "level"):
         assert about_them not in outside.lower(), about_them
+    # The teacher, when there is one, is quoted like the rest.
+    taught = prompts.ask_request(
+        course_title="Course",
+        concept=prompts.ConceptBrief(
+            title="Concept", summary="What it is.", objectives=["Explain it."], prerequisites=[]
+        ),
+        lesson_title="Lesson",
+        part_titles=["One"],
+        part=prompts.PartBrief(number=1, title="One", kind="explanation", said=["A."], shown=[]),
+        question="Why?",
+        character="A calm guide.",
+    )
+    assert '<learner_material kind="teacher">' in taught.user
 
 
 def test_a_picture_is_asked_to_last_as_long_as_the_words_said_over_it() -> None:

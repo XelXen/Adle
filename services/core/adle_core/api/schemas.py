@@ -370,6 +370,13 @@ class LearnerPreferences(_Output):
     #: Empty when the learner has not chosen one.
     voice: str
     volume: int
+    #: The teacher who writes the lessons, in the learner's own words (ADR-071). Empty: the
+    #: one its parts make, or Adle's own.
+    character: str
+    #: What that teacher is made of: a choice for each part chosen.
+    character_parts: dict[str, str]
+    #: While the Expressive voice reads the lessons, the teacher is its person.
+    character_follows_voice: bool
 
 
 class LearnerPreferencesUpdate(_Input):
@@ -380,6 +387,64 @@ class LearnerPreferencesUpdate(_Input):
     goal: Annotated[str, StringConstraints(max_length=600)] | None = None
     voice: Annotated[str, StringConstraints(max_length=120)] | None = None
     volume: Annotated[int, Field(ge=0, le=100)] | None = None
+    #: A teacher in the learner's own words; given, its parts are let go. Empty: none.
+    character: Annotated[str, StringConstraints(max_length=600)] | None = None
+    #: A teacher by its parts; given, the words are let go. Empty: Adle's own.
+    character_parts: (
+        Annotated[
+            dict[
+                Annotated[str, StringConstraints(max_length=40)],
+                Annotated[str, StringConstraints(max_length=40)],
+            ],
+            Field(max_length=12),
+        ]
+        | None
+    ) = None
+    character_follows_voice: bool | None = None
+
+
+class CharacterOption(_Output):
+    key: str
+    name: str
+
+
+class CharacterPart(_Output):
+    key: str
+    name: str
+    options: list[CharacterOption]
+
+
+class CharacterPreset(_Output):
+    name: str
+    parts: dict[str, str]
+
+
+class CharacterPartsChosen(_Input):
+    parts: Annotated[
+        dict[
+            Annotated[str, StringConstraints(max_length=40)],
+            Annotated[str, StringConstraints(max_length=40)],
+        ],
+        Field(max_length=12),
+    ]
+
+
+class CharacterText(_Output):
+    text: str
+
+
+class TeacherCharacter(_Output):
+    """Who can write the lessons, and who does now (ADR-071)."""
+
+    parts: list[CharacterPart]
+    #: Teachers to start from, each a choice of parts.
+    presets: list[CharacterPreset]
+    #: The teacher now: in a sentence, or the Expressive voice's person in its own words.
+    described: str
+    #: The Expressive voice reads the lessons now, so the teacher can be its person.
+    voice_in_use: bool
+    #: The teacher is that person now.
+    follows_voice: bool
 
 
 class SelfRating(_Input):
@@ -461,6 +526,9 @@ class LessonForPlayer(_Output):
     #: The rest of the lesson is still being written. Its parts are added after these, and
     #: none of these changes (ADR-048).
     writing: bool = False
+    #: Some of its slides are being drawn again with their words apart (ADR-073): a slide
+    #: that comes back takes the place of its own in a part not begun yet.
+    mending: bool = False
     #: The parts the learner said did not help and has not taken back (ADR-054).
     unhelpful_parts: list[str] = Field(default_factory=list)
 
@@ -797,6 +865,10 @@ class SceneTrialReport(_Input):
     )
     #: What the player said, cut short: it is told to the model that writes the file again.
     message: Annotated[str, StringConstraints(max_length=2000)] = ""
+    #: What a slide said of its layout as each step ended (ADR-073), as the player heard it.
+    layout: list[Annotated[str, StringConstraints(max_length=300)]] = Field(
+        default_factory=list, max_length=8
+    )
 
 
 class LatestJob(_Output):

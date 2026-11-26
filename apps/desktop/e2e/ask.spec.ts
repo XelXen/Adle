@@ -125,7 +125,8 @@ test.describe('asking a question during a lesson', () => {
     const note = await openWhatIsSent(page, dialog);
     await expect(note).toContainText(
       'Sends your question, this part of the lesson, the lesson outline, the course name, ' +
-        `this concept, and any related passages from your materials to ${PROVIDER}.`,
+        'this concept, any related passages from your materials, and the teacher you chose ' +
+        `to ${PROVIDER}.`,
     );
     await expect(note).toContainText('AI can make mistakes.');
     await closeWhatIsSent(page, dialog);

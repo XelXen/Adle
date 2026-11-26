@@ -13,8 +13,13 @@ import type { LoadSceneOptions, PlayerEvents } from '../../../player/host/WanimP
  * seen to fail passes: the player still falls back to words if it fails later.
  *
  * A slide (ADR-049) is paced by cues: it is loaded so, and told to go on as each of its
- * steps ends, until its last; a live page at its end is operated like any other.
+ * steps ends, until its last; a live page at its end is operated like any other. What it
+ * says of its layout as each step ends goes back with the verdict (ADR-073): a slide whose
+ * words were in each other's way is drawn again.
  */
+
+/** The most a slide's layout is said in, by the ends of its steps, as the core keeps it. */
+const MAX_LAYOUT_NOTES = 8;
 
 /** What a trial needs of the player: the adapter's own methods. */
 export interface TrialPlayer {
@@ -70,12 +75,14 @@ export function runTrial(
     let operating: number | null = null;
     const operated = new Set<number>();
     const unsubscribe: (() => void)[] = [];
+    // What the slide said of its layout as each step ended, in order, each once.
+    const layout: string[] = [];
 
     const finish = (report: SceneTrialReport): void => {
       if (settled) return;
       settled = true;
       for (const stop of unsubscribe) stop();
-      resolve(report);
+      resolve(report.passed && layout.length > 0 ? { ...report, layout } : report);
     };
 
     const controlsArrived = async (): Promise<void> => {
@@ -123,6 +130,12 @@ export function runTrial(
         if (operating === null) finish({ passed: true });
       }),
       player.on('scene-event', (event) => {
+        if (event.name === 'layout' && typeof event.value === 'string') {
+          if (layout.length < MAX_LAYOUT_NOTES && !layout.includes(event.value)) {
+            layout.push(event.value);
+          }
+          return;
+        }
         if (steps === 0 || event.name !== 'step' || typeof event.value !== 'number') return;
         // Each step ends held: go on to the next. A slide is held at its last step, and
         // says nothing more; one with a live page there is operated when it comes.

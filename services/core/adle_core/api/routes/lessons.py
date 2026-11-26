@@ -61,6 +61,7 @@ def _for_player(services: Services, lesson_id: str) -> schemas.LessonForPlayer:
             schemas.LessonAuthor.model_validate(loaded.written_by) if loaded.written_by else None
         ),
         writing=loaded.writing,
+        mending=services.generation.mending(lesson_id),
         unhelpful_parts=services.learning.unhelpful_parts(lesson_id),
     )
 

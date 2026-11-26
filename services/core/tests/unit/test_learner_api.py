@@ -64,6 +64,9 @@ def test_preferences_start_with_sensible_defaults(client: TestClient) -> None:
         "goal": "",
         "voice": "",
         "volume": 100,
+        "character": "",
+        "character_parts": {},
+        "character_follows_voice": True,
     }
 
 
@@ -83,6 +86,9 @@ def test_preferences_can_be_changed_one_at_a_time_and_are_kept(
         "goal": "Understand backpropagation.",
         "voice": "",
         "volume": 100,
+        "character": "",
+        "character_parts": {},
+        "character_follows_voice": True,
     }
     client.patch("/v1/learner/preferences", json={"narration": False})
     voiced = client.patch(

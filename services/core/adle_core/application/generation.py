@@ -31,6 +31,7 @@ import re
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -59,6 +60,8 @@ from adle_core.application.jobs import (
     JobContext,
     JobRunner,
     JobSnapshot,
+    WorkContext,
+    side_by_side,
 )
 from adle_core.application.learner import LearnerService
 from adle_core.application.lessons import DRAWN_AGAIN, LessonService
@@ -67,7 +70,7 @@ from adle_core.application.retrieval import Passage as StoredPassage
 from adle_core.application.retrieval import Retriever
 from adle_core.application.scene_trials import TRIAL_WAIT_SECONDS, SceneTrials, TrialFailure
 from adle_core.errors import AdleError, ConflictError, NotFoundError, ValidationFailedError
-from adle_core.generation import prompts
+from adle_core.generation import prompts, slide_mends
 from adle_core.generation.drafts import (
     DraftError,
     FigureScene,
@@ -105,6 +108,7 @@ from adle_core.ingestion.types import heading_leaf
 from adle_core.learner_model.next_step import MAX_LESSONS_PER_CONCEPT
 from adle_core.learner_model.preferences import LearnerPreferences
 from adle_core.lessons import axioms
+from adle_core.lessons import character as lesson_character
 from adle_core.lessons.bundle import (
     LessonInvalidError,
     SceneRejectedError,
@@ -251,6 +255,8 @@ class _LessonWork:
     #: It was begun at its first part (ADR-048): the job has said so, and the natural voice
     #: has begun on it, already.
     begun_early: bool = False
+    #: Its slides being mended, when they can be (ADR-073).
+    mends: _Mends | None = None
     #: The learner stopped it while it was written: nothing more is drawn for it.
     stopped: bool = False
 
@@ -316,6 +322,8 @@ class _GrowingLesson:
         self.planned = 0
         self.made = 0
         self.notes: list[str] = []
+        #: Its slides being mended beside the writing of the rest (ADR-073).
+        self.mends: _Mends | None = None
 
     @property
     def begun(self) -> bool:
@@ -437,6 +445,7 @@ class _GrowingLesson:
                 made=self.made,
                 notes=list(self.notes),
                 begun_early=True,
+                mends=self.mends,
                 stopped=self._cut == "stopped",
             )
 
@@ -493,6 +502,7 @@ class _GrowingLesson:
                 written_by=self._service._written_by(self._writers()),
             )
             self.stored_id, self.title = stored.id, stored.title
+            self.mends = self._service._mends_for(stored.id, self._job)
             logger.info("generation.lesson_begun")
         else:
             try:
@@ -530,6 +540,7 @@ class _GrowingLesson:
                     offered,
                     self._job,
                     wait_seconds=FIGURE_WAIT_WHILE_WRITING,
+                    mends=self.mends,
                 )
             except (JobCancelledError, NotFoundError):
                 # Ended by the learner: what is not drawn is said in words at the end.
@@ -709,6 +720,16 @@ def next_strategy(used: Sequence[str], subject: str | None = None) -> str | None
     return next((name for name in axioms.ways_for(subject) if name not in used), None)
 
 
+def _element_ids(script: Mapping[str, Any]) -> set[str]:
+    """The names a slide's script gave its elements."""
+    elements = script.get("elements")
+    return {
+        str(element["id"])
+        for element in (elements if isinstance(elements, list) else [])
+        if isinstance(element, dict) and isinstance(element.get("id"), str)
+    }
+
+
 def _marked_steps(narration: Sequence[Mapping[str, Any]]) -> list[str]:
     """A part's words with where each step of its picture plays marked "⟨2⟩", "⟨3⟩" and on:
     the first plays as the part begins (ADR-049, ADR-067)."""
@@ -797,6 +818,67 @@ def _problem_list(error: ValidationError) -> list[str]:
     return found[:12]
 
 
+#: The most of a lesson's slides mended at once (ADR-073), where the provider that writes
+#: lessons takes several requests at once: each is one request, and the writing of the
+#: rest of the lesson goes on beside them.
+SLIDES_MENDED_AT_ONCE = 2
+#: How long a lesson job waits at its end for the slides still being mended.
+MEND_WAIT_SECONDS = 600.0
+#: The most of a lesson's pictures a model writes at once, where the provider that writes
+#: them takes several requests at once (ADR-073): one request each, as before.
+SCENES_AT_ONCE = 3
+
+
+class _Mends:
+    """The slides of one lesson being mended beside its writing (ADR-073)."""
+
+    def __init__(self, service: GenerationService, lesson_id: str, job: JobContext) -> None:
+        self._service = service
+        self._lesson_id = lesson_id
+        self._job = job
+        self._pool = ThreadPoolExecutor(
+            max_workers=SLIDES_MENDED_AT_ONCE, thread_name_prefix=f"adle-mend-{lesson_id}"
+        )
+        self._futures: list[Future[None]] = []
+
+    def add(self, scene_id: str, notes: Sequence[str]) -> None:
+        self._service._mending_begun(self._lesson_id)
+        self._futures.append(
+            self._pool.submit(
+                self._service._mend_slide, self._lesson_id, scene_id, notes, self._job
+            )
+        )
+
+    def finish(self) -> None:
+        """Wait for the slides still being mended, a while at most."""
+        deadline = time.monotonic() + MEND_WAIT_SECONDS
+        for future in list(self._futures):
+            while not future.done() and time.monotonic() < deadline and not self._job.cancelled:
+                threading.Event().wait(0.2)
+
+    def close(self) -> None:
+        """Let the pool go: what has not begun never does, and what runs stops at its next
+        step when the job has (it checks the job between its steps)."""
+        self._pool.shutdown(wait=False, cancel_futures=True)
+        for future in self._futures:
+            if future.cancelled():
+                self._service._mending_ended(self._lesson_id)
+
+
+@dataclass(frozen=True, slots=True)
+class Teacher:
+    """Who writes the lessons and answers the learner's questions (ADR-071)."""
+
+    #: For the learner: the teacher, in a sentence, or the voice's person in its own words.
+    described: str
+    #: For the writer: who to write as.
+    writer: str
+    #: The Expressive voice reads the lessons now, so the teacher can be its person.
+    voice_in_use: bool = False
+    #: The teacher is that person now.
+    follows_voice: bool = False
+
+
 class GenerationService:
     def __init__(
         self,
@@ -813,6 +895,7 @@ class GenerationService:
         on_begun: Callable[[], None] | None = None,
         voice_pending: Callable[[str], bool] | None = None,
         voice_wait: Callable[[], float | None] | None = None,
+        voice_character: Callable[[], str | None] | None = None,
     ) -> None:
         self._database = database
         self._jobs = jobs
@@ -833,6 +916,13 @@ class GenerationService:
         self._voice_pending = voice_pending
         #: How long after a lesson is asked for its first part can usually be heard.
         self._voice_wait = voice_wait
+        #: Who reads the lessons in the Expressive voice, while that voice reads them: the
+        #: teacher can be that person (ADR-071).
+        self._voice_character = voice_character
+        #: Lessons with slides being mended now, and how many (ADR-073): an open lesson
+        #: looks for them again until they are done.
+        self._mending: dict[str, int] = {}
+        self._mending_lock = threading.Lock()
         #: The last thing each lesson job said of its lesson, while the job runs: said again
         #: when more of the lesson can be heard (``voiced``).
         self._said: dict[str, tuple[JobContext, dict[str, Any]]] = {}
@@ -849,12 +939,171 @@ class GenerationService:
         """Pictures waiting to be tried in the app's player (ADR-038)."""
         return self._trials
 
+    def mending(self, lesson_id: str) -> bool:
+        """Whether slides of this lesson are being mended now (ADR-073)."""
+        with self._mending_lock:
+            return self._mending.get(lesson_id, 0) > 0
+
+    def _mending_begun(self, lesson_id: str) -> None:
+        with self._mending_lock:
+            self._mending[lesson_id] = self._mending.get(lesson_id, 0) + 1
+
+    def _mending_ended(self, lesson_id: str) -> None:
+        with self._mending_lock:
+            left = self._mending.get(lesson_id, 0) - 1
+            if left > 0:
+                self._mending[lesson_id] = left
+            else:
+                self._mending.pop(lesson_id, None)
+
+    def _mends_for(self, lesson_id: str, job: JobContext) -> _Mends | None:
+        """A lesson's slides are mended beside its writing where the provider that writes
+        lessons takes several requests at once (ADR-068, ADR-073); else they keep their
+        shadows (ADR-069)."""
+        if self._gateway.at_once("lesson") <= 1:
+            return None
+        return _Mends(self, lesson_id, job)
+
+    def _mend_slide(
+        self, lesson_id: str, scene_id: str, notes: Sequence[str], job: JobContext
+    ) -> None:
+        """One crowded slide drawn again with its words apart (ADR-073): sent back to the
+        model that writes lessons, told which of its elements were in each other's way, at
+        most ``MAX_SLIDE_MENDS`` times; tried in the player as the first was, and kept in its
+        place when it is better. Whatever fails leaves the slide as it was, with its
+        shadows."""
+        try:
+            self._mend(lesson_id, scene_id, notes, job)
+        except (AdleError, DraftError, LessonInvalidError, SceneRejectedError, ValidationError):
+            logger.info("generation.slide_not_mended")
+        except RequestCancelledError:
+            pass
+        finally:
+            self._mending_ended(lesson_id)
+
+    def _mend(self, lesson_id: str, scene_id: str, notes: Sequence[str], job: JobContext) -> None:
+        found = self._lessons.get(lesson_id)
+        lesson = found.lesson
+        artifact = next((item for item in found.scenes if item.id == scene_id), None)
+        index = next(
+            (
+                place
+                for place, segment in enumerate(lesson.segments)
+                if isinstance(getattr(segment, "scene", None), SceneRef)
+                and segment.scene.scene_id == scene_id  # type: ignore[union-attr]
+            ),
+            None,
+        )
+        script = slide_script(artifact.source) if artifact is not None else None
+        if artifact is None or index is None or script is None:
+            return
+        segment = lesson.segments[index]
+        narration = [{"text": beat.text, "cues": list(beat.cues)} for beat in segment.narration]
+        elements = _element_ids(script)
+        faults = slide_mends.faults(notes, elements)
+        if not faults:
+            return
+        with self._database.read() as session:
+            course = get_course_or_404(session, lesson.course_id)
+            concept_row = get_concept_or_404(session, lesson.concept_ids[0])
+            subject = subject_of(course, concept_row.title)
+            course_title = course.title
+            concept = prompts.ConceptBrief(
+                title=concept_row.title,
+                summary=concept_row.summary or "",
+                objectives=[],
+                prerequisites=[],
+            )
+        weight = slide_mends.weight(notes)
+        problems: list[str] = []
+        for _ in range(slide_mends.MAX_SLIDE_MENDS):
+            if job.cancelled:
+                return
+            part = prompts.PictureBrief(
+                number=index + 1,
+                title=segment.title,
+                kind=segment.type,
+                said=_marked_steps(narration),
+                steps=artifact.steps if artifact.steps > 1 else 0,
+                script=script,
+            )
+            result = self._gateway.complete(
+                prompts.slide_mend_request(
+                    course_title=course_title,
+                    subject=subject,
+                    concept=concept,
+                    lesson_title=lesson.title,
+                    part=part,
+                    faults=faults,
+                    problems=problems,
+                ),
+                cancelled=lambda: job.cancelled,
+            )
+            try:
+                drawn = compile_redraw(result.text, narration)
+            except DraftError as error:
+                problems = error.problems
+                continue
+            if drawn.steps != artifact.steps or drawn.cues != [beat["cues"] for beat in narration]:
+                problems = [
+                    f"The slide must take {artifact.steps} steps, as before, each where its "
+                    "words say ⟨n⟩."
+                ]
+                continue
+            mended = inspect_scene(scene_id, artifact.purpose, drawn.source)
+            if not self._trials.present():
+                # Nothing to try it in: the slide that was tried stays.
+                return
+            trial_id = self._trials.offer(
+                scene_class=mended.scene_class,
+                source=mended.source,
+                interactive=mended.interactive,
+                controls=tuple(mended.controls),
+                steps=mended.steps,
+            )
+            verdict, layout = self._trials.wait_with_layout(
+                trial_id, cancelled=lambda: job.cancelled
+            )
+            if verdict != "passed":
+                return
+            better = slide_mends.weight(layout)
+            if better < weight and self._lessons.mend_scene(lesson_id, scene_id, drawn.source):
+                logger.info("generation.slide_mended left=%s", better)
+                weight = better
+                artifact = mended
+            if not slide_mends.crowded(layout):
+                return
+            script = slide_script(drawn.source) or script
+            elements = _element_ids(script)
+            faults = slide_mends.faults(layout, elements) or faults
+            problems = []
+
+    def teacher(self) -> Teacher:
+        """Who writes the lessons and answers the learner's questions (ADR-071): the
+        Expressive voice's person while that voice reads the lessons and the learner lets
+        the teacher follow it; else the teacher the learner made, or Adle's own."""
+        preferences = self._learner.get_preferences()
+        voice = (
+            self._voice_character()
+            if self._voice_character is not None and preferences.narration
+            else None
+        )
+        if voice and preferences.character_follows_voice:
+            return Teacher(
+                described=voice,
+                writer=lesson_character.following_voice(voice),
+                voice_in_use=True,
+                follows_voice=True,
+            )
+        own = lesson_character.described(preferences.character, preferences.character_parts)
+        return Teacher(described=own, writer=own, voice_in_use=voice is not None)
+
     # -- the one way a request is made ---------------------------------------
 
     def _ask(
         self,
         request: ChatRequest,
-        context: JobContext,
+        context: WorkContext,
         done: int,
         total: int,
         doing: str,
@@ -1487,6 +1736,7 @@ class GenerationService:
                 approach=inputs.approach,
                 earlier=inputs.earlier,
                 subject=inputs.subject,
+                character=self.teacher().writer,
             )
             growing = _GrowingLesson(self, inputs.context, context)
             result: ChatResult | None = None
@@ -1570,6 +1820,7 @@ class GenerationService:
             )
 
         stored_id = work.stored_id
+        mends = work.mends if work.mends is not None else self._mends_for(stored_id, context)
         figures, briefs = work.figures, work.briefs
         planned_pictures = work.planned
         total = 1 + len(briefs)
@@ -1613,7 +1864,9 @@ class GenerationService:
                         f"Drawing picture {number} of {planned_pictures}",
                         {"stage": "drawing"},
                     )
-                    if self._settle_figure(stored_id, figure, offered[number - 1], context):
+                    if self._settle_figure(
+                        stored_id, figure, offered[number - 1], context, mends=mends
+                    ):
                         made += 1
                     else:
                         notes.append(
@@ -1626,13 +1879,20 @@ class GenerationService:
                 for _, trial_id in offered:
                     if trial_id is not None:
                         self._trials.withdraw(trial_id)
-            for number, brief in enumerate(briefs, start=1):
-                context.check_cancelled()
+            drawing = threading.Lock()
+            drawn = [0]
+
+            def draw(item: tuple[int, SceneBrief], shared: WorkContext) -> None:
+                """One picture a model writes, tried and taken in: several at once where the
+                provider takes several requests at once (ADR-073)."""
+                nonlocal made
+                number, brief = item
+                shared.check_cancelled()
                 place = planned_pictures - len(briefs) + number
                 label = f"Drawing picture {place} of {planned_pictures}"
-                context.report(number, total, label, {"stage": "drawing"})
+                shared.report(number, total, label, {"stage": "drawing"})
                 try:
-                    artifact, answer = self._write_scene(brief, context, number, total, label)
+                    artifact, answer = self._write_scene(brief, shared, number, total, label)
                 except JobCancelledError:
                     raise
                 except (ProviderError, QuotaExhaustedError) as error:
@@ -1640,34 +1900,48 @@ class GenerationService:
                     logger.info("generation.scene_skipped code=%s", error.code)
                     artifact, answer = None, None
                 settled = None
-                if artifact is not None:
-                    try:
-                        settled = self._lessons.settle_scene(
-                            stored_id,
-                            brief.scene_id,
-                            {"purpose": artifact.purpose, "source": artifact.source},
-                        )
-                    except (LessonInvalidError, SceneRejectedError) as error:
-                        # Drawn, and yet not something this lesson can take. The lesson is
-                        # there already: that part is said in words, as for a picture that
-                        # never came, and the work goes on.
-                        logger.info("generation.scene_unattached code=%s", error.code)
-                if settled is None:
-                    self._lessons.settle_scene(stored_id, brief.scene_id, None)
-                    notes.append(
-                        f"The picture for “{brief.title}” couldn’t be made, so that part is "
-                        "explained in words."
-                    )
-                else:
-                    if answer is not None:
-                        answers.append(answer)
-                    made += 1
-                    if settled.as_animation:
+                with drawing:
+                    if artifact is not None:
+                        try:
+                            settled = self._lessons.settle_scene(
+                                stored_id,
+                                brief.scene_id,
+                                {"purpose": artifact.purpose, "source": artifact.source},
+                            )
+                        except (LessonInvalidError, SceneRejectedError) as error:
+                            # Drawn, and yet not something this lesson can take. The lesson
+                            # is there already: that part is said in words, as for a picture
+                            # that never came, and the work goes on.
+                            logger.info("generation.scene_unattached code=%s", error.code)
+                    if settled is None:
+                        self._lessons.settle_scene(stored_id, brief.scene_id, None)
                         notes.append(
-                            f"“{brief.title}” was meant to be interactive, but came out as an "
-                            "animation."
+                            f"The picture for “{brief.title}” couldn’t be made, so that part "
+                            "is explained in words."
                         )
-                self._say(context, so_far(len(briefs) - number))
+                    else:
+                        if answer is not None:
+                            answers.append(answer)
+                        made += 1
+                        if settled.as_animation:
+                            notes.append(
+                                f"“{brief.title}” was meant to be interactive, but came out "
+                                "as an animation."
+                            )
+                    drawn[0] += 1
+                    self._say(context, so_far(len(briefs) - drawn[0]))
+
+            side_by_side(
+                list(enumerate(briefs, start=1)),
+                draw,
+                context,
+                min(SCENES_AT_ONCE, self._gateway.at_once("scene")),
+            )
+            if mends is not None:
+                # The slides that were crowded, drawn again beside all of this (ADR-073):
+                # the lesson is whole meanwhile, and can be studied.
+                context.report(total, total, "Checking the pictures", {"stage": "drawing"})
+                mends.finish()
         except JobCancelledError:
             # Stopped once there was a lesson: the lesson stays, and what was not drawn is
             # said in words. Stopping before this point saves nothing, as it always did.
@@ -1683,7 +1957,9 @@ class GenerationService:
             pass
         finally:
             # Whatever ended the work, nothing may be left waiting for a picture, nor for
-            # the rest of its words.
+            # the rest of its words, and no slide is mended for it any more.
+            if mends is not None:
+                mends.close()
             with contextlib.suppress(AdleError):
                 self._lessons.settle_unfinished(stored_id)
 
@@ -1725,7 +2001,7 @@ class GenerationService:
         }
 
     def _write_scene(
-        self, brief: SceneBrief, context: JobContext, done: int, total: int, label: str
+        self, brief: SceneBrief, context: WorkContext, done: int, total: int, label: str
     ) -> tuple[SceneArtifact | None, ChatResult | None]:
         """One scene file and the answer it came in, or neither.
 
@@ -1838,16 +2114,19 @@ class GenerationService:
         context: JobContext,
         *,
         wait_seconds: float = TRIAL_WAIT_SECONDS,
+        mends: _Mends | None = None,
     ) -> bool:
         """Take a figure into the stored lesson once it has run in the player, or say its
         part in words. Whether it was taken. Its trial is waited for ``wait_seconds`` at
-        most; one that does not come in time keeps the figure untried."""
+        most; one that does not come in time keeps the figure untried. A slide that said, as
+        it ran, that its words were in each other's way is mended beside the rest of the
+        work, when there is a way to (``mends``, ADR-073)."""
         artifact, trial_id = offered
         if artifact is not None:
-            verdict = (
-                "untried"
+            verdict, layout = (
+                ("untried", ())
                 if trial_id is None
-                else self._trials.wait(
+                else self._trials.wait_with_layout(
                     trial_id, timeout=wait_seconds, cancelled=lambda: context.cancelled
                 )
             )
@@ -1864,6 +2143,8 @@ class GenerationService:
                         figure.scene_id,
                         {"purpose": artifact.purpose, "source": artifact.source},
                     )
+                    if mends is not None and figure.kind == "slide" and slide_mends.crowded(layout):
+                        mends.add(figure.scene_id, layout)
                     return True
                 except (SceneRejectedError, LessonInvalidError, ValidationError) as error:
                     logger.info(
@@ -1874,7 +2155,7 @@ class GenerationService:
         self._lessons.settle_scene(lesson_id, figure.scene_id, None)
         return False
 
-    def _try_in_player(self, artifact: SceneArtifact, context: JobContext) -> TrialFailure | None:
+    def _try_in_player(self, artifact: SceneArtifact, context: WorkContext) -> TrialFailure | None:
         """Run a picture in the app's player before it is kept, if the app is there to.
 
         The verdict, or None when it ran, or when it could not be tried: the app was not
@@ -2016,6 +2297,7 @@ class GenerationService:
                 question=question,
                 passages=passages,
                 problems=problems,
+                character=self.teacher().writer,
             )
             result = self._ask(request, context, attempt - 1, 2, doing)
             try:

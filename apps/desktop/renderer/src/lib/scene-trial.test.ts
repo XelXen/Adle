@@ -151,6 +151,17 @@ describe('runTrial', () => {
     expect(player.nexts).toBe(2);
   });
 
+  it('says what a slide said of its layout, each once, so that it can be mended (ADR-073)', async () => {
+    const player = new FakePlayer();
+    const verdict = runTrial(player, { ...TRIAL, steps: 2 }, QUICK);
+    const crowded = '1 overlapping, 0 under a line, 0 past the edge, 0 without a shadow; c over a';
+    player.emit('scene-event', { name: 'layout', value: crowded });
+    player.emit('scene-event', { name: 'step', value: 0 });
+    player.emit('scene-event', { name: 'layout', value: crowded });
+    player.emit('scene-event', { name: 'step', value: 1 });
+    await expect(verdict).resolves.toEqual({ passed: true, layout: [crowded] });
+  });
+
   it('operates the live page at the end of a slide and goes no further', async () => {
     const player = new FakePlayer();
     const verdict = runTrial(player, { ...TRIAL, steps: 2 }, QUICK);

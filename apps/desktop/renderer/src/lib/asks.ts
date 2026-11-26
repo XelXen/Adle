@@ -74,7 +74,7 @@ export function askDisclosure(redraw = false): string {
     ? 'what you asked for, this part of the lesson with its picture, the lesson title, the ' +
         'course name, and this concept'
     : 'your question, this part of the lesson, the lesson outline, the course name, this ' +
-        'concept, and any related passages from your materials';
+        'concept, any related passages from your materials, and the teacher you chose';
 }
 
 /** What is wrong with a question as typed, or null if it can be asked. */

@@ -15,6 +15,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -33,7 +34,12 @@ from adle_core.infrastructure.orm import (
     StoredLesson,
     StoredScene,
 )
-from adle_core.lessons.bundle import SceneRejectedError, inspect_scene, parse_bundle
+from adle_core.lessons.bundle import (
+    LessonInvalidError,
+    SceneRejectedError,
+    inspect_scene,
+    parse_bundle,
+)
 from adle_core.lessons.ir import SCHEMA_VERSION, Lesson, LessonBundle, SceneArtifact
 
 logger = logging.getLogger(__name__)
@@ -427,6 +433,43 @@ class LessonService:
             )
         session.flush()
         return SettledScene(added=scene is not None, as_animation=as_animation)
+
+    def mend_scene(self, lesson_id: str, scene_id: str, source: str) -> bool:
+        """A slide drawn again with its words apart (ADR-073), in the place of the one it
+        mends, under the same name, so that a lesson open now finds it where the part looks.
+        The whole lesson goes through the gate again. Whether it was taken: not while the
+        picture is still to come, nor once the lesson has none of that name."""
+        with self._database.session() as session:
+            row = _get_or_404(session, lesson_id)
+            stored = next((item for item in row.scenes if item.scene_id == scene_id), None)
+            if stored is None or scene_id in row.pending_scenes:
+                return False
+            purpose = stored.document["purpose"]
+            scenes = [
+                {
+                    "id": item.scene_id,
+                    "purpose": item.document["purpose"],
+                    "source": source if item.scene_id == scene_id else item.document["source"],
+                }
+                for item in row.scenes
+            ]
+            try:
+                bundle = parse_bundle(
+                    {
+                        "lesson": dict(row.document),
+                        "scenes": scenes,
+                        "pending_scene_ids": list(row.pending_scenes),
+                    }
+                )
+            except (SceneRejectedError, LessonInvalidError, ValidationError):
+                return False
+            mended = next(item for item in bundle.scenes if item.id == scene_id)
+            if mended.purpose != purpose:
+                return False
+            stored.content_hash = mended.content_hash
+            stored.document = mended.model_dump(mode="json")
+            session.flush()
+            return True
 
     # -- reading -----------------------------------------------------------
 

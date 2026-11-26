@@ -162,6 +162,15 @@
   gap: var(--ad-space-3);
 }
 
+/* The teacher who writes the lessons, when it is the Expressive voice's person (ADR-071):
+   that person, as the voice was described. */
+.teacherSaid {
+  margin: 0;
+  max-width: 44rem;
+  font: var(--ad-text-body);
+  color: var(--ad-color-muted);
+}
+
 /* A provider's name at the head of its card. */
 .providerName {
   margin: 0;
@@ -274,4 +283,15 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Pastel's color (ADR-074): named like a slider's label, its swatches under it. */
+.fieldLabel {
+  font: var(--ad-text-body-strong);
+  letter-spacing: var(--ad-tracking-tight);
+}
+
+/* Every hue is along it: wide enough to pick one, no wider than the swatches above. */
+.hueSlider {
+  max-width: 26rem;
 }

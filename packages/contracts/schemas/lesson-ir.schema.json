@@ -331,7 +331,7 @@
               { "$ref": "#/$defs/SummarySegment" }
             ]
           },
-          "maxItems": 14,
+          "maxItems": 20,
           "minItems": 1,
           "title": "Segments",
           "type": "array"
@@ -836,13 +836,13 @@
     "lesson": { "$ref": "#/$defs/Lesson" },
     "pending_scene_ids": {
       "items": { "pattern": "^scn_[a-z0-9_]{1,40}$", "type": "string" },
-      "maxItems": 14,
+      "maxItems": 20,
       "title": "Pending Scene Ids",
       "type": "array"
     },
     "scenes": {
       "items": { "$ref": "#/$defs/SceneArtifact" },
-      "maxItems": 14,
+      "maxItems": 20,
       "title": "Scenes",
       "type": "array"
     }

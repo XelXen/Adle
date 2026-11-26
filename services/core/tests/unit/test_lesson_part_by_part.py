@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 from adle_core.application.services import Services
 from adle_core.generation.provider import ProviderUnavailableError
 from adle_core.generation.stream import PartStream
+from adle_core.lessons.ir import MAX_SEGMENTS
 from tests.support.model import LESSON, FakeProvider
 
 KEY = "sk-test-0123456789abcdefghijklmnop"
@@ -486,12 +487,12 @@ def test_parts_past_the_most_a_lesson_has_are_passed_over_and_not_called_unusabl
     keyed: TestClient, services: Services, provider: FakeProvider
 ) -> None:
     _, concept = a_concept(keyed)
-    many = [copy.deepcopy(LESSON["segments"][0]) for _ in range(20)]
+    many = [copy.deepcopy(LESSON["segments"][0]) for _ in range(MAX_SEGMENTS + 6)]
     for number, part in enumerate(many, start=1):
         part["title"] = f"Part {number}"
     provider.queue({**LESSON, "segments": many})
     done = services.jobs.wait(keyed.post(f"/v1/concepts/{concept}/lessons").json()["id"], 60)
     assert done.status == "succeeded", done.error_message
     loaded = keyed.get(f"/v1/lessons/{done.result['lesson_id']}").json()
-    assert len(loaded["lesson"]["segments"]) == 14
+    assert len(loaded["lesson"]["segments"]) == MAX_SEGMENTS
     assert not any("couldn’t be used" in note for note in done.result["notes"])

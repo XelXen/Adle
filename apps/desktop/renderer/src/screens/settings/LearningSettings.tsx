@@ -17,6 +17,7 @@ import {
 import { callCore, describeError } from '../../lib/core-client';
 import { useResource } from '../../lib/use-resource';
 import styles from './Settings.module.css';
+import { TeacherSettings } from './TeacherSettings';
 import { VoiceChoices } from './VoiceChoices';
 import { VolumeSetting } from './VoiceSettings';
 
@@ -171,6 +172,10 @@ export function LearningSettings() {
           <VoiceChoices preferences={current} onChange={(patch) => void change(patch)} />
         </Section>
       ) : null}
+
+      <Section title="Teacher" description="Who writes your lessons and answers your questions.">
+        <TeacherSettings preferences={current} onSaved={preferences.setData} />
+      </Section>
 
       <Section title="Your goal" description="Optional. What do you want to be able to do?">
         <Card>

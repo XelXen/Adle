@@ -63,7 +63,14 @@ describe('lessonDisclosure', () => {
   it('names what is said about the learner, not only what is said about the concept', () => {
     for (const materials of ['some', 'none', 'unknown'] as const) {
       const said = lessonDisclosure(materials);
-      for (const item of ['your level', 'preferences', 'goal', 'course name', 'objectives']) {
+      for (const item of [
+        'your level',
+        'preferences',
+        'goal',
+        'course name',
+        'objectives',
+        'the teacher you chose',
+      ]) {
         expect(said).toContain(item);
       }
     }

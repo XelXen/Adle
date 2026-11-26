@@ -194,6 +194,49 @@ async function addConcept(page: Page, name: string): Promise<void> {
 }
 
 test.describe('generation with the AI provider', () => {
+  test('a lesson is written by the teacher the learner chose (ADR-071)', async ({ profileDir }) => {
+    test.setTimeout(120_000);
+    const session = await open(profileDir);
+    const { page, provider } = session;
+
+    // ---- Who writes the lessons: Adle's own, until the learner chooses ----
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('tab', { name: 'Learning' }).click();
+    const teacher = page.getByRole('combobox', { name: 'Start from' });
+    await expect(teacher).toHaveText(/Adle’s own/);
+    const words = page.getByRole('textbox', { name: 'In your own words' });
+    await expect(words).toHaveValue(/warm, patient teacher/);
+    await expect(page.getByRole('button', { name: 'Save teacher' })).toBeDisabled();
+
+    // ---- A teacher to start from, written out as a sentence, and saved ----
+    await teacher.click();
+    await page.getByRole('option', { name: 'Calm guide' }).click();
+    await expect(words).toHaveValue(/^A calm guide who walks beside the learner/);
+    await expect(page.getByRole('combobox', { name: 'Humor' })).toHaveText(/None/);
+    await page.getByRole('button', { name: 'Save teacher' }).click();
+    await expect(page.getByText('Teacher saved')).toBeVisible();
+    // Saved, it stays as chosen.
+    await expect(words).toHaveValue(/^A calm guide who walks beside the learner/);
+    await expect(teacher).toHaveText(/Calm guide/);
+    await expect(page.getByRole('button', { name: 'Save teacher' })).toBeDisabled();
+    await expectNoAccessibilityViolations(page);
+    await screenshot(page, 'settings-teacher');
+
+    // ---- The lesson's writer is told who they are, as data ----
+    await page.getByRole('button', { name: 'Library', exact: true }).click();
+    await createCourse(page, 'Calculus refresher', { topic: 'Limits.' });
+    await addConcept(page, 'Limits');
+    await detail(page, 'Limits').getByRole('button', { name: 'Create a lesson with AI' }).click();
+    await expect
+      .poll(() => provider.requests.filter((each) => each.kind === 'lesson').length)
+      .toBe(1);
+    const asked = provider.requests.find((each) => each.kind === 'lesson')!;
+    expect(asked.prompt).toContain('<learner_material kind="teacher">');
+    expect(asked.prompt).toContain('A calm guide who walks beside the learner');
+    expect(session.adle.problems).toEqual([]);
+    await close(session);
+  });
+
   test('a course made from files is named by Adle and set up, its first lesson written', async ({
     profileDir,
   }) => {
@@ -302,8 +345,8 @@ test.describe('generation with the AI provider', () => {
     await expect(limits).toContainText('No lessons yet.');
     const lessonNote = await openWhatIsSent(page, limits);
     await expect(lessonNote).toContainText(
-      'Sends the course name, this concept and its objectives, and your level, ' +
-        'preferences, and goal to Custom endpoint (127.0.0.1).',
+      'Sends the course name, this concept and its objectives, your level, preferences, ' +
+        'and goal, and the teacher you chose to Custom endpoint (127.0.0.1).',
     );
     await closeWhatIsSent(page, limits);
     expect(provider.requests).toHaveLength(1);

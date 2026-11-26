@@ -8,8 +8,10 @@ from fastapi import APIRouter, Depends, Query
 
 from adle_core.api import schemas
 from adle_core.application.services import Services, get_services
+from adle_core.errors import ValidationFailedError
 from adle_core.learner_model.preferences import ExplanationDensity, Pace
 from adle_core.learner_model.tracing import SelfReport
+from adle_core.lessons import character as lesson_character
 
 router = APIRouter(tags=["curriculum"])
 
@@ -201,8 +203,54 @@ def update_preferences(
         goal=body.goal,
         voice=body.voice,
         volume=body.volume,
+        character=body.character,
+        character_parts=body.character_parts,
+        character_follows_voice=body.character_follows_voice,
     )
     return schemas.LearnerPreferences.model_validate(updated)
+
+
+@router.post(
+    "/learner/character/describe",
+    operation_id="learner.describe_character",
+    response_model=schemas.CharacterText,
+)
+def describe_character(body: schemas.CharacterPartsChosen) -> schemas.CharacterText:
+    """The teacher these parts make, in a sentence: what the page shows as they change."""
+    try:
+        return schemas.CharacterText(text=lesson_character.compose(body.parts))
+    except lesson_character.UnknownPartError as error:
+        raise ValidationFailedError("That is not a part of a teacher.") from error
+
+
+@router.get(
+    "/learner/character",
+    operation_id="learner.character",
+    response_model=schemas.TeacherCharacter,
+)
+def teacher_character(services: ServicesDep) -> schemas.TeacherCharacter:
+    """Who can write the lessons, as parts and teachers to start from, and who does now."""
+    teacher = services.generation.teacher()
+    return schemas.TeacherCharacter(
+        parts=[
+            schemas.CharacterPart(
+                key=part.key,
+                name=part.name,
+                options=[
+                    schemas.CharacterOption(key=option.key, name=option.name)
+                    for option in part.options
+                ],
+            )
+            for part in lesson_character.PARTS
+        ],
+        presets=[
+            schemas.CharacterPreset(name=preset.name, parts=dict(preset.parts))
+            for preset in lesson_character.PRESETS
+        ],
+        described=teacher.described,
+        voice_in_use=teacher.voice_in_use,
+        follows_voice=teacher.follows_voice,
+    )
 
 
 @router.post(

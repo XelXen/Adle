@@ -33,6 +33,8 @@ TRIAL_WAIT_SECONDS = 60.0
 PRESENT_SECONDS = 10.0
 #: What a failure may say, at most: it is told to the model, quoted, so it is kept short.
 MAX_FAILURE_CHARACTERS = 500
+#: The most a slide's layout is said in, by its steps' ends (ADR-073).
+MAX_LAYOUT_NOTES = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +79,8 @@ class _Trial:
     open: OpenTrial
     answered: threading.Event = field(default_factory=threading.Event)
     verdict: TrialFailure | Literal["passed"] | None = None
+    #: What a slide said of its layout as each step ended (ADR-073): data, never logged.
+    layout: tuple[str, ...] = ()
 
 
 class TrialScene(Protocol):
@@ -158,13 +162,17 @@ class SceneTrials:
         with self._lock:
             self._trials.pop(trial_id, None)
 
-    def report(self, trial_id: str, failure: TrialFailure | None) -> bool:
-        """The app's answer. False when nobody is waiting for it (any more)."""
+    def report(
+        self, trial_id: str, failure: TrialFailure | None, layout: Sequence[str] = ()
+    ) -> bool:
+        """The app's answer, and what a slide said of its layout. False when nobody is
+        waiting for it (any more)."""
         with self._lock:
             trial = self._trials.get(trial_id)
             if trial is None or trial.verdict is not None:
                 return False
             trial.verdict = failure if failure is not None else "passed"
+            trial.layout = tuple(layout)[:MAX_LAYOUT_NOTES]
         trial.answered.set()
         return True
 
@@ -176,16 +184,27 @@ class SceneTrials:
         cancelled: Callable[[], bool] = lambda: False,
     ) -> Verdict:
         """The verdict on a trial, or ``untried`` if none came in time. Always withdraws it."""
+        return self.wait_with_layout(trial_id, timeout=timeout, cancelled=cancelled)[0]
+
+    def wait_with_layout(
+        self,
+        trial_id: str,
+        *,
+        timeout: float = TRIAL_WAIT_SECONDS,
+        cancelled: Callable[[], bool] = lambda: False,
+    ) -> tuple[Verdict, tuple[str, ...]]:
+        """The verdict on a trial and what a slide said of its layout as it ran (ADR-073), or
+        ``untried`` and nothing if no answer came in time. Always withdraws it."""
         with self._lock:
             trial = self._trials.get(trial_id)
         if trial is None:
-            return "untried"
+            return "untried", ()
         deadline = self._clock() + timeout
         try:
             while not trial.answered.wait(0.2):
                 if cancelled() or self._clock() >= deadline:
-                    return "untried"
-            return trial.verdict or "untried"
+                    return "untried", ()
+            return (trial.verdict or "untried"), trial.layout
         finally:
             with self._lock:
                 self._trials.pop(trial_id, None)

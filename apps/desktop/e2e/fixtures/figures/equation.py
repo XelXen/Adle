@@ -33,6 +33,10 @@ class EquationFigure(Scene):
         self.play(FadeOut(frame), run_time=0.5)
         self.audit()
 
+    # A picture's elements by the names its script gave them: a slide's, set as it builds;
+    # none for a figure (ADR-073).
+    e = None
+
     def words_of(self, m, found):
         # Each piece of text, formula or number as one word, not its letters.
         word = isinstance(m, Text) or isinstance(m, DecimalNumber)
@@ -162,16 +166,22 @@ class EquationFigure(Scene):
         # Each word over one drawn before it, or with a line through it, given a shadow; the
         # words in the order they are drawn. How many pairs of words meet, how many words a
         # line runs through, and how many of the words given a shadow have none after all.
-        found = [0, 0, 0]
+        # Which are in whose way, the first few: [the word, the one under it or -1, the
+        # line through it or -1].
+        found = [0, 0, 0, []]
         for j in range(len(words)):
             over = 0
             for i in range(j):
                 if self.meet(words[i], words[j]):
                     over += 1
+                    if len(found[3]) < 4:
+                        found[3].append([j, i, -1])
             struck = 0
-            for path in paths:
-                if struck == 0 and self.struck(words[j], path):
+            for k in range(len(paths)):
+                if struck == 0 and self.struck(words[j], paths[k]):
                     struck = 1
+                    if len(found[3]) < 4:
+                        found[3].append([j, -1, k])
             if over + struck > 0:
                 self.shadow(words[j], struck > 0)
                 if not self.shaded(words[j]):
@@ -286,4 +296,31 @@ class EquationFigure(Scene):
         if found[0] > 0 or found[1] > 0 or outside > 0:
             said = str(found[0]) + " overlapping, " + str(found[1]) + " under a line, "
             said = said + str(outside) + " past the edge, " + str(found[2]) + " without a shadow"
-            self.post_message("layout", said)
+            # And, on a slide, which of its elements are in whose way (ADR-073).
+            for item in found[3]:
+                word = self.name_of(words[item[0]])
+                other = self.name_of(words[item[1]]) if item[1] >= 0 else ""
+                line = self.name_of(lines[item[2]]) if item[2] >= 0 else ""
+                if word != "" and other != "":
+                    said = said + "; " + word + " over " + other
+                if word != "" and line != "":
+                    said = said + "; " + word + " under " + line
+            self.post_message("layout", said[:200])
+
+    def name_of(self, m):
+        # The element of a slide something is part of, by the name its script gave it: the
+        # one with the fewest parts that holds it. Nothing on a picture with no names.
+        best = ""
+        least = 0
+        if not self.e:
+            return best
+        for key in self.e:
+            family = self.e[key].get_family()
+            held = False
+            for part in family:
+                if part is m:
+                    held = True
+            if held and (best == "" or len(family) < least):
+                best = key
+                least = len(family)
+        return best

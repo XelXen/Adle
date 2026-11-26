@@ -115,6 +115,29 @@ export interface BroughtInCourse {
   progress: boolean;
   title: string;
 }
+export interface CharacterOption {
+  key: string;
+  name: string;
+}
+export interface CharacterPart {
+  key: string;
+  name: string;
+  options: CharacterOption[];
+}
+export interface CharacterPartsChosen {
+  parts: {
+    [k: string]: string | undefined;
+  };
+}
+export interface CharacterPreset {
+  name: string;
+  parts: {
+    [k: string]: string | undefined;
+  };
+}
+export interface CharacterText {
+  text: string;
+}
 export interface Concept {
   complexity: number;
   course_id: string;
@@ -507,6 +530,11 @@ export interface LatestJob {
 }
 export interface LearnerPreferences {
   captions: boolean;
+  character: string;
+  character_follows_voice: boolean;
+  character_parts: {
+    [k: string]: string | undefined;
+  };
   explanation_density: 'concise' | 'balanced' | 'detailed';
   goal: string;
   narration: boolean;
@@ -516,6 +544,11 @@ export interface LearnerPreferences {
 }
 export interface LearnerPreferencesUpdate {
   captions?: boolean | null;
+  character?: string | null;
+  character_follows_voice?: boolean | null;
+  character_parts?: {
+    [k: string]: string | undefined;
+  } | null;
   explanation_density?: ('concise' | 'balanced' | 'detailed') | null;
   goal?: string | null;
   narration?: boolean | null;
@@ -632,6 +665,7 @@ export interface LessonAuthor {
  */
 export interface LessonForPlayer {
   lesson: PlayerLesson;
+  mending?: boolean;
   origin: 'sample' | 'generated';
   pending_scene_ids?: string[];
   progress: LessonProgress;
@@ -1113,6 +1147,10 @@ export interface SceneTrialList {
  *
  */
 export interface SceneTrialReport {
+  /**
+   * @maxItems 8
+   */
+  layout?: string[];
   message?: string;
   passed: boolean;
   stage?: ('boot' | 'compile' | 'runtime' | 'timeout' | 'unresponsive' | 'controls') | null;
@@ -1199,6 +1237,17 @@ export interface SourceList {
 }
 export interface SourceRefCreate {
   section_id: string;
+}
+/**
+ * Who can write the lessons, and who does now (ADR-071).
+ *
+ */
+export interface TeacherCharacter {
+  described: string;
+  follows_voice: boolean;
+  parts: CharacterPart[];
+  presets: CharacterPreset[];
+  voice_in_use: boolean;
 }
 /**
  * The learner says a part of a lesson did not help.

@@ -325,6 +325,14 @@ class NarrationService:
             design_parts=voice_design.parts_of(chosen.get("design_parts"), design),
         )
 
+    def expressive_character(self) -> str | None:
+        """Who reads the lessons in the Expressive voice, when that voice reads them (ADR-071):
+        the description it was made from. None while another voice, or none, reads them."""
+        status = self.status()
+        if status.tier != "expressive" or not status.enabled:
+            return None
+        return status.design
+
     def choose(
         self,
         *,

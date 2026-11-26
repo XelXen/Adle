@@ -175,6 +175,7 @@ def build_services(
         on_begun=narration.warm,
         voice_pending=narration.voice_pending,
         voice_wait=narration.ready_after,
+        voice_character=narration.expressive_character,
     )
     narration.on_voiced = generation.voiced
     sources = SourceService(

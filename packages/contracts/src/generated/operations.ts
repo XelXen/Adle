@@ -7,6 +7,8 @@ import type {
   AskList,
   AskRequest,
   BroughtInCourse,
+  CharacterPartsChosen,
+  CharacterText,
   ConceptCreate,
   ConceptEvidence,
   ConceptOrder,
@@ -69,6 +71,7 @@ import type {
   SourceDetail,
   SourceList,
   SourceRefCreate,
+  TeacherCharacter,
   UnhelpfulReport,
   VoiceChoice,
   VoiceDescription,
@@ -188,9 +191,15 @@ export const OPERATIONS = {
   'jobs.get': { method: 'GET', path: '/v1/jobs/{job_id}', internal: false },
   'jobs.list_active': { method: 'GET', path: '/v1/courses/{course_id}/jobs', internal: false },
   'jobs.list_writing': { method: 'GET', path: '/v1/jobs', internal: false },
+  'learner.character': { method: 'GET', path: '/v1/learner/character', internal: false },
   'learner.concept_evidence': {
     method: 'GET',
     path: '/v1/concepts/{concept_id}/evidence',
+    internal: false,
+  },
+  'learner.describe_character': {
+    method: 'POST',
+    path: '/v1/learner/character/describe',
     internal: false,
   },
   'learner.get_preferences': { method: 'GET', path: '/v1/learner/preferences', internal: false },
@@ -556,11 +565,23 @@ export interface OperationTypes {
     body: undefined;
     result: JobList;
   };
+  'learner.character': {
+    path: undefined;
+    query: undefined;
+    body: undefined;
+    result: TeacherCharacter;
+  };
   'learner.concept_evidence': {
     path: { concept_id: string };
     query: undefined;
     body: undefined;
     result: ConceptEvidence;
+  };
+  'learner.describe_character': {
+    path: undefined;
+    query: undefined;
+    body: CharacterPartsChosen;
+    result: CharacterText;
   };
   'learner.get_preferences': {
     path: undefined;

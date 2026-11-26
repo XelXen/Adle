@@ -7,7 +7,7 @@ per-concept state is derived from it and can be rebuilt at any time.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 
@@ -47,6 +47,7 @@ from adle_core.learner_model.tracing import (
     apply,
     initial_knowledge,
 )
+from adle_core.lessons import character as lesson_character
 
 #: How many past observations the interface is shown for one concept.
 HISTORY_LIMIT = 50
@@ -157,8 +158,14 @@ class LearnerService:
         goal: str | None = None,
         voice: str | None = None,
         volume: int | None = None,
+        character: str | None = None,
+        character_parts: Mapping[str, str] | None = None,
+        character_follows_voice: bool | None = None,
     ) -> LearnerPreferences:
-        """Change the preferences that are given and return them all."""
+        """Change the preferences that are given and return them all.
+
+        A teacher is one or the other (ADR-071): given in words, its parts are let go; given
+        by its parts, the words are."""
         with self._database.session() as session:
             updated = self._preferences(session)
             if pace is not None:
@@ -181,6 +188,23 @@ class LearnerService:
                 updated = replace(updated, voice=voice.strip())
             if volume is not None:
                 updated = replace(updated, volume=volume)
+            if character_parts is not None:
+                try:
+                    parts = lesson_character.checked(character_parts)
+                except lesson_character.UnknownPartError as error:
+                    raise ValidationFailedError("That is not a part of a teacher.") from error
+                updated = replace(updated, character_parts=parts, character="")
+            if character is not None:
+                tidy = " ".join(character.split())
+                if len(tidy) > lesson_character.MAX_CHARACTER_LENGTH:
+                    raise ValidationFailedError(
+                        "A teacher can be described in at most 300 characters."
+                    )
+                updated = replace(updated, character=tidy)
+                if tidy:
+                    updated = replace(updated, character_parts={})
+            if character_follows_voice is not None:
+                updated = replace(updated, character_follows_voice=character_follows_voice)
             current = {row.key: row for row in session.scalars(select(LearnerPreference))}
             for key, value in updated.to_stored().items():
                 if key in current:

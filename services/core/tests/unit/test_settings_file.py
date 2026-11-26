@@ -63,6 +63,10 @@ def test_what_is_saved_is_the_preferences_and_the_voice_and_never_a_key(
         "voice": "",
         "volume": 40,
         "goal": "Pass.",
+        # The teacher who writes the lessons, Adle's own (ADR-071).
+        "character": "",
+        "character_parts": {},
+        "character_follows_voice": True,
     }
     assert saved["voice"] == {
         "enabled": True,

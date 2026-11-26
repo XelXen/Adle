@@ -89,6 +89,36 @@ AXIOMS: tuple[Axiom, ...] = (
         "says the rest.",
     ),
     Axiom(
+        "child_could_follow",
+        "Explained so that a child could follow, and nothing skipped.",
+        "Explain as you would to a bright child who has met only what the lesson builds on: "
+        "every step said, never left for the learner to guess; every new word explained the "
+        "first time it is used; an everyday example or comparison wherever it helps; the "
+        "intuition before the formal statement. Take as many parts as the concept needs, and "
+        "never hurry.",
+    ),
+    Axiom(
+        "summed_up_along_the_way",
+        "Along the way, a short summary of what you have learned so far.",
+        "After every three or four parts of new material, a summary part says in two or "
+        "three beats what has been learned so far and how it fits together, its picture "
+        "bringing back what was shown; and the lesson ends with one of the whole of it.",
+    ),
+    Axiom(
+        "beyond_the_examples",
+        "From the examples to the general idea, and where it holds.",
+        "Before the end, generalize: what holds beyond the examples worked and why, where it "
+        "stops holding, and one new case that shows it.",
+    ),
+    Axiom(
+        "light_touch",
+        "Now and then, a light moment or a fun fact, never in the way.",
+        "Write every word as the teacher described above would say it. Now and then, "
+        "rarely (in one part of every four at most), a light, witty moment or a fun fact that "
+        "belongs to the topic and is true, as that teacher allows: never in a question, never "
+        "at the learner's expense, and never in place of a step of the teaching.",
+    ),
+    Axiom(
         "nothing_made_up",
         "Nothing is made up. Your materials come first.",
         "Use the lesson's own numbers, names and examples in the visuals and in the "

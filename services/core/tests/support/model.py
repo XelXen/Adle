@@ -130,6 +130,9 @@ class FakeProvider:
             return "curriculum"
         if "Wanim scene file" in system:
             return "scene"
+        # A crowded slide sent back (ADR-073): before a redraw, whose words it shares.
+        if "some of its words lay over others" in system:
+            return "mend"
         # Before "partway through a lesson", which a redraw's instructions say too (ADR-067).
         if "You draw pictures for Adle" in system:
             return "redraw"
@@ -169,7 +172,7 @@ class FakeProvider:
             return FILM_CHAPTER
         if kind == "storyboard":
             return "NOTHING"
-        if kind == "redraw":
+        if kind in ("redraw", "mend"):
             return REDRAW
         user = text_of(body["messages"][1]["content"])
         return INTERACTIVE_SCENE if "Kind: interactive" in user else ANIMATION_SCENE

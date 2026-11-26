@@ -21,8 +21,11 @@ export const KIND_LESSON = 'lesson_generation';
  * `materials` is whether the course has imported materials, where the caller knows.
  */
 export function lessonDisclosure(materials: 'some' | 'none' | 'unknown'): string {
+  // The teacher the lesson is written as (ADR-071): the one the learner made, or the
+  // Expressive voice's person.
   const always =
-    'the course name, this concept and its objectives, and your level, preferences, and goal';
+    'the course name, this concept and its objectives, your level, preferences, and goal, ' +
+    'and the teacher you chose';
   if (materials === 'some') return `${always}, plus a few passages from your materials`;
   if (materials === 'unknown') return `${always}, plus any related passages from your materials`;
   return always;

@@ -10,9 +10,12 @@ or older version of Adle can be ignored without losing the others.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from enum import StrEnum
+
+from adle_core.lessons import character
 
 MAX_GOAL_LENGTH = 300
 MAX_VOICE_LENGTH = 120
@@ -44,6 +47,13 @@ class LearnerPreferences:
     volume: int = 100
     #: What the learner wants to get out of their study, in their own words.
     goal: str = ""
+    #: The teacher who writes the lessons, in the learner's own words (ADR-071). Empty: the
+    #: one ``character_parts`` make, or Adle's own.
+    character: str = ""
+    #: What that teacher is made of, a choice for each part chosen (``lessons/character``).
+    character_parts: Mapping[str, str] = field(default_factory=dict)
+    #: When the Expressive voice reads the lessons, the teacher is its person.
+    character_follows_voice: bool = True
 
     def __post_init__(self) -> None:
         if len(self.goal) > MAX_GOAL_LENGTH:
@@ -52,11 +62,17 @@ class LearnerPreferences:
             raise ValueError("That is not the name of a voice.")
         if not 0 <= self.volume <= 100:
             raise ValueError("Volume is a number from 0 to 100.")
+        if len(self.character) > character.MAX_CHARACTER_LENGTH:
+            raise ValueError("A teacher can be described in at most 300 characters.")
 
     def to_stored(self) -> dict[str, object]:
         """One JSON-serialisable value per preference key."""
         return {
-            key: value.value if isinstance(value, StrEnum) else value
+            key: value.value
+            if isinstance(value, StrEnum)
+            else dict(value)
+            if isinstance(value, Mapping)
+            else value
             for key, value in asdict(self).items()
         }
 
@@ -91,4 +107,16 @@ def from_stored(stored: Mapping[str, object]) -> LearnerPreferences:
     volume = stored.get("volume")
     if isinstance(volume, int) and not isinstance(volume, bool) and 0 <= volume <= 100:
         values["volume"] = volume
+    words = stored.get("character")
+    if isinstance(words, str):
+        values["character"] = " ".join(words.split())[: character.MAX_CHARACTER_LENGTH]
+    parts = stored.get("character_parts")
+    if isinstance(parts, dict) and all(
+        isinstance(key, str) and isinstance(value, str) for key, value in parts.items()
+    ):
+        with contextlib.suppress(character.UnknownPartError):
+            values["character_parts"] = character.checked(parts)
+    follows = stored.get("character_follows_voice")
+    if isinstance(follows, bool):
+        values["character_follows_voice"] = follows
     return LearnerPreferences(**values)  # type: ignore[arg-type]

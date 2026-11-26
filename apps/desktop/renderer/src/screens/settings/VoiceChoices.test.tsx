@@ -139,6 +139,9 @@ const PREFERENCES: LearnerPreferences = {
   pace: 'standard',
   voice: '',
   volume: 80,
+  character: '',
+  character_parts: {},
+  character_follows_voice: true,
 };
 
 function show(): void {

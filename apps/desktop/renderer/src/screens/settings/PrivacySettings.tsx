@@ -323,13 +323,14 @@ export function PrivacySettings() {
               </li>
               <li>
                 <strong>A lesson:</strong> the course name, the concept and its objectives, your
-                level on that concept in a few words, your preferences and goal, and a few related
-                passages from your materials.
+                level on that concept in a few words, your preferences and goal, the teacher you
+                chose, and a few related passages from your materials. A picture whose words come
+                out crowded may be sent back with its part, to be drawn again.
               </li>
               <li>
                 <strong>A question during a lesson:</strong> your question, that part of the lesson,
-                the lesson outline, the course name, the concept, and a few related passages. Never
-                the answer to a question you haven’t answered.
+                the lesson outline, the course name, the concept, the teacher you chose, and a few
+                related passages. Never the answer to a question you haven’t answered.
               </li>
               <li>
                 <strong>A key test:</strong> a fixed one-word prompt, with nothing of yours in it.

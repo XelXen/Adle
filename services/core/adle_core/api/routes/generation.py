@@ -114,7 +114,7 @@ def report_scene_trial(
     failure = (
         None if body.passed else TrialFailure(stage=body.stage or "runtime", message=body.message)
     )
-    services.generation.trials.report(trial_id, failure)
+    services.generation.trials.report(trial_id, failure, body.layout)
     return Response(status_code=204)
 
 

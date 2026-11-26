@@ -156,7 +156,10 @@ for (const file of crowded) {
       // It is crowded, as a model wrote it: something lies over something at some step.
       expect(layout.length, file).toBeGreaterThan(0);
       // And every word that does has its shadow.
-      for (const said of layout) expect(said, file).toMatch(/, 0 without a shadow$/);
+      for (const said of layout) expect(said, file).toMatch(/, 0 without a shadow(;|$)/);
+      // And it names what is in whose way, by the names its script gave its elements, so
+      // that it can be drawn again with them apart (ADR-073).
+      expect(layout.join(' '), file).toMatch(/; [a-z]\w* (over|under) [a-z]\w*/);
       expect((await player.messages()).filter((message) => message.type === 'error')).toEqual([]);
     });
   }

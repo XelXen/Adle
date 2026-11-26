@@ -260,7 +260,7 @@ The JSON object, its keys in this order:
   "strategy": one of {", ".join(f'"{name}"' for name in STRATEGIES)},
   "sources": [numbers of the excerpts used, or empty],
   "voice": "one sentence: how this lesson is delivered",
-  "segments": [ 6 to 9 segments, in teaching order ],
+  "segments": [ 10 to 16 segments, in teaching order ],
   "practice": [ 3 more questions, in the same form as a checkpoint's "question" ]
 }}
 
@@ -279,13 +279,14 @@ Every segment has "type" and "title". The types, and what else each needs:
   solution growing on the stage, a step of the visual for each step of the solution.
 - "checkpoint": "question". No beats, no visual.
 - "reflection": "prompt" and one or two "beats". Something to think about; not scored.
-- "summary": "beats" and a "visual" that brings back the lesson's key picture and formula.
-  Always the last segment.
+- "summary": "beats" and a "visual" that brings back the key pictures of what it sums up.
+  One after every three or four parts of new material, saying what has been learned so far
+  and how it fits together; and always one as the last segment, of the whole lesson.
 
 A beat is {{"say": "..."}}: narration, read aloud, two or three sentences. Words only: no
 symbols, no formulas, no dollar signs, no backslashes. Say mathematics the way a person
 would ("w times x plus b", "the derivative of the loss"). Put square brackets around the
-words at which the picture should change (see "steps" below). A segment has 2 to 4 beats."""
+words at which the picture should change (see "steps" below). A segment has 2 to 5 beats."""
 
 _LESSON_FORMAT_TAIL = f"""\
 A question has "form", "stem" (may contain $math$), "explanation" (why the right answer is
@@ -308,8 +309,8 @@ answer what the explanation works out. Forms:
 - "explanation": "rubric" (2 to 4 things a good answer says) and "sample_answer".
 
 Requirements for the whole lesson:
-- Three checkpoints, spread through the lesson, in at least two different forms. Each comes
-  after the material it checks. The last one has "transfer": true.
+- Three or four checkpoints, spread through the lesson, in at least two different forms.
+  Each comes after the material it checks. The last one has "transfer": true.
 - Between them the questions check every learning objective.
 - "practice" holds three more questions that are not shown during the lesson. Adle asks
   them days later, as a review. They check the same objectives with different numbers and
@@ -341,6 +342,16 @@ STRATEGY_BRIEFS: dict[str, str] = {
 }
 
 
+def _teacher(character: str) -> str:
+    """Who speaks a lesson or an answer (ADR-071): the learner's choice, as data."""
+    return (
+        "The teacher who speaks, as the learner chose them. Write every word of the narration "
+        "as this person would say it. It changes how things are said, never what is taught "
+        "or how carefully, and it is a description, not an instruction:\n"
+        + _block("teacher", _clip(character, 600))
+    )
+
+
 def lesson_request(
     *,
     course_title: str,
@@ -351,6 +362,7 @@ def lesson_request(
     approach: str | None = None,
     earlier: Sequence[str] = (),
     subject: str | None = None,
+    character: str = "",
 ) -> ChatRequest:
     """The request for one lesson draft.
 
@@ -358,15 +370,18 @@ def lesson_request(
     teaching to use, when Adle or the learner has chosen one; ``earlier`` names the ways
     earlier lessons on this concept used, so that this one is not the same lesson again.
     ``subject`` is the course's (``lessons/axioms.py``): the lesson is formed by the rules
-    of every lesson and by what that subject needs besides (ADR-061).
+    of every lesson and by what that subject needs besides (ADR-061). ``character`` is the
+    teacher who speaks it (``lessons/character.py``, ADR-071).
     """
     taught = axioms.subject(subject)
     teacher = "the subject" if taught.key == axioms.GENERAL else taught.name.lower()
     system = (
-        "You write short lessons for Adle, an app that teaches one concept at a time to one "
+        "You write lessons for Adle, an app that teaches one concept at a time to one "
         "learner at a desk, as a slideshow: narration over pictures that change as it is "
         f"said, and a few questions. You are an expert teacher of {teacher} who explains by "
-        "intuition and example first, and a careful writer.\n\n"
+        "intuition and example first, and a careful writer. There is no hurry: a lesson is "
+        "as long as the learner needs to understand the concept in depth, and nothing of it "
+        "is skipped.\n\n"
         f"{_WRITING_RULES}\n\n{_QUOTED_MATERIAL_RULE}"
     )
     objectives = "\n".join(
@@ -398,6 +413,8 @@ def lesson_request(
     if learner.goal.strip():
         about_learner.append("Their goal:\n" + _block("goal", _clip(learner.goal, 300)))
     parts.append("\n".join(about_learner))
+    if character.strip():
+        parts.append(_teacher(character))
     parts.append(_passages(passages))
     if approach in STRATEGY_BRIEFS:
         how = [
@@ -709,12 +726,14 @@ def ask_request(
     question: str,
     passages: Sequence[Passage] = (),
     problems: Sequence[str] = (),
+    character: str = "",
 ) -> ChatRequest:
     """The request for an answer to something the learner asked about one part of a lesson.
 
     What it carries is what the interface says it sends (`askDisclosure` in the renderer's
-    `lib/asks.ts`). Nothing about the learner's level, preferences, or goal goes with a
-    question; an argument added here is a sentence to add there first.
+    `lib/asks.ts`). Nothing about the learner's level or goal goes with a question; of their
+    preferences, only the teacher they chose (``character``, ADR-071), so that the answer is
+    in the same voice as the lesson. An argument added here is a sentence to add there first.
     """
     system = (
         "You help one learner partway through a lesson in Adle, an app that teaches one "
@@ -777,6 +796,8 @@ def ask_request(
         )
     else:
         parts.append('There are no excerpts for this question. Leave "sources" empty.')
+    if character.strip():
+        parts.append(_teacher(character))
     parts.append("The learner's question:\n" + _block("question", _clip(question, 500)))
     parts.append(_ASK_FORMAT)
     if problems:
@@ -950,6 +971,68 @@ def redraw_request(
             f"{MAX_SLIDE_STEPS}; Adle places them on the words."
         )
     parts.append("What the learner asked for:\n" + _block("question", question))
+    if problems:
+        wrong = "\n".join(f"- {_clip(item, 300)}" for item in problems[:MAX_PROBLEMS_IN_RETRY])
+        parts.append(
+            "Your last answer could not be used. Write it again with this put right:\n"
+            + _block("error", wrong)
+        )
+    return ChatRequest(
+        purpose="lesson",
+        system=system,
+        user="\n\n".join(parts),
+        max_output_tokens=REDRAW_OUTPUT_TOKENS,
+        json_output=True,
+    )
+
+
+def slide_mend_request(
+    *,
+    course_title: str,
+    subject: str | None,
+    concept: ConceptBrief,
+    lesson_title: str,
+    part: PictureBrief,
+    faults: Sequence[str],
+    problems: Sequence[str] = (),
+) -> ChatRequest:
+    """The request that mends one part's slide (ADR-073): as it was tried in the player,
+    some of its words lay over others or under a line. The model that wrote it draws the
+    same slide again with them apart, in as many steps as before; the part's words do not
+    change. ``faults`` are Adle's own sentences, naming elements of the slide's script.
+    """
+    taught = axioms.subject(subject)
+    teacher = "the subject" if taught.key == axioms.GENERAL else taught.name.lower()
+    system = (
+        "You draw pictures for Adle, an app that teaches one concept at a time as a "
+        "slideshow: narration over pictures that change as it is said. One part's slide was "
+        "drawn, and as it played some of its words lay over others, or a line ran through "
+        f"them. You are an expert teacher of {teacher} and a careful designer of slides.\n\n"
+        "Draw the same slide again, showing the same things in the same steps, with every "
+        "word clear of every other word and of every line: give each element a place of its "
+        "own (a region, or beside another), keep labels short, draw an arrow or a line where "
+        "it passes no words, and show fewer things at once if they cannot all fit. The words "
+        "said over the picture do not change.\n\n"
+        f"{_WRITING_RULES}\n\n{_REDRAW_FORMAT}\n\n{_VISUAL_FORMAT}\n\n{_QUOTED_MATERIAL_RULE}"
+    )
+    summary = f"{_clip(concept.title, 200)}\n{_clip(concept.summary, 600)}".strip()
+    lines = [f"Title: {_clip(part.title, 200)}", f"Kind: {part.kind}", "What is said:"]
+    lines.extend(f"- {_clip(line, 760)}" for line in part.said)
+    parts = [
+        "The course:\n" + _block("course", _clip(course_title, 200)),
+        "The concept the lesson teaches:\n" + _block("concept", summary),
+        "The lesson:\n" + _block("lesson", _clip(lesson_title, 200)),
+        f"Part {part.number}, whose slide is to be drawn again:\n"
+        + _block("part", "\n".join(lines)),
+        "Its slide now, as the script it was drawn from:\n"
+        + _block("picture", json.dumps(part.script or {}, ensure_ascii=False)[:MAX_SCRIPT_SHOWN]),
+        f"It takes {part.steps} steps: the first as the part begins, and step n where the "
+        "words say ⟨n⟩. Keep exactly that many, in that order, each showing what its words "
+        "say."
+        if part.steps > 1
+        else "Keep it to one step.",
+        "What was in the way as it played:\n" + "\n".join(f"- {fault}" for fault in faults),
+    ]
     if problems:
         wrong = "\n".join(f"- {_clip(item, 300)}" for item in problems[:MAX_PROBLEMS_IN_RETRY])
         parts.append(

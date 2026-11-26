@@ -491,9 +491,9 @@ test.describe('learning', () => {
       await how.selectOption({ label: 'Everyday analogy' });
       const sent = await openWhatIsSent(page, dialog);
       await expect(sent).toContainText(
-        'Sends the course name, this concept and its objectives, and your level, ' +
-          'preferences, and goal, plus any related passages from your materials to ' +
-          'Custom endpoint (127.0.0.1).',
+        'Sends the course name, this concept and its objectives, your level, preferences, ' +
+          'and goal, and the teacher you chose, plus any related passages from your ' +
+          'materials to Custom endpoint (127.0.0.1).',
       );
       await closeWhatIsSent(page, dialog);
       expect(provider.requests).toHaveLength(0);
