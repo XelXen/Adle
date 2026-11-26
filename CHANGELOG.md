@@ -5,6 +5,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-26
+
+Films are written faster with NVIDIA NIM, and you can see what every chapter is doing
+while they are. A typo in an answer now gets another try.
+
 ### Added
 
 - **A typo gets another try.** If a typed answer is off by a slip of the keys, like
