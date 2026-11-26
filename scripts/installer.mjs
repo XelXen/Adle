@@ -187,20 +187,31 @@ function makeMacImage(source) {
   // to fetch.
   const create = ['create', '-volname', 'Adle', '-srcfolder', stage, '-ov', '-format', 'ULMO'];
   // On a build machine the first try now and then finds the new volume "busy".
-  for (let attempt = 1; ; attempt += 1) {
-    const result = spawnSync('hdiutil', [...create, image], { stdio: 'inherit' });
-    if (result.status === 0) break;
-    if (attempt === 3) throw new Error('hdiutil could not make the disk image, three times.');
-    console.log(`hdiutil failed (try ${attempt}); trying again.`);
-  }
+  hdiutil([...create, image], 3);
   return [image];
+}
+
+/**
+ * hdiutil, tried again a little later when the system's disk images are busy: on a build
+ * machine a new volume is now and then "busy", and a new image "temporarily unavailable"
+ * to attach just after it was made (2026-11-26, run 45860538985).
+ */
+function hdiutil(args, tries = 4) {
+  for (let attempt = 1; ; attempt += 1) {
+    const result = spawnSync('hdiutil', args, { stdio: 'inherit' });
+    if (result.error) throw new Error(`hdiutil could not be run: ${result.error.message}`);
+    if (result.status === 0) return;
+    if (attempt === tries) throw new Error(`hdiutil ${args[0]} failed, ${tries} times.`);
+    console.log(`hdiutil ${args[0]} failed (try ${attempt}); trying again shortly.`);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, attempt * 5000);
+  }
 }
 
 function checkMacImage([image]) {
   const work = mkdtempSync(path.join(os.tmpdir(), 'adle-image-'));
   const mount = path.join(work, 'volume');
   mkdirSync(mount);
-  run('hdiutil', ['attach', image, '-nobrowse', '-readonly', '-mountpoint', mount]);
+  hdiutil(['attach', image, '-nobrowse', '-readonly', '-mountpoint', mount]);
   const copy = path.join(work, 'Adle.app');
   try {
     if (!existsSync(path.join(mount, 'Applications'))) {
@@ -208,7 +219,7 @@ function checkMacImage([image]) {
     }
     run('ditto', [path.join(mount, 'Adle.app'), copy]);
   } finally {
-    run('hdiutil', ['detach', mount]);
+    hdiutil(['detach', mount]);
   }
   // As a Mac checks it before it will start it: every file is the one that was signed.
   run('codesign', ['--verify', '--deep', '--strict', copy]);
