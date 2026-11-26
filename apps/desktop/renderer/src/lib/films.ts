@@ -41,12 +41,23 @@ export function filmStage(view: CourseFilm, maker: FilmMakerStatus): FilmStage {
  * A chapter's state as the learner reads it, while a film is made or after. Several can be
  * written at once, where the provider takes several requests at once (ADR-068).
  */
-export function chapterState(chapter: FilmChapter): string {
+/**
+ * What each chapter of a film being made is doing just now, by its number (ADR-076):
+ * several are made at once where the provider takes several requests at once, and each
+ * says on its own line where it is, as the core says it.
+ */
+export function chaptersAtWork(job: Job | null | undefined): ReadonlyMap<number, string> {
+  return new Map((job?.progress_detail?.chapters ?? []).map((each) => [each.number, each.doing]));
+}
+
+/** A chapter's state in words; one being written says what it is doing, where it can. */
+export function chapterState(chapter: FilmChapter, doing?: string): string {
   if (chapter.state === 'written') {
     return chapter.problems > 0 ? 'Written, with a little overlap' : 'Written and checked';
   }
   if (chapter.state === 'in_words') return 'Told in words';
-  return chapter.state === 'writing' ? 'Being written' : 'Waiting';
+  if (chapter.state === 'writing') return doing ?? 'Being written';
+  return 'Waiting';
 }
 
 /** A time in a film, as a player shows it: 0:05, 3:41, 1:02:09. */

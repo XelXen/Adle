@@ -201,6 +201,26 @@
         "title": "BroughtInCourse",
         "type": "object"
       },
+      "ChapterAtWork": {
+        "description": "A chapter of a film being made just now, and what it is doing (ADR-076).",
+        "properties": {
+          "doing": { "title": "Doing", "type": "string" },
+          "number": { "title": "Number", "type": "integer" },
+          "stage": {
+            "anyOf": [
+              {
+                "enum": ["waiting", "thinking", "writing", "drawing", "voicing"],
+                "type": "string"
+              },
+              { "type": "null" }
+            ],
+            "title": "Stage"
+          }
+        },
+        "required": ["number", "doing"],
+        "title": "ChapterAtWork",
+        "type": "object"
+      },
       "CharacterOption": {
         "properties": {
           "key": { "title": "Key", "type": "string" },
@@ -1047,6 +1067,11 @@
       "JobProgressDetail": {
         "description": "What long work is doing just now, for a learner who is waiting for it.\n\nNothing here is the answer itself: a stage, and the titles of what has been written.",
         "properties": {
+          "chapters": {
+            "items": { "$ref": "#/components/schemas/ChapterAtWork" },
+            "title": "Chapters",
+            "type": "array"
+          },
           "outline": { "items": { "type": "string" }, "title": "Outline", "type": "array" },
           "stage": {
             "anyOf": [

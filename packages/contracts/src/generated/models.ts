@@ -115,6 +115,15 @@ export interface BroughtInCourse {
   progress: boolean;
   title: string;
 }
+/**
+ * A chapter of a film being made just now, and what it is doing (ADR-076).
+ *
+ */
+export interface ChapterAtWork {
+  doing: string;
+  number: number;
+  stage?: ('waiting' | 'thinking' | 'writing' | 'drawing' | 'voicing') | null;
+}
 export interface CharacterOption {
   key: string;
   name: string;
@@ -372,6 +381,7 @@ export interface Job {
  *
  */
 export interface JobProgressDetail {
+  chapters?: ChapterAtWork[];
   outline?: string[];
   stage?: ('waiting' | 'thinking' | 'writing' | 'drawing' | 'voicing') | null;
   title?: string | null;

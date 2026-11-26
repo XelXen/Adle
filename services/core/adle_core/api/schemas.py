@@ -793,6 +793,18 @@ class UnhelpfulReport(_Input):
 # -- jobs ------------------------------------------------------------------
 
 
+class ChapterAtWork(_Output):
+    """A chapter of a film being made just now, and what it is doing (ADR-076)."""
+
+    #: Its place among the film's chapters, from 1. The film's opening is not one of them.
+    number: int
+    #: What it is doing just now, in a few words: "Writing: Nemotron 3 Ultra is thinking",
+    #: "Waiting for the film maker", "Mending it (1 of 3)".
+    doing: str
+    #: As a job's ``stage``.
+    stage: Literal["waiting", "thinking", "writing", "drawing", "voicing"] | None = None
+
+
 class JobProgressDetail(_Output):
     """What long work is doing just now, for a learner who is waiting for it.
 
@@ -809,6 +821,9 @@ class JobProgressDetail(_Output):
     outline: list[str] = Field(default_factory=list)
     #: What is being written, as its own title, once that has arrived.
     title: str | None = None
+    #: For a film: each chapter being made just now, in order (ADR-076). Several are made
+    #: at once where the provider takes several requests at once (ADR-068).
+    chapters: list[ChapterAtWork] = Field(default_factory=list)
 
 
 class Job(_Output):

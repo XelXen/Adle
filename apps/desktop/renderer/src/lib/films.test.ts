@@ -5,6 +5,7 @@ import type { CourseFilm, Film, FilmChapter, FilmMakerStatus, Job } from '@adle/
 import {
   aboutBytes,
   chapterAt,
+  chaptersAtWork,
   chapterState,
   clockOf,
   cueAt,
@@ -100,6 +101,27 @@ describe('a film’s chapters', () => {
     // Several at once, where the provider takes several requests at once (ADR-068).
     expect(chapterState(chapter('writing'))).toBe('Being written');
     expect(chapterState(chapter('waiting'))).toBe('Waiting');
+  });
+
+  it('says what each chapter being written is doing, on its own line (ADR-076)', () => {
+    const making = {
+      progress_detail: {
+        chapters: [
+          { number: 1, doing: 'Writing: Nemotron 3 Ultra is thinking', stage: 'thinking' },
+          { number: 3, doing: 'Waiting for the film maker', stage: 'waiting' },
+        ],
+      },
+    } as unknown as Job;
+    const atWork = chaptersAtWork(making);
+    expect(chapterState(chapter('writing'), atWork.get(1))).toBe(
+      'Writing: Nemotron 3 Ultra is thinking',
+    );
+    expect(chapterState(chapter('writing'), atWork.get(3))).toBe('Waiting for the film maker');
+    // One that has not said yet is being written; one written says so, whatever is said.
+    expect(chapterState(chapter('writing'), atWork.get(2))).toBe('Being written');
+    expect(chapterState(chapter('written'), 'Writing')).toBe('Written and checked');
+    expect(chaptersAtWork(null).size).toBe(0);
+    expect(chaptersAtWork({ progress_detail: null } as unknown as Job).size).toBe(0);
   });
 
   it('knows which chapter a moment is in', () => {

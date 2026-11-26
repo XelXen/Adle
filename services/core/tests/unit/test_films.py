@@ -288,7 +288,7 @@ def test_a_film_stopped_is_unfinished_and_continued_where_it_was_left(
     job = keyed.post(f"/v1/courses/{course}/film").json()
     eventually(lambda: len(provider.requests) == 2, "the second chapter was asked for")
     eventually(
-        lambda: "Checking chapter 2" in filming.jobs.get(job["id"]).progress_message,
+        lambda: doing(filming, job["id"], 2) == "Checking it in the film maker",
         "the second chapter is being checked",
     )
     filming.jobs.cancel(job["id"])
@@ -353,7 +353,7 @@ def test_removing_a_film_or_its_course_stops_it_and_takes_its_files(
     provider.queue(marked("hang"))
     job = keyed.post(f"/v1/courses/{course}/film").json()
     eventually(
-        lambda: "Checking chapter 1" in filming.jobs.get(job["id"]).progress_message,
+        lambda: doing(filming, job["id"], 1) == "Checking it in the film maker",
         "the chapter is being checked",
     )
     assert keyed.delete(f"/v1/courses/{course}").status_code == 204
@@ -583,6 +583,14 @@ def test_a_chapter_with_no_storyboard_is_not_looked_over(
 # -- chapters side by side (ADR-068) ------------------------------------------------------------
 
 
+def doing(filming: Services, job_id: str, number: int) -> str:
+    """What a chapter of a film being made is doing just now, on its own line (ADR-076)."""
+    detail = filming.jobs.get(job_id).progress_detail or {}
+    return next(
+        (each["doing"] for each in detail.get("chapters", []) if each["number"] == number), ""
+    )
+
+
 def engine_runs_counted(
     filming: Services, monkeypatch: pytest.MonkeyPatch
 ) -> Callable[[], tuple[int, int]]:
@@ -639,9 +647,21 @@ def test_chapters_are_written_side_by_side_where_the_provider_takes_several_at_o
         ),
         "each chapter said to be being written",
     )
+    # Each says what it is doing on a line of its own, and the job how many are written
+    # (ADR-076): one line for the job would say only what was said last.
+    job_id = started.json()["id"]
+    eventually(
+        lambda: all(doing(filming, job_id, number).startswith("Writing") for number in (1, 2, 3)),
+        "each chapter's own line",
+    )
+    seen = seeing.get(f"/v1/jobs/{job_id}").json()
+    assert seen["progress_message"] == "Writing chapters: 0 of 3 done"
+    assert [each["number"] for each in seen["progress_detail"]["chapters"]] == [1, 2, 3]
     release.set()
     job = filming.jobs.wait(started.json()["id"], timeout=60)
     assert job.status == "succeeded", (job.error_code, job.error_message)
+    # Once a chapter is written its line goes: none is left when they all are.
+    assert not (job.progress_detail or {}).get("chapters")
 
     assert not all_asked.broken
     film = seeing.get(f"/v1/courses/{course}/film").json()["film"]

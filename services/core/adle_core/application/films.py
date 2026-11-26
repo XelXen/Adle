@@ -248,6 +248,75 @@ class _Best:
     problems: int
 
 
+#: The most a chapter's line says of what it is doing: one line of the Film tab.
+MAX_DOING_LENGTH = 160
+
+
+class _AtWork:
+    """What each chapter of a film being made is doing just now, said together (ADR-076).
+
+    Several chapters are made at once where the provider takes several requests at once
+    (ADR-068), and the job has one line of its own: each chapter has a line of its own
+    here instead, and the job's says how many chapters are written."""
+
+    def __init__(
+        self, context: WorkContext, count: int, total: int, written: Callable[[], int]
+    ) -> None:
+        self._context = context
+        self._count = count
+        self._total = total
+        self._written = written
+        self._lock = threading.Lock()
+        self._lines: dict[int, tuple[str, str | None]] = {}
+
+    def say(self, index: int, doing: str, stage: str | None) -> None:
+        with self._lock:
+            self._lines[index] = (" ".join(doing.split())[:MAX_DOING_LENGTH], stage)
+            self._report(stage)
+
+    def done(self, index: int) -> None:
+        """The chapter is written (or told in words): its line goes, and the count is said."""
+        with self._lock:
+            self._lines.pop(index, None)
+            self._report(None)
+
+    def _report(self, stage: str | None) -> None:
+        written = self._written()
+        at_work = [
+            {"number": index + 1, "doing": doing, **({"stage": said} if said else {})}
+            for index, (doing, said) in sorted(self._lines.items())
+        ]
+        detail: dict[str, Any] = {"chapters": at_work}
+        if stage:
+            detail["stage"] = stage
+        self._context.report(
+            written, self._total, f"Writing chapters: {written} of {self._count} done", detail
+        )
+
+
+class _ChapterContext:
+    """The film's job as one chapter being made sees it (ADR-076): stopped when the job is,
+    and what it says is its own line, beside those of the chapters made with it."""
+
+    def __init__(self, shared: WorkContext, index: int, board: _AtWork) -> None:
+        self._shared = shared
+        self._index = index
+        self._board = board
+
+    @property
+    def cancelled(self) -> bool:
+        return self._shared.cancelled
+
+    def check_cancelled(self, partial_result: Any | None = None) -> None:
+        self._shared.check_cancelled(partial_result)
+
+    def report(
+        self, done: int, total: int, message: str = "", detail: dict[str, Any] | None = None
+    ) -> None:
+        stage = (detail or {}).get("stage")
+        self._board.say(self._index, message, stage if isinstance(stage, str) else None)
+
+
 def file_name_for(title: str) -> str:
     """A course's name as a film's file name."""
     plain = " ".join(_NOT_IN_A_NAME.sub(" ", title).split()).strip(". ")
@@ -725,6 +794,8 @@ class FilmService:
         waiting = [index for index, chapter in enumerate(chapters) if chapter.state == WAITING]
         guard = threading.Lock()
         written_so_far = [len(chapters) - len(waiting)]
+        # Each chapter at work says what it is doing on a line of its own (ADR-076).
+        board = _AtWork(context, len(chapters), total, lambda: written_so_far[0])
 
         def write(index: int, shared: WorkContext) -> None:
             """One chapter written, checked, and kept; recorded as soon as it is."""
@@ -749,7 +820,7 @@ class FilmService:
                 ),
                 work,
                 index,
-                shared,
+                _ChapterContext(shared, index, board),
                 written,
                 total,
                 looks=looks,
@@ -776,6 +847,7 @@ class FilmService:
                     film_id, chapters, written_by=self._authors(earlier_authors, results)
                 )
                 record(chapter.lines)
+            board.done(index)
 
         side_by_side(waiting, write, context, min(CHAPTERS_AT_ONCE, self._gateway.at_once("film")))
 
@@ -924,7 +996,6 @@ class FilmService:
         so_far: Callable[[], int] = done if done is not None else (lambda: index)
         module = script.chapter_module(position)
         take = script.take_module(position)
-        number, count = index + 1, len(brief.chapters)
         previous: str | None = None
         problems: list[str] = []
         best: _Best | None = None
@@ -933,11 +1004,8 @@ class FilmService:
         looked = telling_pictures = after_look = False
         for attempt in range(1 + script.MAX_MENDS):
             context.check_cancelled()
-            doing = (
-                f"Writing chapter {number} of {count}"
-                if attempt == 0
-                else f"Mending chapter {number} of {count}"
-            )
+            # Said on the chapter's own line (ADR-076): which chapter it is goes without saying.
+            doing = "Writing" if attempt == 0 else f"Mending it ({attempt} of {script.MAX_MENDS})"
             result = self._ask(
                 prompts.film_chapter_request(
                     brief, previous=previous, problems=problems, looked_over=telling_pictures
@@ -967,11 +1035,13 @@ class FilmService:
                 ]
                 logger.info("film.chapter_refused attempt=%s", attempt)
                 continue
+            # The film maker checks one chapter at a time: one may wait here for another.
+            context.report(so_far(), total, "Waiting for the film maker", {"stage": "waiting"})
             with self._engine_turn:
                 (work / f"{module}.py").write_text(source, encoding="utf-8")
                 (work / f"{take}.py").write_text(script.take_source(position), encoding="utf-8")
                 context.report(
-                    so_far(), total, f"Checking chapter {number} of {count}", {"stage": "drawing"}
+                    so_far(), total, "Checking it in the film maker", {"stage": "drawing"}
                 )
                 report = self._looked_at(work, take, context)
                 # Read while it is this chapter's: the next run draws over it.
@@ -1022,7 +1092,7 @@ class FilmService:
                         results,
                         so_far(),
                         total,
-                        f"Checking the pictures of chapter {number} of {count}",
+                        "Looking over its pictures",
                     )
                     if seen:
                         problems = _together(found, seen)

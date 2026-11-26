@@ -122,9 +122,11 @@ test.describe('a film of the whole course', () => {
       const chapters = page.getByRole('list', { name: 'Chapters' });
       const [first, second] = [0, 1].map((index) => chapters.getByRole('listitem').nth(index));
       await expect(first!).toContainText('1. Area');
-      await expect(first!).toContainText('Being written');
+      // What it is doing, on its own line (ADR-076); the bar says how many are written.
+      await expect(first!).toContainText('Writing');
       await expect(second!).toContainText('2. Volume');
       await expect(second!).toContainText('Waiting');
+      await expect(page.getByText('Writing chapters: 0 of 2 done')).toBeVisible();
       await expect
         .poll(() => provider.requests.filter((each) => each.kind === 'film').length)
         .toBe(1);
@@ -274,6 +276,62 @@ test.describe('a film of the whole course', () => {
       const mend = nvidia.requests[2]!.prompt;
       expect(mend).toContain('looked at a picture of the screen at the end of each animation');
       expect(mend).toContain('The label "2 tall" sits far from the grid; put it beside the grid.');
+    } finally {
+      await adle.close();
+      await aihubmix.close();
+      await nvidia.close();
+    }
+  });
+
+  test('says what each chapter made at the same time is doing, on its own line', async ({
+    profileDir,
+  }) => {
+    test.setTimeout(120_000);
+    const aihubmix = await startFakeProvider();
+    const nvidia = await startFakeProvider();
+    const adle = await launchApp(profileDir, {
+      onboarded: true,
+      env: {
+        ADLE_PROVIDER_ENDPOINTS: JSON.stringify({
+          aihubmix: aihubmix.baseUrl,
+          nvidia: nvidia.baseUrl,
+        }),
+        ADLE_FILM_PYTHON: corePython,
+        ADLE_FILM_ENGINE: standIn,
+      },
+    });
+    const { page } = adle;
+    try {
+      await waitForCore(page);
+      await page.getByRole('button', { name: 'Settings' }).click();
+      await saveProviderKey(page, NVIDIA, NVIDIA_KEY);
+      await page.getByRole('button', { name: 'Library', exact: true }).click();
+      await createCourse(page, COURSE, { topic: 'Measuring shapes.' });
+      await openCourseTab(page, 'Curriculum');
+      await addConcept(page, 'Area', 'Find the area of a rectangle by counting squares.');
+      await addConcept(page, 'Volume', 'Find the volume of a box by counting cubes.');
+
+      // NVIDIA takes several requests at once (ADR-068): both chapters are written together,
+      // and each says what it is doing on its own line (ADR-076).
+      nvidia.hold('film');
+      await openCourseTab(page, 'Film');
+      await page.getByRole('button', { name: 'Make the film' }).click();
+      await expect(page.getByRole('heading', { name: 'Making the film' })).toBeVisible();
+      await expect
+        .poll(() => nvidia.requests.filter((each) => each.kind === 'film').length)
+        .toBe(2);
+      const chapters = page.getByRole('list', { name: 'Chapters' });
+      for (const [index, title] of ['1. Area', '2. Volume'].entries()) {
+        const row = chapters.getByRole('listitem').nth(index);
+        await expect(row).toContainText(title);
+        await expect(row).toContainText('Writing');
+      }
+      await expect(page.getByText('Writing chapters: 0 of 2 done')).toBeVisible();
+      await expectNoAccessibilityViolations(page);
+      await screenshot(page, 'film-making-side-by-side');
+
+      await page.getByRole('button', { name: 'Stop', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'The film isn’t finished' })).toBeVisible();
     } finally {
       await adle.close();
       await aihubmix.close();

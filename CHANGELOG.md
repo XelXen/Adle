@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **See every chapter of a film being made.** With NVIDIA NIM, up to three chapters of a
+  film are written at the same time, and now each says what it is doing in its own row
+  of the Film tab ("Writing", "Waiting for the film maker", "Mending it (1 of 3)"). The
+  bar above says how many chapters are written.
+
 ## [0.2.1] - 2026-11-25
 
 A small update to 0.2.0, from lessons written for real with NVIDIA NIM. Lessons now sound

@@ -178,16 +178,21 @@ def test_removing_the_file_stops_its_reading(
     source = notes(client, services)
 
     sent_by_then: list[int] = []
+    removed = threading.Event()
 
     def removed_while_read(body: dict[str, Any]) -> str:
         # Removed as its first page is read, and while the next may be drawn from it.
         services.sources.delete(source["id"])
         sent_by_then.append(len(provider.requests))
+        removed.set()
         return READ_PAGE
 
     provider.when("scanned-notes.pdf, page 1", removed_while_read)
     job = read(client, services, source["id"])
     assert job.status == "cancelled"
+    # The reading stops at once; the removal can take a few seconds more, while Windows
+    # lets go of a file a page is being drawn from (ADR-068). Seen ending first, 2026-11-26.
+    assert removed.wait(30), "the file was removed"
     # The pages being read when the file went are the last requests: nothing more is sent.
     assert len(provider.requests) == sent_by_then[0]
     assert client.get(f"/v1/sources/{source['id']}").status_code == 404

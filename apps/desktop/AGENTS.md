@@ -146,6 +146,10 @@ most, a file's name.
   "Making a film", a toast and the notification `film_ready` when it is ready, a toast and
   `writing_stopped` when it could not be finished), not by `WritingProvider`. A screen that
   starts a film calls its `refresh()`.
+- **Each chapter being made says what it is doing, in its own row** (ADR-076): the job's
+  `progress_detail.chapters` (`chaptersAtWork`), shown by `chapterState` in place of
+  "Being written"; the bar above says how many chapters are written. Several are made at
+  once at NVIDIA (ADR-068): never show one line for all of them.
 - A journey uses a stand-in film engine and the stand-in provider (`e2e/film.spec.ts`),
   never a real download.
 

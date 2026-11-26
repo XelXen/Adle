@@ -22,6 +22,7 @@ import { callCore, describeError } from '../../lib/core-client';
 import {
   aboutBytes,
   filmRequests,
+  chaptersAtWork,
   chapterState,
   type FilmStage,
   filmStage,
@@ -387,7 +388,7 @@ function Body({
           <p className={styles.note}>
             You don’t need to wait here. Keep Adle open, and it tells you when the film is ready.
           </p>
-          <Chapters film={stage.film} making />
+          <Chapters film={stage.film} making atWork={chaptersAtWork(stage.job)} />
           <div className={styles.actions}>
             <Button loading={busy} onClick={() => onStop(stage.job.id)}>
               Stop
@@ -481,7 +482,16 @@ function FilmMakerNeeded({
   );
 }
 
-function Chapters({ film, making }: { film: Film; making: boolean }) {
+function Chapters({
+  film,
+  making,
+  atWork,
+}: {
+  film: Film;
+  making: boolean;
+  /** What each chapter being made is doing just now, by its number (ADR-076). */
+  atWork?: ReadonlyMap<number, string>;
+}) {
   return (
     <ol className={styles.chapters} aria-label="Chapters">
       {film.chapters.map((chapter, index) => (
@@ -492,7 +502,9 @@ function Chapters({ film, making }: { film: Film; making: boolean }) {
           <span className={styles.chapterTitle}>
             {index + 1}. {chapter.title}
           </span>
-          <span className={styles.chapterState}>{chapterState(chapter)}</span>
+          <span className={styles.chapterState}>
+            {chapterState(chapter, making ? atWork?.get(index + 1) : undefined)}
+          </span>
         </li>
       ))}
     </ol>
