@@ -31,9 +31,18 @@ export function opening(changelog, version) {
     .trim();
 }
 
+/** Whether a version is an alpha, which GitHub shows as a pre-release (ADR-043). */
+export function isAlpha(version) {
+  return /-alpha\.\d+$/.test(version);
+}
+
 export function notes(version, intro) {
   const file = (rest) => `\`Adle-${version}-${rest}\``;
   const tag = `v${version}`;
+  // An alpha asks to be tried; a version only to be told what is wrong with it.
+  const tellUs = isAlpha(version)
+    ? `This is an alpha:\n[tell us what breaks](${REPOSITORY}/issues).`
+    : `If something breaks,\n[tell us](${REPOSITORY}/issues).`;
   return `${intro}
 
 ## Installing
@@ -65,8 +74,7 @@ not keep it.
 
 ## What is in it
 
-[CHANGELOG.md](${REPOSITORY}/blob/${tag}/CHANGELOG.md) has every change. This is an alpha:
-[tell us what breaks](${REPOSITORY}/issues).
+[CHANGELOG.md](${REPOSITORY}/blob/${tag}/CHANGELOG.md) has every change. ${tellUs}
 
 Adle is free software under the [GNU General Public License, version 3](${REPOSITORY}/blob/${tag}/LICENSE).
 The source of this release is attached below, as GitHub attaches it to every release.
