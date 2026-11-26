@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-25
+
+The first version that is not an alpha. Lessons are now written by a teacher you choose,
+take as long as a concept needs with a summary every few parts, and keep their slides
+readable. You can ask for a part's picture to be drawn again, NVIDIA NIM works at its own
+pace with several requests at once, and two new themes, Pastel and Pastel dark, come in a
+color you pick.
+
 ### Added
 
 - **Choose your teacher.** Lessons and answers are now written as a teacher would say
