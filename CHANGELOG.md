@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-25
+
+A small update to 0.2.0, from lessons written for real with NVIDIA NIM. Lessons now sound
+like the teacher you chose, with a light moment or a fun fact two or three times a lesson,
+and pictures on a slide no longer land on each other.
+
 ### Changed
 
 - **You can hear your teacher.** The teacher you choose now shapes how every part of a
