@@ -3190,7 +3190,7 @@
       }
     }
   },
-  "info": { "title": "Adle core", "version": "0.2.2" },
+  "info": { "title": "Adle core", "version": "0.2.3" },
   "openapi": "3.1.0",
   "paths": {
     "/v1/concepts/{concept_id}": {

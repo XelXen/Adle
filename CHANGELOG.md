@@ -5,6 +5,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-26
+
+A film now opens on its list of chapters, laid out to fit the screen, and its voice
+pauses between sentences instead of running them together.
+
 ### Changed
 
 - **A film opens on its list of chapters.** They are shown numbered, in two columns that

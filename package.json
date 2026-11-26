@@ -1,6 +1,6 @@
 {
   "name": "adle",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "Adle — Adaptive Learning Environment. A local-first desktop app that learns what you understand and teaches what you need next.",
   "license": "GPL-3.0-only",
