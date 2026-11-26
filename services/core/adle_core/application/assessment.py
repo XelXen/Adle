@@ -9,10 +9,11 @@ right, and what the answer changed.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, replace
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from adle_core.application.asks import asked_since
 from adle_core.application.curriculum import (
@@ -28,6 +29,7 @@ from adle_core.evaluation.scoring import (
     MalformedResponseError,
     Response,
     Score,
+    near_miss,
     reveals,
     score,
 )
@@ -45,6 +47,9 @@ from adle_core.learner_model.practice import FRESH_AGAIN_AFTER
 from adle_core.learner_model.tracing import Observation, ObservationKind
 from adle_core.lessons.ir import CheckpointSegment, OrderingItem, guess_probability
 from adle_core.lessons.player import ItemMask
+
+#: What a near miss is told (ADR-078): nothing of the answer, only where to look.
+NEAR_MISS = "Check what you typed, and try again."
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +81,9 @@ class AssessmentService:
         self._lessons = lessons
         self._learner = learner
         self._mask = mask
+        # When each question last had a near miss said of it (ADR-078): one a sitting.
+        self._near_misses: dict[tuple[str, str], datetime] = {}
+        self._near_lock = threading.Lock()
 
     def answer(
         self,
@@ -116,6 +124,14 @@ class AssessmentService:
                 result = score(item, response)
             except MalformedResponseError as error:
                 raise ValidationFailedError(str(error)) from error
+            # A slip of the keys, not of the idea (ADR-078): said, nothing kept, and
+            # answered again. Once a sitting: the next answer is scored as it is.
+            if (
+                result.outcome is Outcome.INCORRECT
+                and near_miss(item, response)
+                and self._second_chance(lesson_id, question_id, moment)
+            ):
+                return self._near(lesson_id, question_id, item.concept_id)
         skipped = result.outcome is Outcome.SKIPPED
         can_reveal = reveals(item)
 
@@ -208,3 +224,41 @@ class AssessmentService:
                 knowledge=knowledge_record(state),
                 attempt_number=len(earlier) + (0 if skipped else 1),
             )
+
+    def _second_chance(self, lesson_id: str, question_id: str, moment: datetime) -> bool:
+        """Whether a near miss may be said of this question now (ADR-078): not if one was
+        said of it in this sitting, the time an explanation stays in mind."""
+        key = (lesson_id, question_id)
+        with self._near_lock:
+            for other, when in list(self._near_misses.items()):
+                if moment - when >= FRESH_AGAIN_AFTER:
+                    del self._near_misses[other]
+            if key in self._near_misses:
+                return False
+            self._near_misses[key] = moment
+            return True
+
+    def _near(self, lesson_id: str, question_id: str, concept_id: str) -> AnswerResult:
+        """What a near miss is told (ADR-078): to look again at what was typed. Nothing is
+        kept, and nothing of the answer or its explanation is shown: it is answered again."""
+        with self._database.read() as session:
+            answered = session.scalar(
+                select(func.count())
+                .select_from(Attempt)
+                .where(
+                    Attempt.lesson_id == lesson_id,
+                    Attempt.question_id == question_id,
+                    Attempt.outcome != Outcome.SKIPPED.value,
+                )
+            )
+            knowledge = knowledge_record(session.get(LearnerConceptState, concept_id))
+        return AnswerResult(
+            outcome="near",
+            feedback=NEAR_MISS,
+            explanation="",
+            correct_answer="",
+            correct_option=None,
+            change="",
+            knowledge=knowledge,
+            attempt_number=answered or 0,
+        )

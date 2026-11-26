@@ -224,6 +224,8 @@ const OUTCOME_WORDS: Record<AnswerResult['outcome'], string> = {
   partial: 'Partly right',
   incorrect: 'Not yet',
   skipped: 'Skipped',
+  // Never among a set's outcomes: a near miss is answered again (ADR-078).
+  near: 'Almost',
 };
 
 export function outcomeWords(outcome: AnswerResult['outcome']): string {

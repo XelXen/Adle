@@ -23,6 +23,8 @@ const OUTCOME: Record<AnswerResult['outcome'], { title: string; tone: CalloutTon
   partial: { title: 'Partly right', tone: 'info' },
   incorrect: { title: 'Not quite', tone: 'info' },
   skipped: { title: 'Skipped', tone: 'info' },
+  // A slip of the keys (ADR-078): nothing is kept, and the question is answered again.
+  near: { title: 'Almost', tone: 'info' },
 };
 
 /**
@@ -48,6 +50,8 @@ export function CheckpointPanel({
   const [problem, setProblem] = useState<string>();
   const [busy, setBusy] = useState<'answer' | 'skip' | null>(null);
   const [result, setResult] = useState<AnswerResult | null>(null);
+  // What was said of an answer that was almost right (ADR-078), until it is answered again.
+  const [almost, setAlmost] = useState<string | null>(null);
   const said = useRef<HTMLDivElement>(null);
 
   // What is said about an answer appears below the question, where the lesson's controls
@@ -90,6 +94,13 @@ export function CheckpointPanel({
         path: { lesson_id: lessonId, question_id: question.id },
         body,
       });
+      if (answered.outcome === 'near') {
+        // Almost an accepted answer, by a slip of the keys: nothing was kept, and the
+        // answer stays open to be looked at again and checked again.
+        setAlmost(answered.feedback ?? 'Check what you typed, and try again.');
+        return;
+      }
+      setAlmost(null);
       setResult(answered);
       onAnswered(answered);
     } catch (error) {
@@ -302,6 +313,11 @@ export function CheckpointPanel({
 
       {/* Present from the start, so that what arrives in it is announced. */}
       <div role="status" ref={said}>
+        {result === null && almost !== null ? (
+          <Callout tone={OUTCOME.near.tone} title={OUTCOME.near.title}>
+            {almost}
+          </Callout>
+        ) : null}
         {result !== null ? (
           <Callout tone={OUTCOME[result.outcome].tone} title={OUTCOME[result.outcome].title}>
             <div className={styles.result}>

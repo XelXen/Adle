@@ -49,7 +49,7 @@
           "feedback": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Feedback" },
           "knowledge": { "$ref": "#/components/schemas/Knowledge" },
           "outcome": {
-            "enum": ["correct", "partial", "incorrect", "skipped"],
+            "enum": ["correct", "partial", "incorrect", "skipped", "near"],
             "title": "Outcome",
             "type": "string"
           }

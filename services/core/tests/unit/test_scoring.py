@@ -10,6 +10,7 @@ from pydantic import TypeAdapter
 from adle_core.evaluation.scoring import (
     MalformedResponseError,
     Response,
+    near_miss,
     normalise_answer,
     score,
 )
@@ -155,6 +156,42 @@ def test_short_answers_ignore_case_spacing_punctuation_and_articles(given: str) 
 def test_other_short_answers_are_incorrect(given: str) -> None:
     result = score(SHORT, Response(text=given))
     assert (result.outcome, result.correct_answer) == (Outcome.INCORRECT, "Bias")
+
+
+CHEMISTRY = item("short_answer", accepted=["CH3CH2CH3", "propane"])
+
+
+@pytest.mark.parametrize(
+    ("given", "near"),
+    [
+        # A key slipped (ADR-078): one changed, put in, left out, or two swapped.
+        ("CH3CHWCH3", True),
+        ("CH3CH2CH33", True),
+        ("CH3CH2H3", True),
+        ("CH3HC2CH3", True),
+        ("propnae", True),
+        # Two slips in an answer of fewer than ten characters, or more than two in any.
+        ("CH3CWWCH3", False),
+        ("butane", False),
+        # Right, or nothing like it.
+        ("CH3CH2CH3", False),
+        ("ethanol", False),
+    ],
+)
+def test_a_slip_of_the_keys_is_a_near_miss(given: str, near: bool) -> None:
+    assert near_miss(CHEMISTRY, Response(text=given)) is near
+
+
+def test_a_short_answer_or_a_number_has_no_near_miss() -> None:
+    # Where one character is the whole difference, a slip and a wrong answer are one thing.
+    assert not near_miss(item("short_answer", accepted=["CH4"]), Response(text="CH3"))
+    assert not near_miss(item("short_answer", accepted=["1024"]), Response(text="1025"))
+    # Ten characters or more allow two slips.
+    long = item("short_answer", accepted=["photosynthesis"])
+    assert near_miss(long, Response(text="photosinthesys"))
+    assert not near_miss(long, Response(text="fotosinthesys"))
+    # Only typed answers: a choice has nothing to slip on.
+    assert not near_miss(item("true_false", correct=True), Response(truth=False))
 
 
 def test_normalising_keeps_what_distinguishes_answers() -> None:

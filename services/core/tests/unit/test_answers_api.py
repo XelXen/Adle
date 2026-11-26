@@ -203,3 +203,35 @@ def test_a_skip_shows_the_explanation_so_the_answer_that_follows_is_an_aided_one
         lesson["lesson_id"], "q_compute", Response(number=3), now=later
     )
     assert "just seen its explanation" not in recalled.change
+
+
+def test_a_slip_of_the_keys_is_said_and_answered_again_with_nothing_kept(
+    client: TestClient, lesson: dict[str, Any], services: Services
+) -> None:
+    # "biaz" for "bias": almost, not wrong (ADR-078).
+    near = answer(client, lesson, "q_only_the_bias", text="biaz")
+    assert near.status_code == 200, near.text
+    said = near.json()
+    assert said["outcome"] == "near"
+    assert said["feedback"] == "Check what you typed, and try again."
+    # Nothing of the answer is shown, and nothing is kept: it is not evidence.
+    assert (said["correct_answer"], said["explanation"], said["change"]) == ("", "", "")
+    assert state(client, lesson)["answered"] == 0
+    with services.database.session() as session:
+        assert session.scalars(select(Attempt)).all() == []
+    # Answered again, it counts as a first answer, in full.
+    right = answer(client, lesson, "q_only_the_bias", text="bias").json()
+    assert (right["outcome"], right["attempt_number"]) == ("correct", 1)
+    assert state(client, lesson)["answered"] == 1
+
+
+def test_a_second_slip_in_a_sitting_is_scored_as_it_is(
+    client: TestClient, lesson: dict[str, Any]
+) -> None:
+    assert answer(client, lesson, "q_only_the_bias", text="biaz").json()["outcome"] == "near"
+    again = answer(client, lesson, "q_only_the_bias", text="bais").json()
+    assert again["outcome"] == "incorrect"
+    assert again["correct_answer"] == "bias"
+    # An answer nothing like an accepted one is wrong at once.
+    other = answer(client, lesson, "q_only_the_bias", text="the weight").json()
+    assert other["outcome"] == "incorrect"

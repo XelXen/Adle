@@ -148,6 +148,50 @@ def _score_short_answer(item: ShortAnswerItem, response: Response) -> Score:
     )
 
 
+#: A typed answer this close to an accepted one is a slip of the keys, said and tried again
+#: (ADR-078): a letter in an answer of four or more, two in one of ten or more.
+_SLIPS = ((10, 2), (4, 1))
+#: An answer that is a number: there one character is the whole difference.
+_A_NUMBER = re.compile(r"[\d\s.,+-]+")
+
+
+def _edits(first: str, second: str, most: int) -> int:
+    """How many letters put in, left out, changed, or swapped with the next turn one into
+    the other (optimal string alignment); ``most + 1`` as soon as it is more than ``most``."""
+    if abs(len(first) - len(second)) > most:
+        return most + 1
+    before: list[int] = []
+    previous = list(range(len(second) + 1))
+    for i in range(1, len(first) + 1):
+        current = [i, *([0] * len(second))]
+        for j in range(1, len(second) + 1):
+            cost = 0 if first[i - 1] == second[j - 1] else 1
+            current[j] = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost)
+            if i > 1 and j > 1 and first[i - 1] == second[j - 2] and first[i - 2] == second[j - 1]:
+                current[j] = min(current[j], before[j - 2] + 1)
+        if min(current) > most:
+            return most + 1
+        before, previous = previous, current
+    return previous[-1]
+
+
+def near_miss(item: AssessmentItem, response: Response) -> bool:
+    """A typed answer that misses an accepted one by a slip of the keys (ADR-078): a letter
+    or two put in, left out, changed or swapped, as "CH3CHWCH3" for "CH3CH2CH3". Never for
+    a short answer, nor for one that is a number: there one character is the difference."""
+    if not isinstance(item, ShortAnswerItem) or not response.text:
+        return False
+    given = normalise_answer(response.text)
+    for accepted in item.accepted:
+        target = normalise_answer(accepted)
+        if not target or _A_NUMBER.fullmatch(target):
+            continue
+        allowed = next((slips for length, slips in _SLIPS if len(target) >= length), 0)
+        if allowed and 0 < _edits(given, target, allowed) <= allowed:
+            return True
+    return False
+
+
 def _score_ordering(item: OrderingItem, response: Response) -> Score:
     expected = tuple(entry.id for entry in item.items)
     given = response.order

@@ -627,7 +627,9 @@ class AnswerRequest(_Input):
 
 
 class AnswerResult(_Output):
-    outcome: Literal["correct", "partial", "incorrect", "skipped"]
+    #: ``near``: almost an accepted answer, by a slip of the keys (ADR-078). Nothing is
+    #: kept, nothing of the answer is shown, and the question is answered again.
+    outcome: Literal["correct", "partial", "incorrect", "skipped", "near"]
     #: About the answer that was given, when there is something specific to say.
     feedback: str | None
     #: Why the right answer is right.

@@ -24,7 +24,7 @@ export interface AnswerResult {
   explanation: string;
   feedback: string | null;
   knowledge: Knowledge;
-  outcome: 'correct' | 'partial' | 'incorrect' | 'skipped';
+  outcome: 'correct' | 'partial' | 'incorrect' | 'skipped' | 'near';
 }
 /**
  * What the evidence says about the learner and one concept. Deliberately no score.
